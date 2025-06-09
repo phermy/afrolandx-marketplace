@@ -123,10 +123,10 @@ export default function Home() {
               const categoryIcons = ["👘", "🧵", "📿", "✨"];
               return (
                 <Card key={category.id} className="text-center card-hover bg-white">
-                  <CardContent className="p-6">
-                    <div className="text-4xl mb-4">{categoryIcons[index] || "🎯"}</div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
-                    <p className="text-gray-600 text-sm">{category.description || "Discover our authentic collection"}</p>
+                  <CardContent className="p-8">
+                    <div className="text-5xl mb-6">{categoryIcons[index] || "🎯"}</div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">{category.name}</h3>
+                    <p className="text-gray-600 text-base">{category.description || "Discover our authentic collection"}</p>
                   </CardContent>
                 </Card>
               );

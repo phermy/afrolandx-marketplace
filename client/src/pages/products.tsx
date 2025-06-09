@@ -60,9 +60,41 @@ export default function Products() {
     return filters;
   };
 
-  // Fetch products
+  // Fetch products with proper dependency tracking
+  const filters = buildFilters();
   const { data: allProducts = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products', buildFilters()],
+    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      // Add status filter
+      params.append('status', 'approved');
+      
+      // Add search filter
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      
+      // Add category filter
+      if (selectedCategory) {
+        params.append('categoryId', selectedCategory.toString());
+      }
+      
+      // Add price filters
+      if (priceRange.min) {
+        params.append('minPrice', priceRange.min);
+      }
+      
+      if (priceRange.max) {
+        params.append('maxPrice', priceRange.max);
+      }
+      
+      const response = await fetch(`/api/products?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      return response.json();
+    },
   });
 
   // Sort products

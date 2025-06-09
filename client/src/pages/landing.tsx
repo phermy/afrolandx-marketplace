@@ -252,7 +252,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-6" style={{ lineHeight: '1.4', paddingBottom: '0.2em' }}>
+              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-6" style={{ lineHeight: '1.3', paddingBottom: '0.3em' }}>
                 Celebrating Nigerian Heritage
               </h2>
               <p className="text-gray-600 text-lg mb-6">
