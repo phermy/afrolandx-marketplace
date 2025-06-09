@@ -102,16 +102,59 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Store the redirect URL in session for after authentication
+    if (req.query.redirect) {
+      (req.session as any).returnTo = req.query.redirect as string;
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+  app.get("/api/callback", async (req, res, next) => {
+    passport.authenticate(`replitauth:${req.hostname}`, async (err: any, user: any) => {
+      if (err) {
+        return res.redirect("/api/login");
+      }
+      if (!user) {
+        return res.redirect("/api/login");
+      }
+
+      req.logIn(user, async (err) => {
+        if (err) {
+          return res.redirect("/api/login");
+        }
+
+        // Check if this was an admin login attempt
+        const returnTo = (req.session as any).returnTo;
+        delete (req.session as any).returnTo;
+
+        if (returnTo === '/admin') {
+          // Verify admin role before redirect
+          try {
+            const userId = user.claims.sub;
+            const dbUser = await storage.getUser(userId);
+            
+            if (dbUser) {
+              const roles = dbUser.roles ? JSON.parse(dbUser.roles as string) : [];
+              if (roles.includes('admin')) {
+                return res.redirect('/admin');
+              }
+            }
+            
+            // Not an admin, redirect to home with error message
+            return res.redirect('/?error=admin_access_denied');
+          } catch (error) {
+            console.error('Error checking admin role:', error);
+            return res.redirect('/?error=auth_error');
+          }
+        }
+
+        // Normal login redirect
+        res.redirect(returnTo || "/");
+      });
     })(req, res, next);
   });
 

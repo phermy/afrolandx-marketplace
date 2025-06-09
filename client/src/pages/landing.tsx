@@ -1,10 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // Check for authentication errors in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    
+    if (error === 'admin_access_denied') {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have admin privileges to access the admin panel.',
+        variant: 'destructive',
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error === 'auth_error') {
+      toast({
+        title: 'Authentication Error',
+        description: 'An error occurred during authentication. Please try again.',
+        variant: 'destructive',
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast]);
 
   const handleLogin = () => {
     window.location.href = "/api/login";

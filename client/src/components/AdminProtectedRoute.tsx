@@ -34,8 +34,10 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
   }
 
   if (!isAuthenticated) {
-    // Redirect to login with admin intent
-    window.location.href = '/api/login?redirect=/admin';
+    // Only redirect once to prevent loops
+    if (typeof window !== 'undefined' && !window.location.href.includes('/api/login')) {
+      window.location.href = '/api/login?redirect=/admin';
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
