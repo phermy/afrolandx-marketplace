@@ -41,21 +41,20 @@ export default function Landing() {
       <section className="relative bg-gradient-to-r from-nigerian-green to-green-700 text-white pattern-bg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold font-nigerian mb-6">
+            <h1 className="text-5xl md:text-6xl font-bold font-nigerian mb-6 text-white drop-shadow-lg">
               Discover Authentic Nigerian Fashion
             </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto opacity-90">
+            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-white drop-shadow-md">
               From traditional Aso Oke to contemporary native wear, find the finest Nigerian fashion pieces 
               crafted by local artisans. Celebrate our rich cultural heritage.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleLogin} size="lg" className="btn-gold">
+              <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold">
                 Start Shopping
               </Button>
               <Button 
                 size="lg" 
-                variant="outline" 
-                className="border-white text-white hover:bg-white hover:text-nigerian-green"
+                className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white"
                 onClick={() => setIsVendorModalOpen(true)}
               >
                 Become a Vendor
@@ -221,8 +220,20 @@ export default function Landing() {
               </Button>
             </div>
             <div className="relative">
-              <div className="w-full h-96 bg-gradient-to-br from-nigerian-green via-nigerian-gold to-coral rounded-xl shadow-2xl"></div>
-              <div className="absolute inset-0 cultural-overlay rounded-xl"></div>
+              <div className="w-full h-96 bg-gradient-to-br from-nigerian-green via-nigerian-gold to-coral rounded-xl shadow-2xl flex items-center justify-center">
+                <div className="text-center text-white p-8">
+                  <div className="text-6xl mb-4">👑</div>
+                  <h3 className="text-2xl font-bold mb-2">Authentic Nigerian Fashion</h3>
+                  <p className="text-lg opacity-90">Traditional • Modern • Timeless</p>
+                  <div className="flex justify-center space-x-4 mt-4 text-3xl">
+                    <span>👘</span>
+                    <span>🧵</span>
+                    <span>📿</span>
+                    <span>✨</span>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute inset-0 cultural-overlay rounded-xl opacity-10"></div>
             </div>
           </div>
         </div>
@@ -238,13 +249,12 @@ export default function Landing() {
             Join thousands of fashion enthusiasts who trust NaijaFashion for authentic Nigerian clothing and accessories.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button onClick={handleLogin} size="lg" className="btn-gold">
+            <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold">
               Start Shopping Now
             </Button>
             <Button 
               size="lg" 
-              variant="outline" 
-              className="border-white text-white hover:bg-white hover:text-nigerian-green"
+              className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white"
               onClick={() => setIsVendorModalOpen(true)}
             >
               Become a Vendor
