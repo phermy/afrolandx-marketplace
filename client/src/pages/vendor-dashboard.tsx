@@ -130,14 +130,7 @@ export default function VendorDashboard() {
   const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    addProductMutation.mutate({
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      price: formData.get("price") as string,
-      quantity: parseInt(formData.get("quantity") as string),
-      categoryId: parseInt(formData.get("categoryId") as string),
-      weight: parseFloat(formData.get("weight") as string),
-    });
+    addProductMutation.mutate(formData);
   };
 
   if (isLoading || vendorLoading) {

@@ -1,13 +1,51 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// Configure multer for image uploads
+const storage_config = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/products';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `product-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage: storage_config,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  
+  // Serve uploaded images
+  app.use('/uploads', express.static('uploads'));
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -164,10 +202,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes
-  app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
+  app.post('/api/products', isAuthenticated, isVendor, upload.array('images', 5), async (req: any, res) => {
     try {
+      const files = req.files as Express.Multer.File[];
+      const imageUrls = files?.map(file => `/uploads/${file.filename}`) || [];
+
       const productData = insertProductSchema.parse({
-        ...req.body,
+        name: req.body.name,
+        description: req.body.description,
+        price: req.body.price,
+        quantity: parseInt(req.body.quantity),
+        categoryId: parseInt(req.body.categoryId),
+        weight: req.body.weight ? parseFloat(req.body.weight) : null,
+        images: imageUrls,
         vendorId: req.vendor.id,
       });
 
