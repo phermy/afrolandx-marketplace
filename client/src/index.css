@@ -203,7 +203,8 @@
 }
 
 .btn-nigerian-outline {
-  @apply border-2 border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+  @apply border-2 text-nigerian-green hover:bg-nigerian-green hover:text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+  border-color: var(--nigerian-green);
 }
 
 .btn-gold {
@@ -212,7 +213,8 @@
 
 /* Form styling */
 .input-nigerian {
-  @apply border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-nigerian-green focus:border-transparent transition-all duration-200;
+  @apply border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-offset-2 transition-all duration-200;
+  --tw-ring-color: var(--nigerian-green);
 }
 
 /* Mobile responsive improvements */
