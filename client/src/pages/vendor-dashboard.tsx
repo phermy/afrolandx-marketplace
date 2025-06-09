@@ -89,8 +89,8 @@ export default function VendorDashboard() {
 
   // Add product mutation
   const addProductMutation = useMutation({
-    mutationFn: async (productData: any) => {
-      await apiRequest("POST", "/api/products", productData);
+    mutationFn: async (formData: FormData) => {
+      await apiRequest("POST", "/api/products", formData);
     },
     onSuccess: () => {
       toast({
