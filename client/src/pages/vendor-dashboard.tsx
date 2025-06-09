@@ -99,6 +99,13 @@ export default function VendorDashboard() {
         description: "Product submitted for approval!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      
+      // Reset form and category selection
+      setSelectedCategory('');
+      const form = document.querySelector('form') as HTMLFormElement;
+      if (form) {
+        form.reset();
+      }
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {

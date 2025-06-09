@@ -274,16 +274,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Request files:', req.files);
       console.log('Vendor info:', req.vendor);
       
+      // Validate required fields are present
+      if (!req.body.name || !req.body.description || !req.body.price || !req.body.quantity || !req.body.categoryId) {
+        return res.status(400).json({ 
+          message: 'Missing required fields', 
+          required: ['name', 'description', 'price', 'quantity', 'categoryId'] 
+        });
+      }
+      
       const files = req.files as Express.Multer.File[];
       const imageUrls = files?.map(file => `/uploads/${file.filename}`) || [];
 
       const productData = {
-        name: req.body.name,
-        description: req.body.description,
+        name: req.body.name.trim(),
+        description: req.body.description.trim(),
         price: req.body.price,
         quantity: parseInt(req.body.quantity),
         categoryId: parseInt(req.body.categoryId),
-        weight: req.body.weight ? parseFloat(req.body.weight) : null,
+        weight: req.body.weight && req.body.weight.trim() ? parseFloat(req.body.weight) : undefined,
         images: imageUrls,
         vendorId: req.vendor.id,
       };
