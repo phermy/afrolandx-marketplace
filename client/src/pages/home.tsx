@@ -119,20 +119,18 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {categories.slice(0, 3).map((category) => (
-              <Card key={category.id} className="group cursor-pointer card-hover">
-                <CardContent className="p-0">
-                  <div className="relative overflow-hidden rounded-lg">
-                    <div className="w-full h-64 bg-gradient-to-br from-nigerian-green to-nigerian-gold opacity-80"></div>
-                    <div className="absolute inset-0 bg-black bg-opacity-40 group-hover:bg-opacity-30 transition-all duration-300"></div>
-                    <div className="absolute bottom-6 left-6 text-white">
-                      <h3 className="text-2xl font-bold mb-2">{category.name}</h3>
-                      <p className="text-sm opacity-90">{category.description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {categories.slice(0, 3).map((category, index) => {
+              const categoryIcons = ["👘", "🧵", "📿", "✨"];
+              return (
+                <Card key={category.id} className="text-center card-hover bg-white">
+                  <CardContent className="p-6">
+                    <div className="text-4xl mb-4">{categoryIcons[index] || "🎯"}</div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
+                    <p className="text-gray-600 text-sm">{category.description || "Discover our authentic collection"}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
