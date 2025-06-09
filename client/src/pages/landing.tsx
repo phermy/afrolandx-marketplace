@@ -76,7 +76,6 @@ export default function Landing() {
             </div>
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent"></div>
       </section>
 
       {/* Features Section */}
@@ -235,83 +234,16 @@ export default function Landing() {
               </Button>
             </div>
             <div className="relative">
-              <div className="w-full h-96 rounded-xl shadow-2xl overflow-hidden">
-                <svg
-                  className="w-full h-full object-cover"
-                  viewBox="0 0 400 400"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {/* Background gradient */}
-                  <defs>
-                    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#008751" />
-                      <stop offset="50%" stopColor="#D4AF37" />
-                      <stop offset="100%" stopColor="#FF6B35" />
-                    </linearGradient>
-                    <pattern id="pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                      <circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)" />
-                    </pattern>
-                  </defs>
-                  
-                  <rect width="400" height="400" fill="url(#bgGradient)" />
-                  <rect width="400" height="400" fill="url(#pattern)" />
-                  
-                  {/* Nigerian woman in traditional dress */}
-                  <g transform="translate(200, 50)">
-                    {/* Head */}
-                    <circle cx="0" cy="40" r="25" fill="#8B4513" stroke="#654321" strokeWidth="2" />
-                    
-                    {/* Hair/Head wrap (Gele) */}
-                    <path d="M -30 25 Q -35 10 -20 15 Q 0 5 20 15 Q 35 10 30 25 Q 25 35 15 40 Q 0 45 -15 40 Q -25 35 -30 25 Z" 
-                          fill="#D4AF37" stroke="#B8860B" strokeWidth="2" />
-                    
-                    {/* Face features */}
-                    <circle cx="-8" cy="35" r="2" fill="#2F1B14" />
-                    <circle cx="8" cy="35" r="2" fill="#2F1B14" />
-                    <path d="M -5 45 Q 0 50 5 45" stroke="#2F1B14" strokeWidth="2" fill="none" />
-                    
-                    {/* Traditional dress body */}
-                    <rect x="-40" y="65" width="80" height="120" rx="10" 
-                          fill="#008751" stroke="#006B3F" strokeWidth="2" />
-                    
-                    {/* Dress patterns */}
-                    <rect x="-35" y="75" width="15" height="15" fill="#D4AF37" />
-                    <rect x="-10" y="75" width="15" height="15" fill="#D4AF37" />
-                    <rect x="15" y="75" width="15" height="15" fill="#D4AF37" />
-                    <rect x="-35" y="105" width="15" height="15" fill="#D4AF37" />
-                    <rect x="-10" y="105" width="15" height="15" fill="#D4AF37" />
-                    <rect x="15" y="105" width="15" height="15" fill="#D4AF37" />
-                    
-                    {/* Arms */}
-                    <rect x="-55" y="75" width="15" height="60" rx="7" fill="#8B4513" />
-                    <rect x="40" y="75" width="15" height="60" rx="7" fill="#8B4513" />
-                    
-                    {/* Traditional jewelry (beads) */}
-                    <circle cx="0" cy="65" r="15" fill="none" stroke="#FF6B35" strokeWidth="4" />
-                    <circle cx="0" cy="65" r="12" fill="none" stroke="#D4AF37" strokeWidth="3" />
-                    
-                    {/* Wrapper (bottom traditional skirt) */}
-                    <rect x="-45" y="185" width="90" height="100" rx="15" 
-                          fill="#FF6B35" stroke="#E55527" strokeWidth="2" />
-                    
-                    {/* Wrapper patterns */}
-                    <path d="M -40 200 L 40 200 M -40 220 L 40 220 M -40 240 L 40 240" 
-                          stroke="#D4AF37" strokeWidth="3" />
-                  </g>
-                  
-                  {/* Decorative elements */}
-                  <g fill="#D4AF37" opacity="0.6">
-                    <circle cx="50" cy="100" r="3" />
-                    <circle cx="350" cy="150" r="4" />
-                    <circle cx="80" cy="300" r="2" />
-                    <circle cx="320" cy="320" r="3" />
-                  </g>
-                  
-                  {/* Text overlay */}
-                  <text x="200" y="360" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold">
-                    Authentic Nigerian Beauty
-                  </text>
-                </svg>
+              <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden flex items-center justify-center">
+                <img 
+                  src="https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
+                  alt="Beautiful Nigerian woman in traditional dress"
+                  className="w-full h-full object-cover rounded-xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent rounded-xl"></div>
+                <div className="absolute bottom-4 left-4 right-4 text-center">
+                  <p className="text-white font-semibold text-lg drop-shadow-lg">Authentic Nigerian Beauty</p>
+                </div>
               </div>
             </div>
           </div>
