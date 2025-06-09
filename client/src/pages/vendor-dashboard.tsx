@@ -102,9 +102,10 @@ export default function VendorDashboard() {
       
       // Reset form and category selection
       setSelectedCategory('');
-      const form = document.querySelector('form') as HTMLFormElement;
-      if (form) {
-        form.reset();
+      // Find the specific product form and reset it
+      const productForm = document.querySelector('form[data-form="add-product"]') as HTMLFormElement;
+      if (productForm) {
+        productForm.reset();
       }
     },
     onError: (error) => {
@@ -390,7 +391,7 @@ export default function VendorDashboard() {
                 <p className="text-gray-600">Add a new product for admin approval</p>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleAddProduct} className="space-y-6">
+                <form onSubmit={handleAddProduct} className="space-y-6" data-form="add-product">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="name">Product Name</Label>

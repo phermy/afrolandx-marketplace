@@ -41,11 +41,11 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded files statically
+  app.use('/uploads', express.static('uploads'));
+  
   // Auth middleware
   await setupAuth(app);
-  
-  // Serve uploaded images
-  app.use('/uploads', express.static('uploads'));
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
