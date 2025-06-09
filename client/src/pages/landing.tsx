@@ -272,7 +272,7 @@ export default function Landing() {
             <div className="relative">
               <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1594736797933-d0b22d6ac07c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
+                  src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
                   alt="Beautiful Nigerian woman in traditional dress"
                   className="w-full h-full object-cover"
                 />
@@ -351,7 +351,7 @@ export default function Landing() {
                 <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
-                {(!isAuthenticated || isAdmin(user)) && (
+                {(!isAuthenticated || (isAuthenticated && isAdmin(user))) && (
                   <li>
                     <button 
                       onClick={handleAdminPortalClick} 
