@@ -665,29 +665,43 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Select
-                          value={managedUser.role || 'customer'}
-                          onValueChange={(newRole) => {
-                            if (managedUser.id === user?.id && newRole !== 'admin') {
-                              toast({
-                                title: 'Cannot modify own role',
-                                description: 'You cannot remove admin privileges from yourself.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            updateUserRoleMutation.mutate({ userId: managedUser.id, role: newRole });
-                          }}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="customer">Customer</SelectItem>
-                            <SelectItem value="vendor">Vendor</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center space-x-3">
+                          {['customer', 'vendor', 'admin'].map((role) => {
+                            const userHasRole = hasRole(managedUser, role);
+                            const isSelfAdminRemoval = managedUser.id === user?.id && role === 'admin' && userHasRole;
+                            
+                            return (
+                              <div key={role} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${managedUser.id}-${role}`}
+                                  checked={userHasRole}
+                                  disabled={isSelfAdminRemoval}
+                                  onCheckedChange={(checked) => {
+                                    if (isSelfAdminRemoval) {
+                                      toast({
+                                        title: 'Cannot modify own admin role',
+                                        description: 'You cannot remove admin privileges from yourself.',
+                                        variant: 'destructive',
+                                      });
+                                      return;
+                                    }
+                                    toggleUserRoleMutation.mutate({ 
+                                      userId: managedUser.id, 
+                                      role, 
+                                      hasRole: userHasRole 
+                                    });
+                                  }}
+                                />
+                                <label 
+                                  htmlFor={`${managedUser.id}-${role}`}
+                                  className={`text-sm capitalize cursor-pointer ${isSelfAdminRemoval ? 'text-gray-400' : ''}`}
+                                >
+                                  {role}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}

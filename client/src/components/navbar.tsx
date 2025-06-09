@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
+import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -74,7 +75,7 @@ export default function Navbar() {
               }`}>
                 Products
               </Link>
-              {isAuthenticated && user?.role === 'vendor' && (
+              {isAuthenticated && isVendor(user) && (
                 <Link href="/vendor" className={`px-3 py-2 font-medium transition-colors ${
                   location === '/vendor' 
                     ? 'text-nigerian-green border-b-2 border-nigerian-green' 
@@ -83,7 +84,7 @@ export default function Navbar() {
                   Vendor Portal
                 </Link>
               )}
-              {isAuthenticated && user?.role === 'admin' && (
+              {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
                   location === '/admin' 
                     ? 'text-red-600 border-b-2 border-red-600' 
@@ -171,7 +172,7 @@ export default function Navbar() {
                       {user.email}
                     </p>
                     <Badge variant="secondary" className="w-fit text-xs">
-                      {user.role}
+                      {getUserRoleDisplay(user)}
                     </Badge>
                   </div>
                   <DropdownMenuSeparator />
@@ -185,14 +186,14 @@ export default function Navbar() {
                       <span className="cursor-pointer">Profile Settings</span>
                     </Link>
                   </DropdownMenuItem>
-                  {user.role === 'vendor' && (
+                  {isVendor(user) && (
                     <DropdownMenuItem>
                       <Link href="/vendor">
                         <span className="cursor-pointer">Vendor Dashboard</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
-                  {user.role === 'admin' && (
+                  {isAdmin(user) && (
                     <DropdownMenuItem>
                       <Link href="/admin">
                         <span className="cursor-pointer">Admin Panel</span>
@@ -256,14 +257,14 @@ export default function Navbar() {
                   Products
                 </a>
               </Link>
-              {isAuthenticated && user?.role === 'vendor' && (
+              {isAuthenticated && isVendor(user) && (
                 <Link href="/vendor">
                   <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
                     Vendor Portal
                   </a>
                 </Link>
               )}
-              {isAuthenticated && user?.role === 'admin' && (
+              {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin">
                   <a className="block px-3 py-2 text-gray-700 hover:text-red-600 font-medium">
                     Admin Panel
