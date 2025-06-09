@@ -110,20 +110,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/admin/users/:userId/role', isAuthenticated, isAdmin, async (req, res) => {
+  // Update user roles (admin only)
+  app.patch('/api/admin/users/:userId/roles', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
-      const { role } = req.body;
+      const { roles } = req.body;
+      
+      if (!Array.isArray(roles) || !roles.every(role => ['customer', 'vendor', 'admin'].includes(role))) {
+        return res.status(400).json({ message: 'Invalid roles array' });
+      }
+
+      await storage.updateUserRoles(userId, roles);
+      res.json({ message: 'User roles updated successfully' });
+    } catch (error) {
+      console.error('Error updating user roles:', error);
+      res.status(500).json({ message: 'Failed to update user roles' });
+    }
+  });
+
+  // Add role to user (admin only)
+  app.post('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, role } = req.params;
       
       if (!['customer', 'vendor', 'admin'].includes(role)) {
         return res.status(400).json({ message: 'Invalid role' });
       }
-
-      await storage.updateUserRole(userId, role);
-      res.json({ message: 'User role updated successfully' });
+      
+      await storage.addUserRole(userId, role);
+      res.json({ message: 'Role added successfully' });
     } catch (error) {
-      console.error('Error updating user role:', error);
-      res.status(500).json({ message: 'Failed to update user role' });
+      console.error('Error adding user role:', error);
+      res.status(500).json({ message: 'Failed to add user role' });
+    }
+  });
+
+  // Remove role from user (admin only)
+  app.delete('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId, role } = req.params;
+      
+      if (!['customer', 'vendor', 'admin'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role' });
+      }
+      
+      await storage.removeUserRole(userId, role);
+      res.json({ message: 'Role removed successfully' });
+    } catch (error) {
+      console.error('Error removing user role:', error);
+      res.status(500).json({ message: 'Failed to remove user role' });
     }
   });
 
@@ -136,7 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User ID is required' });
       }
 
-      await storage.updateUserRole(userId, 'admin');
+      await storage.addUserRole(userId, 'admin');
       res.json({ message: 'Admin privileges granted successfully' });
     } catch (error) {
       console.error('Error granting admin privileges:', error);
@@ -186,11 +221,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
       });
 
-      // Update user role to vendor
-      await storage.upsertUser({
-        id: userId,
-        role: 'vendor',
-      });
+      // Add vendor role to user
+      await storage.addUserRole(userId, 'vendor');
 
       const vendor = await storage.createVendor(vendorData);
       res.json(vendor);
