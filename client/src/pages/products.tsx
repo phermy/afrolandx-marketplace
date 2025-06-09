@@ -176,14 +176,14 @@ export default function Products() {
                     Category
                   </label>
                   <Select
-                    value={selectedCategory?.toString() || ''}
-                    onValueChange={(value) => setSelectedCategory(value ? parseInt(value) : null)}
+                    value={selectedCategory?.toString() || 'all'}
+                    onValueChange={(value) => setSelectedCategory(value === 'all' ? null : parseInt(value))}
                   >
                     <SelectTrigger className="input-nigerian">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Categories</SelectItem>
+                      <SelectItem value="all">All Categories</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
