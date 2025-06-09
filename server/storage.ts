@@ -29,6 +29,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(userId: string, role: string): Promise<void>;
+  getAllUsers(): Promise<User[]>;
   
   // Vendor operations
   createVendor(vendor: InsertVendor): Promise<Vendor>;
@@ -91,6 +92,10 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, userId));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
   }
 
   // Vendor operations
@@ -213,7 +218,7 @@ export class DatabaseStorage implements IStorage {
       const [updatedItem] = await db
         .update(cartItems)
         .set({ 
-          quantity: existingItem.quantity + cartItem.quantity,
+          quantity: (existingItem.quantity || 0) + (cartItem.quantity || 1),
           updatedAt: new Date()
         })
         .where(eq(cartItems.id, existingItem.id))
