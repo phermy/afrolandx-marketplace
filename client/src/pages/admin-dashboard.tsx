@@ -606,6 +606,84 @@ export default function AdminDashboard() {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>User Management</span>
+                  <Badge variant="outline">{allUsers.length} total users</Badge>
+                </CardTitle>
+                <p className="text-gray-600">Manage user roles and assign admin privileges</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {allUsers.map((managedUser) => (
+                    <div key={managedUser.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={managedUser.profileImageUrl} alt={managedUser.firstName || 'User'} />
+                          <AvatarFallback className="bg-nigerian-green text-white">
+                            {managedUser.firstName && managedUser.lastName 
+                              ? `${managedUser.firstName[0]}${managedUser.lastName[0]}`.toUpperCase()
+                              : managedUser.email ? managedUser.email[0].toUpperCase() : 'U'
+                            }
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            {managedUser.firstName && managedUser.lastName 
+                              ? `${managedUser.firstName} ${managedUser.lastName}` 
+                              : managedUser.email}
+                          </h3>
+                          <p className="text-sm text-gray-600">{managedUser.email}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge 
+                              variant={
+                                managedUser.role === 'admin' ? 'destructive' :
+                                managedUser.role === 'vendor' ? 'default' : 'secondary'
+                              }
+                              className="text-xs"
+                            >
+                              {managedUser.role || 'customer'}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              Joined {new Date(managedUser.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Select
+                          value={managedUser.role || 'customer'}
+                          onValueChange={(newRole) => {
+                            if (managedUser.id === user?.id && newRole !== 'admin') {
+                              toast({
+                                title: 'Cannot modify own role',
+                                description: 'You cannot remove admin privileges from yourself.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            updateUserRoleMutation.mutate({ userId: managedUser.id, role: newRole });
+                          }}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="customer">Customer</SelectItem>
+                            <SelectItem value="vendor">Vendor</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
