@@ -66,7 +66,7 @@ export default function Home() {
               <Button size="lg" className="btn-gold">
                 Shop Traditional Wear
               </Button>
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-nigerian-green">
+              <Button size="lg" className="bg-nigerian-green text-white hover:bg-green-700 border-0">
                 Become a Vendor
               </Button>
             </div>
