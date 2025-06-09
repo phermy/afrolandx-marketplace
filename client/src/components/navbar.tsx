@@ -60,44 +60,36 @@ export default function Navbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:ml-8 md:flex md:space-x-8">
-              <Link href="/">
-                <a className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/' 
-                    ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                    : 'text-gray-700 hover:text-nigerian-green'
-                }`}>
-                  Home
-                </a>
+              <Link href="/" className={`px-3 py-2 font-medium transition-colors ${
+                location === '/' 
+                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                  : 'text-gray-700 hover:text-nigerian-green'
+              }`}>
+                Home
               </Link>
-              <Link href="/products">
-                <a className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/products' 
-                    ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                    : 'text-gray-700 hover:text-nigerian-green'
-                }`}>
-                  Products
-                </a>
+              <Link href="/products" className={`px-3 py-2 font-medium transition-colors ${
+                location === '/products' 
+                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                  : 'text-gray-700 hover:text-nigerian-green'
+              }`}>
+                Products
               </Link>
               {isAuthenticated && user?.role === 'vendor' && (
-                <Link href="/vendor">
-                  <a className={`px-3 py-2 font-medium transition-colors ${
-                    location === '/vendor' 
-                      ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                      : 'text-gray-700 hover:text-nigerian-green'
-                  }`}>
-                    Vendor Portal
-                  </a>
+                <Link href="/vendor" className={`px-3 py-2 font-medium transition-colors ${
+                  location === '/vendor' 
+                    ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                    : 'text-gray-700 hover:text-nigerian-green'
+                }`}>
+                  Vendor Portal
                 </Link>
               )}
               {isAuthenticated && user?.role === 'admin' && (
-                <Link href="/admin">
-                  <a className={`px-3 py-2 font-medium transition-colors ${
-                    location === '/admin' 
-                      ? 'text-red-600 border-b-2 border-red-600' 
-                      : 'text-gray-700 hover:text-red-600'
-                  }`}>
-                    Admin Panel
-                  </a>
+                <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
+                  location === '/admin' 
+                    ? 'text-red-600 border-b-2 border-red-600' 
+                    : 'text-gray-700 hover:text-red-600'
+                }`}>
+                  Admin Panel
                 </Link>
               )}
             </div>
