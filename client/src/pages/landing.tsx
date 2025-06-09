@@ -38,23 +38,37 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-nigerian-green to-green-700 text-white pattern-bg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-green-900 to-emerald-800"></div>
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.08'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '60px 60px'
+        }}></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold font-nigerian mb-6 text-white drop-shadow-lg">
-              Discover Authentic Nigerian Fashion
+            <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
+              <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
+                Discover Authentic
+              </span>
+              <span className="block text-amber-300 mt-2">
+                Nigerian Fashion
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-white drop-shadow-md">
+            <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
               From traditional Aso Oke to contemporary native wear, find the finest Nigerian fashion pieces 
-              crafted by local artisans. Celebrate our rich cultural heritage.
+              crafted by local artisans. Celebrate our rich cultural heritage with authentic designs.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold">
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+              <Button 
+                onClick={handleLogin} 
+                size="lg" 
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+              >
                 Start Shopping
               </Button>
               <Button 
                 size="lg" 
-                className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white"
+                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border-2 border-white/30 hover:border-white/50 text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
                 onClick={() => setIsVendorModalOpen(true)}
               >
                 Become a Vendor
@@ -62,6 +76,7 @@ export default function Landing() {
             </div>
           </div>
         </div>
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent"></div>
       </section>
 
       {/* Features Section */}
@@ -220,20 +235,84 @@ export default function Landing() {
               </Button>
             </div>
             <div className="relative">
-              <div className="w-full h-96 bg-gradient-to-br from-nigerian-green via-nigerian-gold to-coral rounded-xl shadow-2xl flex items-center justify-center">
-                <div className="text-center text-white p-8">
-                  <div className="text-6xl mb-4">👑</div>
-                  <h3 className="text-2xl font-bold mb-2">Authentic Nigerian Fashion</h3>
-                  <p className="text-lg opacity-90">Traditional • Modern • Timeless</p>
-                  <div className="flex justify-center space-x-4 mt-4 text-3xl">
-                    <span>👘</span>
-                    <span>🧵</span>
-                    <span>📿</span>
-                    <span>✨</span>
-                  </div>
-                </div>
+              <div className="w-full h-96 rounded-xl shadow-2xl overflow-hidden">
+                <svg
+                  className="w-full h-full object-cover"
+                  viewBox="0 0 400 400"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {/* Background gradient */}
+                  <defs>
+                    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#008751" />
+                      <stop offset="50%" stopColor="#D4AF37" />
+                      <stop offset="100%" stopColor="#FF6B35" />
+                    </linearGradient>
+                    <pattern id="pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)" />
+                    </pattern>
+                  </defs>
+                  
+                  <rect width="400" height="400" fill="url(#bgGradient)" />
+                  <rect width="400" height="400" fill="url(#pattern)" />
+                  
+                  {/* Nigerian woman in traditional dress */}
+                  <g transform="translate(200, 50)">
+                    {/* Head */}
+                    <circle cx="0" cy="40" r="25" fill="#8B4513" stroke="#654321" strokeWidth="2" />
+                    
+                    {/* Hair/Head wrap (Gele) */}
+                    <path d="M -30 25 Q -35 10 -20 15 Q 0 5 20 15 Q 35 10 30 25 Q 25 35 15 40 Q 0 45 -15 40 Q -25 35 -30 25 Z" 
+                          fill="#D4AF37" stroke="#B8860B" strokeWidth="2" />
+                    
+                    {/* Face features */}
+                    <circle cx="-8" cy="35" r="2" fill="#2F1B14" />
+                    <circle cx="8" cy="35" r="2" fill="#2F1B14" />
+                    <path d="M -5 45 Q 0 50 5 45" stroke="#2F1B14" strokeWidth="2" fill="none" />
+                    
+                    {/* Traditional dress body */}
+                    <rect x="-40" y="65" width="80" height="120" rx="10" 
+                          fill="#008751" stroke="#006B3F" strokeWidth="2" />
+                    
+                    {/* Dress patterns */}
+                    <rect x="-35" y="75" width="15" height="15" fill="#D4AF37" />
+                    <rect x="-10" y="75" width="15" height="15" fill="#D4AF37" />
+                    <rect x="15" y="75" width="15" height="15" fill="#D4AF37" />
+                    <rect x="-35" y="105" width="15" height="15" fill="#D4AF37" />
+                    <rect x="-10" y="105" width="15" height="15" fill="#D4AF37" />
+                    <rect x="15" y="105" width="15" height="15" fill="#D4AF37" />
+                    
+                    {/* Arms */}
+                    <rect x="-55" y="75" width="15" height="60" rx="7" fill="#8B4513" />
+                    <rect x="40" y="75" width="15" height="60" rx="7" fill="#8B4513" />
+                    
+                    {/* Traditional jewelry (beads) */}
+                    <circle cx="0" cy="65" r="15" fill="none" stroke="#FF6B35" strokeWidth="4" />
+                    <circle cx="0" cy="65" r="12" fill="none" stroke="#D4AF37" strokeWidth="3" />
+                    
+                    {/* Wrapper (bottom traditional skirt) */}
+                    <rect x="-45" y="185" width="90" height="100" rx="15" 
+                          fill="#FF6B35" stroke="#E55527" strokeWidth="2" />
+                    
+                    {/* Wrapper patterns */}
+                    <path d="M -40 200 L 40 200 M -40 220 L 40 220 M -40 240 L 40 240" 
+                          stroke="#D4AF37" strokeWidth="3" />
+                  </g>
+                  
+                  {/* Decorative elements */}
+                  <g fill="#D4AF37" opacity="0.6">
+                    <circle cx="50" cy="100" r="3" />
+                    <circle cx="350" cy="150" r="4" />
+                    <circle cx="80" cy="300" r="2" />
+                    <circle cx="320" cy="320" r="3" />
+                  </g>
+                  
+                  {/* Text overlay */}
+                  <text x="200" y="360" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold">
+                    Authentic Nigerian Beauty
+                  </text>
+                </svg>
               </div>
-              <div className="absolute inset-0 cultural-overlay rounded-xl opacity-10"></div>
             </div>
           </div>
         </div>
