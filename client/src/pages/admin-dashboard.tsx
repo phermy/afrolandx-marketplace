@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Vendor, ProductWithDetails, AdminStats } from '@/types';
+import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -50,6 +51,13 @@ export default function AdminDashboard() {
   // Fetch products with details for approval
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({
     queryKey: ['/api/products/with-details'],
+    enabled: isAuthenticated && user?.role === 'admin',
+    retry: false,
+  });
+
+  // Fetch all users for management
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ['/api/admin/users'],
     enabled: isAuthenticated && user?.role === 'admin',
     retry: false,
   });
@@ -146,6 +154,38 @@ export default function AdminDashboard() {
       toast({
         title: 'Error',
         description: 'Failed to initialize categories.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Update user role mutation
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      await apiRequest('PATCH', `/api/admin/users/${userId}/role`, { role });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'User role updated successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Admin session expired. Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error',
+        description: 'Failed to update user role.',
         variant: 'destructive',
       });
     },
@@ -302,6 +342,7 @@ export default function AdminDashboard() {
           <TabsList>
             <TabsTrigger value="products">Product Approvals</TabsTrigger>
             <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
 
