@@ -25,7 +25,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, like, or, gte, lte, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -190,7 +190,15 @@ export class DatabaseStorage implements IStorage {
     return product;
   }
 
-  async getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean }): Promise<Product[]> {
+  async getProducts(filters?: { 
+    status?: string; 
+    categoryId?: number; 
+    vendorId?: number; 
+    featured?: boolean;
+    search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+  }): Promise<Product[]> {
     const conditions = [];
     
     if (filters?.status) {
@@ -204,6 +212,20 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.featured !== undefined) {
       conditions.push(eq(products.featured, filters.featured));
+    }
+    if (filters?.search) {
+      conditions.push(
+        or(
+          like(products.name, `%${filters.search}%`),
+          like(products.description, `%${filters.search}%`)
+        )
+      );
+    }
+    if (filters?.minPrice !== undefined) {
+      conditions.push(gte(products.price, filters.minPrice.toString()));
+    }
+    if (filters?.maxPrice !== undefined) {
+      conditions.push(lte(products.price, filters.maxPrice.toString()));
     }
     
     const query = db.select().from(products);
