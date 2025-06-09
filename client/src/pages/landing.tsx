@@ -316,6 +316,7 @@ export default function Landing() {
                 <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
+                <li><a href="/admin" className="hover:text-red-400 transition-colors text-red-500 font-medium">Admin Portal</a></li>
               </ul>
             </div>
           </div>
