@@ -41,15 +41,18 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve uploaded files statically - must be before other routes
-  app.use('/uploads', express.static('uploads', {
-    setHeaders: (res, path) => {
-      if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || path.endsWith('.webp')) {
-        res.setHeader('Content-Type', 'image/jpeg');
-      }
+  // Dedicated image serving route
+  app.get('/uploads/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(process.cwd(), 'uploads', 'products', filename);
+    
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: 'Image not found' });
     }
-  }));
-  
+  });
+
   // Auth middleware
   await setupAuth(app);
 

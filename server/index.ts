@@ -37,8 +37,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Serve uploaded files statically before all other routes
-  app.use('/uploads', express.static('uploads'));
+  // Remove static file serving from here since it's handled in routes
   
   const server = await registerRoutes(app);
 
