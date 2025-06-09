@@ -227,7 +227,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  if (!isAuthenticated || !isAdmin(user)) {
     return null; // Will redirect in useEffect
   }
 

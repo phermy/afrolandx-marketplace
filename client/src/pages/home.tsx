@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
+import { getUserRoleDisplay } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
 
 export default function Home() {
