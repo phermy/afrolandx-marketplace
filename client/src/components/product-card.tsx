@@ -163,8 +163,8 @@ export default function ProductCard({ product }: ProductCardProps) {
             variant="outline"
             className="w-full mt-2 border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
             onClick={() => {
-              // In a real app, this would open a product detail modal or navigate to product page
-              console.log('View product details:', product.id);
+              // Open product details in a new window/tab for now
+              window.open(`/products/${product.id}`, '_blank');
             }}
           >
             View Details
