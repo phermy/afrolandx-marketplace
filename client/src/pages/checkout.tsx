@@ -101,7 +101,7 @@ export default function Checkout() {
           description: `Order #${order.id} has been created. You will receive a confirmation email shortly.`,
         });
         clearCart();
-        window.location.href = '/orders';
+        window.location.href = '/';
       }, 2000);
     },
     onError: (error) => {

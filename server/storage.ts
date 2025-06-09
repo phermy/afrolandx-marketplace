@@ -66,6 +66,7 @@ export interface IStorage {
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersForUser(userId: string): Promise<Order[]>;
+  getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
   

@@ -3,11 +3,13 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 // Configure multer for image uploads
 const storage_config = multer.diskStorage({
@@ -466,6 +468,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize Paystack payment
+  app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { totalAmount, shippingAmount, shippingAddress, shippingMethod } = req.body;
+
+      if (!isPaystackInitialized()) {
+        return res.status(503).json({ message: 'Payment service not configured. Please contact administrator.' });
+      }
+
+      // Get user details
+      const user = await storage.getUser(userId);
+      if (!user || !user.email) {
+        return res.status(400).json({ message: 'User email required for payment' });
+      }
+
+      // Generate payment reference
+      const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      
+      // Create order with pending payment
+      const orderData = {
+        userId,
+        totalAmount,
+        shippingAmount: shippingAmount || '0',
+        shippingAddress,
+        shippingMethod,
+        paymentStatus: 'pending',
+        orderStatus: 'pending',
+        paymentReference: reference
+      };
+
+      const order = await storage.createOrder(orderData);
+
+      // Create order items from cart
+      const cartItems = await storage.getCartItems(userId);
+      for (const item of cartItems) {
+        await storage.createOrderItem({
+          orderId: order.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          priceAtTime: item.product.price,
+        });
+      }
+
+      // Initialize Paystack payment
+      const paystack = getPaystackService();
+      const paymentData = await paystack.initializeTransaction(
+        user.email,
+        parseFloat(totalAmount),
+        reference,
+        {
+          orderId: order.id,
+          userId,
+          shippingMethod,
+          custom_fields: [
+            {
+              display_name: "Order ID",
+              variable_name: "order_id",
+              value: order.id.toString()
+            }
+          ]
+        }
+      );
+
+      res.json({
+        order,
+        paymentUrl: paymentData.data.authorization_url,
+        reference: paymentData.data.reference
+      });
+    } catch (error) {
+      console.error('Error initializing payment:', error);
+      res.status(500).json({ message: 'Failed to initialize payment' });
+    }
+  });
+
   // Order routes
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
@@ -513,27 +590,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const totalVendorAmount = products.reduce((sum: number, p: any) => sum + p.totalPrice, 0);
         const productNames = products.map((p: any) => p.product.name).join(', ');
         
-        await storage.createNotification({
-          userId: vendorId,
-          type: 'product_sold',
-          title: 'Products Sold!',
-          message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
-          orderId: order.id,
-          isRead: false
-        });
+        try {
+          await storage.createNotification({
+            userId: vendorId,
+            type: 'product_sold',
+            title: 'Products Sold!',
+            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
+            orderId: order.id,
+            isRead: false
+          });
+        } catch (notificationError) {
+          console.error('Error creating vendor notification:', notificationError);
+        }
       }
 
       // Notify all admins about the new order
-      const adminUsers = await storage.getAdminUsers();
-      for (const admin of adminUsers) {
-        await storage.createNotification({
-          userId: admin.id,
-          type: 'order_placed',
-          title: 'New Order Placed',
-          message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
-          orderId: order.id,
-          isRead: false
-        });
+      try {
+        const adminUsers = await storage.getAdminUsers();
+        for (const admin of adminUsers) {
+          await storage.createNotification({
+            userId: admin.id,
+            type: 'order_placed',
+            title: 'New Order Placed',
+            message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
+            orderId: order.id,
+            isRead: false
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error creating admin notifications:', notificationError);
       }
 
       // Clear cart after order creation
@@ -572,6 +657,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch order' });
+    }
+  });
+
+  // Verify Paystack payment
+  app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const { reference } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!isPaystackInitialized()) {
+        return res.status(503).json({ message: 'Payment service not configured' });
+      }
+
+      // Verify payment with Paystack
+      const paystack = getPaystackService();
+      const verification = await paystack.verifyTransaction(reference);
+
+      if (verification.data.status === 'success') {
+        // Update order payment status
+        await storage.updatePaymentStatus(verification.data.metadata.orderId, 'paid', reference);
+        
+        // Get the order and create notifications
+        const order = await storage.getOrder(verification.data.metadata.orderId);
+        if (order) {
+          // Get order items for vendor notifications
+          const orderItems = await storage.getOrderItemsWithProducts(order.id);
+          const vendorProductMap: { [key: string]: any[] } = {};
+          
+          for (const item of orderItems) {
+            const product = await storage.getProduct(item.productId);
+            if (product) {
+              const vendor = await storage.getVendor(product.vendorId);
+              if (vendor) {
+                const vendorId = vendor.userId;
+                if (!vendorProductMap[vendorId]) {
+                  vendorProductMap[vendorId] = [];
+                }
+                vendorProductMap[vendorId].push({
+                  product: product,
+                  quantity: item.quantity,
+                  totalPrice: parseFloat(item.priceAtTime) * item.quantity
+                });
+              }
+            }
+          }
+
+          // Notify vendors about successful payment
+          for (const vendorId in vendorProductMap) {
+            const products = vendorProductMap[vendorId];
+            const totalVendorAmount = products.reduce((sum: number, p: any) => sum + p.totalPrice, 0);
+            const productNames = products.map((p: any) => p.product.name).join(', ');
+            
+            try {
+              await storage.createNotification({
+                userId: vendorId,
+                type: 'product_sold',
+                title: 'Payment Confirmed - Products Sold!',
+                message: `Payment confirmed for your products (${productNames}) in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
+                orderId: order.id,
+                isRead: false
+              });
+            } catch (notificationError) {
+              console.error('Error creating vendor notification:', notificationError);
+            }
+          }
+
+          // Notify admins about successful payment
+          try {
+            const adminUsers = await storage.getAdminUsers();
+            for (const admin of adminUsers) {
+              await storage.createNotification({
+                userId: admin.id,
+                type: 'payment_confirmed',
+                title: 'Payment Confirmed',
+                message: `Payment confirmed for order #${order.id}. Amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
+                orderId: order.id,
+                isRead: false
+              });
+            }
+          } catch (notificationError) {
+            console.error('Error creating admin notifications:', notificationError);
+          }
+        }
+
+        res.json({
+          success: true,
+          message: 'Payment verified successfully',
+          order: verification.data.metadata.orderId
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Payment verification failed'
+        });
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      res.status(500).json({ message: 'Payment verification failed' });
     }
   });
 
