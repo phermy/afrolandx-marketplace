@@ -55,6 +55,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Grant admin privileges to users
+  app.post('/api/admin/grant-admin', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+
+      await storage.updateUserRole(userId, 'admin');
+      res.json({ message: 'Admin privileges granted successfully' });
+    } catch (error) {
+      console.error('Error granting admin privileges:', error);
+      res.status(500).json({ message: 'Failed to grant admin privileges' });
+    }
+  });
+
   // Initialize default categories
   app.post('/api/categories/init', isAuthenticated, isAdmin, async (req, res) => {
     try {

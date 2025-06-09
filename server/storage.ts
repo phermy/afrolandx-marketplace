@@ -28,6 +28,7 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserRole(userId: string, role: string): Promise<void>;
   
   // Vendor operations
   createVendor(vendor: InsertVendor): Promise<Vendor>;
@@ -83,6 +84,13 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 
   // Vendor operations

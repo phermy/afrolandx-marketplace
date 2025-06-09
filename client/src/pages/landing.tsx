@@ -26,6 +26,7 @@ export default function Landing() {
               <a href="#features" className="text-gray-700 hover:text-nigerian-green transition-colors">Features</a>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors">About</a>
               <a href="#contact" className="text-gray-700 hover:text-nigerian-green transition-colors">Contact</a>
+              <a href="/admin" className="text-red-600 hover:text-red-700 transition-colors font-medium">Admin Portal</a>
             </div>
 
             <div className="flex items-center space-x-4">
