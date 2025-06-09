@@ -59,13 +59,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to check if user has role
+  const hasRole = (user: any, role: string): boolean => {
+    const roles = user?.roles || [];
+    return Array.isArray(roles) && roles.includes(role);
+  };
+
   // Admin check middleware
   const isAdmin = async (req: any, res: any, next: any) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
-      if (user?.role !== 'admin') {
+      if (!hasRole(user, 'admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
       
@@ -82,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const vendor = await storage.getVendorByUserId(userId);
       
-      if (user?.role !== 'vendor' || !vendor || vendor.status !== 'approved') {
+      if (!hasRole(user, 'vendor') || !vendor || vendor.status !== 'approved') {
         return res.status(403).json({ message: "Approved vendor access required" });
       }
       

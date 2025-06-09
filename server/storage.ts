@@ -28,7 +28,9 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserRole(userId: string, role: string): Promise<void>;
+  updateUserRoles(userId: string, roles: string[]): Promise<void>;
+  addUserRole(userId: string, role: string): Promise<void>;
+  removeUserRole(userId: string, role: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   
   // Vendor operations
@@ -87,11 +89,34 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserRole(userId: string, role: string): Promise<void> {
+  async updateUserRoles(userId: string, roles: string[]): Promise<void> {
     await db
       .update(users)
-      .set({ role, updatedAt: new Date() })
+      .set({ roles, updatedAt: new Date() })
       .where(eq(users.id, userId));
+  }
+
+  async addUserRole(userId: string, role: string): Promise<void> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (user) {
+      const currentRoles = user.roles as string[] || [];
+      if (!currentRoles.includes(role)) {
+        const newRoles = [...currentRoles, role];
+        await this.updateUserRoles(userId, newRoles);
+      }
+    }
+  }
+
+  async removeUserRole(userId: string, role: string): Promise<void> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (user) {
+      const currentRoles = user.roles as string[] || [];
+      const newRoles = currentRoles.filter(r => r !== role);
+      if (newRoles.length === 0) {
+        newRoles.push("customer"); // Always keep at least customer role
+      }
+      await this.updateUserRoles(userId, newRoles);
+    }
   }
 
   async getAllUsers(): Promise<User[]> {
