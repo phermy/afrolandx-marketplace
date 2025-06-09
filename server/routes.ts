@@ -270,9 +270,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.post('/api/products', isAuthenticated, isVendor, upload.array('images', 5), async (req: any, res) => {
     try {
-      console.log('Request body:', req.body);
-      console.log('Request files:', req.files);
-      console.log('Vendor info:', req.vendor);
+      // Remove debug logging for production
+      // console.log('Request body:', req.body);
+      // console.log('Request files:', req.files);
+      // console.log('Vendor info:', req.vendor);
       
       // Validate required fields are present
       if (!req.body.name || !req.body.description || !req.body.price || !req.body.quantity || !req.body.categoryId) {
@@ -291,15 +292,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         price: req.body.price,
         quantity: parseInt(req.body.quantity),
         categoryId: parseInt(req.body.categoryId),
-        weight: req.body.weight && req.body.weight.trim() ? parseFloat(req.body.weight) : undefined,
+        weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
         images: imageUrls,
         vendorId: req.vendor.id,
       };
 
-      console.log('Product data before validation:', productData);
-      
       const validatedData = insertProductSchema.parse(productData);
-      console.log('Validated data:', validatedData);
 
       const product = await storage.createProduct(validatedData);
       res.json(product);
