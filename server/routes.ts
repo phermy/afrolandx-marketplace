@@ -270,10 +270,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Product routes
   app.post('/api/products', isAuthenticated, isVendor, upload.array('images', 5), async (req: any, res) => {
     try {
+      console.log('Request body:', req.body);
+      console.log('Request files:', req.files);
+      console.log('Vendor info:', req.vendor);
+      
       const files = req.files as Express.Multer.File[];
       const imageUrls = files?.map(file => `/uploads/${file.filename}`) || [];
 
-      const productData = insertProductSchema.parse({
+      const productData = {
         name: req.body.name,
         description: req.body.description,
         price: req.body.price,
@@ -282,12 +286,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weight: req.body.weight ? parseFloat(req.body.weight) : null,
         images: imageUrls,
         vendorId: req.vendor.id,
-      });
+      };
 
-      const product = await storage.createProduct(productData);
+      console.log('Product data before validation:', productData);
+      
+      const validatedData = insertProductSchema.parse(productData);
+      console.log('Validated data:', validatedData);
+
+      const product = await storage.createProduct(validatedData);
       res.json(product);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error('Validation error details:', error.errors);
         res.status(400).json({ message: 'Validation error', errors: error.errors });
       } else {
         console.error('Error creating product:', error);

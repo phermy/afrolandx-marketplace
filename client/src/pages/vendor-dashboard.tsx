@@ -21,6 +21,7 @@ export default function VendorDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isRegistering, setIsRegistering] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -131,6 +132,12 @@ export default function VendorDashboard() {
   const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    
+    // Manually add the selected category since Select component doesn't auto-populate FormData
+    if (selectedCategory) {
+      formData.set('categoryId', selectedCategory);
+    }
+    
     addProductMutation.mutate(formData);
   };
 
@@ -390,7 +397,7 @@ export default function VendorDashboard() {
                     </div>
                     <div>
                       <Label htmlFor="categoryId">Category</Label>
-                      <Select name="categoryId" required>
+                      <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
                         <SelectTrigger className="input-nigerian">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
