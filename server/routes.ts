@@ -436,6 +436,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Shipping quotes endpoint
+  app.get('/api/shipping/quote', isAuthenticated, async (req: any, res) => {
+    try {
+      // Return available shipping methods for Nigeria
+      const shippingQuotes = [
+        {
+          carrier: 'UPS',
+          service: 'UPS Standard',
+          price: 2500,
+          duration: '3-5 business days'
+        },
+        {
+          carrier: 'FedEx',
+          service: 'FedEx Express',
+          price: 3000,
+          duration: '2-3 business days'
+        },
+        {
+          carrier: 'DHL',
+          service: 'DHL Express',
+          price: 3500,
+          duration: '1-2 business days'
+        }
+      ];
+      res.json(shippingQuotes);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch shipping quotes' });
+    }
+  });
+
   // Order routes
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
@@ -447,14 +477,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const order = await storage.createOrder(orderData);
 
-      // Create order items from cart
+      // Create order items from cart and collect vendor information
       const cartItems = await storage.getCartItems(userId);
+      const vendorProductMap: { [key: string]: any[] } = {};
+      
       for (const item of cartItems) {
         await storage.createOrderItem({
           orderId: order.id,
           productId: item.productId,
           quantity: item.quantity,
           priceAtTime: item.product.price,
+        });
+
+        // Get vendor information for this product
+        const product = await storage.getProduct(item.productId);
+        if (product) {
+          const vendor = await storage.getVendor(product.vendorId);
+          if (vendor) {
+            const vendorId = vendor.userId;
+            if (!vendorProductMap[vendorId]) {
+              vendorProductMap[vendorId] = [];
+            }
+            vendorProductMap[vendorId].push({
+              product: item.product,
+              quantity: item.quantity,
+              totalPrice: parseFloat(item.product.price) * item.quantity
+            });
+          }
+        }
+      }
+
+      // Notify each vendor about their products sold
+      for (const vendorId in vendorProductMap) {
+        const products = vendorProductMap[vendorId];
+        const totalVendorAmount = products.reduce((sum: number, p: any) => sum + p.totalPrice, 0);
+        const productNames = products.map((p: any) => p.product.name).join(', ');
+        
+        await storage.createNotification({
+          userId: vendorId,
+          type: 'product_sold',
+          title: 'Products Sold!',
+          message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
+          orderId: order.id,
+          isRead: false
+        });
+      }
+
+      // Notify all admins about the new order
+      const adminUsers = await storage.getAdminUsers();
+      for (const admin of adminUsers) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: 'order_placed',
+          title: 'New Order Placed',
+          message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
+          orderId: order.id,
+          isRead: false
         });
       }
 
@@ -494,6 +572,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch order' });
+    }
+  });
+
+  // Notification routes
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notifications = await storage.getUserNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      await storage.markNotificationAsRead(notificationId);
+      res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to mark notification as read' });
     }
   });
 
