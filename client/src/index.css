@@ -195,6 +195,19 @@
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
   letter-spacing: -0.025em;
+  line-height: 1.3;
+  padding-bottom: 0.15em;
+}
+
+/* Fix text clipping issues */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.3;
+  padding-bottom: 0.1em;
+}
+
+.text-4xl {
+  line-height: 1.25;
+  padding-bottom: 0.1em;
 }
 
 /* Button enhancements */
