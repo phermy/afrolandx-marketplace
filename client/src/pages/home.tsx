@@ -35,7 +35,8 @@ export default function Home() {
   });
 
   const { data: featuredProducts = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products", { featured: true }],
+    queryKey: ["/api/products", "featured"],
+    queryFn: () => fetch("/api/products?featured=true").then(res => res.json()),
   });
 
   const { data: allProducts = [] } = useQuery<Product[]>({
