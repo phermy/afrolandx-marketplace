@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
+import Profile from "@/pages/profile";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
@@ -41,6 +42,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/products" component={Products} />
+          <Route path="/profile" component={Profile} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">
             <AdminProtectedRoute>
