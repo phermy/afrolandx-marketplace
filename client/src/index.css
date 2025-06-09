@@ -123,11 +123,11 @@
 }
 
 /* Focus states for Nigerian theme */
-.focus\:ring-nigerian-green:focus {
+.focus-ring-nigerian:focus {
   --tw-ring-color: var(--nigerian-green);
 }
 
-.focus\:border-nigerian-green:focus {
+.focus-border-nigerian:focus {
   border-color: var(--nigerian-green);
 }
 
