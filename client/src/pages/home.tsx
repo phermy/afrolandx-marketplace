@@ -122,11 +122,16 @@ export default function Home() {
             {categories.slice(0, 3).map((category, index) => {
               const categoryIcons = ["👘", "🧵", "📿", "✨"];
               return (
-                <Card key={category.id} className="text-center card-hover bg-white">
-                  <CardContent className="p-6">
-                    <div className="text-4xl mb-4">{categoryIcons[index] || "🎯"}</div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
-                    <p className="text-gray-600 text-sm">{category.description || "Discover our authentic collection"}</p>
+                <Card key={category.id} className="text-center card-hover bg-white shadow-lg border-0">
+                  <CardContent className="p-8">
+                    <div className="text-6xl mb-6">{categoryIcons[index] || "🎯"}</div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">{category.name}</h3>
+                    <p className="text-gray-600 text-base leading-relaxed">{category.description || "Discover our authentic collection"}</p>
+                    <div className="mt-6">
+                      <span className="inline-block px-4 py-2 bg-nigerian-green text-white text-sm font-medium rounded-full hover:bg-green-700 transition-colors cursor-pointer">
+                        Explore Now
+                      </span>
+                    </div>
                   </CardContent>
                 </Card>
               );
