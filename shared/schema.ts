@@ -110,11 +110,25 @@ export const orderItems = pgTable("order_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Notifications table for vendor and admin notifications
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: varchar("type").notNull(), // 'order_placed', 'product_sold', 'vendor_approved', etc.
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  orderId: integer("order_id").references(() => orders.id),
+  productId: integer("product_id").references(() => products.id),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   vendor: one(vendors, { fields: [users.id], references: [vendors.userId] }),
   cartItems: many(cartItems),
   orders: many(orders),
+  notifications: many(notifications),
 }));
 
 export const vendorsRelations = relations(vendors, ({ one, many }) => ({
@@ -146,6 +160,12 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   product: one(products, { fields: [orderItems.productId], references: [products.id] }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+  order: one(orders, { fields: [notifications.orderId], references: [orders.id] }),
+  product: one(products, { fields: [notifications.productId], references: [products.id] }),
 }));
 
 // Zod schemas
@@ -184,6 +204,11 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 });
 
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
 });

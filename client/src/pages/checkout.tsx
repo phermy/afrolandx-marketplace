@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/hooks/useCart';
+import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
@@ -151,6 +151,7 @@ export default function Checkout() {
       shippingAmount: selectedQuote.price.toString(),
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
+      paymentMethod,
     };
 
     createOrderMutation.mutate(orderData);
