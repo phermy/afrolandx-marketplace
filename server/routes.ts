@@ -468,6 +468,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize Paystack (when secret key is provided)
+  app.post('/api/paystack/initialize', isAuthenticated, async (req: any, res) => {
+    try {
+      const { secretKey } = req.body;
+      
+      if (!secretKey) {
+        return res.status(400).json({ message: 'Paystack secret key required' });
+      }
+
+      // Initialize Paystack service
+      const { initializePaystack } = await import('./paystack');
+      initializePaystack(secretKey);
+      
+      res.json({ message: 'Paystack initialized successfully' });
+    } catch (error) {
+      console.error('Error initializing Paystack:', error);
+      res.status(500).json({ message: 'Failed to initialize Paystack' });
+    }
+  });
+
   // Initialize Paystack payment
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {

@@ -81,28 +81,48 @@ export default function Checkout() {
     retry: false,
   });
 
-  // Create order mutation
+  // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const response = await apiRequest('POST', '/api/orders', orderData);
-      return response.json();
+      // Try Paystack integration first
+      try {
+        const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
+        return response.json();
+      } catch (error) {
+        // Fall back to direct order creation if Paystack not configured
+        const response = await apiRequest('POST', '/api/orders', orderData);
+        return response.json();
+      }
     },
-    onSuccess: (order) => {
-      toast({
-        title: 'Order Created',
-        description: 'Redirecting to payment...',
-      });
-      
-      // In a real implementation, this would redirect to Paystack
-      // For now, we'll simulate payment completion
-      setTimeout(() => {
+    onSuccess: (result) => {
+      if (result.paymentUrl) {
+        // Redirect to Paystack payment page
         toast({
-          title: 'Order Placed Successfully!',
-          description: `Order #${order.id} has been created. You will receive a confirmation email shortly.`,
+          title: 'Redirecting to Payment',
+          description: 'You will be redirected to complete your payment...',
         });
-        clearCart();
-        window.location.href = '/';
-      }, 2000);
+        
+        // Store order reference for verification
+        localStorage.setItem('pending_payment_reference', result.reference);
+        
+        // Redirect to Paystack
+        window.location.href = result.paymentUrl;
+      } else {
+        // Direct order creation (fallback)
+        toast({
+          title: 'Order Created',
+          description: 'Simulating payment completion...',
+        });
+        
+        setTimeout(() => {
+          toast({
+            title: 'Order Placed Successfully!',
+            description: `Order #${result.id} has been created. You will receive a confirmation email shortly.`,
+          });
+          clearCart();
+          window.location.href = '/';
+        }, 2000);
+      }
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
