@@ -102,11 +102,18 @@ export default function VendorDashboard() {
       
       // Reset form and category selection
       setSelectedCategory('');
-      // Find the specific product form and reset it
-      const productForm = document.querySelector('form[data-form="add-product"]') as HTMLFormElement;
-      if (productForm) {
-        productForm.reset();
-      }
+      // Use setTimeout to ensure form reset happens after state update
+      setTimeout(() => {
+        const productForm = document.querySelector('form[data-form="add-product"]') as HTMLFormElement;
+        if (productForm) {
+          productForm.reset();
+          // Also clear file inputs specifically
+          const fileInputs = productForm.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
+          fileInputs.forEach(input => {
+            input.value = '';
+          });
+        }
+      }, 100);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {

@@ -11,6 +11,7 @@ import Products from "@/pages/products";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
+import ShoppingCart from "@/components/shopping-cart";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -47,6 +48,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <ShoppingCart />
       </TooltipProvider>
     </QueryClientProvider>
   );

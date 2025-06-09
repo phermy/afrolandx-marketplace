@@ -41,8 +41,14 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Serve uploaded files statically
-  app.use('/uploads', express.static('uploads'));
+  // Serve uploaded files statically - must be before other routes
+  app.use('/uploads', express.static('uploads', {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || path.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      }
+    }
+  }));
   
   // Auth middleware
   await setupAuth(app);
