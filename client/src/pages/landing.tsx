@@ -104,7 +104,7 @@ export default function Landing() {
               </Button>
               <Button 
                 size="lg" 
-                className="bg-white text-gray-900 hover:bg-gray-100 font-semibold border-2 border-white text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border-2 border-white/30 hover:border-white/50 text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
                 onClick={() => setIsVendorModalOpen(true)}
               >
                 Become a Vendor
@@ -252,7 +252,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold font-nigerian mb-6" style={{ lineHeight: '1.4', paddingBottom: '0.2em', color: '#1f2937' }}>
+              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-6" style={{ lineHeight: '1.4', paddingBottom: '0.2em' }}>
                 Celebrating Nigerian Heritage
               </h2>
               <p className="text-gray-600 text-lg mb-6">
