@@ -10,6 +10,11 @@ export default function Landing() {
     window.location.href = "/api/login";
   };
 
+  const handleAdminPortalClick = () => {
+    // Redirect to login with admin intent
+    window.location.href = '/api/login?redirect=/admin';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -315,7 +320,14 @@ export default function Landing() {
                 <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
-                <li><a href="/admin" className="hover:text-white transition-colors">Admin Portal</a></li>
+                <li>
+                  <button 
+                    onClick={handleAdminPortalClick} 
+                    className="hover:text-white transition-colors text-left"
+                  >
+                    Admin Portal
+                  </button>
+                </li>
               </ul>
             </div>
           </div>

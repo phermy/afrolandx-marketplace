@@ -13,6 +13,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
 import ShoppingCart from "@/components/shopping-cart";
+import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -34,7 +35,11 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/products" component={Products} />
           <Route path="/vendor" component={VendorDashboard} />
-          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin">
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          </Route>
           <Route path="/checkout" component={Checkout} />
         </>
       )}
