@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
-import { useCart } from '@/hooks/useCart';
+import { useCart } from '@/contexts/CartContext';
 import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
