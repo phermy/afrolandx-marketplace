@@ -21,6 +21,8 @@ export default function ShoppingCart() {
   } = useCart();
   const { isAuthenticated } = useAuth();
 
+  console.log('Cart component render - isAuthenticated:', isAuthenticated, 'isCartOpen:', isCartOpen);
+  
   if (!isAuthenticated || !isCartOpen) {
     return null;
   }

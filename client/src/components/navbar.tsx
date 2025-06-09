@@ -129,7 +129,10 @@ export default function Navbar() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={toggleCart}
+                onClick={() => {
+                  console.log('Cart button clicked');
+                  toggleCart();
+                }}
                 className="relative text-gray-700 hover:text-nigerian-green"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

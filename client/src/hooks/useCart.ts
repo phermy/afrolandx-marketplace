@@ -30,6 +30,8 @@ export function useCart() {
         title: 'Added to cart',
         description: 'Product has been added to your cart.',
       });
+      // Auto-open cart after adding item
+      setIsCartOpen(true);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -182,9 +184,18 @@ export function useCart() {
     clearCartMutation.mutate();
   };
 
-  const toggleCart = () => setIsCartOpen(!isCartOpen);
-  const openCart = () => setIsCartOpen(true);
-  const closeCart = () => setIsCartOpen(false);
+  const toggleCart = () => {
+    console.log('Toggling cart, current state:', isCartOpen);
+    setIsCartOpen(!isCartOpen);
+  };
+  const openCart = () => {
+    console.log('Opening cart');
+    setIsCartOpen(true);
+  };
+  const closeCart = () => {
+    console.log('Closing cart');
+    setIsCartOpen(false);
+  };
 
   return {
     cartItems,
