@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/lib/roleUtils";
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     // Check for authentication errors in URL
@@ -269,7 +272,7 @@ export default function Landing() {
             <div className="relative">
               <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1595273670150-bd0c3c392e46?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
+                  src="https://images.unsplash.com/photo-1594736797933-d0b22d6ac07c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
                   alt="Beautiful Nigerian woman in traditional dress"
                   className="w-full h-full object-cover"
                 />
@@ -348,14 +351,16 @@ export default function Landing() {
                 <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
-                <li>
-                  <button 
-                    onClick={handleAdminPortalClick} 
-                    className="hover:text-white transition-colors text-left"
-                  >
-                    Admin Portal
-                  </button>
-                </li>
+                {(!isAuthenticated || isAdmin(user)) && (
+                  <li>
+                    <button 
+                      onClick={handleAdminPortalClick} 
+                      className="hover:text-white transition-colors text-left"
+                    >
+                      Admin Portal
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
           </div>
