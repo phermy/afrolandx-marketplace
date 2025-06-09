@@ -1,0 +1,503 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Navbar from "@/components/navbar";
+import type { Vendor, Product, Category } from "@/types";
+
+export default function VendorDashboard() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+      return;
+    }
+  }, [isAuthenticated, isLoading, toast]);
+
+  // Fetch vendor info
+  const { data: vendor, isLoading: vendorLoading } = useQuery<Vendor>({
+    queryKey: ["/api/vendors/me"],
+    retry: false,
+  });
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  // Fetch vendor's products
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products", { vendorId: vendor?.id }],
+    enabled: !!vendor?.id,
+  });
+
+  // Vendor registration mutation
+  const registerVendorMutation = useMutation({
+    mutationFn: async (vendorData: { businessName: string; description: string }) => {
+      await apiRequest("POST", "/api/vendors", vendorData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Vendor registration submitted! Please wait for admin approval.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] });
+      setIsRegistering(false);
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to register as vendor. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Add product mutation
+  const addProductMutation = useMutation({
+    mutationFn: async (productData: any) => {
+      await apiRequest("POST", "/api/products", productData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Product submitted for approval!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to add product. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleVendorRegistration = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    registerVendorMutation.mutate({
+      businessName: formData.get("businessName") as string,
+      description: formData.get("description") as string,
+    });
+  };
+
+  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    addProductMutation.mutate({
+      name: formData.get("name") as string,
+      description: formData.get("description") as string,
+      price: formData.get("price") as string,
+      quantity: parseInt(formData.get("quantity") as string),
+      categoryId: parseInt(formData.get("categoryId") as string),
+      weight: parseFloat(formData.get("weight") as string),
+    });
+  };
+
+  if (isLoading || vendorLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner-nigerian"></div>
+      </div>
+    );
+  }
+
+  if (!vendor && !isRegistering) {
+    // Show vendor registration form
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-center">Become a Vendor</CardTitle>
+              <p className="text-gray-600 text-center">
+                Join our community of Nigerian artisans and designers
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleVendorRegistration} className="space-y-6">
+                <div>
+                  <Label htmlFor="businessName">Business Name</Label>
+                  <Input
+                    id="businessName"
+                    name="businessName"
+                    placeholder="e.g., Adunni Textiles"
+                    required
+                    className="input-nigerian"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Business Description</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    placeholder="Tell us about your business, your products, and your story..."
+                    rows={4}
+                    required
+                    className="input-nigerian"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full btn-nigerian"
+                  disabled={registerVendorMutation.isPending}
+                >
+                  {registerVendorMutation.isPending ? "Submitting..." : "Register as Vendor"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (vendor?.status === "pending") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <Card>
+            <CardContent className="text-center py-12">
+              <div className="text-6xl mb-4">⏳</div>
+              <h2 className="text-2xl font-bold mb-4">Application Under Review</h2>
+              <p className="text-gray-600 mb-6">
+                Thank you for your vendor application! Our admin team is reviewing your submission. 
+                You'll receive an email notification once your application is approved.
+              </p>
+              <Badge variant="secondary" className="badge-pending">
+                Status: Pending Approval
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (vendor?.status === "suspended") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <Card>
+            <CardContent className="text-center py-12">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold mb-4">Account Suspended</h2>
+              <p className="text-gray-600 mb-6">
+                Your vendor account has been suspended. Please contact our support team for more information.
+              </p>
+              <Badge variant="destructive" className="badge-rejected">
+                Status: Suspended
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Approved vendor dashboard
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 font-nigerian">
+            Welcome back, {vendor?.businessName}!
+          </h1>
+          <p className="text-gray-600">Manage your products and track your sales</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-nigerian-green rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-gray-600 text-sm">Total Products</p>
+                  <p className="text-2xl font-bold text-gray-900">{products.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-nigerian-gold rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-gray-600 text-sm">Approved</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {products.filter(p => p.status === 'approved').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-500 rounded-lg">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-gray-600 text-sm">Pending</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {products.filter(p => p.status === 'pending').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-2 bg-coral rounded-lg">
+                  <span className="text-white font-bold text-lg">₦</span>
+                </div>
+                <div className="ml-4">
+                  <p className="text-gray-600 text-sm">Total Value</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ₦{products.reduce((sum, p) => sum + parseFloat(p.price), 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="products" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="add-product">Add Product</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {products.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">No products yet. Add your first product!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {products.map((product) => (
+                      <div key={product.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900">{product.name}</h3>
+                          <p className="text-gray-600 text-sm">{product.description}</p>
+                          <div className="flex items-center space-x-4 mt-2">
+                            <span className="text-nigerian-green font-semibold">₦{parseFloat(product.price).toLocaleString()}</span>
+                            <span className="text-gray-500 text-sm">Qty: {product.quantity}</span>
+                            <Badge 
+                              className={
+                                product.status === 'approved' ? 'badge-approved' :
+                                product.status === 'pending' ? 'badge-pending' :
+                                'badge-rejected'
+                              }
+                            >
+                              {product.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="add-product">
+            <Card>
+              <CardHeader>
+                <CardTitle>Add New Product</CardTitle>
+                <p className="text-gray-600">Add a new product for admin approval</p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddProduct} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="name">Product Name</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        placeholder="e.g., Premium Ankara Dress"
+                        required
+                        className="input-nigerian"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="categoryId">Category</Label>
+                      <Select name="categoryId" required>
+                        <SelectTrigger className="input-nigerian">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      placeholder="Describe your product..."
+                      rows={4}
+                      required
+                      className="input-nigerian"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label htmlFor="price">Price (₦)</Label>
+                      <Input
+                        id="price"
+                        name="price"
+                        type="number"
+                        placeholder="45000"
+                        required
+                        className="input-nigerian"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="quantity">Quantity</Label>
+                      <Input
+                        id="quantity"
+                        name="quantity"
+                        type="number"
+                        placeholder="10"
+                        required
+                        className="input-nigerian"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="weight">Weight (kg)</Label>
+                      <Input
+                        id="weight"
+                        name="weight"
+                        type="number"
+                        step="0.1"
+                        placeholder="0.5"
+                        className="input-nigerian"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full btn-nigerian"
+                    disabled={addProductMutation.isPending}
+                  >
+                    {addProductMutation.isPending ? "Adding Product..." : "Add Product"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profile">
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendor Profile</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Business Name</Label>
+                    <Input value={vendor?.businessName || ""} disabled className="input-nigerian" />
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Textarea value={vendor?.description || ""} disabled className="input-nigerian" rows={4} />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Badge className={vendor?.status === 'approved' ? 'badge-approved' : 'badge-pending'}>
+                      {vendor?.status}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
