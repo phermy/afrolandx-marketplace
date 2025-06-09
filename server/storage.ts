@@ -6,6 +6,7 @@ import {
   cartItems,
   orders,
   orderItems,
+  notifications,
   type User,
   type UpsertUser,
   type Vendor,
@@ -20,6 +21,8 @@ import {
   type InsertOrder,
   type OrderItem,
   type InsertOrderItem,
+  type Notification,
+  type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -65,6 +68,12 @@ export interface IStorage {
   getOrdersForUser(userId: string): Promise<Order[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
+  
+  // Notification operations
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  markNotificationAsRead(id: number): Promise<void>;
+  getAdminUsers(): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -335,6 +344,38 @@ export class DatabaseStorage implements IStorage {
       .update(orders)
       .set(updateData)
       .where(eq(orders.id, id));
+  }
+
+  // Notification operations
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db
+      .insert(notifications)
+      .values(notification)
+      .returning();
+    return newNotification;
+  }
+
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id));
+  }
+
+  async getAdminUsers(): Promise<User[]> {
+    const adminUsers = await db
+      .select()
+      .from(users)
+      .where(sql`${users.roles}::jsonb ? 'admin'`);
+    return adminUsers;
   }
 }
 
