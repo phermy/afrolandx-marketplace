@@ -39,28 +39,28 @@ export default function AdminDashboard() {
   // Fetch admin stats
   const { data: stats } = useQuery<AdminStats>({
     queryKey: ['/api/admin/stats'],
-    enabled: isAuthenticated && user?.role === 'admin',
+    enabled: isAuthenticated && isAdmin(user),
     retry: false,
   });
 
   // Fetch all vendors
   const { data: vendors = [] } = useQuery<Vendor[]>({
     queryKey: ['/api/vendors'],
-    enabled: isAuthenticated && user?.role === 'admin',
+    enabled: isAuthenticated && isAdmin(user),
     retry: false,
   });
 
   // Fetch products with details for approval
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({
     queryKey: ['/api/products/with-details'],
-    enabled: isAuthenticated && user?.role === 'admin',
+    enabled: isAuthenticated && isAdmin(user),
     retry: false,
   });
 
   // Fetch all users for management
   const { data: allUsers = [] } = useQuery<User[]>({
     queryKey: ['/api/admin/users'],
-    enabled: isAuthenticated && user?.role === 'admin',
+    enabled: isAuthenticated && isAdmin(user),
     retry: false,
   });
 
@@ -161,10 +161,14 @@ export default function AdminDashboard() {
     },
   });
 
-  // Update user role mutation
-  const updateUserRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      await apiRequest('PATCH', `/api/admin/users/${userId}/role`, { role });
+  // Toggle user role mutation
+  const toggleUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role, hasRole }: { userId: string; role: string; hasRole: boolean }) => {
+      if (hasRole) {
+        await apiRequest('DELETE', `/api/admin/users/${userId}/roles/${role}`);
+      } else {
+        await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
+      }
     },
     onSuccess: () => {
       toast({
@@ -640,15 +644,20 @@ export default function AdminDashboard() {
                           </h3>
                           <p className="text-sm text-gray-600">{managedUser.email}</p>
                           <div className="flex items-center space-x-2 mt-1">
-                            <Badge 
-                              variant={
-                                managedUser.role === 'admin' ? 'destructive' :
-                                managedUser.role === 'vendor' ? 'default' : 'secondary'
-                              }
-                              className="text-xs"
-                            >
-                              {managedUser.role || 'customer'}
-                            </Badge>
+                            <div className="flex space-x-1">
+                              {managedUser.roles?.map((role: string) => (
+                                <Badge 
+                                  key={role}
+                                  variant={
+                                    role === 'admin' ? 'destructive' :
+                                    role === 'vendor' ? 'default' : 'secondary'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {role}
+                                </Badge>
+                              ))}
+                            </div>
                             <span className="text-xs text-gray-500">
                               Joined {new Date(managedUser.createdAt).toLocaleDateString()}
                             </span>
