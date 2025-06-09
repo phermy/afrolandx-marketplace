@@ -234,15 +234,16 @@ export default function Landing() {
               </Button>
             </div>
             <div className="relative">
-              <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden flex items-center justify-center">
+              <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
-                  alt="Beautiful Nigerian woman in traditional dress"
-                  className="w-full h-full object-cover rounded-xl"
+                  src="https://images.unsplash.com/photo-1531384370597-8590413be50a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
+                  alt="Beautiful Nigerian woman in traditional attire"
+                  className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent rounded-xl"></div>
-                <div className="absolute bottom-4 left-4 right-4 text-center">
-                  <p className="text-white font-semibold text-lg drop-shadow-lg">Authentic Nigerian Beauty</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                <div className="absolute bottom-6 left-6 right-6">
+                  <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">Nigerian Heritage</h3>
+                  <p className="text-white/90 text-sm drop-shadow-md">Celebrating traditional beauty and craftsmanship</p>
                 </div>
               </div>
             </div>
