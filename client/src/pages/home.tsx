@@ -163,13 +163,15 @@ export default function Home() {
       </section>
 
       {/* All Products */}
-      {filteredProducts.length > 0 && (
+      {(searchQuery || selectedCategory !== null) && (
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-12">
               <div>
                 <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
-                  {searchQuery ? `Search Results for "${searchQuery}"` : "All Products"}
+                  {searchQuery ? `Search Results for "${searchQuery}"` : 
+                   selectedCategory ? `${categories.find(c => c.id === selectedCategory)?.name || 'Category'} Products` : 
+                   "All Products"}
                 </h2>
                 <p className="text-gray-600 text-lg">
                   {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
@@ -177,11 +179,59 @@ export default function Home() {
               </div>
             </div>
 
+            {filteredProducts.length > 0 ? (
+              <div className="product-grid">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">
+                  {searchQuery ? `No products found for "${searchQuery}"` : 
+                   selectedCategory ? `No products found in ${categories.find(c => c.id === selectedCategory)?.name || 'this category'}` :
+                   'No products found'}
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory(null);
+                  }}
+                  className="mt-4"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Show all products when no filters are active */}
+      {!searchQuery && selectedCategory === null && allProducts.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center mb-12">
+              <div>
+                <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">All Products</h2>
+                <p className="text-gray-600 text-lg">Discover our complete collection</p>
+              </div>
+            </div>
+
             <div className="product-grid">
-              {filteredProducts.map((product) => (
+              {allProducts.slice(0, 12).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
+            
+            {allProducts.length > 12 && (
+              <div className="text-center mt-8">
+                <Button variant="outline" className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white">
+                  View All Products →
+                </Button>
+              </div>
+            )}
           </div>
         </section>
       )}
