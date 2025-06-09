@@ -387,6 +387,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/products/:id/featured', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { featured } = req.body;
+
+      await storage.updateProductFeatured(productId, featured);
+      res.json({ message: 'Product featured status updated' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update featured status' });
+    }
+  });
+
   // Cart routes
   app.post('/api/cart', isAuthenticated, async (req: any, res) => {
     try {

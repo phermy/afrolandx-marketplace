@@ -97,6 +97,39 @@ export default function AdminDashboard() {
     },
   });
 
+  // Toggle featured status mutation
+  const toggleFeaturedMutation = useMutation({
+    mutationFn: async ({ productId, featured }: { productId: number; featured: boolean }) => {
+      await apiRequest('PATCH', `/api/products/${productId}/featured`, { featured });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Product featured status updated successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Admin session expired. Please log in again.",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: 'Error',
+        description: 'Failed to update featured status.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Update product status mutation
   const updateProductStatusMutation = useMutation({
     mutationFn: async ({ productId, status }: { productId: number; status: string }) => {
@@ -217,6 +250,7 @@ export default function AdminDashboard() {
   };
 
   const pendingProducts = allProducts.filter(p => p.status === 'pending');
+  const approvedProducts = allProducts.filter(p => p.status === 'approved');
   const pendingVendors = vendors.filter(v => v.status === 'pending');
 
   if (isLoading) {
@@ -347,6 +381,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList>
             <TabsTrigger value="products">Product Approvals</TabsTrigger>
+            <TabsTrigger value="featured">Featured Products</TabsTrigger>
             <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
@@ -424,6 +459,123 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="featured">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Featured Products Management</span>
+                  <Badge variant="secondary">{approvedProducts.filter(p => p.featured).length} featured</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex flex-col space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Current Featured Products</h3>
+                    {approvedProducts.filter(p => p.featured).length === 0 ? (
+                      <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                        <svg className="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                        <h4 className="text-md font-medium text-gray-900 mb-2">No Featured Products</h4>
+                        <p className="text-gray-500">Select products below to feature them on the homepage.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {approvedProducts.filter(p => p.featured).map((product) => (
+                          <div key={product.id} className="border border-gray-200 rounded-lg p-4 bg-yellow-50">
+                            <div className="flex items-start space-x-3">
+                              <div className="w-16 h-16 flex-shrink-0">
+                                {product.images && product.images.length > 0 ? (
+                                  <img
+                                    src={product.images[0]}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover rounded"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
+                                    <span className="text-white text-xs">No Image</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 mb-1">{product.name}</h4>
+                                <p className="text-sm text-gray-600 mb-2">{formatPrice(product.price)}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-500">by {product.vendor.businessName}</span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => toggleFeaturedMutation.mutate({ productId: product.id, featured: false })}
+                                    disabled={toggleFeaturedMutation.isPending}
+                                    className="text-xs"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex flex-col space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Available Products</h3>
+                    <p className="text-gray-600 text-sm">Select approved products to feature on the homepage. Featured products will be highlighted for customers.</p>
+                    {approvedProducts.filter(p => !p.featured).length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">All approved products are already featured.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {approvedProducts.filter(p => !p.featured).map((product) => (
+                          <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 flex-shrink-0">
+                                  {product.images && product.images.length > 0 ? (
+                                    <img
+                                      src={product.images[0]}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover rounded"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
+                                      <span className="text-white text-xs">No Image</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-900">{product.name}</h4>
+                                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                    <span>{formatPrice(product.price)}</span>
+                                    <span>by {product.vendor.businessName}</span>
+                                    <span>in {product.category.name}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => toggleFeaturedMutation.mutate({ productId: product.id, featured: true })}
+                                disabled={toggleFeaturedMutation.isPending}
+                                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                              >
+                                ⭐ Feature
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
