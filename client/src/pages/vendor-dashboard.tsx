@@ -88,8 +88,8 @@ export default function VendorDashboard() {
 
   // Add product mutation
   const addProductMutation = useMutation({
-    mutationFn: async (productData: any) => {
-      await apiRequest("POST", "/api/products", productData);
+    mutationFn: async (formData: FormData) => {
+      await apiRequest("POST", "/api/products", formData);
     },
     onSuccess: () => {
       toast({
@@ -457,6 +457,21 @@ export default function VendorDashboard() {
                         className="input-nigerian"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="images">Product Images</Label>
+                    <Input
+                      id="images"
+                      name="images"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="input-nigerian"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Upload up to 5 images. Supported formats: JPG, PNG, WEBP
+                    </p>
                   </div>
 
                   <Button

@@ -26,7 +26,6 @@ export default function Landing() {
               <a href="#features" className="text-gray-700 hover:text-nigerian-green transition-colors">Features</a>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors">About</a>
               <a href="#contact" className="text-gray-700 hover:text-nigerian-green transition-colors">Contact</a>
-              <a href="/admin" className="text-red-600 hover:text-red-700 transition-colors font-medium">Admin Portal</a>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -316,7 +315,7 @@ export default function Landing() {
                 <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
-                <li><a href="/admin" className="hover:text-red-400 transition-colors text-red-500 font-medium">Admin Portal</a></li>
+                <li><a href="/admin" className="hover:text-white transition-colors">Admin Portal</a></li>
               </ul>
             </div>
           </div>

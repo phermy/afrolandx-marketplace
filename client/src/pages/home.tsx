@@ -41,13 +41,23 @@ export default function Home() {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-nigerian-green to-green-700 text-white pattern-bg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-green-900 to-emerald-800"></div>
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.08'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '60px 60px'
+        }}></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold font-nigerian mb-6">
-              Celebrate Nigerian Heritage
+            <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
+              <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
+                Celebrate Nigerian
+              </span>
+              <span className="block text-amber-300 mt-2">
+                Heritage
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto opacity-90">
+            <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
               Discover authentic Nigerian fashion - from traditional Aso Oke to handcrafted beads. 
               Connect with local artisans and celebrate our rich cultural heritage.
             </p>
