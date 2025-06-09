@@ -18,6 +18,18 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
+  const scrollToProducts = () => {
+    const productsSection = document.getElementById('products-section');
+    if (productsSection) {
+      productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleCategorySelect = (categoryId: number | null) => {
+    setSelectedCategory(categoryId);
+    setTimeout(() => scrollToProducts(), 100);
+  };
+
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
@@ -90,7 +102,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={selectedCategory === null ? "default" : "outline"}
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => handleCategorySelect(null)}
                 className={selectedCategory === null ? "btn-nigerian" : ""}
               >
                 All Categories
@@ -99,7 +111,7 @@ export default function Home() {
                 <Button
                   key={category.id}
                   variant={selectedCategory === category.id ? "default" : "outline"}
-                  onClick={() => setSelectedCategory(category.id)}
+                  onClick={() => handleCategorySelect(category.id)}
                   className={selectedCategory === category.id ? "btn-nigerian" : ""}
                 >
                   {category.name}
@@ -164,7 +176,7 @@ export default function Home() {
 
       {/* All Products */}
       {(searchQuery || selectedCategory !== null) && (
-        <section className="py-16 bg-white">
+        <section id="products-section" className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-12">
               <div>
@@ -210,7 +222,7 @@ export default function Home() {
 
       {/* Show all products when no filters are active */}
       {!searchQuery && selectedCategory === null && allProducts.length > 0 && (
-        <section className="py-16 bg-white">
+        <section id="products-section" className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-12">
               <div>
