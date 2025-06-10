@@ -87,14 +87,20 @@ export class PaystackService {
     return result;
   }
 
-  async initializeTransaction(email: string, amount: number, reference: string, metadata?: any): Promise<PaystackInitializeResponse> {
-    return await this.makeRequest('/transaction/initialize', 'POST', {
+  async initializeTransaction(email: string, amount: number, reference: string, metadata?: any, callbackUrl?: string): Promise<PaystackInitializeResponse> {
+    const payload: any = {
       email,
       amount: amount * 100, // Paystack expects amount in kobo
       reference,
       currency: 'NGN',
       metadata,
-    });
+    };
+
+    if (callbackUrl) {
+      payload.callback_url = callbackUrl;
+    }
+
+    return await this.makeRequest('/transaction/initialize', 'POST', payload);
   }
 
   async verifyTransaction(reference: string): Promise<PaystackVerifyResponse> {

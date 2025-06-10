@@ -598,6 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Initialize Paystack payment
       const paystack = getPaystackService();
+      const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/callback`;
       const paymentData = await paystack.initializeTransaction(
         user.email,
         parseFloat(totalAmount),
@@ -606,7 +607,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: order.id,
           userId,
           shippingMethod,
-          callback_url: `${req.protocol}://${req.get('host')}/api/payment/callback`,
           custom_fields: [
             {
               display_name: "Order ID",
@@ -614,7 +614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               value: order.id.toString()
             }
           ]
-        }
+        },
+        callbackUrl
       );
 
       res.json({

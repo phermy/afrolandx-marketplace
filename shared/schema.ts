@@ -120,6 +120,7 @@ export const notifications = pgTable("notifications", {
   orderId: integer("order_id").references(() => orders.id),
   productId: integer("product_id").references(() => products.id),
   isRead: boolean("is_read").notNull().default(false),
+  expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
