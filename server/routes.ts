@@ -1209,6 +1209,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dismiss notification (delete it)
+  app.delete('/api/notifications/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      
+      // Verify notification belongs to user for security
+      await storage.dismissNotification(notificationId, userId);
+      res.json({ message: 'Notification dismissed' });
+    } catch (error) {
+      console.error('Error dismissing notification:', error);
+      res.status(500).json({ message: 'Failed to dismiss notification' });
+    }
+  });
+
   // Admin analytics
   app.get('/api/admin/stats', isAuthenticated, isAdmin, async (req, res) => {
     try {

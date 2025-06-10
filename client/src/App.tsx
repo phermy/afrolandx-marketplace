@@ -16,6 +16,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
 import ShoppingCart from "@/components/shopping-cart";
+import NotificationPanel from "@/components/notifications";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 
 function Router() {
