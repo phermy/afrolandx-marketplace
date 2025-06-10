@@ -61,6 +61,13 @@ export default function VendorDashboard() {
     enabled: !!vendor?.id,
   });
 
+  // Fetch vendor's orders
+  const { data: vendorOrders = [] } = useQuery({
+    queryKey: ["/api/vendors/orders"],
+    enabled: !!vendor?.id && vendor?.status === 'approved',
+    retry: false,
+  });
+
   // Vendor registration mutation
   const registerVendorMutation = useMutation({
     mutationFn: async (vendorData: { businessName: string; description: string }) => {

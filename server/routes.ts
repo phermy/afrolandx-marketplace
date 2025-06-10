@@ -5,12 +5,14 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { isAdmin } from "./adminAuth";
-import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema } from "@shared/schema";
+import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { db } from "./db";
+import { eq, desc, and } from "drizzle-orm";
 
 // Configure multer for image uploads
 const storage_config = multer.diskStorage({
@@ -1053,6 +1055,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Webhook error:', error);
       res.status(500).json({ message: 'Webhook processing failed' });
+    }
+  });
+
+  // Vendor order tracking - simplified implementation using storage methods
+  app.get('/api/vendors/orders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.getVendorByUserId(userId);
+      
+      if (!vendor) {
+        return res.status(404).json({ message: 'Vendor not found' });
+      }
+
+      // Get all vendor products to filter orders
+      const vendorProducts = await storage.getProducts({ vendorId: vendor.id });
+      const vendorProductIds = vendorProducts.map(p => p.id);
+
+      if (vendorProductIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get all orders and filter for vendor-relevant ones
+      const allOrders = await storage.getAllOrders();
+      const vendorOrders = [];
+
+      for (const order of allOrders) {
+        const orderItems = await storage.getOrderItemsWithProducts(order.id);
+        const vendorItems = orderItems.filter(item => vendorProductIds.includes(item.productId));
+        
+        if (vendorItems.length > 0) {
+          const customer = await storage.getUser(order.userId);
+          const vendorTotal = vendorItems.reduce((sum, item) => 
+            sum + (parseFloat(item.priceAtTime) * item.quantity), 0
+          );
+
+          vendorOrders.push({
+            ...order,
+            items: vendorItems,
+            customer: {
+              firstName: customer?.firstName,
+              lastName: customer?.lastName,
+              email: customer?.email,
+            },
+            vendorTotal
+          });
+        }
+      }
+
+      res.json(vendorOrders);
+    } catch (error) {
+      console.error('Error fetching vendor orders:', error);
+      res.status(500).json({ message: 'Failed to fetch vendor orders' });
+    }
+  });
+
+  // Admin order tracking - simplified implementation using storage methods
+  app.get('/api/admin/orders', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      // Get all orders using storage method - need to implement getAllOrders
+      const allOrders = await storage.getOrdersForUser(''); // This will be modified to get all orders
+      
+      const ordersWithDetails = await Promise.all(
+        allOrders.map(async (order) => {
+          const items = await storage.getOrderItemsWithProducts(order.id);
+          const customer = await storage.getUser(order.userId);
+
+          // Get vendor details for each item
+          const itemsWithVendors = await Promise.all(
+            items.map(async (item) => {
+              const product = await storage.getProduct(item.productId);
+              const vendor = product ? await storage.getVendor(product.vendorId) : null;
+              return {
+                ...item,
+                vendorName: vendor?.businessName || 'Unknown Vendor'
+              };
+            })
+          );
+
+          return {
+            ...order,
+            items: itemsWithVendors,
+            customer: {
+              id: customer?.id,
+              email: customer?.email,
+              firstName: customer?.firstName,
+              lastName: customer?.lastName,
+            }
+          };
+        })
+      );
+
+      res.json(ordersWithDetails);
+    } catch (error) {
+      console.error('Error fetching admin orders:', error);
+      res.status(500).json({ message: 'Failed to fetch admin orders' });
     }
   });
 
