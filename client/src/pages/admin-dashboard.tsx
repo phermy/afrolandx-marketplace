@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { X } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -76,6 +77,24 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/users'],
     enabled: isAuthenticated && isAdmin(user),
     retry: false,
+  });
+
+  // Fetch admin notifications
+  const { data: adminNotifications = [] } = useQuery({
+    queryKey: ['/api/notifications'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+    refetchInterval: 30000,
+  });
+
+  // Admin notification dismiss mutation
+  const dismissNotificationMutation = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return await apiRequest("DELETE", `/api/notifications/${notificationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    }
   });
 
   // Update vendor status mutation
@@ -326,7 +345,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Notifications */}
-        {notifications.length > 0 && (
+        {Array.isArray(adminNotifications) && adminNotifications.length > 0 && (
           <div className="mb-8">
             <Card>
               <CardHeader>
@@ -334,18 +353,29 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(notifications as any[]).slice(0, 5).map((notification: any) => (
-                    <div key={notification.id} className="flex items-start space-x-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="text-red-600 text-lg">
-                        {notification.type === 'order' ? '📦' : '📢'}
+                  {adminNotifications.slice(0, 5).map((notification: any) => (
+                    <div key={notification.id} className="flex items-start justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-3">
+                        <div className="text-red-600 text-lg">
+                          {notification.type === 'order' ? '📦' : '📢'}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-red-800">{notification.title}</h4>
+                          <p className="text-red-700 text-sm">{notification.message}</p>
+                          <p className="text-red-600 text-xs mt-1">
+                            {new Date(notification.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-red-800">{notification.title}</h4>
-                        <p className="text-red-700 text-sm">{notification.message}</p>
-                        <p className="text-red-600 text-xs mt-1">
-                          {new Date(notification.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => dismissNotificationMutation.mutate(notification.id)}
+                        className="h-8 w-8 p-0 hover:bg-red-200"
+                        disabled={dismissNotificationMutation.isPending}
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </Button>
                     </div>
                   ))}
                 </div>
