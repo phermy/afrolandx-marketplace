@@ -169,7 +169,7 @@ export default function Navbar() {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Link href="/orders">
+                    <Link href="/my-orders">
                       <span className="cursor-pointer">My Orders</span>
                     </Link>
                   </DropdownMenuItem>

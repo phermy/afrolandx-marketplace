@@ -719,6 +719,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/orders/my-orders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orders = await storage.getOrdersForUser(userId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch orders' });
+    }
+  });
+
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

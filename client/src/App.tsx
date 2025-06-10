@@ -10,6 +10,7 @@ import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
 import Profile from "@/pages/profile";
+import MyOrders from "@/pages/my-orders";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
@@ -43,6 +44,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/products" component={Products} />
           <Route path="/profile" component={Profile} />
+          <Route path="/my-orders" component={MyOrders} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">
             <AdminProtectedRoute>
