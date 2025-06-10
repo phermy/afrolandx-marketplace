@@ -49,6 +49,12 @@ export default function VendorDashboard() {
     queryKey: ["/api/categories"],
   });
 
+  // Fetch notifications
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["/api/notifications"],
+    retry: false,
+  });
+
   // Fetch vendor's products
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products", { vendorId: vendor?.id }],
@@ -273,6 +279,35 @@ export default function VendorDashboard() {
           </h1>
           <p className="text-gray-600">Manage your products and track your sales</p>
         </div>
+
+        {/* Notifications */}
+        {Array.isArray(notifications) && notifications.length > 0 && (
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-nigerian-green">Recent Notifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(notifications as any[]).slice(0, 5).map((notification: any) => (
+                    <div key={notification.id} className="flex items-start space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="text-green-600 text-lg">
+                        {notification.type === 'order' ? '🎉' : '📢'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-green-800">{notification.title}</h4>
+                        <p className="text-green-700 text-sm">{notification.message}</p>
+                        <p className="text-green-600 text-xs mt-1">
+                          {new Date(notification.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

@@ -43,6 +43,13 @@ export default function AdminDashboard() {
     retry: false,
   });
 
+  // Fetch notifications
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['/api/notifications'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+
   // Fetch all vendors
   const { data: vendors = [] } = useQuery<Vendor[]>({
     queryKey: ['/api/vendors'],
@@ -310,6 +317,35 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-red-600">Recent Order Notifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(notifications as any[]).slice(0, 5).map((notification: any) => (
+                    <div key={notification.id} className="flex items-start space-x-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="text-red-600 text-lg">
+                        {notification.type === 'order' ? '📦' : '📢'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-red-800">{notification.title}</h4>
+                        <p className="text-red-700 text-sm">{notification.message}</p>
+                        <p className="text-red-600 text-xs mt-1">
+                          {new Date(notification.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
