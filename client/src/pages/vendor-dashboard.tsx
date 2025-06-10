@@ -390,6 +390,7 @@ export default function VendorDashboard() {
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList>
             <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="add-product">Add Product</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
@@ -424,6 +425,76 @@ export default function VendorDashboard() {
                               {product.status}
                             </Badge>
                           </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Orders</CardTitle>
+                <p className="text-gray-600">Track orders containing your products</p>
+              </CardHeader>
+              <CardContent>
+                {Array.isArray(vendorOrders) && vendorOrders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">No orders yet. Start selling to see orders here!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Array.isArray(vendorOrders) && vendorOrders.map((order: any) => (
+                      <div key={order.id} className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="font-semibold text-lg">Order #{order.id}</h3>
+                            <p className="text-gray-600 text-sm">
+                              Customer: {order.customer?.firstName} {order.customer?.lastName}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              Email: {order.customer?.email}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge className={
+                              order.orderStatus === 'confirmed' ? 'badge-approved' :
+                              order.orderStatus === 'pending' ? 'badge-pending' :
+                              'badge-rejected'
+                            }>
+                              {order.orderStatus}
+                            </Badge>
+                            <p className="text-nigerian-green font-bold text-lg mt-2">
+                              ₦{order.vendorTotal?.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium mb-2">Your Items in this Order:</h4>
+                          <div className="space-y-2">
+                            {order.items?.map((item: any) => (
+                              <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
+                                <div>
+                                  <span className="font-medium">{item.productName}</span>
+                                  <span className="text-gray-600 ml-2">x{item.quantity}</span>
+                                </div>
+                                <span className="font-semibold">
+                                  ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4 mt-4 text-sm text-gray-600">
+                          <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+                          <p>Payment Status: <span className={order.paymentStatus === 'completed' ? 'text-green-600' : 'text-yellow-600'}>
+                            {order.paymentStatus}
+                          </span></p>
                         </div>
                       </div>
                     ))}

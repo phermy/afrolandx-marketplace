@@ -64,6 +64,13 @@ export default function AdminDashboard() {
     retry: false,
   });
 
+  // Fetch all orders for admin tracking
+  const { data: adminOrders = [] } = useQuery({
+    queryKey: ['/api/admin/orders'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+
   // Fetch all users for management
   const { data: allUsers = [] } = useQuery<User[]>({
     queryKey: ['/api/admin/users'],
@@ -417,6 +424,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList>
             <TabsTrigger value="products">Product Approvals</TabsTrigger>
+            <TabsTrigger value="orders">Order Management</TabsTrigger>
             <TabsTrigger value="featured">Featured Products</TabsTrigger>
             <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
@@ -491,6 +499,94 @@ export default function AdminDashboard() {
                             </Button>
                           </div>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Management</CardTitle>
+                <p className="text-gray-600">Monitor all platform orders and transactions</p>
+              </CardHeader>
+              <CardContent>
+                {Array.isArray(adminOrders) && adminOrders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">No orders in the system yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {Array.isArray(adminOrders) && adminOrders.map((order: any) => (
+                      <div key={order.id} className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="font-semibold text-lg">Order #{order.id}</h3>
+                            <p className="text-gray-600 text-sm">
+                              Customer: {order.customer?.firstName} {order.customer?.lastName}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              Email: {order.customer?.email}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge className={
+                              order.orderStatus === 'confirmed' ? 'badge-approved' :
+                              order.orderStatus === 'pending' ? 'badge-pending' :
+                              'badge-rejected'
+                            }>
+                              {order.orderStatus}
+                            </Badge>
+                            <p className="text-red-600 font-bold text-lg mt-2">
+                              ₦{parseFloat(order.totalAmount).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <h4 className="font-medium text-sm text-gray-700 mb-1">Payment Status</h4>
+                            <Badge className={order.paymentStatus === 'completed' ? 'badge-approved' : 'badge-pending'}>
+                              {order.paymentStatus}
+                            </Badge>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-sm text-gray-700 mb-1">Order Date</h4>
+                            <p className="text-sm">{new Date(order.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium mb-3">Order Items:</h4>
+                          <div className="space-y-2">
+                            {order.items?.map((item: any) => (
+                              <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
+                                <div>
+                                  <span className="font-medium">{item.productName}</span>
+                                  <span className="text-gray-600 ml-2">x{item.quantity}</span>
+                                  <span className="text-gray-500 ml-2 text-sm">by {item.vendorName}</span>
+                                </div>
+                                <span className="font-semibold">
+                                  ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {order.shippingAddress && (
+                          <div className="border-t pt-4 mt-4">
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Shipping Address</h4>
+                            <div className="text-sm text-gray-600">
+                              <p>{JSON.parse(order.shippingAddress).address1}</p>
+                              <p>{JSON.parse(order.shippingAddress).city}, {JSON.parse(order.shippingAddress).state}</p>
+                              <p>{JSON.parse(order.shippingAddress).country} {JSON.parse(order.shippingAddress).postalCode}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

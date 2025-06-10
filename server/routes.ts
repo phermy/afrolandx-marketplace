@@ -1113,8 +1113,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin order tracking - simplified implementation using storage methods
   app.get('/api/admin/orders', isAuthenticated, isAdmin, async (req, res) => {
     try {
-      // Get all orders using storage method - need to implement getAllOrders
-      const allOrders = await storage.getOrdersForUser(''); // This will be modified to get all orders
+      // Get all orders using storage method
+      const allOrders = await storage.getAllOrders();
       
       const ordersWithDetails = await Promise.all(
         allOrders.map(async (order) => {
