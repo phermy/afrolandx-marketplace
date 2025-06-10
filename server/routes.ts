@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test Paystack integration
+  // Test Paystack integration with payment initialization
   app.get('/api/test-paystack', async (req, res) => {
     try {
       if (!isPaystackInitialized()) {
@@ -408,11 +408,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'Paystack service not initialized' 
         });
       }
+
+      // Test payment initialization with Paystack API
+      const paystack = getPaystackService();
+      const testReference = 'TEST_' + Date.now();
+      
+      const testPayment = await paystack.initializeTransaction(
+        'test@example.com',
+        10000, // 100 NGN in kobo
+        testReference,
+        { test: true }
+      );
       
       res.json({ 
         status: 'success', 
-        message: 'Paystack service is initialized and ready',
-        timestamp: new Date().toISOString()
+        message: 'Paystack service is fully functional',
+        timestamp: new Date().toISOString(),
+        test_payment: {
+          reference: testReference,
+          authorization_url: testPayment.data.authorization_url,
+          access_code: testPayment.data.access_code
+        }
       });
     } catch (error) {
       res.status(500).json({ 
