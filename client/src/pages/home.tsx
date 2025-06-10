@@ -123,30 +123,32 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Categories */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Featured Categories</h2>
-            <p className="text-gray-600 text-lg">Explore our curated collection of authentic Nigerian fashion</p>
+      {/* Featured Categories - Only show for non-authenticated users */}
+      {!user && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Featured Categories</h2>
+              <p className="text-gray-600 text-lg">Explore our curated collection of authentic Nigerian fashion</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {categories.slice(0, 3).map((category, index) => {
+                const categoryIcons = ["👘", "🧵", "📿", "✨"];
+                return (
+                  <Card key={category.id} className="text-center card-hover bg-white">
+                    <CardContent className="p-8">
+                      <div className="text-5xl mb-6">{categoryIcons[index] || "🎯"}</div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-3">{category.name}</h3>
+                      <p className="text-gray-600 text-base">{category.description || "Discover our authentic collection"}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {categories.slice(0, 3).map((category, index) => {
-              const categoryIcons = ["👘", "🧵", "📿", "✨"];
-              return (
-                <Card key={category.id} className="text-center card-hover bg-white">
-                  <CardContent className="p-8">
-                    <div className="text-5xl mb-6">{categoryIcons[index] || "🎯"}</div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-3">{category.name}</h3>
-                    <p className="text-gray-600 text-base">{category.description || "Discover our authentic collection"}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Featured Products */}
       <section className="py-16 bg-gray-50">
@@ -222,7 +224,7 @@ export default function Home() {
       )}
 
       {/* Show all products when no filters are active */}
-      {!searchQuery && selectedCategory === null && allProducts.length > 0 && (
+      {!searchQuery && selectedCategory === null && (
         <section id="products-section" className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-12">
@@ -232,17 +234,15 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="product-grid">
-              {allProducts.slice(0, 12).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-            
-            {allProducts.length > 12 && (
-              <div className="text-center mt-8">
-                <Button variant="outline" className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white">
-                  View All Products →
-                </Button>
+            {allProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg">No products available at the moment.</p>
+              </div>
+            ) : (
+              <div className="product-grid">
+                {allProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
               </div>
             )}
           </div>

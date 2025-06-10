@@ -105,21 +105,8 @@ export default function Navbar() {
                   placeholder="Search for traditional wear, Aso Oke, beads..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-11 pr-4 py-2 input-nigerian h-10"
+                  className="w-full px-4 py-2 input-nigerian h-10"
                 />
-                <svg
-                  className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
               </div>
             </form>
           </div>

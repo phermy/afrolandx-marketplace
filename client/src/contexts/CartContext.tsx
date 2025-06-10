@@ -46,8 +46,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         title: 'Added to cart',
         description: 'Product has been added to your cart.',
       });
-      // Auto-open cart after adding item
-      setIsCartOpen(true);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {

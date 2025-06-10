@@ -191,19 +191,13 @@ export default function ShoppingCart() {
             {/* Cart Summary */}
             <div className="border-t bg-gray-50 p-6">
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">{formatPrice(cartTotal.toString())}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-semibold">{formatPrice(shipping.toString())}</span>
-                </div>
-                <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-nigerian-green">{formatPrice(finalTotal.toString())}</span>
+                  <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Shipping cost will be calculated at checkout
+                </p>
               </div>
 
               {/* Checkout Button */}
