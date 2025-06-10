@@ -13,8 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { X, Package, Truck, CheckCircle, Clock, Bell } from "lucide-react";
 import Navbar from "@/components/navbar";
-import type { Vendor, Product, Category } from "@/types";
+import type { Vendor, Product, Category, Notification } from "@/types";
 
 export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
