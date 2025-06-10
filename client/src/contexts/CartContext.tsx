@@ -35,19 +35,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
 
-  // Add to cart mutation
+  // Add to cart mutation with optimistic updates
   const addToCartMutation = useMutation({
     mutationFn: async ({ productId, quantity = 1 }: { productId: number; quantity?: number }) => {
-      await apiRequest('POST', '/api/cart', { productId, quantity });
+      const response = await apiRequest('POST', '/api/cart', { productId, quantity });
+      return response;
     },
-    onSuccess: () => {
+    onMutate: async ({ productId, quantity = 1 }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/cart'] });
+      
+      // Snapshot the previous value
+      const previousCart = queryClient.getQueryData(['/api/cart']);
+      
+      return { previousCart };
+    },
+    onSuccess: (data) => {
+      // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      
       toast({
         title: 'Added to cart',
         description: 'Product has been added to your cart.',
       });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousCart) {
+        queryClient.setQueryData(['/api/cart'], context.previousCart);
+      }
+      
       if (isUnauthorizedError(error)) {
         toast({
           title: 'Unauthorized',
@@ -64,6 +80,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         description: 'Failed to add product to cart.',
         variant: 'destructive',
       });
+    },
+    onSettled: () => {
+      // Ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
     },
   });
 

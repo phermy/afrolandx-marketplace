@@ -606,6 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderId: order.id,
           userId,
           shippingMethod,
+          callback_url: `${req.protocol}://${req.get('host')}/api/payment/callback`,
           custom_fields: [
             {
               display_name: "Order ID",
@@ -624,6 +625,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error initializing payment:', error);
       res.status(500).json({ message: 'Failed to initialize payment' });
+    }
+  });
+
+  // Payment verification and completion endpoint
+  app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const { reference } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!isPaystackInitialized()) {
+        return res.status(503).json({ message: 'Payment service not configured' });
+      }
+
+      // Verify payment with Paystack
+      const paystack = getPaystackService();
+      const verificationResult = await paystack.verifyTransaction(reference);
+
+      if (!verificationResult.status || verificationResult.data.status !== 'success') {
+        return res.status(400).json({ message: 'Payment verification failed' });
+      }
+
+      // Find order by payment reference
+      const orders = await storage.getOrdersForUser(userId);
+      const order = orders.find(o => o.paymentReference === reference);
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      // Update order status
+      await storage.updatePaymentStatus(order.id, 'completed', reference);
+      await storage.updateOrderStatus(order.id, 'confirmed');
+
+      // Clear user's cart
+      await storage.clearCart(userId);
+
+      // Get order items for notifications
+      const orderItems = await storage.getOrderItemsWithProducts(order.id);
+      
+      // Create notifications for vendors and admins
+      const vendorNotifications = new Set<number>();
+      
+      for (const item of orderItems) {
+        const product = await storage.getProduct(item.productId);
+        if (product && !vendorNotifications.has(product.vendorId)) {
+          const vendor = await storage.getVendor(product.vendorId);
+          if (vendor) {
+            await storage.createNotification({
+              userId: vendor.userId,
+              title: 'New Order Received! 🎉',
+              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
+              type: 'order'
+            });
+            vendorNotifications.add(product.vendorId);
+          }
+        }
+      }
+
+      // Notify all admins
+      const adminUsers = await storage.getAdminUsers();
+      for (const admin of adminUsers) {
+        await storage.createNotification({
+          userId: admin.id,
+          title: 'New Order Placed! 📦',
+          message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
+          type: 'order'
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        orderId: order.id,
+        message: 'Payment verified and order confirmed' 
+      });
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      res.status(500).json({ message: 'Failed to verify payment' });
+    }
+  });
+
+  // Payment callback endpoint for Paystack redirects
+  app.get('/api/payment/callback', async (req, res) => {
+    try {
+      const { reference, trxref } = req.query;
+      const paymentReference = reference || trxref;
+
+      if (!paymentReference) {
+        return res.redirect('/checkout?error=missing_reference');
+      }
+
+      if (!isPaystackInitialized()) {
+        return res.redirect('/checkout?error=payment_service_unavailable');
+      }
+
+      // Verify payment with Paystack
+      const paystack = getPaystackService();
+      const verificationResult = await paystack.verifyTransaction(paymentReference as string);
+
+      if (!verificationResult.status || verificationResult.data.status !== 'success') {
+        return res.redirect('/checkout?error=payment_failed');
+      }
+
+      // Get order ID from metadata
+      const orderId = verificationResult.data.metadata?.orderId || 
+                     verificationResult.data.metadata?.custom_fields?.find((field: any) => field.variable_name === 'order_id')?.value;
+
+      if (!orderId) {
+        return res.redirect('/checkout?error=order_not_found');
+      }
+
+      // Update order status
+      await storage.updatePaymentStatus(parseInt(orderId), 'completed', paymentReference as string);
+      await storage.updateOrderStatus(parseInt(orderId), 'confirmed');
+
+      // Get user ID from order
+      const order = await storage.getOrder(parseInt(orderId));
+      if (order) {
+        // Clear user's cart
+        await storage.clearCart(order.userId);
+
+        // Get order items for notifications
+        const orderItems = await storage.getOrderItemsWithProducts(order.id);
+        
+        // Create notifications for vendors and admins
+        const vendorNotifications = new Set<number>();
+        
+        for (const item of orderItems) {
+          const product = await storage.getProduct(item.productId);
+          if (product && !vendorNotifications.has(product.vendorId)) {
+            const vendor = await storage.getVendor(product.vendorId);
+            if (vendor) {
+              await storage.createNotification({
+                userId: vendor.userId,
+                title: 'New Order Received! 🎉',
+                message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
+                type: 'order'
+              });
+              vendorNotifications.add(product.vendorId);
+            }
+          }
+        }
+
+        // Notify all admins
+        const adminUsers = await storage.getAdminUsers();
+        for (const admin of adminUsers) {
+          await storage.createNotification({
+            userId: admin.id,
+            title: 'New Order Placed! 📦',
+            message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
+            type: 'order'
+          });
+        }
+      }
+
+      // Redirect to success page
+      res.redirect(`/order-success?order_id=${orderId}&reference=${paymentReference}`);
+    } catch (error) {
+      console.error('Error processing payment callback:', error);
+      res.redirect('/checkout?error=processing_failed');
     }
   });
 
@@ -925,6 +1085,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(quotes);
     } catch (error) {
       res.status(500).json({ message: 'Failed to get shipping quotes' });
+    }
+  });
+
+  // Notification routes
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const notifications = await storage.getUserNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      await storage.markNotificationAsRead(notificationId);
+      res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ message: 'Failed to mark notification as read' });
     }
   });
 
