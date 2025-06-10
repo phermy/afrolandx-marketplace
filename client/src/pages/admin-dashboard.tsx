@@ -581,9 +581,22 @@ export default function AdminDashboard() {
                           <div className="border-t pt-4 mt-4">
                             <h4 className="font-medium text-sm text-gray-700 mb-2">Shipping Address</h4>
                             <div className="text-sm text-gray-600">
-                              <p>{JSON.parse(order.shippingAddress).address1}</p>
-                              <p>{JSON.parse(order.shippingAddress).city}, {JSON.parse(order.shippingAddress).state}</p>
-                              <p>{JSON.parse(order.shippingAddress).country} {JSON.parse(order.shippingAddress).postalCode}</p>
+                              {(() => {
+                                try {
+                                  const address = typeof order.shippingAddress === 'string' 
+                                    ? JSON.parse(order.shippingAddress) 
+                                    : order.shippingAddress;
+                                  return (
+                                    <>
+                                      <p>{address.address1}</p>
+                                      <p>{address.city}, {address.state}</p>
+                                      <p>{address.country} {address.postalCode}</p>
+                                    </>
+                                  );
+                                } catch (e) {
+                                  return <p>Invalid address format</p>;
+                                }
+                              })()}
                             </div>
                           </div>
                         )}

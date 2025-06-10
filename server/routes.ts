@@ -782,8 +782,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Redirect to success page
-      res.redirect(`/order-success?order_id=${orderId}&reference=${paymentReference}`);
+      // Redirect to My Orders page after successful payment
+      res.redirect(`/my-orders?payment=success&orderId=${orderId}&reference=${paymentReference}`);
     } catch (error) {
       console.error('Error processing payment callback:', error);
       res.redirect('/checkout?error=processing_failed');

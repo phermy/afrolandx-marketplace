@@ -395,9 +395,9 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    // Set expiration time to 2 minutes from now for order notifications
+    // Set expiration time to 10 minutes from now for order notifications
     const expirationTime = notification.type === 'order' 
-      ? new Date(Date.now() + 2 * 60 * 1000) // 2 minutes
+      ? new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       : null;
 
     const [newNotification] = await db
