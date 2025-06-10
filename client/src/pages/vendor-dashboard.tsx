@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X, Package, Truck, CheckCircle, Clock, Bell } from "lucide-react";
 import Navbar from "@/components/navbar";
-import type { Vendor, Product, Category, Notification } from "@/types";
+import type { Vendor, Product, Category } from "@/types";
+import type { Notification } from "@shared/schema";
 
 export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -50,12 +51,6 @@ export default function VendorDashboard() {
     queryKey: ["/api/categories"],
   });
 
-  // Fetch notifications
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["/api/notifications"],
-    retry: false,
-  });
-
   // Fetch vendor's products
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products", { vendorId: vendor?.id }],
@@ -67,6 +62,38 @@ export default function VendorDashboard() {
     queryKey: ["/api/vendors/orders"],
     enabled: !!vendor?.id && vendor?.status === 'approved',
     retry: false,
+  });
+
+  // Fetch vendor notifications
+  const { data: vendorNotifications = [] } = useQuery<Notification[]>({
+    queryKey: ['/api/notifications'],
+    enabled: isAuthenticated && isVendor(user),
+    retry: false,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Notification dismiss mutation
+  const dismissNotificationMutation = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return await apiRequest("DELETE", `/api/notifications/${notificationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    }
+  });
+
+  // Order status update mutation
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
+      return await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/orders"] });
+      toast({
+        title: "Success",
+        description: "Order status updated successfully",
+      });
+    }
   });
 
   // Vendor registration mutation
@@ -280,6 +307,43 @@ export default function VendorDashboard() {
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Vendor Notifications */}
+        {Array.isArray(vendorNotifications) && vendorNotifications.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {vendorNotifications.map((notification) => (
+              <Card key={notification.id} className="border-nigerian-green bg-green-50">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bell className="w-4 h-4 text-nigerian-green" />
+                        <h4 className="font-semibold text-nigerian-green">{notification.title}</h4>
+                        {!notification.isRead && (
+                          <Badge className="bg-nigerian-green text-white text-xs">New</Badge>
+                        )}
+                      </div>
+                      <p className="text-gray-700 mb-2">{notification.message}</p>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {notification.createdAt ? new Date(String(notification.createdAt)).toLocaleString() : 'Unknown time'}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => dismissNotificationMutation.mutate(notification.id)}
+                      className="h-8 w-8 p-0 hover:bg-red-100"
+                      disabled={dismissNotificationMutation.isPending}
+                    >
+                      <X className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 font-nigerian">
@@ -491,11 +555,59 @@ export default function VendorDashboard() {
                           </div>
                         </div>
                         
-                        <div className="border-t pt-4 mt-4 text-sm text-gray-600">
-                          <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                          <p>Payment Status: <span className={order.paymentStatus === 'completed' ? 'text-green-600' : 'text-yellow-600'}>
-                            {order.paymentStatus}
-                          </span></p>
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex justify-between items-start">
+                            <div className="text-sm text-gray-600">
+                              <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+                              <p>Payment Status: <span className={order.paymentStatus === 'completed' ? 'text-green-600' : 'text-yellow-600'}>
+                                {order.paymentStatus}
+                              </span></p>
+                            </div>
+                            
+                            {/* Order Status Management */}
+                            {order.paymentStatus === 'completed' && (
+                              <div className="flex flex-col gap-2">
+                                <p className="text-sm font-medium text-gray-700 mb-2">Update Order Status:</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {order.orderStatus === 'confirmed' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'processing' })}
+                                      disabled={updateOrderStatusMutation.isPending}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                      <Package className="w-3 h-3 mr-1" />
+                                      Mark Processing
+                                    </Button>
+                                  )}
+                                  
+                                  {order.orderStatus === 'processing' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'shipped' })}
+                                      disabled={updateOrderStatusMutation.isPending}
+                                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                                    >
+                                      <Truck className="w-3 h-3 mr-1" />
+                                      Mark Shipped
+                                    </Button>
+                                  )}
+                                  
+                                  {order.orderStatus === 'shipped' && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'delivered' })}
+                                      disabled={updateOrderStatusMutation.isPending}
+                                      className="bg-green-600 hover:bg-green-700 text-white"
+                                    >
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Mark Delivered
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

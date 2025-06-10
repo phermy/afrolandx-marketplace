@@ -790,6 +790,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update order status (vendor only)
+  app.patch('/api/orders/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { status } = req.body;
+      const userId = req.user.claims.sub;
+
+      // Verify vendor owns products in this order
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      const orderItems = await storage.getOrderItemsWithProducts(orderId);
+      const vendor = await storage.getVendorByUserId(userId);
+      
+      if (!vendor) {
+        return res.status(403).json({ message: 'Access denied: Vendor account required' });
+      }
+
+      const vendorOwnsItems = orderItems.some(async (item) => {
+        const product = await storage.getProduct(item.productId);
+        return product?.vendorId === vendor.id;
+      });
+
+      if (!vendorOwnsItems) {
+        return res.status(403).json({ message: 'Access denied: You can only update orders containing your products' });
+      }
+
+      // Update order status
+      await storage.updateOrderStatus(orderId, status);
+
+      // Create customer notification based on status
+      let notificationTitle = '';
+      let notificationMessage = '';
+
+      switch (status) {
+        case 'processing':
+          notificationTitle = 'Order Being Prepared! 📦';
+          notificationMessage = `Your order #${orderId} is now being prepared by ${vendor.businessName}. We'll notify you when it ships.`;
+          break;
+        case 'shipped':
+          notificationTitle = 'Order Shipped! 🚚';
+          notificationMessage = `Great news! Your order #${orderId} has been shipped by ${vendor.businessName}. It should arrive soon.`;
+          break;
+        case 'delivered':
+          notificationTitle = 'Order Delivered! ✅';
+          notificationMessage = `Your order #${orderId} from ${vendor.businessName} has been delivered. Thank you for your purchase!`;
+          break;
+      }
+
+      if (notificationTitle && notificationMessage) {
+        await storage.createNotification({
+          userId: order.userId,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'order',
+          orderId: order.id
+        });
+      }
+
+      res.json({ message: 'Order status updated successfully' });
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      res.status(500).json({ message: 'Failed to update order status' });
+    }
+  });
+
   // Order routes
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
