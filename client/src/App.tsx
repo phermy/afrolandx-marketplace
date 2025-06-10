@@ -11,6 +11,7 @@ import Home from "@/pages/home";
 import Products from "@/pages/products";
 import Profile from "@/pages/profile";
 import MyOrders from "@/pages/my-orders";
+import OrderSuccess from "@/pages/order-success";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/products" component={Products} />
           <Route path="/profile" component={Profile} />
           <Route path="/my-orders" component={MyOrders} />
+          <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">
             <AdminProtectedRoute>
