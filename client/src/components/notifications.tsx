@@ -78,11 +78,11 @@ export default function NotificationPanel() {
                 <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
                 <div className="flex items-center text-xs text-gray-500">
                   <Clock className="w-3 h-3 mr-1" />
-                  {new Date(notification.createdAt).toLocaleString()}
+                  {notification.createdAt ? new Date(String(notification.createdAt)).toLocaleString() : 'Unknown time'}
                 </div>
                 {notification.expiresAt && (
                   <div className="text-xs text-yellow-600 mt-1">
-                    Expires: {new Date(notification.expiresAt).toLocaleString()}
+                    Expires: {notification.expiresAt ? new Date(String(notification.expiresAt)).toLocaleString() : 'Never'}
                   </div>
                 )}
               </div>

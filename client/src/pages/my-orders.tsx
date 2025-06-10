@@ -1,21 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { useLocation } from 'wouter';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 import type { Order } from '@/types';
 
 export default function MyOrders() {
   const { user, isAuthenticated } = useAuth();
+  const [location] = useLocation();
+  const { toast } = useToast();
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders/my-orders'],
     enabled: isAuthenticated,
     retry: false,
   });
+
+  // Handle payment success redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const orderId = urlParams.get('orderId');
+    const reference = urlParams.get('reference');
+
+    if (paymentStatus === 'success' && orderId) {
+      toast({
+        title: "Payment Successful! 🎉",
+        description: `Your order #${orderId} has been confirmed and payment processed successfully.`,
+        variant: "default",
+      });
+      
+      // Clean up URL parameters
+      window.history.replaceState({}, '', '/my-orders');
+    }
+  }, [toast]);
 
   const formatPrice = (price: string) => {
     return `₦${parseFloat(price).toLocaleString()}`;

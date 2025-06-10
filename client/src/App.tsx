@@ -70,6 +70,7 @@ function App() {
           <Toaster />
           <Router />
           <ShoppingCart />
+          <NotificationPanel />
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>
