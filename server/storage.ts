@@ -25,7 +25,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, like, or, gte, lte, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -75,6 +75,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
   markNotificationAsRead(id: number): Promise<void>;
+  cleanupExpiredNotifications(): Promise<void>;
   getAdminUsers(): Promise<User[]>;
 }
 
@@ -386,14 +387,25 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async createNotification(notification: InsertNotification): Promise<Notification> {
+    // Set expiration time to 2 minutes from now for order notifications
+    const expirationTime = notification.type === 'order' 
+      ? new Date(Date.now() + 2 * 60 * 1000) // 2 minutes
+      : null;
+
     const [newNotification] = await db
       .insert(notifications)
-      .values(notification)
+      .values({
+        ...notification,
+        expiresAt: expirationTime
+      })
       .returning();
     return newNotification;
   }
 
   async getUserNotifications(userId: string): Promise<Notification[]> {
+    // Clean up expired notifications first
+    await this.cleanupExpiredNotifications();
+    
     return await db
       .select()
       .from(notifications)
@@ -406,6 +418,15 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.id, id));
+  }
+
+  async cleanupExpiredNotifications(): Promise<void> {
+    const now = new Date();
+    await db
+      .delete(notifications)
+      .where(
+        sql`${notifications.expiresAt} IS NOT NULL AND ${notifications.expiresAt} < ${now}`
+      );
   }
 
   async getAdminUsers(): Promise<User[]> {
