@@ -399,6 +399,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test Paystack integration
+  app.get('/api/test-paystack', async (req, res) => {
+    try {
+      if (!isPaystackInitialized()) {
+        return res.status(500).json({ 
+          status: 'error', 
+          message: 'Paystack service not initialized' 
+        });
+      }
+      
+      res.json({ 
+        status: 'success', 
+        message: 'Paystack service is initialized and ready',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        status: 'error', 
+        message: 'Paystack integration test failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Cart routes
   app.post('/api/cart', isAuthenticated, async (req: any, res) => {
     try {

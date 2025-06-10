@@ -54,7 +54,7 @@ export default function Landing() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="text-2xl font-bold text-nigerian-green font-nigerian">
-                <span className="text-nigerian-gold">👑</span> NaijaFashion
+                <span className="text-nigerian-gold">👑</span> Afrolandx
               </div>
             </div>
 
@@ -119,7 +119,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
-              Why Choose NaijaFashion?
+              Why Choose Afrolandx?
             </h2>
             <p className="text-gray-600 text-lg">
               Your trusted marketplace for authentic Nigerian fashion
@@ -366,7 +366,7 @@ export default function Landing() {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 NaijaFashion. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
+            <p>&copy; 2025 Afrolandx. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
           </div>
         </div>
       </footer>

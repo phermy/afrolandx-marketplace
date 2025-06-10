@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializePaystack } from "./paystack";
 
 const app = express();
 app.use(express.json());
@@ -37,7 +38,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Remove static file serving from here since it's handled in routes
+  // Initialize Paystack service with secret key
+  if (process.env.PAYSTACK_SECRET_KEY) {
+    initializePaystack(process.env.PAYSTACK_SECRET_KEY);
+    log("Paystack service initialized successfully");
+  } else {
+    log("Warning: PAYSTACK_SECRET_KEY not found in environment variables");
+  }
   
   const server = await registerRoutes(app);
 

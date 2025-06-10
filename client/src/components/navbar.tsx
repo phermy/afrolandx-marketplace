@@ -55,7 +55,7 @@ export default function Navbar() {
           <div className="flex items-center">
             <Link href="/">
               <div className="text-2xl font-bold text-nigerian-green font-nigerian cursor-pointer">
-                <span className="text-nigerian-gold">👑</span> NaijaFashion
+                <span className="text-nigerian-gold">👑</span> Afrolandx
               </div>
             </Link>
 

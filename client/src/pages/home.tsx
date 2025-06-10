@@ -65,7 +65,7 @@ export default function Home() {
           <div className="text-center">
             <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
-                Celebrate Nigerian
+                Celebrate Cultural
               </span>
               <span className="block text-amber-300 mt-2">
                 Heritage
@@ -253,7 +253,7 @@ export default function Home() {
       <section className="py-16 bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Why Choose NaijaFashion</h2>
+            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Why Choose Afrolandx</h2>
             <p className="text-gray-600 text-lg">Your trusted marketplace for authentic Nigerian fashion</p>
           </div>
 
@@ -304,7 +304,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="text-2xl font-bold font-nigerian mb-4">
-                <span className="text-nigerian-gold">👑</span> NaijaFashion
+                <span className="text-nigerian-gold">👑</span> Afrolandx
               </div>
               <p className="text-green-100 mb-4">
                 Connecting the world to authentic Nigerian fashion and culture.
@@ -360,7 +360,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-green-600 mt-8 pt-8 text-center text-green-100">
-            <p>&copy; 2024 NaijaFashion. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
+            <p>&copy; 2025 Afrolandx. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
           </div>
         </div>
       </footer>
