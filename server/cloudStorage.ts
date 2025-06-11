@@ -105,12 +105,18 @@ export function initializeCloudStorage(): void {
   };
 
   if (!config.accessKeyId || !config.secretAccessKey || !config.bucketName) {
-    console.warn('Cloud storage credentials not provided. Using local storage fallback.');
+    console.log('Cloud storage credentials not provided. Using local storage fallback.');
     return;
   }
 
-  cloudStorageService = new CloudStorageService(config);
-  console.log('Cloud storage service initialized successfully');
+  try {
+    cloudStorageService = new CloudStorageService(config);
+    console.log('Cloud storage service initialized successfully');
+  } catch (error) {
+    console.warn('Failed to initialize cloud storage:', error);
+    console.log('Falling back to local storage');
+    cloudStorageService = null;
+  }
 }
 
 export function getCloudStorageService(): CloudStorageService {

@@ -50,17 +50,22 @@ app.use((req, res, next) => {
   // Initialize cloud storage service
   initializeCloudStorage();
 
-  // Migrate existing images to cloud storage
+  // Migrate existing images to cloud storage (only if cloud storage is properly configured)
   if (process.env.AWS_S3_BUCKET) {
-    try {
-      const { imageOptimizer } = await import('./imageOptimizer');
-      setTimeout(async () => {
-        log('Starting image migration to cloud storage...');
-        await imageOptimizer.migrateLocalImagesToCloud();
-        log('Image migration process completed');
-      }, 3000); // Wait 3 seconds after startup
-    } catch (error) {
-      log('Image migration skipped:', String(error));
+    const { isCloudStorageEnabled } = await import('./cloudStorage');
+    if (isCloudStorageEnabled()) {
+      try {
+        const { imageOptimizer } = await import('./imageOptimizer');
+        setTimeout(async () => {
+          log('Starting image migration to cloud storage...');
+          await imageOptimizer.migrateLocalImagesToCloud();
+          log('Image migration process completed');
+        }, 3000);
+      } catch (error) {
+        log('Image migration skipped:', String(error));
+      }
+    } else {
+      log('Cloud storage not available, using optimized local image serving');
     }
   }
   

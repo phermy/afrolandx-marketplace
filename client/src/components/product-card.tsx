@@ -5,8 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Product } from '@/types';
 
-// Image optimization utility
-const getOptimizedImageUrl = (imagePath: string): string => {
+// Image optimization utility with responsive sizing
+const getOptimizedImageUrl = (imagePath: string, options: {
+  width?: number;
+  height?: number;
+  quality?: number;
+  format?: string;
+} = {}): string => {
   if (!imagePath) return '';
   
   // If it's already a full URL (cloud storage), return as-is
@@ -14,9 +19,16 @@ const getOptimizedImageUrl = (imagePath: string): string => {
     return imagePath;
   }
   
-  // If it's a local path, construct the full URL
+  // If it's a local path, add optimization parameters
   if (imagePath.startsWith('/uploads/')) {
-    return imagePath;
+    const { width = 400, height = 400, quality = 85, format = 'jpeg' } = options;
+    const params = new URLSearchParams();
+    params.set('w', width.toString());
+    params.set('h', height.toString());
+    params.set('q', quality.toString());
+    params.set('f', format);
+    
+    return `${imagePath}?${params.toString()}`;
   }
   
   return imagePath;
@@ -68,7 +80,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="relative overflow-hidden">
           {product.images && product.images.length > 0 ? (
             <img
-              src={getOptimizedImageUrl(product.images[0])}
+              src={getOptimizedImageUrl(product.images[0], { width: 400, height: 400, quality: 85 })}
               alt={product.name}
               className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"

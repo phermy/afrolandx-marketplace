@@ -64,15 +64,77 @@ const localUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Dedicated image serving route
-  app.get('/uploads/:filename', (req, res) => {
+  // Optimized image serving route
+  app.get('/uploads/:filename', async (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(process.cwd(), 'uploads', 'products', filename);
     
     if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
+      try {
+        const { imageProcessor } = await import('./imageProcessor');
+        
+        // Get optimization parameters from query
+        const width = req.query.w ? parseInt(req.query.w as string) : 800;
+        const height = req.query.h ? parseInt(req.query.h as string) : 800;
+        const quality = req.query.q ? parseInt(req.query.q as string) : 85;
+        const format = (req.query.f as string) || 'jpeg';
+        
+        // Optimize and serve image
+        const optimizedPath = await imageProcessor.optimizeImage(filePath, {
+          width,
+          height,
+          quality,
+          format: format as 'jpeg' | 'webp' | 'png'
+        });
+        
+        // Set appropriate cache headers
+        res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1 year
+        res.setHeader('Content-Type', `image/${format}`);
+        
+        res.sendFile(path.resolve(optimizedPath));
+      } catch (error) {
+        console.error('Error optimizing image:', error);
+        // Fallback to original image
+        res.sendFile(filePath);
+      }
     } else {
       res.status(404).json({ message: 'Image not found' });
+    }
+  });
+
+  // Advanced image optimization API endpoint
+  app.get('/api/images/optimize/uploads/:filename', async (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(process.cwd(), 'uploads', 'products', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+
+    try {
+      const { imageProcessor } = await import('./imageProcessor');
+      
+      // Parse optimization parameters
+      const width = req.query.w ? parseInt(req.query.w as string) : undefined;
+      const height = req.query.h ? parseInt(req.query.h as string) : undefined;
+      const quality = req.query.q ? parseInt(req.query.q as string) : 85;
+      const format = (req.query.f as string) || 'jpeg';
+      
+      const optimizedPath = await imageProcessor.optimizeImage(filePath, {
+        width,
+        height,
+        quality,
+        format: format as 'jpeg' | 'webp' | 'png'
+      });
+      
+      // Set cache headers and content type
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      res.setHeader('Content-Type', `image/${format}`);
+      
+      res.sendFile(path.resolve(optimizedPath));
+    } catch (error) {
+      console.error('Error in image optimization API:', error);
+      res.status(500).json({ message: 'Failed to optimize image' });
     }
   });
 
