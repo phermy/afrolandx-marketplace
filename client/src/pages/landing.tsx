@@ -431,8 +431,13 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="text-2xl font-bold font-nigerian mb-4">
-                <span className="text-nigerian-gold">👑</span> NaijaFashion
+              <div className="flex items-center text-2xl font-bold font-nigerian mb-4">
+                <img 
+                  src={logoImage} 
+                  alt="Afrolandx Logo" 
+                  className="w-8 h-8 mr-2"
+                />
+                Afrolandx
               </div>
               <p className="text-gray-400 mb-4">
                 Connecting the world to authentic Nigerian fashion and culture.
