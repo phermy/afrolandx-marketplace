@@ -14,9 +14,9 @@ export default function Landing() {
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
 
-  // Fetch all products for display on landing page
+  // Fetch only approved products for display on landing page
   const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products", { status: "approved" }],
+    queryKey: ["/api/products"],
     retry: false,
   });
 
@@ -158,7 +158,7 @@ export default function Landing() {
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
                   <div className="relative overflow-hidden rounded-t-lg">
                     <img
-                      src={product.imageUrl || '/api/placeholder/300/400'}
+                      src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/api/placeholder/300/400')}
                       alt={product.name}
                       className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
