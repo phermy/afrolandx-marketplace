@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -54,8 +55,13 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/">
-              <div className="text-2xl font-bold text-nigerian-green font-nigerian cursor-pointer">
-                <span className="text-nigerian-gold">👑</span> Afrolandx
+              <div className="flex items-center text-2xl font-bold text-nigerian-green font-nigerian cursor-pointer">
+                <img 
+                  src={logoImage} 
+                  alt="Afrolandx Logo" 
+                  className="w-8 h-8 mr-2"
+                />
+                Afrolandx
               </div>
             </Link>
 

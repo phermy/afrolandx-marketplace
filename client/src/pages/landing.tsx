@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
 import { ShoppingCart } from "lucide-react";
 import type { Product } from "@/types";
+import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
@@ -78,8 +79,13 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <div className="text-2xl font-bold text-nigerian-green font-nigerian">
-                <span className="text-nigerian-gold">👑</span> Afrolandx
+              <div className="flex items-center text-2xl font-bold text-nigerian-green font-nigerian">
+                <img 
+                  src={logoImage} 
+                  alt="Afrolandx Logo" 
+                  className="w-8 h-8 mr-2"
+                />
+                Afrolandx
               </div>
             </div>
 

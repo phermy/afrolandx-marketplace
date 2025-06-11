@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 import { getUserRoleDisplay } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
+import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Home() {
   const { user } = useAuth();
