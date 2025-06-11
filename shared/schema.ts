@@ -191,6 +191,9 @@ export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  stock: z.number().min(0).default(0),
+  imageUrl: z.string().optional(),
 });
 
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({

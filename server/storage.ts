@@ -53,6 +53,7 @@ export interface IStorage {
   getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean }): Promise<Product[]>;
   updateProductStatus(id: number, status: string): Promise<void>;
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
+  updateProductStock(id: number, stock: number): Promise<void>;
   getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]>;
   
   // Cart operations
@@ -250,6 +251,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(products)
       .set({ featured, updatedAt: new Date() })
+      .where(eq(products.id, id));
+  }
+
+  async updateProductStock(id: number, stock: number): Promise<void> {
+    await db
+      .update(products)
+      .set({ stock, updatedAt: new Date() })
       .where(eq(products.id, id));
   }
 
