@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializePaystack } from "./paystack";
+import { initializeCloudStorage } from "./cloudStorage";
 
 const app = express();
 app.use(express.json());
@@ -45,6 +46,9 @@ app.use((req, res, next) => {
   } else {
     log("Warning: PAYSTACK_SECRET_KEY not found in environment variables");
   }
+
+  // Initialize cloud storage service
+  initializeCloudStorage();
   
   const server = await registerRoutes(app);
 

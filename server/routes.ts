@@ -11,11 +11,29 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { getCloudStorageService, isCloudStorageEnabled } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 
-// Configure multer for image uploads
-const storage_config = multer.diskStorage({
+// Configure multer for memory storage (for cloud upload)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Fallback local storage for when cloud storage is not available
+const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = 'uploads/products';
     if (!fs.existsSync(uploadDir)) {
@@ -29,8 +47,8 @@ const storage_config = multer.diskStorage({
   }
 });
 
-const upload = multer({
-  storage: storage_config,
+const localUpload = multer({
+  storage: localStorage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp/;
@@ -282,49 +300,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes
-  app.post('/api/products', isAuthenticated, isVendor, upload.array('images', 5), async (req: any, res) => {
-    try {
-      // Remove debug logging for production
-      // console.log('Request body:', req.body);
-      // console.log('Request files:', req.files);
-      // console.log('Vendor info:', req.vendor);
-      
-      // Validate required fields are present
-      if (!req.body.name || !req.body.description || !req.body.price || !req.body.stock || !req.body.categoryId) {
-        return res.status(400).json({ 
-          message: 'Missing required fields', 
-          required: ['name', 'description', 'price', 'stock', 'categoryId'] 
-        });
+  app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
+    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
+    
+    uploadHandler(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message });
       }
-      
-      const files = req.files as Express.Multer.File[];
-      const imageUrls = files?.map(file => `/uploads/${file.filename}`) || [];
 
-      const productData = {
-        name: req.body.name.trim(),
-        description: req.body.description.trim(),
-        price: req.body.price,
-        stock: parseInt(req.body.stock),
-        categoryId: parseInt(req.body.categoryId),
-        weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
-        imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
-        images: imageUrls,
-        vendorId: req.vendor.id,
-      };
+      try {
+        // Validate required fields are present
+        if (!req.body.name || !req.body.description || !req.body.price || !req.body.stock || !req.body.categoryId) {
+          return res.status(400).json({ 
+            message: 'Missing required fields', 
+            required: ['name', 'description', 'price', 'stock', 'categoryId'] 
+          });
+        }
+        
+        const files = req.files as Express.Multer.File[];
+        let imageUrls: string[] = [];
 
-      const validatedData = insertProductSchema.parse(productData);
+        // Process image uploads
+        if (files && files.length > 0) {
+          if (isCloudStorageEnabled()) {
+            // Upload to cloud storage
+            const cloudStorage = getCloudStorageService();
+            const uploadPromises = files.map(file => 
+              cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
+            );
+            imageUrls = await Promise.all(uploadPromises);
+          } else {
+            // Use local file paths
+            imageUrls = files.map(file => `/uploads/${file.filename}`);
+          }
+        }
 
-      const product = await storage.createProduct(validatedData);
-      res.json(product);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        console.error('Validation error details:', error.errors);
-        res.status(400).json({ message: 'Validation error', errors: error.errors });
-      } else {
-        console.error('Error creating product:', error);
-        res.status(500).json({ message: 'Failed to create product' });
+        const productData = {
+          name: req.body.name.trim(),
+          description: req.body.description.trim(),
+          price: req.body.price,
+          stock: parseInt(req.body.stock),
+          categoryId: parseInt(req.body.categoryId),
+          weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
+          imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
+          images: imageUrls,
+          vendorId: req.vendor.id,
+        };
+
+        const validatedData = insertProductSchema.parse(productData);
+        const product = await storage.createProduct(validatedData);
+        res.json(product);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          console.error('Validation error details:', error.errors);
+          res.status(400).json({ message: 'Validation error', errors: error.errors });
+        } else {
+          console.error('Error creating product:', error);
+          res.status(500).json({ message: 'Failed to create product' });
+        }
       }
-    }
+    });
   });
 
   app.get('/api/products', async (req, res) => {
