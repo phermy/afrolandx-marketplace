@@ -401,6 +401,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Placeholder image service
+  app.get('/api/placeholder/:width/:height', (req, res) => {
+    const { width, height } = req.params;
+    const w = parseInt(width) || 300;
+    const h = parseInt(height) || 400;
+    
+    // Generate SVG placeholder
+    const svg = `
+      <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#1a5f3f"/>
+        <rect x="20" y="20" width="${w-40}" height="${h-40}" fill="#d4af37" opacity="0.1"/>
+        <text x="50%" y="45%" font-family="Arial, sans-serif" font-size="16" fill="#d4af37" text-anchor="middle">Nigerian Fashion</text>
+        <text x="50%" y="55%" font-family="Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle">${w} × ${h}</text>
+      </svg>
+    `;
+    
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(svg);
+  });
+
   // Test Paystack integration with payment initialization
   app.get('/api/test-paystack', async (req, res) => {
     try {

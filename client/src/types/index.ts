@@ -36,8 +36,9 @@ export interface Product {
   name: string;
   description: string;
   price: string;
-  quantity: number;
+  stock: number;
   weight?: string;
+  imageUrl?: string;
   images: string[];
   status: 'pending' | 'approved' | 'rejected';
   featured: boolean;

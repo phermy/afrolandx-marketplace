@@ -490,7 +490,7 @@ export default function VendorDashboard() {
                           <p className="text-gray-600 text-sm">{product.description}</p>
                           <div className="flex items-center space-x-4 mt-2">
                             <span className="text-nigerian-green font-semibold">₦{parseFloat(product.price).toLocaleString()}</span>
-                            <span className="text-gray-500 text-sm">Qty: {product.quantity}</span>
+                            <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
                             <Badge 
                               className={
                                 product.status === 'approved' ? 'badge-approved' :
@@ -676,6 +676,17 @@ export default function VendorDashboard() {
                     />
                   </div>
 
+                  <div>
+                    <Label htmlFor="imageUrl">Product Image URL</Label>
+                    <Input
+                      id="imageUrl"
+                      name="imageUrl"
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      className="input-nigerian"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <Label htmlFor="price">Price (₦)</Label>
@@ -689,10 +700,10 @@ export default function VendorDashboard() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="quantity">Quantity</Label>
+                      <Label htmlFor="stock">Stock Quantity</Label>
                       <Input
-                        id="quantity"
-                        name="quantity"
+                        id="stock"
+                        name="stock"
                         type="number"
                         placeholder="10"
                         required
