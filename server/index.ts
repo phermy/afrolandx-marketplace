@@ -55,8 +55,10 @@ app.use((req, res, next) => {
     try {
       const { imageOptimizer } = await import('./imageOptimizer');
       setTimeout(async () => {
+        log('Starting image migration to cloud storage...');
         await imageOptimizer.migrateLocalImagesToCloud();
-      }, 5000); // Wait 5 seconds after startup
+        log('Image migration process completed');
+      }, 3000); // Wait 3 seconds after startup
     } catch (error) {
       log('Image migration skipped:', String(error));
     }

@@ -27,8 +27,11 @@ export class ImageOptimizer {
                 // Read local file
                 const fs = await import('fs');
                 const path = await import('path');
-                const localPath = path.join(process.cwd(), imagePath);
+                // Extract filename from the path and construct correct file path
+                const filename = path.basename(imagePath);
+                const localPath = path.join(process.cwd(), 'uploads', 'products', filename);
                 
+                console.log(`Checking file: ${localPath}`);
                 if (fs.existsSync(localPath)) {
                   const imageBuffer = fs.readFileSync(localPath);
                   const cloudUrl = await cloudStorage.uploadImage(imageBuffer, 'image/jpeg', 'products');
@@ -36,6 +39,7 @@ export class ImageOptimizer {
                   hasChanges = true;
                   console.log(`Migrated image: ${imagePath} -> ${cloudUrl}`);
                 } else {
+                  console.log(`File not found: ${localPath}`);
                   // Keep the original if file doesn't exist
                   updatedImages.push(imagePath);
                 }
