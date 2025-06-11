@@ -382,18 +382,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const files = req.files as Express.Multer.File[];
         let imageUrls: string[] = [];
 
-        // Process image uploads
+        // Process image uploads with robust fallback
         if (files && files.length > 0) {
-          if (isCloudStorageEnabled()) {
-            // Upload to cloud storage
-            const cloudStorage = getCloudStorageService();
-            const uploadPromises = files.map(file => 
-              cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
-            );
-            imageUrls = await Promise.all(uploadPromises);
-          } else {
-            // Use local file paths
-            imageUrls = files.map(file => `/uploads/${file.filename}`);
+          try {
+            if (isCloudStorageEnabled()) {
+              // Try cloud storage first
+              const cloudStorage = getCloudStorageService();
+              const uploadPromises = files.map(file => 
+                cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
+              );
+              imageUrls = await Promise.all(uploadPromises);
+              console.log('Successfully uploaded images to cloud storage');
+            } else {
+              // Use local storage with proper file handling
+              imageUrls = files.map(file => `/uploads/${file.filename}`);
+            }
+          } catch (error) {
+            console.error('Cloud storage failed, falling back to local storage:', error);
+            // Fallback to local storage - save files locally
+            const fs = await import('fs');
+            const path = await import('path');
+            
+            imageUrls = [];
+            for (const file of files) {
+              const uploadDir = path.join(process.cwd(), 'uploads', 'products');
+              if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+              }
+              
+              const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+              const filename = `product-${uniqueSuffix}${path.extname(file.originalname)}`;
+              const filepath = path.join(uploadDir, filename);
+              
+              fs.writeFileSync(filepath, file.buffer);
+              imageUrls.push(`/uploads/${filename}`);
+            }
+            console.log('Successfully saved images locally as fallback');
           }
         }
 
