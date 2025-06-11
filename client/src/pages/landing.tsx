@@ -256,7 +256,7 @@ export default function Landing() {
                 Celebrating Nigerian Heritage
               </h2>
               <p className="text-gray-600 text-lg mb-6">
-                NaijaFashion is more than just an e-commerce platform. We're a cultural bridge 
+                Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
                 connecting Nigerian artisans with fashion enthusiasts worldwide. Our mission is 
                 to preserve and promote the rich heritage of Nigerian traditional fashion while 
                 supporting local communities.

@@ -353,7 +353,7 @@ export default function VendorDashboard() {
         </div>
 
         {/* Notifications */}
-        {Array.isArray(notifications) && notifications.length > 0 && (
+        {Array.isArray(vendorNotifications) && vendorNotifications.length > 0 && (
           <div className="mb-8">
             <Card>
               <CardHeader>
@@ -361,18 +361,29 @@ export default function VendorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(notifications as any[]).slice(0, 5).map((notification: any) => (
-                    <div key={notification.id} className="flex items-start space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="text-green-600 text-lg">
-                        {notification.type === 'order' ? '🎉' : '📢'}
+                  {vendorNotifications.slice(0, 5).map((notification: any) => (
+                    <div key={notification.id} className="flex items-start justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-start space-x-3">
+                        <div className="text-green-600 text-lg">
+                          {notification.type === 'order' ? '🎉' : '📢'}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-green-800">{notification.title}</h4>
+                          <p className="text-green-700 text-sm">{notification.message}</p>
+                          <p className="text-green-600 text-xs mt-1">
+                            {new Date(notification.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-green-800">{notification.title}</h4>
-                        <p className="text-green-700 text-sm">{notification.message}</p>
-                        <p className="text-green-600 text-xs mt-1">
-                          {new Date(notification.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => dismissNotificationMutation.mutate(notification.id)}
+                        className="h-8 w-8 p-0 hover:bg-green-200"
+                        disabled={dismissNotificationMutation.isPending}
+                      >
+                        <X className="w-4 h-4 text-green-600" />
+                      </Button>
                     </div>
                   ))}
                 </div>
