@@ -786,8 +786,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Clear user's cart
         await storage.clearCart(order.userId);
 
-        // Get order items for notifications
+        // Get order items for stock reduction and notifications
         const orderItems = await storage.getOrderItemsWithProducts(order.id);
+        
+        // Reduce stock for each purchased item
+        console.log('Processing stock reduction for order:', order.id);
+        for (const item of orderItems) {
+          console.log('Processing item:', item);
+          const product = await storage.getProduct(item.productId);
+          console.log('Product before stock reduction:', product);
+          if (product && product.stock >= item.quantity) {
+            const newStock = product.stock - item.quantity;
+            console.log(`Reducing stock for product ${item.productId} from ${product.stock} to ${newStock}`);
+            await storage.updateProductStock(item.productId, newStock);
+            console.log('Stock reduction completed for product:', item.productId);
+          } else {
+            console.log(`Cannot reduce stock for product ${item.productId}: insufficient stock or product not found`);
+          }
+        }
         
         // Create notifications for vendors and admins
         const vendorNotifications = new Set<number>();
