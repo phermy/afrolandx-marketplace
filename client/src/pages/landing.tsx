@@ -1,15 +1,24 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
+import { ShoppingCart } from "lucide-react";
+import type { Product } from "@/types";
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+
+  // Fetch all products for display on landing page
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products", { status: "approved" }],
+    retry: false,
+  });
 
   useEffect(() => {
     // Check for authentication errors in URL
@@ -44,6 +53,22 @@ export default function Landing() {
   const handleAdminPortalClick = () => {
     // Redirect to login with admin intent
     window.location.href = '/api/login?redirect=/admin';
+  };
+
+  const handleAddToCart = (productId: number) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to add items to your cart",
+        variant: "default",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 1000);
+      return;
+    }
+    // This would normally trigger the add to cart functionality
+    // But since user is not authenticated, we redirect to login
   };
 
   return (
@@ -111,6 +136,90 @@ export default function Landing() {
               </Button>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Featured Products Section */}
+      <section className="py-20 bg-white" id="products">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold font-nigerian mb-6 text-gray-900">
+              Featured <span className="text-nigerian-green">Collections</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Discover authentic Nigerian fashion pieces crafted by local artisans. 
+              Each piece tells a story of our rich cultural heritage.
+            </p>
+          </div>
+
+          {products.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {products.slice(0, 8).map((product) => (
+                <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
+                  <div className="relative overflow-hidden rounded-t-lg">
+                    <img
+                      src={product.imageUrl || '/api/placeholder/300/400'}
+                      alt={product.name}
+                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {product.featured && (
+                      <Badge className="absolute top-3 left-3 bg-nigerian-gold text-white">
+                        Featured
+                      </Badge>
+                    )}
+                    {product.stock <= 5 && product.stock > 0 && (
+                      <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
+                        Low Stock
+                      </Badge>
+                    )}
+                    {product.stock === 0 && (
+                      <Badge className="absolute top-3 right-3 bg-red-500 text-white">
+                        Out of Stock
+                      </Badge>
+                    )}
+                  </div>
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold text-lg mb-2 text-gray-900 group-hover:text-nigerian-green transition-colors">
+                      {product.name}
+                    </h3>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                      {product.description}
+                    </p>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-2xl font-bold text-nigerian-green">
+                        ₦{product.price.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {product.stock} left
+                      </span>
+                    </div>
+                    <Button 
+                      onClick={() => handleAddToCart(product.id)}
+                      className="w-full btn-nigerian"
+                      disabled={product.stock === 0}
+                    >
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">
+                New products coming soon! Check back later for amazing Nigerian fashion pieces.
+              </p>
+            </div>
+          )}
+
+          {products.length > 8 && (
+            <div className="text-center mt-12">
+              <Button onClick={handleLogin} size="lg" className="btn-nigerian">
+                View All Products
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 

@@ -65,9 +65,10 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  quantity: integer("quantity").notNull().default(0),
+  stock: integer("stock").notNull().default(0), // renamed from quantity to stock
   weight: decimal("weight", { precision: 5, scale: 2 }), // in kg
-  images: jsonb("images").default([]), // array of image URLs
+  imageUrl: text("image_url"), // single image URL for display
+  images: jsonb("images").default([]), // array of image URLs for gallery
   status: varchar("status").default("pending"), // pending, approved, rejected
   featured: boolean("featured").default(false),
   createdAt: timestamp("created_at").defaultNow(),

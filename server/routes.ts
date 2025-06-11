@@ -664,8 +664,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clear user's cart
       await storage.clearCart(userId);
 
-      // Get order items for notifications
+      // Get order items for stock reduction and notifications
       const orderItems = await storage.getOrderItemsWithProducts(order.id);
+      
+      // Reduce stock for each purchased item
+      for (const item of orderItems) {
+        const product = await storage.getProduct(item.productId);
+        if (product && product.stock >= item.quantity) {
+          const newStock = product.stock - item.quantity;
+          await storage.updateProductStock(item.productId, newStock);
+        }
+      }
       
       // Create notifications for vendors and admins
       const vendorNotifications = new Set<number>();
