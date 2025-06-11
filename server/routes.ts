@@ -290,10 +290,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // console.log('Vendor info:', req.vendor);
       
       // Validate required fields are present
-      if (!req.body.name || !req.body.description || !req.body.price || !req.body.quantity || !req.body.categoryId) {
+      if (!req.body.name || !req.body.description || !req.body.price || !req.body.stock || !req.body.categoryId) {
         return res.status(400).json({ 
           message: 'Missing required fields', 
-          required: ['name', 'description', 'price', 'quantity', 'categoryId'] 
+          required: ['name', 'description', 'price', 'stock', 'categoryId'] 
         });
       }
       
@@ -304,9 +304,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: req.body.name.trim(),
         description: req.body.description.trim(),
         price: req.body.price,
-        quantity: parseInt(req.body.quantity),
+        stock: parseInt(req.body.stock),
         categoryId: parseInt(req.body.categoryId),
         weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
+        imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
         images: imageUrls,
         vendorId: req.vendor.id,
       };
