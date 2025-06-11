@@ -49,6 +49,18 @@ app.use((req, res, next) => {
 
   // Initialize cloud storage service
   initializeCloudStorage();
+
+  // Migrate existing images to cloud storage
+  if (process.env.AWS_S3_BUCKET) {
+    try {
+      const { imageOptimizer } = await import('./imageOptimizer');
+      setTimeout(async () => {
+        await imageOptimizer.migrateLocalImagesToCloud();
+      }, 5000); // Wait 5 seconds after startup
+    } catch (error) {
+      log('Image migration skipped:', String(error));
+    }
+  }
   
   const server = await registerRoutes(app);
 

@@ -5,6 +5,23 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Product } from '@/types';
 
+// Image optimization utility
+const getOptimizedImageUrl = (imagePath: string): string => {
+  if (!imagePath) return '';
+  
+  // If it's already a full URL (cloud storage), return as-is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // If it's a local path, construct the full URL
+  if (imagePath.startsWith('/uploads/')) {
+    return imagePath;
+  }
+  
+  return imagePath;
+};
+
 interface ProductCardProps {
   product: Product;
 }
@@ -51,9 +68,10 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="relative overflow-hidden">
           {product.images && product.images.length > 0 ? (
             <img
-              src={product.images[0]}
+              src={getOptimizedImageUrl(product.images[0])}
               alt={product.name}
               className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
               onError={(e) => {
                 // Fallback to gradient background if image fails to load
                 e.currentTarget.style.display = 'none';

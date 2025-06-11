@@ -458,6 +458,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.send(svg);
   });
 
+  // Image migration endpoint for admin use
+  app.post('/api/admin/migrate-images', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      if (!isCloudStorageEnabled()) {
+        return res.status(400).json({ 
+          message: 'Cloud storage not enabled' 
+        });
+      }
+
+      const { imageOptimizer } = await import('./imageOptimizer');
+      await imageOptimizer.migrateLocalImagesToCloud();
+      
+      res.json({ 
+        message: 'Image migration completed successfully' 
+      });
+    } catch (error) {
+      console.error('Error during manual migration:', error);
+      res.status(500).json({ 
+        message: 'Failed to migrate images' 
+      });
+    }
+  });
+
   // Test Paystack integration with payment initialization
   app.get('/api/test-paystack', async (req, res) => {
     try {
