@@ -41,7 +41,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     );
   };
 
-  const isOutOfStock = product.quantity <= 0;
+  const isOutOfStock = product.stock <= 0;
   const isAvailable = product.status === 'approved' && !isOutOfStock;
 
   return (
@@ -120,7 +120,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           {/* Stock Info */}
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm text-gray-500">
-              {isOutOfStock ? 'Out of Stock' : `${product.quantity} in stock`}
+              {isOutOfStock ? 'Out of Stock' : `${product.stock} in stock`}
             </span>
             {product.weight && (
               <span className="text-sm text-gray-500">
