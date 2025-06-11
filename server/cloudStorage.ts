@@ -15,13 +15,20 @@ class CloudStorageService {
   private s3Client: S3Client;
   private bucketName: string;
 
-  constructor(config: CloudStorageConfig) {
+  constructor(config: CloudStorageConfig & { sessionToken?: string }) {
+    const credentials: any = {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    };
+
+    // Add session token if provided (required for temporary credentials)
+    if (config.sessionToken) {
+      credentials.sessionToken = config.sessionToken;
+    }
+
     this.s3Client = new S3Client({
       region: config.region,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
+      credentials,
       endpoint: config.endpoint,
       forcePathStyle: true, // Required for some S3-compatible services
     });
@@ -101,6 +108,7 @@ export function initializeCloudStorage(): void {
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
     region: process.env.AWS_REGION || 'us-east-1',
     bucketName: process.env.AWS_S3_BUCKET || '',
+    sessionToken: process.env.AWS_SESSION_TOKEN,
     endpoint: process.env.AWS_S3_ENDPOINT,
   };
 
