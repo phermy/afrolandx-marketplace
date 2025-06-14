@@ -11,7 +11,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { getCloudStorageService, isCloudStorageEnabled } from "./cloudStorage";
+import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -1530,6 +1530,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch admin stats' });
+    }
+  });
+
+  // Admin endpoint to refresh AWS credentials
+  app.post('/api/admin/refresh-cloud-storage', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      console.log('Admin requested cloud storage reinitialization...');
+      reinitializeCloudStorage();
+      
+      const isEnabled = isCloudStorageEnabled();
+      res.json({ 
+        message: 'Cloud storage reinitialization completed',
+        cloudStorageEnabled: isEnabled,
+        status: isEnabled ? 'AWS credentials refreshed successfully' : 'Cloud storage not available - check credentials'
+      });
+    } catch (error) {
+      console.error('Error reinitializing cloud storage:', error);
+      res.status(500).json({ message: 'Failed to reinitialize cloud storage' });
+    }
+  });
+
+  // Admin endpoint to check cloud storage status
+  app.get('/api/admin/cloud-storage-status', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const isEnabled = isCloudStorageEnabled();
+      const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET);
+      
+      res.json({
+        cloudStorageEnabled: isEnabled,
+        hasCredentials,
+        awsRegion: process.env.AWS_REGION || 'us-east-1',
+        bucketName: process.env.AWS_S3_BUCKET || 'Not configured',
+        hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
+        status: isEnabled ? 'Active' : (hasCredentials ? 'Credentials may be expired' : 'Not configured')
+      });
+    } catch (error) {
+      console.error('Error checking cloud storage status:', error);
+      res.status(500).json({ message: 'Failed to check cloud storage status' });
     }
   });
 
