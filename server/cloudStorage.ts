@@ -66,8 +66,21 @@ class CloudStorageService {
 
       // Return the public URL
       return `https://${this.bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${filename}`;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
+      
+      // Check if it's a token expiration error
+      if ((error as any).name === 'ExpiredToken' || (error as any).Code === 'ExpiredToken') {
+        console.error('AWS credentials have expired. Please refresh your AWS session token.');
+        throw new Error('AWS credentials expired - please refresh your session token');
+      }
+      
+      // Check for other credential issues
+      if ((error as any).name === 'InvalidAccessKeyId' || (error as any).name === 'SignatureDoesNotMatch') {
+        console.error('AWS credentials are invalid. Please check your access keys.');
+        throw new Error('Invalid AWS credentials');
+      }
+      
       throw new Error('Failed to upload image');
     }
   }
@@ -125,6 +138,12 @@ export function initializeCloudStorage(): void {
     console.log('Falling back to local storage');
     cloudStorageService = null;
   }
+}
+
+// Function to reinitialize cloud storage with fresh credentials
+export function reinitializeCloudStorage(): void {
+  console.log('Reinitializing cloud storage with fresh credentials...');
+  initializeCloudStorage();
 }
 
 export function getCloudStorageService(): CloudStorageService {

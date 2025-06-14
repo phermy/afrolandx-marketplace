@@ -397,11 +397,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Use local storage with proper file handling
               imageUrls = files.map(file => `/uploads/${file.filename}`);
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('Cloud storage failed, falling back to local storage:', error);
-            // Fallback to local storage - save files locally
+            
+            // Check if it's an AWS credential issue and provide specific feedback
+            if (error.message?.includes('AWS credentials expired')) {
+              console.error('AWS session token has expired. Image will be saved locally until credentials are refreshed.');
+            } else if (error.message?.includes('Invalid AWS credentials')) {
+              console.error('AWS credentials are invalid. Image will be saved locally until credentials are fixed.');
+            }
+            
+            // Fallback to local storage with optimization
             const fs = await import('fs');
             const path = await import('path');
+            const sharp = await import('sharp');
             
             imageUrls = [];
             for (const file of files) {
@@ -410,14 +419,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 fs.mkdirSync(uploadDir, { recursive: true });
               }
               
+              // Optimize image before saving locally
+              const optimizedBuffer = await sharp.default(file.buffer)
+                .resize(800, 800, { 
+                  fit: 'inside', 
+                  withoutEnlargement: true 
+                })
+                .jpeg({ 
+                  quality: 85,
+                  progressive: true 
+                })
+                .toBuffer();
+              
               const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-              const filename = `product-${uniqueSuffix}${path.extname(file.originalname)}`;
+              const filename = `product-${uniqueSuffix}.jpg`;
               const filepath = path.join(uploadDir, filename);
               
-              fs.writeFileSync(filepath, file.buffer);
-              imageUrls.push(`/uploads/${filename}`);
+              fs.writeFileSync(filepath, optimizedBuffer);
+              imageUrls.push(`/uploads/products/${filename}`);
             }
-            console.log('Successfully saved images locally as fallback');
+            console.log('Successfully saved optimized images locally as fallback');
           }
         }
 
