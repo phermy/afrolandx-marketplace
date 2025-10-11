@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import Navbar from "@/components/navbar";
 import ProductCard from "@/components/product-card";
 import ShoppingCart from "@/components/shopping-cart";
@@ -16,6 +17,7 @@ import logoImage from '@assets/Group 1000002646_1749631956471.png';
 export default function Home() {
   const { user } = useAuth();
   const { cartItems, isCartOpen, toggleCart } = useCart();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
@@ -24,6 +26,10 @@ export default function Home() {
     if (productsSection) {
       productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const handleBecomeVendor = () => {
+    setLocation('/vendor');
   };
 
   const handleCategorySelect = (categoryId: number | null) => {
@@ -88,7 +94,7 @@ export default function Home() {
               <Button 
                 size="lg" 
                 className="bg-nigerian-green text-white hover:bg-green-700 border-0"
-                onClick={() => window.location.href = '/vendor'}
+                onClick={handleBecomeVendor}
                 data-testid="button-become-vendor"
               >
                 Become a Vendor
