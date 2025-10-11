@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,14 +40,24 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart, isAddingToCart } = useCart();
+  const { addToCart, isAddingToCart, openCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const [isAddedToCart, setIsAddedToCart] = useState(false);
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
+      window.location.href = '/api/login';
+      return;
+    }
+    
     addToCart(product.id, 1);
     setIsAddedToCart(true);
-    // Reset the state after 2 seconds
-    setTimeout(() => setIsAddedToCart(false), 2000);
+    // Open cart drawer to show the added item
+    setTimeout(() => {
+      openCart();
+      setIsAddedToCart(false);
+    }, 1500);
   };
 
   const formatPrice = (price: string) => {
@@ -168,6 +179,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 ? 'bg-green-600 hover:bg-green-600' 
                 : 'btn-nigerian'
             }`}
+            data-testid="button-add-to-cart"
           >
             {isAddingToCart ? (
               <div className="flex items-center">
@@ -183,6 +195,13 @@ export default function ProductCard({ product }: ProductCardProps) {
               </div>
             ) : !isAvailable ? (
               isOutOfStock ? 'Out of Stock' : 'Unavailable'
+            ) : !isAuthenticated ? (
+              <div className="flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Login to Add to Cart
+              </div>
             ) : (
               'Add to Cart'
             )}
