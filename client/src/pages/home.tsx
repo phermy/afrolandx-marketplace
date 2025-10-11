@@ -77,10 +77,20 @@ export default function Home() {
               Connect with local artisans and celebrate our rich cultural heritage.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="btn-gold">
+              <Button 
+                size="lg" 
+                className="btn-gold"
+                onClick={scrollToProducts}
+                data-testid="button-shop-traditional-wear"
+              >
                 Shop Traditional Wear
               </Button>
-              <Button size="lg" className="bg-nigerian-green text-white hover:bg-green-700 border-0">
+              <Button 
+                size="lg" 
+                className="bg-nigerian-green text-white hover:bg-green-700 border-0"
+                onClick={() => window.location.href = '/vendor'}
+                data-testid="button-become-vendor"
+              >
                 Become a Vendor
               </Button>
             </div>
