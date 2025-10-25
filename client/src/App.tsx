@@ -15,6 +15,7 @@ import OrderSuccess from "@/pages/order-success";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
+import Measurements from "@/pages/measurements";
 import ShoppingCart from "@/components/shopping-cart";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 
@@ -46,6 +47,7 @@ function Router() {
           <Route path="/products" component={Products} />
           <Route path="/profile" component={Profile} />
           <Route path="/my-orders" component={MyOrders} />
+          <Route path="/measurements" component={Measurements} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">
