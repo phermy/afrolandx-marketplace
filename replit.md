@@ -12,6 +12,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 25, 2025 - AI Chatbot Implementation
+- Added AI-powered customer support chatbot using Replit AI Integrations (OpenAI gpt-5-mini)
+- Chatbot provides help with product recommendations, measurement guidance, orders, and Nigerian fashion questions
+- Floating chat button appears on all pages with clean, accessible UI
+- Multi-turn conversation support with context retention within sessions
+- Secure endpoint with Zod validation to prevent message injection attacks
+- No API key required - uses Replit AI Integrations (charges billed to Replit credits)
+
 ### October 25, 2025 - Measurements Feature Implementation
 - Added comprehensive measurements system for custom tailoring
 - Customers can submit body measurements (chest, waist, hips, height, shoulder width, sleeve length, arm length, inseam, outseam, neck) to vendors

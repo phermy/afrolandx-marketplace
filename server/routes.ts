@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
+import { getChatbotService } from "./chatbot";
 import { isAdmin } from "./adminAuth";
 import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
@@ -1737,6 +1738,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error checking cloud storage status:', error);
       res.status(500).json({ message: 'Failed to check cloud storage status' });
+    }
+  });
+
+  // Chatbot endpoint with input validation
+  const chatMessageSchema = z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().min(1).max(5000),
+  });
+
+  const chatRequestSchema = z.object({
+    messages: z.array(chatMessageSchema).min(1).max(50),
+  });
+
+  app.post('/api/chat', async (req, res) => {
+    try {
+      // Validate request body to prevent injection of system messages or malformed data
+      const validationResult = chatRequestSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Invalid request format', 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { messages } = validationResult.data;
+      const chatbot = getChatbotService();
+      const response = await chatbot.generateResponse(messages);
+      
+      res.json({ response });
+    } catch (error) {
+      console.error('Error in chatbot endpoint:', error);
+      res.status(500).json({ message: 'Failed to generate response' });
     }
   });
 

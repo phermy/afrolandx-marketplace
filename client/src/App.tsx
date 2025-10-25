@@ -17,6 +17,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
 import Measurements from "@/pages/measurements";
 import ShoppingCart from "@/components/shopping-cart";
+import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 
 function Router() {
@@ -71,6 +72,7 @@ function App() {
           <Toaster />
           <Router />
           <ShoppingCart />
+          <Chatbot />
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>
