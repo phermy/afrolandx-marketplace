@@ -7,6 +7,7 @@ import {
   orders,
   orderItems,
   notifications,
+  measurements,
   type User,
   type UpsertUser,
   type Vendor,
@@ -23,6 +24,8 @@ import {
   type InsertOrderItem,
   type Notification,
   type InsertNotification,
+  type Measurement,
+  type InsertMeasurement,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, lt } from "drizzle-orm";
@@ -80,6 +83,15 @@ export interface IStorage {
   dismissNotification(id: number, userId: string): Promise<void>;
   cleanupExpiredNotifications(): Promise<void>;
   getAdminUsers(): Promise<User[]>;
+  
+  // Measurement operations
+  createMeasurement(measurement: InsertMeasurement): Promise<Measurement>;
+  getMeasurement(id: number): Promise<Measurement | undefined>;
+  getUserMeasurements(userId: string): Promise<Measurement[]>;
+  getVendorMeasurements(vendorId: number): Promise<Measurement[]>;
+  getOrderMeasurement(orderId: number): Promise<Measurement | undefined>;
+  updateMeasurementStatus(id: number, status: string): Promise<void>;
+  deleteMeasurement(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -460,6 +472,60 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(sql`${users.roles}::jsonb ? 'admin'`);
     return adminUsers;
+  }
+
+  // Measurement operations
+  async createMeasurement(measurementData: InsertMeasurement): Promise<Measurement> {
+    const [measurement] = await db
+      .insert(measurements)
+      .values(measurementData)
+      .returning();
+    return measurement;
+  }
+
+  async getMeasurement(id: number): Promise<Measurement | undefined> {
+    const [measurement] = await db
+      .select()
+      .from(measurements)
+      .where(eq(measurements.id, id));
+    return measurement;
+  }
+
+  async getUserMeasurements(userId: string): Promise<Measurement[]> {
+    return await db
+      .select()
+      .from(measurements)
+      .where(eq(measurements.userId, userId))
+      .orderBy(desc(measurements.createdAt));
+  }
+
+  async getVendorMeasurements(vendorId: number): Promise<Measurement[]> {
+    return await db
+      .select()
+      .from(measurements)
+      .where(eq(measurements.vendorId, vendorId))
+      .orderBy(desc(measurements.createdAt));
+  }
+
+  async getOrderMeasurement(orderId: number): Promise<Measurement | undefined> {
+    const [measurement] = await db
+      .select()
+      .from(measurements)
+      .where(eq(measurements.orderId, orderId));
+    return measurement;
+  }
+
+  async updateMeasurementStatus(id: number, status: string): Promise<void> {
+    await db
+      .update(measurements)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(measurements.id, id));
+  }
+
+  async deleteMeasurement(id: number): Promise<void> {
+    await db
+      .delete(measurements)
+      .where(eq(measurements.id, id));
   }
 }
 
