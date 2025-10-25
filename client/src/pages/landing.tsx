@@ -9,11 +9,40 @@ import { isAdmin } from "@/lib/roleUtils";
 import { ShoppingCart } from "lucide-react";
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
+import useEmblaCarousel from 'embla-carousel-react';
+import heroImg1 from '@assets/stock_images/nigerian_independenc_b796c37a.jpg';
+import heroImg2 from '@assets/stock_images/nigerian_independenc_684259e0.jpg';
+import heroImg3 from '@assets/stock_images/nigerian_independenc_19526865.jpg';
+import cultureImg1 from '@assets/stock_images/nigeria_cultural_her_0933402b.jpg';
+import cultureImg2 from '@assets/stock_images/nigeria_cultural_her_fdd13cc3.jpg';
+import chiefImg1 from '@assets/stock_images/nigerian_tribal_chie_4e3710c4.jpg';
+import chiefImg2 from '@assets/stock_images/nigerian_tribal_chie_11b29bb3.jpg';
+
+const culturalImages = [
+  heroImg1,
+  heroImg2,
+  heroImg3,
+  cultureImg1,
+  cultureImg2,
+  chiefImg1,
+  chiefImg2,
+];
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    const autoplay = setInterval(() => {
+      emblaApi.scrollNext();
+    }, 5000);
+
+    return () => clearInterval(autoplay);
+  }, [emblaApi]);
 
   // Fetch only approved products for display on landing page
   const { data: products = [] } = useQuery<Product[]>({
@@ -104,15 +133,33 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-green-900 to-emerald-800"></div>
-        <div className="absolute inset-0" style={{
+      {/* Hero Section with Cultural Carousel */}
+      <section className="relative overflow-hidden h-[600px]">
+        {/* Cultural Images Carousel */}
+        <div className="absolute inset-0" ref={emblaRef}>
+          <div className="flex h-full">
+            {culturalImages.map((image, index) => (
+              <div key={index} className="flex-[0_0_100%] min-w-0 relative">
+                <img 
+                  src={image} 
+                  alt={`Nigerian cultural fashion ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-green-900/80 to-emerald-800/85"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pattern Overlay */}
+        <div className="absolute inset-0 z-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.08'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           backgroundSize: '60px 60px'
         }}></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
-          <div className="text-center">
+
+        {/* Hero Content */}
+        <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="text-center w-full">
             <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
                 Discover Authentic
@@ -142,6 +189,18 @@ export default function Landing() {
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Carousel Indicators */}
+        <div className="absolute bottom-8 left-0 right-0 z-30 flex justify-center gap-2">
+          {culturalImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => emblaApi?.scrollTo(index)}
+              className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
         </div>
       </section>
 
