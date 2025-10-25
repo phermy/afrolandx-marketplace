@@ -10,22 +10,22 @@ import { ShoppingCart } from "lucide-react";
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import yorubaImg1 from '@assets/stock_images/yoruba_traditional_c_335d9cc6.jpg';
-import yorubaImg2 from '@assets/stock_images/yoruba_traditional_c_377014d7.jpg';
-import yorubaImg3 from '@assets/stock_images/yoruba_traditional_c_2d753732.jpg';
-import hausaImg1 from '@assets/stock_images/hausa_traditional_cu_52274624.jpg';
-import hausaImg2 from '@assets/stock_images/hausa_traditional_cu_47db2d83.jpg';
-import igboImg1 from '@assets/stock_images/igbo_traditional_cul_1c105a44.jpg';
-import igboImg2 from '@assets/stock_images/igbo_traditional_cul_b558eb93.jpg';
+import yorubaArt1 from '@assets/stock_images/yoruba_cultural_arti_54f4c626.jpg';
+import yorubaArt2 from '@assets/stock_images/yoruba_cultural_arti_9cf363ed.jpg';
+import yorubaArt3 from '@assets/stock_images/yoruba_cultural_arti_59b72e03.jpg';
+import hausaCraft1 from '@assets/stock_images/hausa_traditional_cr_f6b82ec3.jpg';
+import hausaCraft2 from '@assets/stock_images/hausa_traditional_cr_fa5db11d.jpg';
+import igboArt1 from '@assets/stock_images/igbo_traditional_art_ee314ff6.jpg';
+import igboArt2 from '@assets/stock_images/igbo_traditional_art_8bead5a0.jpg';
 
 const culturalImages = [
-  yorubaImg1,
-  hausaImg1,
-  igboImg1,
-  yorubaImg2,
-  hausaImg2,
-  igboImg2,
-  yorubaImg3,
+  yorubaArt1,
+  hausaCraft1,
+  igboArt1,
+  yorubaArt2,
+  hausaCraft2,
+  igboArt2,
+  yorubaArt3,
 ];
 
 export default function Landing() {
