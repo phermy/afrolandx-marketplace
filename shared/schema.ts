@@ -125,17 +125,48 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Measurements table for customer body measurements
+export const measurements = pgTable("measurements", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orderId: integer("order_id").references(() => orders.id), // optional - link to specific order
+  productId: integer("product_id").references(() => products.id), // optional - link to specific product
+  vendorId: integer("vendor_id").references(() => vendors.id), // vendor who will receive the measurements
+  
+  // Body measurements (all in centimeters for consistency)
+  chest: decimal("chest", { precision: 5, scale: 2 }), // Chest/Bust circumference
+  waist: decimal("waist", { precision: 5, scale: 2 }), // Waist circumference
+  hips: decimal("hips", { precision: 5, scale: 2 }), // Hip circumference
+  shoulderWidth: decimal("shoulder_width", { precision: 5, scale: 2 }), // Shoulder to shoulder
+  sleeveLength: decimal("sleeve_length", { precision: 5, scale: 2 }), // Shoulder to wrist
+  armLength: decimal("arm_length", { precision: 5, scale: 2 }), // Full arm length
+  inseam: decimal("inseam", { precision: 5, scale: 2 }), // Inner leg length
+  outseam: decimal("outseam", { precision: 5, scale: 2 }), // Outer leg length
+  neck: decimal("neck", { precision: 5, scale: 2 }), // Neck circumference
+  height: decimal("height", { precision: 5, scale: 2 }), // Total height
+  
+  // Additional info
+  unit: varchar("unit").default("cm"), // cm or inches
+  notes: text("notes"), // Special instructions or notes
+  status: varchar("status").default("pending"), // pending, received, acknowledged
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   vendor: one(vendors, { fields: [users.id], references: [vendors.userId] }),
   cartItems: many(cartItems),
   orders: many(orders),
   notifications: many(notifications),
+  measurements: many(measurements),
 }));
 
 export const vendorsRelations = relations(vendors, ({ one, many }) => ({
   user: one(users, { fields: [vendors.userId], references: [users.id] }),
   products: many(products),
+  measurements: many(measurements),
 }));
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
@@ -147,6 +178,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
   cartItems: many(cartItems),
   orderItems: many(orderItems),
+  measurements: many(measurements),
 }));
 
 export const cartItemsRelations = relations(cartItems, ({ one }) => ({
@@ -157,6 +189,7 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   user: one(users, { fields: [orders.userId], references: [users.id] }),
   orderItems: many(orderItems),
+  measurements: many(measurements),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -168,6 +201,13 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
   order: one(orders, { fields: [notifications.orderId], references: [orders.id] }),
   product: one(products, { fields: [notifications.productId], references: [products.id] }),
+}));
+
+export const measurementsRelations = relations(measurements, ({ one }) => ({
+  user: one(users, { fields: [measurements.userId], references: [users.id] }),
+  order: one(orders, { fields: [measurements.orderId], references: [orders.id] }),
+  product: one(products, { fields: [measurements.productId], references: [products.id] }),
+  vendor: one(vendors, { fields: [measurements.vendorId], references: [vendors.id] }),
 }));
 
 // Zod schemas
@@ -218,6 +258,24 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertMeasurementSchema = createInsertSchema(measurements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  chest: z.number().positive().optional(),
+  waist: z.number().positive().optional(),
+  hips: z.number().positive().optional(),
+  shoulderWidth: z.number().positive().optional(),
+  sleeveLength: z.number().positive().optional(),
+  armLength: z.number().positive().optional(),
+  inseam: z.number().positive().optional(),
+  outseam: z.number().positive().optional(),
+  neck: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  unit: z.enum(["cm", "inches"]).default("cm"),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -235,3 +293,5 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertMeasurement = z.infer<typeof insertMeasurementSchema>;
+export type Measurement = typeof measurements.$inferSelect;
