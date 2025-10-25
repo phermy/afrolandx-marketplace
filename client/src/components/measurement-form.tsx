@@ -49,6 +49,10 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
   const [scanStatus, setScanStatus] = useState<'idle' | 'initiating' | 'processing' | 'completed' | 'error'>('idle');
   const [scanSessionId, setScanSessionId] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [scanData, setScanData] = useState<any>(null);
+  const [showGenderHeightPrompt, setShowGenderHeightPrompt] = useState(false);
+  const [scanGender, setScanGender] = useState<'male' | 'female'>('female');
+  const [scanHeight, setScanHeight] = useState<number>(170);
 
   const form = useForm<any>({
     resolver: zodResolver(insertMeasurementSchema.omit({ userId: true })),
@@ -101,7 +105,15 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
   });
 
   const onSubmit = (data: any) => {
-    createMeasurementMutation.mutate(data);
+    // Include scan metadata if measurements came from scan
+    const submitData = scanData ? {
+      ...data,
+      scanMethod: 'ai_scan',
+      scanSessionId: scanSessionId,
+      scanData: scanData,
+    } : data;
+    
+    createMeasurementMutation.mutate(submitData);
   };
 
   const handleUnitChange = (newUnit: "cm" | "inches") => {
@@ -109,19 +121,25 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
     form.setValue("unit", newUnit);
   };
 
-  const handleStartScan = async () => {
+  const handleStartScan = () => {
+    setShowGenderHeightPrompt(true);
+  };
+
+  const handleConfirmScan = async () => {
+    setShowGenderHeightPrompt(false);
     setIsScanningModalOpen(true);
     setScanStatus('initiating');
     
     try {
-      // Initiate scan
+      // Initiate scan with user-provided gender and height
       const response = await apiRequest('POST', '/api/body-scan/initiate', {
-        gender: 'female', // In production, ask user for gender
-        height: 170, // In production, ask user for approximate height
+        gender: scanGender,
+        height: scanHeight,
       });
       
       setScanSessionId(response.sessionId);
       setIsDemoMode(response.demoMode);
+      setScanData(response);
       setScanStatus('processing');
       
       // Poll for results
@@ -171,6 +189,13 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           form.setValue('unit', 'cm');
           setSelectedUnit('cm');
 
+          // Store scan metadata for submission
+          setScanData({
+            scanMethod: 'ai_scan',
+            scanSessionId: sessionId,
+            scanData: response,
+          });
+
           setScanStatus('completed');
           
           toast({
@@ -184,7 +209,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           setTimeout(() => {
             setIsScanningModalOpen(false);
           }, 2000);
-        } else if (response.status === 'processing') {
+        } else if (response.status === 'pending' || response.status === 'processing') {
           attempts++;
           setTimeout(poll, 2000); // Poll every 2 seconds
         } else if (response.status === 'failed' || response.status === 'error') {
@@ -536,6 +561,69 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           </form>
         </Form>
       </CardContent>
+
+      {/* Gender/Height Prompt Dialog */}
+      <Dialog open={showGenderHeightPrompt} onOpenChange={setShowGenderHeightPrompt}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-scan-prompt">
+          <DialogHeader>
+            <DialogTitle>Body Scan Setup</DialogTitle>
+            <DialogDescription>
+              We need a few details to start your body scan
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Gender</label>
+              <Select
+                value={scanGender}
+                onValueChange={(value: 'male' | 'female') => setScanGender(value)}
+                data-testid="select-scan-gender"
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                This helps the AI provide more accurate measurements
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Approximate Height (cm)</label>
+              <Input
+                type="number"
+                value={scanHeight}
+                onChange={(e) => setScanHeight(parseInt(e.target.value) || 170)}
+                placeholder="e.g., 170"
+                data-testid="input-scan-height"
+              />
+              <p className="text-xs text-gray-500">
+                Your approximate height in centimeters
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowGenderHeightPrompt(false)}
+              data-testid="button-cancel-scan"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmScan}
+              className="btn-nigerian"
+              data-testid="button-confirm-scan"
+            >
+              <Scan className="h-4 w-4 mr-2" />
+              Start Scan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Scanning Modal */}
       <Dialog open={isScanningModalOpen} onOpenChange={setIsScanningModalOpen}>
