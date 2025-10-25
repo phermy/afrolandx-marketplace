@@ -14,22 +14,22 @@ import { getUserRoleDisplay } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import yorubaArt1 from '@assets/stock_images/yoruba_cultural_arti_54f4c626.jpg';
-import yorubaArt2 from '@assets/stock_images/yoruba_cultural_arti_9cf363ed.jpg';
-import yorubaArt3 from '@assets/stock_images/yoruba_cultural_arti_59b72e03.jpg';
-import hausaCraft1 from '@assets/stock_images/hausa_traditional_cr_f6b82ec3.jpg';
-import hausaCraft2 from '@assets/stock_images/hausa_traditional_cr_fa5db11d.jpg';
-import igboArt1 from '@assets/stock_images/igbo_traditional_art_ee314ff6.jpg';
-import igboArt2 from '@assets/stock_images/igbo_traditional_art_8bead5a0.jpg';
+import maskImg1 from '@assets/stock_images/african_tribal_mask__b9d91dc8.jpg';
+import maskImg2 from '@assets/stock_images/african_tribal_mask__a4b4950f.jpg';
+import beadsImg1 from '@assets/stock_images/traditional_african__12ea2d80.jpg';
+import beadsImg2 from '@assets/stock_images/traditional_african__e1ddf4b0.jpg';
+import potteryImg1 from '@assets/stock_images/african_pottery_clay_f297241e.jpg';
+import potteryImg2 from '@assets/stock_images/african_pottery_clay_6c61e8a3.jpg';
+import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
 
 const culturalImages = [
-  yorubaArt1,
-  hausaCraft1,
-  igboArt1,
-  yorubaArt2,
-  hausaCraft2,
-  igboArt2,
-  yorubaArt3,
+  maskImg1,
+  beadsImg1,
+  potteryImg1,
+  fabricImg,
+  maskImg2,
+  beadsImg2,
+  potteryImg2,
 ];
 
 export default function Home() {

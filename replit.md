@@ -13,10 +13,9 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### October 25, 2025 - Cultural Heritage Carousel
-- Added auto-rotating carousel to home page hero section showcasing Nigerian ethnic diversity
-- 7 authentic images of cultural artifacts representing the three major Nigerian ethnic groups: Yoruba, Hausa, and Igbo
-- Features traditional masks, beads, crafts, pottery, textiles, bronze art, and cultural symbols
-- Focuses on cultural objects and artifacts rather than people
+- Added auto-rotating carousel to home page hero section showcasing Nigerian cultural heritage
+- 7 authentic images of traditional objects: tribal masks, beadwork/jewelry, pottery/calabash, and kente/ankara fabrics
+- Features only cultural artifacts and objects - no people
 - Carousel auto-rotates every 5 seconds with smooth transitions
 - Manual navigation via indicator dots at bottom
 - Implemented on both landing page (non-authenticated) and home page (authenticated users)
