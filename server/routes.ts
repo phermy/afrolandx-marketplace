@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { isAdmin } from "./adminAuth";
-import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, orders, orderItems, products, vendors } from "@shared/schema";
+import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -1320,6 +1320,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Notification marked as read' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to mark notification as read' });
+    }
+  });
+
+  // Measurement routes
+  // Customer: Submit measurements to a vendor
+  app.post('/api/measurements', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const measurementData = insertMeasurementSchema.parse({
+        ...req.body,
+        userId,
+      });
+
+      const measurement = await storage.createMeasurement(measurementData as any);
+
+      // Create notification for the vendor
+      if (measurementData.vendorId) {
+        const vendor = await storage.getVendor(measurementData.vendorId);
+        if (vendor) {
+          const customer = await storage.getUser(userId);
+          await storage.createNotification({
+            userId: vendor.userId,
+            type: 'measurement_received',
+            title: 'New Measurement Received',
+            message: `${customer?.firstName || 'A customer'} has submitted their measurements for your review.`,
+          });
+        }
+      }
+
+      res.json(measurement);
+    } catch (error) {
+      console.error('Error creating measurement:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid measurement data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to create measurement' });
+    }
+  });
+
+  // Customer: Get their own measurements
+  app.get('/api/measurements', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const measurements = await storage.getUserMeasurements(userId);
+      res.json(measurements);
+    } catch (error) {
+      console.error('Error fetching measurements:', error);
+      res.status(500).json({ message: 'Failed to fetch measurements' });
+    }
+  });
+
+  // Get specific measurement
+  app.get('/api/measurements/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const measurementId = parseInt(req.params.id);
+      const measurement = await storage.getMeasurement(measurementId);
+
+      if (!measurement) {
+        return res.status(404).json({ message: 'Measurement not found' });
+      }
+
+      // Check if user owns this measurement or is the vendor it was sent to
+      const vendor = await storage.getVendorByUserId(userId);
+      if (measurement.userId !== userId && measurement.vendorId !== vendor?.id) {
+        return res.status(403).json({ message: 'Unauthorized' });
+      }
+
+      res.json(measurement);
+    } catch (error) {
+      console.error('Error fetching measurement:', error);
+      res.status(500).json({ message: 'Failed to fetch measurement' });
+    }
+  });
+
+  // Customer: Delete their measurement
+  app.delete('/api/measurements/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const measurementId = parseInt(req.params.id);
+      const measurement = await storage.getMeasurement(measurementId);
+
+      if (!measurement) {
+        return res.status(404).json({ message: 'Measurement not found' });
+      }
+
+      if (measurement.userId !== userId) {
+        return res.status(403).json({ message: 'Unauthorized' });
+      }
+
+      await storage.deleteMeasurement(measurementId);
+      res.json({ message: 'Measurement deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting measurement:', error);
+      res.status(500).json({ message: 'Failed to delete measurement' });
+    }
+  });
+
+  // Vendor: Get all measurements sent to them
+  app.get('/api/vendors/measurements', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendor = await storage.getVendorByUserId(userId);
+
+      if (!vendor) {
+        return res.status(404).json({ message: 'Vendor not found' });
+      }
+
+      const measurements = await storage.getVendorMeasurements(vendor.id);
+      
+      // Enrich with customer information
+      const measurementsWithCustomers = await Promise.all(
+        measurements.map(async (m) => {
+          const customer = await storage.getUser(m.userId);
+          return {
+            ...m,
+            customer: {
+              firstName: customer?.firstName,
+              lastName: customer?.lastName,
+              email: customer?.email,
+            }
+          };
+        })
+      );
+
+      res.json(measurementsWithCustomers);
+    } catch (error) {
+      console.error('Error fetching vendor measurements:', error);
+      res.status(500).json({ message: 'Failed to fetch measurements' });
+    }
+  });
+
+  // Vendor: Update measurement status
+  app.patch('/api/vendors/measurements/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const measurementId = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!status || !['pending', 'received', 'acknowledged'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      const measurement = await storage.getMeasurement(measurementId);
+      if (!measurement) {
+        return res.status(404).json({ message: 'Measurement not found' });
+      }
+
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || measurement.vendorId !== vendor.id) {
+        return res.status(403).json({ message: 'Unauthorized' });
+      }
+
+      await storage.updateMeasurementStatus(measurementId, status);
+
+      // Notify customer that vendor acknowledged their measurements
+      if (status === 'acknowledged') {
+        await storage.createNotification({
+          userId: measurement.userId,
+          type: 'measurement_acknowledged',
+          title: 'Measurements Acknowledged',
+          message: 'Your measurements have been reviewed and acknowledged by the vendor.',
+        });
+      }
+
+      res.json({ message: 'Measurement status updated successfully' });
+    } catch (error) {
+      console.error('Error updating measurement status:', error);
+      res.status(500).json({ message: 'Failed to update measurement status' });
     }
   });
 
