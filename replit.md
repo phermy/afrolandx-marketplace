@@ -2,13 +2,25 @@
 
 ## Overview
 
-Afrolandx is a full-stack e-commerce platform specializing in authentic Nigerian fashion. The application connects vendors selling traditional Nigerian clothing and accessories with customers worldwide. Built with a modern tech stack, it features vendor management, product listings, shopping cart functionality, order processing, and integrated payment processing through Paystack.
+Afrolandx is a full-stack e-commerce platform specializing in authentic Nigerian fashion. The application connects vendors selling traditional Nigerian clothing and accessories with customers worldwide. Built with a modern tech stack, it features vendor management, product listings, shopping cart functionality, order processing, integrated payment processing through Paystack, and a comprehensive measurements system for custom tailoring.
 
-The platform supports three user roles (customers, vendors, and administrators) with role-based access control, enabling vendors to manage their products, administrators to oversee the marketplace, and customers to browse and purchase authentic Nigerian fashion items.
+The platform supports three user roles (customers, vendors, and administrators) with role-based access control, enabling vendors to manage their products and customer measurements, administrators to oversee the marketplace, and customers to browse, purchase authentic Nigerian fashion items, and submit body measurements for custom-fitted clothing.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes
+
+### October 25, 2025 - Measurements Feature Implementation
+- Added comprehensive measurements system for custom tailoring
+- Customers can submit body measurements (chest, waist, hips, height, shoulder width, sleeve length, arm length, inseam, outseam, neck) to vendors
+- Support for both metric (cm) and imperial (inches) measurement units
+- Customers can manage their measurements through dedicated /measurements page
+- Vendors can view and acknowledge customer measurements in their dashboard
+- Notification system alerts vendors when measurements are submitted and customers when acknowledged
+- Full CRUD operations with proper authentication and authorization
+- Measurements can be optionally linked to specific orders, products, or vendors
 
 ## System Architecture
 
@@ -80,6 +92,7 @@ Preferred communication style: Simple, everyday language.
 - Cart items with user-product relationship
 - Notifications table for user alerts
 - Sessions table for Express session storage
+- Measurements table for custom tailoring with comprehensive body measurements
 
 **Key Design Decisions:**
 - Used JSONB for flexible role arrays to support multi-role users
