@@ -10,22 +10,22 @@ import { ShoppingCart } from "lucide-react";
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import heroImg1 from '@assets/stock_images/nigerian_independenc_b796c37a.jpg';
-import heroImg2 from '@assets/stock_images/nigerian_independenc_684259e0.jpg';
-import heroImg3 from '@assets/stock_images/nigerian_independenc_19526865.jpg';
-import cultureImg1 from '@assets/stock_images/nigeria_cultural_her_0933402b.jpg';
-import cultureImg2 from '@assets/stock_images/nigeria_cultural_her_fdd13cc3.jpg';
-import chiefImg1 from '@assets/stock_images/nigerian_tribal_chie_4e3710c4.jpg';
-import chiefImg2 from '@assets/stock_images/nigerian_tribal_chie_11b29bb3.jpg';
+import yorubaImg1 from '@assets/stock_images/yoruba_traditional_c_335d9cc6.jpg';
+import yorubaImg2 from '@assets/stock_images/yoruba_traditional_c_377014d7.jpg';
+import yorubaImg3 from '@assets/stock_images/yoruba_traditional_c_2d753732.jpg';
+import hausaImg1 from '@assets/stock_images/hausa_traditional_cu_52274624.jpg';
+import hausaImg2 from '@assets/stock_images/hausa_traditional_cu_47db2d83.jpg';
+import igboImg1 from '@assets/stock_images/igbo_traditional_cul_1c105a44.jpg';
+import igboImg2 from '@assets/stock_images/igbo_traditional_cul_b558eb93.jpg';
 
 const culturalImages = [
-  heroImg1,
-  heroImg2,
-  heroImg3,
-  cultureImg1,
-  cultureImg2,
-  chiefImg1,
-  chiefImg2,
+  yorubaImg1,
+  hausaImg1,
+  igboImg1,
+  yorubaImg2,
+  hausaImg2,
+  igboImg2,
+  yorubaImg3,
 ];
 
 export default function Landing() {

@@ -12,6 +12,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 25, 2025 - Cultural Heritage Carousel
+- Added auto-rotating carousel to home page hero section showcasing Nigerian ethnic diversity
+- 7 authentic images representing the three major Nigerian ethnic groups: Yoruba, Hausa, and Igbo
+- Carousel auto-rotates every 5 seconds with smooth transitions
+- Manual navigation via indicator dots at bottom
+- Images celebrate traditional ceremonies, attire, and cultural heritage
+- Implemented on both landing page (non-authenticated) and home page (authenticated users)
+- Uses embla-carousel-react for smooth performance
+
 ### October 25, 2025 - AI Body Scanning Integration
 - Integrated 3DLOOK body scanning API for automated measurement capture
 - "Scan My Body" button on measurement form initiates AI-powered body scanning
