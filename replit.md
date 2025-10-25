@@ -12,6 +12,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 25, 2025 - AI Body Scanning Integration
+- Integrated 3DLOOK body scanning API for automated measurement capture
+- "Scan My Body" button on measurement form initiates AI-powered body scanning
+- Demo mode available for testing without API key (simulates full scanning flow)
+- Production mode uses 3DLOOK Mobile Tailor API when DLOOK_API_KEY provided
+- Privacy-focused: photos processed by AI and deleted immediately, only measurements stored
+- Scan process: initiate → phone camera redirect → 2 photos → AI processing (45-60s) → auto-fill form
+- Supports 10 body measurements: chest, waist, hips, height, shoulder width, sleeve length, arm length, inseam, outseam, neck
+- Measurements schema updated to track scan method and session metadata
+- Polling mechanism for scan results with timeout handling
+- Full error handling with fallback to manual entry
+
 ### October 25, 2025 - Vendor-Customer Messaging System
 - Added direct messaging system for vendor-customer communication
 - Customers can send messages to vendors about products

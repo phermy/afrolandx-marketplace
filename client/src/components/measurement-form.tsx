@@ -25,7 +25,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Ruler, Loader2 } from "lucide-react";
+import { Ruler, Loader2, Scan, Info } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MeasurementFormProps {
   vendorId?: number;
@@ -37,6 +45,10 @@ interface MeasurementFormProps {
 export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: MeasurementFormProps) {
   const { toast } = useToast();
   const [selectedUnit, setSelectedUnit] = useState<"cm" | "inches">("cm");
+  const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
+  const [scanStatus, setScanStatus] = useState<'idle' | 'initiating' | 'processing' | 'completed' | 'error'>('idle');
+  const [scanSessionId, setScanSessionId] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const form = useForm<any>({
     resolver: zodResolver(insertMeasurementSchema.omit({ userId: true })),
@@ -97,6 +109,106 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
     form.setValue("unit", newUnit);
   };
 
+  const handleStartScan = async () => {
+    setIsScanningModalOpen(true);
+    setScanStatus('initiating');
+    
+    try {
+      // Initiate scan
+      const response = await apiRequest('POST', '/api/body-scan/initiate', {
+        gender: 'female', // In production, ask user for gender
+        height: 170, // In production, ask user for approximate height
+      });
+      
+      setScanSessionId(response.sessionId);
+      setIsDemoMode(response.demoMode);
+      setScanStatus('processing');
+      
+      // Poll for results
+      pollScanResults(response.sessionId);
+    } catch (error) {
+      console.error('Error initiating scan:', error);
+      setScanStatus('error');
+      toast({
+        title: "Error",
+        description: "Failed to start body scan. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const pollScanResults = async (sessionId: string) => {
+    const maxAttempts = 40; // 40 attempts * 2 seconds = 80 seconds max
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setScanStatus('error');
+        toast({
+          title: "Timeout",
+          description: "Scan is taking longer than expected. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const response = await apiRequest('GET', `/api/body-scan/results/${sessionId}`);
+        
+        if (response.status === 'completed' && response.measurements) {
+          // Auto-fill form with measurements
+          const measurements = response.measurements;
+          form.setValue('chest', measurements.chest);
+          form.setValue('waist', measurements.waist);
+          form.setValue('hips', measurements.hips);
+          form.setValue('height', measurements.height);
+          form.setValue('shoulderWidth', measurements.shoulderWidth);
+          form.setValue('sleeveLength', measurements.sleeveLength);
+          form.setValue('armLength', measurements.armLength);
+          form.setValue('inseam', measurements.inseam);
+          form.setValue('outseam', measurements.outseam);
+          form.setValue('neck', measurements.neck);
+          form.setValue('unit', 'cm');
+          setSelectedUnit('cm');
+
+          setScanStatus('completed');
+          
+          toast({
+            title: "Scan Complete!",
+            description: isDemoMode 
+              ? "Demo measurements loaded. Review and submit when ready."
+              : "Your body measurements have been loaded. Review and submit when ready.",
+          });
+          
+          // Close modal after a delay
+          setTimeout(() => {
+            setIsScanningModalOpen(false);
+          }, 2000);
+        } else if (response.status === 'processing') {
+          attempts++;
+          setTimeout(poll, 2000); // Poll every 2 seconds
+        } else if (response.status === 'failed' || response.status === 'error') {
+          setScanStatus('error');
+          toast({
+            title: "Scan Failed",
+            description: "Body scan failed. Please try manual entry.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error polling scan results:', error);
+        setScanStatus('error');
+        toast({
+          title: "Error",
+          description: "Failed to retrieve scan results. Please try manual entry.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    poll();
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -109,6 +221,27 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Body Scan Option */}
+        <div className="mb-6">
+          <Alert className="bg-nigerian-green/10 border-nigerian-green">
+            <Info className="h-4 w-4 text-nigerian-green" />
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-sm">
+                Skip manual entry! Use AI body scanning to get accurate measurements from your phone camera.
+              </span>
+              <Button
+                type="button"
+                onClick={handleStartScan}
+                className="btn-nigerian ml-4"
+                data-testid="button-scan-body"
+              >
+                <Scan className="h-4 w-4 mr-2" />
+                Scan My Body
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Unit Selection */}
@@ -403,6 +536,95 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           </form>
         </Form>
       </CardContent>
+
+      {/* Scanning Modal */}
+      <Dialog open={isScanningModalOpen} onOpenChange={setIsScanningModalOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-scanning">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scan className="h-5 w-5 text-nigerian-green" />
+              {scanStatus === 'completed' ? 'Scan Complete!' : 'Body Scanning'}
+            </DialogTitle>
+            <DialogDescription>
+              {isDemoMode && (
+                <Alert className="mt-2 bg-yellow-50 border-yellow-300">
+                  <Info className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    <strong>Demo Mode:</strong> This is a simulation. In production, customers would use their phone camera for actual scanning.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            {scanStatus === 'initiating' && (
+              <div className="text-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-nigerian-green" />
+                <p className="text-sm text-gray-600">Initializing scanner...</p>
+              </div>
+            )}
+
+            {scanStatus === 'processing' && (
+              <div className="text-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-nigerian-green" />
+                <div className="space-y-2">
+                  <p className="font-medium">Processing your scan...</p>
+                  <p className="text-sm text-gray-600">
+                    {isDemoMode 
+                      ? "In demo mode, this simulates the 45-60 second AI processing time."
+                      : "AI is analyzing your photos to extract measurements. This takes about 45-60 seconds."}
+                  </p>
+                  {isDemoMode && (
+                    <p className="text-xs text-gray-500 mt-4">
+                      In production, you would:<br />
+                      1. Be redirected to your phone camera<br />
+                      2. Follow voice-guided instructions to take 2 photos<br />
+                      3. Wait for AI processing<br />
+                      4. Measurements automatically loaded here
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {scanStatus === 'completed' && (
+              <div className="text-center space-y-4">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                  <Scan className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="space-y-2">
+                  <p className="font-medium text-green-600">Measurements loaded successfully!</p>
+                  <p className="text-sm text-gray-600">
+                    Your body measurements have been auto-filled in the form. Review and submit when ready.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {scanStatus === 'error' && (
+              <div className="text-center space-y-4">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                  <Info className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="space-y-2">
+                  <p className="font-medium text-red-600">Scan failed</p>
+                  <p className="text-sm text-gray-600">
+                    Please try again or use manual entry below.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setIsScanningModalOpen(false)}
+                  variant="outline"
+                  data-testid="button-close-scan-error"
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
