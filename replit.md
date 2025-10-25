@@ -12,6 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 25, 2025 - Vendor-Customer Messaging System
+- Added direct messaging system for vendor-customer communication
+- Customers can send messages to vendors about products
+- Vendors can reply to customer inquiries
+- Real-time conversation view with message threading
+- Unread message count displayed in navbar with automatic updates
+- Notification system alerts users of new messages
+- Full message history preserved for each conversation
+- Accessible at /messages page
+
 ### October 25, 2025 - AI Chatbot Implementation
 - Added AI-powered customer support chatbot using Replit AI Integrations (OpenAI gpt-5-mini)
 - Chatbot provides help with product recommendations, measurement guidance, orders, and Nigerian fashion questions

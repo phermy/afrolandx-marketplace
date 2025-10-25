@@ -16,6 +16,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
 import Measurements from "@/pages/measurements";
+import Messages from "@/pages/messages";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
@@ -49,6 +50,7 @@ function Router() {
           <Route path="/profile" component={Profile} />
           <Route path="/my-orders" component={MyOrders} />
           <Route path="/measurements" component={Measurements} />
+          <Route path="/messages" component={Messages} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">

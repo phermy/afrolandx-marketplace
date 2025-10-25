@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
+import { useQuery } from '@tanstack/react-query';
 import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,12 @@ export default function Navbar() {
   const { cartCount, toggleCart } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ['/api/messages/unread-count'],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +184,16 @@ export default function Navbar() {
                   <DropdownMenuItem>
                     <Link href="/my-orders">
                       <span className="cursor-pointer">My Orders</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Link href="/messages">
+                      <span className="cursor-pointer flex items-center justify-between">
+                        Messages
+                        {unreadData && unreadData.count > 0 && (
+                          <Badge variant="default" className="ml-2">{unreadData.count}</Badge>
+                        )}
+                      </span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>

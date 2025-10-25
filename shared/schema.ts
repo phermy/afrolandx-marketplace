@@ -154,6 +154,17 @@ export const measurements = pgTable("measurements", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Messages table for vendor-customer communication
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  recipientId: varchar("recipient_id").notNull().references(() => users.id),
+  productId: integer("product_id").references(() => products.id), // optional - link to specific product being discussed
+  content: text("content").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   vendor: one(vendors, { fields: [users.id], references: [vendors.userId] }),
@@ -161,6 +172,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   orders: many(orders),
   notifications: many(notifications),
   measurements: many(measurements),
+  sentMessages: many(messages, { relationName: "sender" }),
+  receivedMessages: many(messages, { relationName: "recipient" }),
 }));
 
 export const vendorsRelations = relations(vendors, ({ one, many }) => ({
@@ -208,6 +221,12 @@ export const measurementsRelations = relations(measurements, ({ one }) => ({
   order: one(orders, { fields: [measurements.orderId], references: [orders.id] }),
   product: one(products, { fields: [measurements.productId], references: [products.id] }),
   vendor: one(vendors, { fields: [measurements.vendorId], references: [vendors.id] }),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, { fields: [messages.senderId], references: [users.id], relationName: "sender" }),
+  recipient: one(users, { fields: [messages.recipientId], references: [users.id], relationName: "recipient" }),
+  product: one(products, { fields: [messages.productId], references: [products.id] }),
 }));
 
 // Zod schemas
@@ -276,6 +295,13 @@ export const insertMeasurementSchema = createInsertSchema(measurements).omit({
   unit: z.enum(["cm", "inches"]).default("cm"),
 });
 
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  content: z.string().min(1).max(2000),
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -295,3 +321,5 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertMeasurement = z.infer<typeof insertMeasurementSchema>;
 export type Measurement = typeof measurements.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;

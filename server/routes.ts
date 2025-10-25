@@ -6,7 +6,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { getChatbotService } from "./chatbot";
 import { isAdmin } from "./adminAuth";
-import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, orders, orderItems, products, vendors } from "@shared/schema";
+import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, insertMessageSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -1771,6 +1771,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error in chatbot endpoint:', error);
       res.status(500).json({ message: 'Failed to generate response' });
+    }
+  });
+
+  // Messaging endpoints
+  app.post('/api/messages', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const validationResult = insertMessageSchema.safeParse({
+        ...req.body,
+        senderId: userId,
+      });
+
+      if (!validationResult.success) {
+        return res.status(400).json({ message: 'Invalid message data', errors: validationResult.error.errors });
+      }
+
+      const message = await storage.sendMessage(validationResult.data);
+
+      await storage.createNotification({
+        userId: message.recipientId,
+        type: 'new_message',
+        title: 'New Message',
+        message: `You have a new message`,
+      });
+
+      res.status(201).json(message);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      res.status(500).json({ message: 'Failed to send message' });
+    }
+  });
+
+  app.get('/api/messages/conversations', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const conversations = await storage.getConversations(userId);
+      res.json(conversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      res.status(500).json({ message: 'Failed to fetch conversations' });
+    }
+  });
+
+  app.get('/api/messages/conversation/:otherUserId', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const { otherUserId } = req.params;
+      const messages = await storage.getConversationMessages(userId, otherUserId);
+      
+      await storage.markMessagesAsRead(userId, otherUserId);
+
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching conversation messages:', error);
+      res.status(500).json({ message: 'Failed to fetch messages' });
+    }
+  });
+
+  app.get('/api/messages/unread-count', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const count = await storage.getUnreadMessageCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
+      res.status(500).json({ message: 'Failed to fetch unread count' });
     }
   });
 
