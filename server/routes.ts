@@ -6,6 +6,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { getChatbotService } from "./chatbot";
 import { isAdmin } from "./adminAuth";
+import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, insertMessageSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1855,6 +1856,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to fetch unread count' });
     }
   });
+
+  // Body scanning endpoints
+  app.get('/api/body-scan/status', getServiceStatus);
+  app.post('/api/body-scan/initiate', isAuthenticated, initiateScan);
+  app.get('/api/body-scan/results/:sessionId', isAuthenticated, getScanResults);
 
   const httpServer = createServer(app);
   return httpServer;

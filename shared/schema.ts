@@ -145,6 +145,11 @@ export const measurements = pgTable("measurements", {
   neck: decimal("neck", { precision: 5, scale: 2 }), // Neck circumference
   height: decimal("height", { precision: 5, scale: 2 }), // Total height
   
+  // Scan metadata
+  scanMethod: varchar("scan_method").default("manual"), // manual or ai_scan
+  scanSessionId: varchar("scan_session_id"), // 3DLOOK session ID
+  scanData: jsonb("scan_data"), // Additional scan metadata from 3DLOOK
+  
   // Additional info
   unit: varchar("unit").default("cm"), // cm or inches
   notes: text("notes"), // Special instructions or notes
