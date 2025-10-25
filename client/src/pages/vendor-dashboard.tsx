@@ -64,6 +64,13 @@ export default function VendorDashboard() {
     retry: false,
   });
 
+  // Fetch vendor's measurements
+  const { data: vendorMeasurements = [] } = useQuery<any[]>({
+    queryKey: ["/api/vendors/measurements"],
+    enabled: !!vendor?.id && vendor?.status === 'approved',
+    retry: false,
+  });
+
   // Fetch vendor notifications
   const { data: vendorNotifications = [] } = useQuery<Notification[]>({
     queryKey: ['/api/notifications'],
@@ -92,6 +99,27 @@ export default function VendorDashboard() {
       toast({
         title: "Success",
         description: "Order status updated successfully",
+      });
+    }
+  });
+
+  // Measurement status update mutation
+  const updateMeasurementStatusMutation = useMutation({
+    mutationFn: async ({ measurementId, status }: { measurementId: number; status: string }) => {
+      return await apiRequest("PATCH", `/api/vendors/measurements/${measurementId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/measurements"] });
+      toast({
+        title: "Success",
+        description: "Measurement status updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update measurement status",
+        variant: "destructive",
       });
     }
   });
@@ -467,6 +495,7 @@ export default function VendorDashboard() {
           <TabsList>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="measurements">Measurements</TabsTrigger>
             <TabsTrigger value="add-product">Add Product</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
@@ -620,6 +649,131 @@ export default function VendorDashboard() {
                             )}
                           </div>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="measurements">
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Measurements</CardTitle>
+                <p className="text-gray-600">View and acknowledge measurements submitted by customers</p>
+              </CardHeader>
+              <CardContent>
+                {Array.isArray(vendorMeasurements) && vendorMeasurements.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">No measurements submitted yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Array.isArray(vendorMeasurements) && vendorMeasurements.map((measurement: any) => (
+                      <div key={measurement.id} className="border border-gray-200 rounded-lg p-6" data-testid={`vendor-measurement-${measurement.id}`}>
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="font-semibold text-lg">Measurement #{measurement.id}</h3>
+                            <p className="text-gray-600 text-sm">
+                              Customer: {measurement.customer?.firstName} {measurement.customer?.lastName}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              Email: {measurement.customer?.email}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              Unit: {measurement.unit}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge className={
+                              measurement.status === 'acknowledged' ? 'bg-green-500' :
+                              measurement.status === 'received' ? 'bg-blue-500' :
+                              'bg-yellow-500'
+                            }>
+                              {measurement.status || 'pending'}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium mb-3">Body Measurements ({measurement.unit}):</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            {measurement.chest && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Chest: </span>
+                                <span className="font-semibold">{measurement.chest}</span>
+                              </div>
+                            )}
+                            {measurement.waist && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Waist: </span>
+                                <span className="font-semibold">{measurement.waist}</span>
+                              </div>
+                            )}
+                            {measurement.hips && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Hips: </span>
+                                <span className="font-semibold">{measurement.hips}</span>
+                              </div>
+                            )}
+                            {measurement.height && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Height: </span>
+                                <span className="font-semibold">{measurement.height}</span>
+                              </div>
+                            )}
+                            {measurement.shoulderWidth && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Shoulder: </span>
+                                <span className="font-semibold">{measurement.shoulderWidth}</span>
+                              </div>
+                            )}
+                            {measurement.sleeveLength && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Sleeve: </span>
+                                <span className="font-semibold">{measurement.sleeveLength}</span>
+                              </div>
+                            )}
+                            {measurement.inseam && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Inseam: </span>
+                                <span className="font-semibold">{measurement.inseam}</span>
+                              </div>
+                            )}
+                            {measurement.neck && (
+                              <div className="bg-gray-50 p-2 rounded">
+                                <span className="text-gray-600">Neck: </span>
+                                <span className="font-semibold">{measurement.neck}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {measurement.notes && (
+                            <div className="mt-4 bg-blue-50 p-3 rounded">
+                              <p className="text-sm font-medium text-gray-700">Customer Notes:</p>
+                              <p className="text-sm text-gray-600 mt-1">{measurement.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {measurement.status !== 'acknowledged' && (
+                          <div className="border-t pt-4 mt-4">
+                            <Button
+                              size="sm"
+                              onClick={() => updateMeasurementStatusMutation.mutate({ 
+                                measurementId: measurement.id, 
+                                status: 'acknowledged' 
+                              })}
+                              disabled={updateMeasurementStatusMutation.isPending}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              data-testid={`button-acknowledge-${measurement.id}`}
+                            >
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Acknowledge Measurements
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
