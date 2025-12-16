@@ -417,6 +417,9 @@ export default function VendorWorkshopPage() {
                       <Label>Quantity</Label>
                       <Input
                         type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="Enter quantity"
                         value={newResource.quantity}
                         onChange={(e) => setNewResource({...newResource, quantity: e.target.value})}
                         data-testid="input-quantity"
@@ -455,7 +458,14 @@ export default function VendorWorkshopPage() {
                       quantity: parseFloat(newResource.quantity),
                       lowStockThreshold: parseFloat(newResource.lowStockThreshold),
                     })}
-                    disabled={!newResource.materialType || !newResource.materialName || !newResource.quantity || addResourceMutation.isPending}
+                    disabled={
+                      !newResource.materialType || 
+                      !newResource.materialName || 
+                      !newResource.quantity || 
+                      parseFloat(newResource.quantity) <= 0 ||
+                      isNaN(parseFloat(newResource.quantity)) ||
+                      addResourceMutation.isPending
+                    }
                     className="w-full"
                     data-testid="button-add-material"
                   >
