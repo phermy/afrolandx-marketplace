@@ -2663,6 +2663,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==========================================
+  // Google Places API Endpoints for Nigeria Discovery
+  // ==========================================
+  
+  // Search for places in Nigeria (hotels, malls, restaurants, etc.)
+  app.get('/api/places/search', async (req, res) => {
+    try {
+      const { query, type, lat, lng, radius = 5000 } = req.query;
+      
+      if (!query && !type) {
+        return res.status(400).json({ message: 'Query or type parameter required' });
+      }
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: 'Google Maps API not configured' });
+      }
+      
+      // Use Text Search if query provided, otherwise Nearby Search
+      let url: string;
+      let options: RequestInit;
+      
+      if (query) {
+        // Text Search API (New)
+        url = 'https://places.googleapis.com/v1/places:searchText';
+        const body: any = {
+          textQuery: `${query} Nigeria`,
+          maxResultCount: 20,
+        };
+        
+        if (lat && lng) {
+          body.locationBias = {
+            circle: {
+              center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
+              radius: parseInt(radius as string)
+            }
+          };
+        }
+        
+        options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount,places.photos,places.priceLevel,places.primaryType,places.internationalPhoneNumber,places.websiteUri,places.currentOpeningHours'
+          },
+          body: JSON.stringify(body)
+        };
+      } else {
+        // Nearby Search API (New)
+        url = 'https://places.googleapis.com/v1/places:searchNearby';
+        
+        if (!lat || !lng) {
+          // Default to Lagos coordinates if no location provided
+          return res.status(400).json({ message: 'Location (lat, lng) required for nearby search' });
+        }
+        
+        const body: any = {
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
+              radius: parseInt(radius as string)
+            }
+          }
+        };
+        
+        if (type) {
+          body.includedTypes = [type];
+        }
+        
+        options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount,places.photos,places.priceLevel,places.primaryType,places.internationalPhoneNumber,places.websiteUri,places.currentOpeningHours'
+          },
+          body: JSON.stringify(body)
+        };
+      }
+      
+      const response = await fetch(url, options);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Google Places API error:', data);
+        return res.status(response.status).json({ message: 'Failed to fetch places', error: data });
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error searching places:', error);
+      res.status(500).json({ message: 'Failed to search places' });
+    }
+  });
+  
+  // Get place details by ID
+  app.get('/api/places/:placeId', async (req, res) => {
+    try {
+      const { placeId } = req.params;
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: 'Google Maps API not configured' });
+      }
+      
+      const url = `https://places.googleapis.com/v1/places/${placeId}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,types,rating,userRatingCount,photos,priceLevel,primaryType,internationalPhoneNumber,websiteUri,currentOpeningHours,reviews,regularOpeningHours,editorialSummary'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Google Places API error:', data);
+        return res.status(response.status).json({ message: 'Failed to fetch place details', error: data });
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching place details:', error);
+      res.status(500).json({ message: 'Failed to fetch place details' });
+    }
+  });
+  
+  // Get place photo by resource name
+  app.get('/api/places/photo/:photoName(*)', async (req, res) => {
+    try {
+      const { photoName } = req.params;
+      const { maxWidth = 400, maxHeight = 400 } = req.query;
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: 'Google Maps API not configured' });
+      }
+      
+      // Construct photo URL for Places API (New)
+      const url = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=${maxWidth}&maxHeightPx=${maxHeight}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ message: 'Failed to fetch photo' });
+      }
+      
+      // Redirect to the actual image URL (Google returns a redirect)
+      res.redirect(response.url);
+    } catch (error) {
+      console.error('Error fetching place photo:', error);
+      res.status(500).json({ message: 'Failed to fetch photo' });
+    }
+  });
+  
+  // Autocomplete for place search
+  app.get('/api/places/autocomplete', async (req, res) => {
+    try {
+      const { input, lat, lng } = req.query;
+      
+      if (!input) {
+        return res.status(400).json({ message: 'Input parameter required' });
+      }
+      
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: 'Google Maps API not configured' });
+      }
+      
+      const body: any = {
+        input: input as string,
+        includedRegionCodes: ['NG'], // Restrict to Nigeria
+      };
+      
+      if (lat && lng) {
+        body.locationBias = {
+          circle: {
+            center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
+            radius: 50000 // 50km
+          }
+        };
+      }
+      
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Google Places Autocomplete error:', data);
+        return res.status(response.status).json({ message: 'Failed to get suggestions', error: data });
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error('Error in autocomplete:', error);
+      res.status(500).json({ message: 'Failed to get suggestions' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

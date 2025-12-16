@@ -23,6 +23,7 @@ import CollabDrops from "@/pages/collab-drops";
 import VendorWorkshop from "@/pages/vendor-workshop";
 import EventPlanner from "@/pages/event-planner";
 import Quiz from "@/pages/quiz";
+import DiscoverNigeria from "@/pages/discover-nigeria";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
@@ -46,6 +47,7 @@ function Router() {
           <Route path="/products" component={Products} />
           <Route path="/collab-drops" component={CollabDrops} />
           <Route path="/events" component={EventPlanner} />
+          <Route path="/discover" component={DiscoverNigeria} />
           <Route path="/admin">
             <AdminProtectedRoute>
               <AdminDashboard />
@@ -64,6 +66,7 @@ function Router() {
           <Route path="/loyalty" component={Loyalty} />
           <Route path="/collab-drops" component={CollabDrops} />
           <Route path="/events" component={EventPlanner} />
+          <Route path="/discover" component={DiscoverNigeria} />
           <Route path="/quizzes/:id" component={Quiz} />
           <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />

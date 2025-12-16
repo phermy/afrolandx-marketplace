@@ -102,6 +102,13 @@ export default function Navbar() {
               }`} data-testid="nav-link-collab-drops">
                 Collabs
               </Link>
+              <Link href="/discover" className={`px-3 py-2 font-medium transition-colors ${
+                location === '/discover' 
+                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                  : 'text-gray-700 hover:text-nigerian-green'
+              }`} data-testid="nav-link-discover">
+                Discover
+              </Link>
               {isAuthenticated && isVendor(user) && (
                 <Link href="/vendor" className={`px-3 py-2 font-medium transition-colors ${
                   location === '/vendor' 
@@ -306,6 +313,21 @@ export default function Navbar() {
               <Link href="/products">
                 <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
                   Products
+                </a>
+              </Link>
+              <Link href="/events">
+                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
+                  Events
+                </a>
+              </Link>
+              <Link href="/collab-drops">
+                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
+                  Collabs
+                </a>
+              </Link>
+              <Link href="/discover">
+                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium" data-testid="mobile-nav-discover">
+                  Discover
                 </a>
               </Link>
               {isAuthenticated && isVendor(user) && (

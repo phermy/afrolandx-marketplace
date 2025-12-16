@@ -122,6 +122,7 @@ export default function Landing() {
               <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-products">Products</a>
               <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-events">Events</a>
               <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-collab-drops">Collabs</a>
+              <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-discover">Discover</a>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors">About</a>
             </div>
 
