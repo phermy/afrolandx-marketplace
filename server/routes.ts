@@ -2765,12 +2765,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { placeId } = req.params;
       
+      // Basic validation - prevent path traversal, allow Google's documented place ID chars
+      if (!placeId || placeId.includes('..') || placeId.includes('/')) {
+        return res.status(400).json({ message: 'Invalid place ID format' });
+      }
+      
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ message: 'Google Maps API not configured' });
       }
       
-      const url = `https://places.googleapis.com/v1/places/${placeId}`;
+      const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -2800,13 +2805,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { photoName } = req.params;
       const { maxWidth = 400, maxHeight = 400 } = req.query;
       
+      // Basic validation - must start with "places/" and contain "/photos/"
+      if (!photoName || !photoName.startsWith('places/') || !photoName.includes('/photos/')) {
+        return res.status(400).json({ message: 'Invalid photo reference format' });
+      }
+      
+      // Sanitize max width/height to prevent abuse
+      const sanitizedMaxWidth = Math.min(Math.max(parseInt(String(maxWidth)) || 400, 100), 4000);
+      const sanitizedMaxHeight = Math.min(Math.max(parseInt(String(maxHeight)) || 400, 100), 4000);
+      
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ message: 'Google Maps API not configured' });
       }
       
       // Construct photo URL for Places API (New)
-      const url = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=${maxWidth}&maxHeightPx=${maxHeight}`;
+      const url = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=${sanitizedMaxWidth}&maxHeightPx=${sanitizedMaxHeight}`;
       
       const response = await fetch(url);
       

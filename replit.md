@@ -12,6 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### December 16, 2025 - Discover Nigeria (Location-Based Services)
+- Added "Discover Nigeria" page with real-time location search powered by Google Places API
+- Search for hotels, malls, restaurants, tourist attractions, airports, car rentals, cafes, and nightlife
+- Pre-configured Nigerian cities: Lagos, Abuja, Port Harcourt, Kano, Ibadan, Enugu, Calabar, Benin City
+- "Near Me" feature uses browser geolocation to find places nearby
+- Place details modal shows ratings, reviews, contact info, opening hours, and photos
+- Direct integration with Google Maps for navigation
+- Backend proxy endpoints secure the API key (no client-side exposure)
+- Located at /discover page
+
 ### December 16, 2025 - 9 Advanced Features Implementation
 
 **Feature 1: Bespoke Lookbook Studio**
