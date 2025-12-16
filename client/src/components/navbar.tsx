@@ -88,6 +88,20 @@ export default function Navbar() {
               }`}>
                 Products
               </Link>
+              <Link href="/events" className={`px-3 py-2 font-medium transition-colors ${
+                location === '/events' 
+                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                  : 'text-gray-700 hover:text-nigerian-green'
+              }`} data-testid="nav-link-events">
+                Events
+              </Link>
+              <Link href="/collab-drops" className={`px-3 py-2 font-medium transition-colors ${
+                location === '/collab-drops' 
+                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
+                  : 'text-gray-700 hover:text-nigerian-green'
+              }`} data-testid="nav-link-collab-drops">
+                Collabs
+              </Link>
               {isAuthenticated && isVendor(user) && (
                 <Link href="/vendor" className={`px-3 py-2 font-medium transition-colors ${
                   location === '/vendor' 
@@ -201,12 +215,34 @@ export default function Navbar() {
                       <span className="cursor-pointer">Profile Settings</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="menu-item-measurements">
+                    <Link href="/measurements">
+                      <span className="cursor-pointer">Measurements</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="menu-item-lookbook">
+                    <Link href="/lookbook">
+                      <span className="cursor-pointer">My Lookbook</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem data-testid="menu-item-loyalty">
+                    <Link href="/loyalty">
+                      <span className="cursor-pointer">Loyalty & Rewards</span>
+                    </Link>
+                  </DropdownMenuItem>
                   {isVendor(user) && (
-                    <DropdownMenuItem>
-                      <Link href="/vendor">
-                        <span className="cursor-pointer">Vendor Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem>
+                        <Link href="/vendor">
+                          <span className="cursor-pointer">Vendor Dashboard</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem data-testid="menu-item-workshop">
+                        <Link href="/vendor/workshop">
+                          <span className="cursor-pointer">Workshop</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {isAdmin(user) && (
                     <DropdownMenuItem>

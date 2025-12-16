@@ -17,6 +17,12 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
 import Measurements from "@/pages/measurements";
 import Messages from "@/pages/messages";
+import Lookbook from "@/pages/lookbook";
+import Loyalty from "@/pages/loyalty";
+import CollabDrops from "@/pages/collab-drops";
+import VendorWorkshop from "@/pages/vendor-workshop";
+import EventPlanner from "@/pages/event-planner";
+import Quiz from "@/pages/quiz";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
@@ -37,6 +43,9 @@ function Router() {
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
+          <Route path="/products" component={Products} />
+          <Route path="/collab-drops" component={CollabDrops} />
+          <Route path="/events" component={EventPlanner} />
           <Route path="/admin">
             <AdminProtectedRoute>
               <AdminDashboard />
@@ -51,6 +60,12 @@ function Router() {
           <Route path="/my-orders" component={MyOrders} />
           <Route path="/measurements" component={Measurements} />
           <Route path="/messages" component={Messages} />
+          <Route path="/lookbook" component={Lookbook} />
+          <Route path="/loyalty" component={Loyalty} />
+          <Route path="/collab-drops" component={CollabDrops} />
+          <Route path="/events" component={EventPlanner} />
+          <Route path="/quizzes/:id" component={Quiz} />
+          <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
           <Route path="/admin">

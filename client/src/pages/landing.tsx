@@ -119,9 +119,10 @@ export default function Landing() {
             </div>
 
             <div className="hidden md:flex items-center space-x-6">
-              <a href="#features" className="text-gray-700 hover:text-nigerian-green transition-colors">Features</a>
+              <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-products">Products</a>
+              <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-events">Events</a>
+              <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-collab-drops">Collabs</a>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors">About</a>
-              <a href="#contact" className="text-gray-700 hover:text-nigerian-green transition-colors">Contact</a>
             </div>
 
             <div className="flex items-center space-x-4">

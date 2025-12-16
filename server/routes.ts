@@ -1978,12 +1978,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FEATURE 2: Smart Fit Confidence Score
   // ============================================
   
-  app.get('/api/products/:id/fit-score', isAuthenticated, async (req, res) => {
+  app.get('/api/products/:id/fit-score', async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
       const userId = req.user?.id;
       
-      // Get user's measurements if available
+      // Get user's measurements if available (only for authenticated users)
       let userMeasurements;
       if (userId) {
         const measurements = await storage.getUserMeasurements(userId);
@@ -1996,7 +1996,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         fitScore, 
         totalReviews: feedback.length,
-        recommendation: fitScore >= 85 ? 'Excellent fit' : fitScore >= 70 ? 'Good fit' : 'Consider measurements'
+        recommendation: fitScore >= 85 ? 'Excellent fit' : fitScore >= 70 ? 'Good fit' : 'Consider measurements',
+        hasPersonalizedScore: !!userMeasurements
       });
     } catch (error) {
       console.error('Error calculating fit score:', error);
