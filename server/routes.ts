@@ -1862,6 +1862,789 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/body-scan/initiate', isAuthenticated, initiateScan);
   app.get('/api/body-scan/results/:sessionId', isAuthenticated, getScanResults);
 
+  // ============================================
+  // FEATURE 1: Bespoke Lookbook Studio
+  // ============================================
+  
+  app.post('/api/occasions', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const occasion = await storage.createOccasionProfile({ ...req.body, userId });
+      res.status(201).json(occasion);
+    } catch (error) {
+      console.error('Error creating occasion:', error);
+      res.status(500).json({ message: 'Failed to create occasion' });
+    }
+  });
+
+  app.get('/api/occasions', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const occasions = await storage.getUserOccasions(userId);
+      res.json(occasions);
+    } catch (error) {
+      console.error('Error fetching occasions:', error);
+      res.status(500).json({ message: 'Failed to fetch occasions' });
+    }
+  });
+
+  app.post('/api/lookbooks/generate', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const { occasionId, eventType, budget, styleNotes } = req.body;
+      
+      // Get available products
+      const allProducts = await storage.getProducts({ status: 'approved' });
+      
+      // Use AI to generate outfit recommendations
+      const chatbotService = getChatbotService();
+      const prompt = `You are a Nigerian fashion stylist. Based on the following occasion:
+        Event Type: ${eventType}
+        Budget: ${budget ? `₦${budget}` : 'No limit'}
+        Style Notes: ${styleNotes || 'None'}
+        
+        Select 3-5 items from this product catalog that would create a perfect outfit:
+        ${JSON.stringify(allProducts.slice(0, 20).map(p => ({ id: p.id, name: p.name, price: p.price, category: p.categoryId })))}
+        
+        Return a JSON array of product IDs with reasons, like: [{"productId": 1, "reason": "Perfect Agbada for wedding"}]`;
+      
+      let bundleItems: any[] = [];
+      try {
+        const aiResponse = await chatbotService.chat([{ role: 'user', content: prompt }]);
+        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          bundleItems = JSON.parse(jsonMatch[0]);
+        }
+      } catch (e) {
+        // Fallback to random selection if AI fails
+        bundleItems = allProducts.slice(0, 4).map(p => ({ productId: p.id, reason: 'Recommended for you' }));
+      }
+      
+      // Enhance bundle items with product details
+      const enhancedItems = await Promise.all(bundleItems.map(async (item: any) => {
+        const product = await storage.getProduct(item.productId);
+        return product ? { ...item, name: product.name, price: product.price, imageUrl: product.imageUrl } : null;
+      }));
+      
+      const filteredItems = enhancedItems.filter(Boolean);
+      const totalPrice = filteredItems.reduce((sum, item: any) => sum + parseFloat(item.price || '0'), 0);
+      
+      const lookbook = await storage.createLookbookRecommendation({
+        userId,
+        occasionId,
+        bundleItems: filteredItems,
+        totalPrice: totalPrice.toString(),
+        status: 'generated',
+      });
+      
+      res.status(201).json(lookbook);
+    } catch (error) {
+      console.error('Error generating lookbook:', error);
+      res.status(500).json({ message: 'Failed to generate lookbook' });
+    }
+  });
+
+  app.get('/api/lookbooks', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const lookbooks = await storage.getUserLookbooks(userId);
+      res.json(lookbooks);
+    } catch (error) {
+      console.error('Error fetching lookbooks:', error);
+      res.status(500).json({ message: 'Failed to fetch lookbooks' });
+    }
+  });
+
+  app.post('/api/lookbooks/:id/accept', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.updateLookbookStatus(id, 'accepted');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error accepting lookbook:', error);
+      res.status(500).json({ message: 'Failed to accept lookbook' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 2: Smart Fit Confidence Score
+  // ============================================
+  
+  app.get('/api/products/:id/fit-score', isAuthenticated, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      
+      // Get user's measurements if available
+      let userMeasurements;
+      if (userId) {
+        const measurements = await storage.getUserMeasurements(userId);
+        userMeasurements = measurements[0]; // Most recent
+      }
+      
+      const fitScore = await storage.calculateFitScore(productId, userMeasurements);
+      const feedback = await storage.getProductFeedback(productId);
+      
+      res.json({ 
+        fitScore, 
+        totalReviews: feedback.length,
+        recommendation: fitScore >= 85 ? 'Excellent fit' : fitScore >= 70 ? 'Good fit' : 'Consider measurements'
+      });
+    } catch (error) {
+      console.error('Error calculating fit score:', error);
+      res.status(500).json({ message: 'Failed to calculate fit score' });
+    }
+  });
+
+  app.post('/api/orders/:orderId/feedback', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const orderId = parseInt(req.params.orderId);
+      const { productId, fitRating, alterationNeeded, alterationDetails, overallRating, comment } = req.body;
+      
+      const feedback = await storage.createOrderFeedback({
+        orderId,
+        productId,
+        userId,
+        fitRating,
+        alterationNeeded,
+        alterationDetails,
+        overallRating,
+        comment,
+      });
+      
+      // Award loyalty points for leaving a review
+      await storage.addLoyaltyPoints(userId, 50, 'review', 'Points for leaving a product review', orderId, 'order');
+      
+      res.status(201).json(feedback);
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      res.status(500).json({ message: 'Failed to submit feedback' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 3: Measurement Health Alerts
+  // ============================================
+  
+  app.get('/api/vendor/measurement-alerts', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const alerts = await storage.getVendorMeasurementAlerts(vendor.id);
+      res.json(alerts);
+    } catch (error) {
+      console.error('Error fetching measurement alerts:', error);
+      res.status(500).json({ message: 'Failed to fetch alerts' });
+    }
+  });
+
+  app.post('/api/vendor/measurement-alerts/:id/acknowledge', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const id = parseInt(req.params.id);
+      await storage.acknowledgeMeasurementAlert(id, vendor.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+      res.status(500).json({ message: 'Failed to acknowledge alert' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 4: Vendor Workshop Dashboard
+  // ============================================
+  
+  app.get('/api/vendor/workshop/orders', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const vendorOrders = await storage.getVendorOrders(vendor.id);
+      
+      // Get production steps for each order
+      const ordersWithSteps = await Promise.all(vendorOrders.map(async (order) => {
+        const steps = await storage.getOrderProductionSteps(order.id);
+        const items = await storage.getOrderItemsWithProducts(order.id);
+        return { ...order, productionSteps: steps, items };
+      }));
+      
+      res.json(ordersWithSteps);
+    } catch (error) {
+      console.error('Error fetching workshop orders:', error);
+      res.status(500).json({ message: 'Failed to fetch orders' });
+    }
+  });
+
+  app.post('/api/vendor/workshop/orders/:orderId/steps', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const orderId = parseInt(req.params.orderId);
+      const { stage, notes, orderItemId } = req.body;
+      
+      const step = await storage.createProductionStep({
+        orderId,
+        orderItemId,
+        stage,
+        notes,
+        completedBy: userId,
+      });
+      
+      res.status(201).json(step);
+    } catch (error) {
+      console.error('Error creating production step:', error);
+      res.status(500).json({ message: 'Failed to create step' });
+    }
+  });
+
+  app.patch('/api/vendor/workshop/steps/:id/complete', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { notes } = req.body;
+      
+      await storage.updateProductionStep(id, new Date(), notes);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error completing step:', error);
+      res.status(500).json({ message: 'Failed to complete step' });
+    }
+  });
+
+  // Vendor resources
+  app.get('/api/vendor/resources', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const resources = await storage.getVendorResources(vendor.id);
+      const lowStock = await storage.getLowStockResources(vendor.id);
+      
+      res.json({ resources, lowStockAlerts: lowStock });
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      res.status(500).json({ message: 'Failed to fetch resources' });
+    }
+  });
+
+  app.post('/api/vendor/resources', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const resource = await storage.createVendorResource({ ...req.body, vendorId: vendor.id });
+      res.status(201).json(resource);
+    } catch (error) {
+      console.error('Error creating resource:', error);
+      res.status(500).json({ message: 'Failed to create resource' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 5: Event Outfit Planner
+  // ============================================
+  
+  app.get('/api/events/collections', async (req, res) => {
+    try {
+      const { eventType } = req.query;
+      const collections = await storage.getEventCollections(eventType as string);
+      
+      // Enhance with product details
+      const enhanced = await Promise.all(collections.map(async (collection) => {
+        const productIds = (collection.productIds as number[]) || [];
+        const collectionProducts = await Promise.all(
+          productIds.map(id => storage.getProduct(id))
+        );
+        return { ...collection, products: collectionProducts.filter(Boolean) };
+      }));
+      
+      res.json(enhanced);
+    } catch (error) {
+      console.error('Error fetching event collections:', error);
+      res.status(500).json({ message: 'Failed to fetch collections' });
+    }
+  });
+
+  app.post('/api/events/collections', isAdmin, async (req, res) => {
+    try {
+      const collection = await storage.createEventCollection(req.body);
+      res.status(201).json(collection);
+    } catch (error) {
+      console.error('Error creating event collection:', error);
+      res.status(500).json({ message: 'Failed to create collection' });
+    }
+  });
+
+  app.get('/api/events/recommend', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const { eventType, budget, familySize } = req.query;
+      
+      // Get collections for this event type
+      const collections = await storage.getEventCollections(eventType as string);
+      
+      // Get user's measurements
+      const measurements = await storage.getUserMeasurements(userId);
+      const hasMeasurements = measurements.length > 0;
+      
+      // Enhance collections with fit compatibility
+      const recommendations = await Promise.all(collections.map(async (collection) => {
+        const productIds = (collection.productIds as number[]) || [];
+        const collectionProducts = await Promise.all(
+          productIds.map(async (id) => {
+            const product = await storage.getProduct(id);
+            if (!product) return null;
+            const fitScore = hasMeasurements ? await storage.calculateFitScore(id, measurements[0]) : 85;
+            return { ...product, fitScore };
+          })
+        );
+        
+        const totalPrice = collectionProducts
+          .filter(Boolean)
+          .reduce((sum, p: any) => sum + parseFloat(p?.price || '0'), 0);
+        
+        return {
+          ...collection,
+          products: collectionProducts.filter(Boolean),
+          totalPrice,
+          avgFitScore: collectionProducts.reduce((sum, p: any) => sum + (p?.fitScore || 85), 0) / collectionProducts.length,
+        };
+      }));
+      
+      // Filter by budget if specified
+      const filtered = budget 
+        ? recommendations.filter(r => r.totalPrice <= parseFloat(budget as string))
+        : recommendations;
+      
+      res.json(filtered);
+    } catch (error) {
+      console.error('Error getting event recommendations:', error);
+      res.status(500).json({ message: 'Failed to get recommendations' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 6: Cultural Story Capsules
+  // ============================================
+  
+  app.get('/api/products/:id/stories', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const stories = await storage.getProductStories(productId);
+      res.json(stories);
+    } catch (error) {
+      console.error('Error fetching product stories:', error);
+      res.status(500).json({ message: 'Failed to fetch stories' });
+    }
+  });
+
+  app.post('/api/products/:id/stories', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const productId = parseInt(req.params.id);
+      
+      // Verify user owns this product (is the vendor)
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || vendor.id !== product.vendorId) {
+        return res.status(403).json({ message: 'Not authorized to add stories to this product' });
+      }
+      
+      const story = await storage.createProductStory({ ...req.body, productId });
+      res.status(201).json(story);
+    } catch (error) {
+      console.error('Error creating product story:', error);
+      res.status(500).json({ message: 'Failed to create story' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 7: Loyalty & Rewards Program
+  // ============================================
+  
+  app.get('/api/loyalty', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const account = await storage.getOrCreateLoyaltyAccount(userId);
+      const history = await storage.getLoyaltyHistory(userId);
+      
+      res.json({ account, history: history.slice(0, 20) });
+    } catch (error) {
+      console.error('Error fetching loyalty account:', error);
+      res.status(500).json({ message: 'Failed to fetch loyalty account' });
+    }
+  });
+
+  app.post('/api/loyalty/redeem', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const { points } = req.body;
+      const success = await storage.redeemLoyaltyPoints(userId, points);
+      
+      if (!success) {
+        return res.status(400).json({ message: 'Insufficient points' });
+      }
+      
+      // Calculate discount (100 points = ₦500 discount)
+      const discountAmount = (points / 100) * 500;
+      
+      res.json({ success: true, discountAmount });
+    } catch (error) {
+      console.error('Error redeeming points:', error);
+      res.status(500).json({ message: 'Failed to redeem points' });
+    }
+  });
+
+  app.get('/api/loyalty/referral-code', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const code = await storage.generateReferralCode(userId);
+      res.json({ referralCode: code });
+    } catch (error) {
+      console.error('Error generating referral code:', error);
+      res.status(500).json({ message: 'Failed to generate referral code' });
+    }
+  });
+
+  app.post('/api/loyalty/apply-referral', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const { referralCode } = req.body;
+      const success = await storage.applyReferralCode(userId, referralCode);
+      
+      if (!success) {
+        return res.status(400).json({ message: 'Invalid or already used referral code' });
+      }
+      
+      res.json({ success: true, message: 'Referral code applied! You earned 100 bonus points.' });
+    } catch (error) {
+      console.error('Error applying referral code:', error);
+      res.status(500).json({ message: 'Failed to apply referral code' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 7b: Cultural Quizzes
+  // ============================================
+  
+  app.get('/api/quizzes', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const quizzes = await storage.getActiveQuizzes();
+      
+      // Mark which quizzes user has completed
+      const enhanced = await Promise.all(quizzes.map(async (quiz) => {
+        const completed = await storage.hasUserCompletedQuiz(userId, quiz.id);
+        return { ...quiz, completed };
+      }));
+      
+      res.json(enhanced);
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+      res.status(500).json({ message: 'Failed to fetch quizzes' });
+    }
+  });
+
+  app.get('/api/quizzes/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const quiz = await storage.getQuiz(id);
+      
+      if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+      
+      res.json(quiz);
+    } catch (error) {
+      console.error('Error fetching quiz:', error);
+      res.status(500).json({ message: 'Failed to fetch quiz' });
+    }
+  });
+
+  app.post('/api/quizzes/:id/submit', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const quizId = parseInt(req.params.id);
+      const { answers } = req.body;
+      
+      // Check if already completed
+      const alreadyCompleted = await storage.hasUserCompletedQuiz(userId, quizId);
+      if (alreadyCompleted) {
+        return res.status(400).json({ message: 'You have already completed this quiz' });
+      }
+      
+      const quiz = await storage.getQuiz(quizId);
+      if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+      
+      // Calculate score
+      const questions = quiz.questions as any[];
+      let correctCount = 0;
+      answers.forEach((answer: number, index: number) => {
+        if (questions[index] && questions[index].correctIndex === answer) {
+          correctCount++;
+        }
+      });
+      
+      const score = Math.round((correctCount / questions.length) * 100);
+      const passed = score >= 70;
+      const pointsEarned = passed ? (quiz.rewardPoints || 10) : 0;
+      
+      const attempt = await storage.submitQuizAttempt({
+        userId,
+        quizId,
+        answers,
+        score,
+        passed,
+        pointsEarned,
+      });
+      
+      res.json({ 
+        attempt, 
+        score, 
+        passed, 
+        pointsEarned,
+        correctCount,
+        totalQuestions: questions.length
+      });
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      res.status(500).json({ message: 'Failed to submit quiz' });
+    }
+  });
+
+  app.post('/api/admin/quizzes', isAdmin, async (req, res) => {
+    try {
+      const quiz = await storage.createCulturalQuiz(req.body);
+      res.status(201).json(quiz);
+    } catch (error) {
+      console.error('Error creating quiz:', error);
+      res.status(500).json({ message: 'Failed to create quiz' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 8: Live Fabric Viewer
+  // ============================================
+  
+  app.get('/api/products/:id/fabric-assets', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const assets = await storage.getProductFabricAssets(productId);
+      res.json(assets);
+    } catch (error) {
+      console.error('Error fetching fabric assets:', error);
+      res.status(500).json({ message: 'Failed to fetch fabric assets' });
+    }
+  });
+
+  app.post('/api/products/:id/fabric-assets', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const productId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || vendor.id !== product.vendorId) {
+        return res.status(403).json({ message: 'Not authorized' });
+      }
+      
+      const asset = await storage.createFabricAsset({ ...req.body, productId });
+      res.status(201).json(asset);
+    } catch (error) {
+      console.error('Error creating fabric asset:', error);
+      res.status(500).json({ message: 'Failed to create fabric asset' });
+    }
+  });
+
+  // ============================================
+  // FEATURE 9: Designer Collaboration Hub
+  // ============================================
+  
+  app.get('/api/collab-drops', async (req, res) => {
+    try {
+      const { status } = req.query;
+      const drops = await storage.getCollabDrops(status as string);
+      
+      // Enhance with product and designer details
+      const enhanced = await Promise.all(drops.map(async (drop) => {
+        const designer = await storage.getVendor(drop.designerId);
+        const artisan = drop.artisanId ? await storage.getVendor(drop.artisanId) : null;
+        const productIds = (drop.productIds as number[]) || [];
+        const dropProducts = await Promise.all(productIds.map(id => storage.getProduct(id)));
+        
+        return {
+          ...drop,
+          designer,
+          artisan,
+          products: dropProducts.filter(Boolean),
+        };
+      }));
+      
+      res.json(enhanced);
+    } catch (error) {
+      console.error('Error fetching collab drops:', error);
+      res.status(500).json({ message: 'Failed to fetch drops' });
+    }
+  });
+
+  app.get('/api/collab-drops/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const drop = await storage.getCollabDrop(id);
+      
+      if (!drop) return res.status(404).json({ message: 'Drop not found' });
+      
+      const designer = await storage.getVendor(drop.designerId);
+      const artisan = drop.artisanId ? await storage.getVendor(drop.artisanId) : null;
+      const productIds = (drop.productIds as number[]) || [];
+      const dropProducts = await Promise.all(productIds.map(id => storage.getProduct(id)));
+      const rsvps = await storage.getDropRsvps(id);
+      
+      res.json({
+        ...drop,
+        designer,
+        artisan,
+        products: dropProducts.filter(Boolean),
+        rsvpCount: rsvps.length,
+      });
+    } catch (error) {
+      console.error('Error fetching collab drop:', error);
+      res.status(500).json({ message: 'Failed to fetch drop' });
+    }
+  });
+
+  app.post('/api/collab-drops', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      
+      const drop = await storage.createCollabDrop({ ...req.body, designerId: vendor.id });
+      res.status(201).json(drop);
+    } catch (error) {
+      console.error('Error creating collab drop:', error);
+      res.status(500).json({ message: 'Failed to create drop' });
+    }
+  });
+
+  app.post('/api/collab-drops/:id/rsvp', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const dropId = parseInt(req.params.id);
+      const drop = await storage.getCollabDrop(dropId);
+      
+      if (!drop) return res.status(404).json({ message: 'Drop not found' });
+      
+      // Check if already RSVPed
+      const hasRsvped = await storage.hasUserRsvped(userId, dropId);
+      if (hasRsvped) {
+        return res.status(400).json({ message: 'Already RSVPed' });
+      }
+      
+      // Check RSVP cap
+      if (drop.rsvpCap && (drop.rsvpCount || 0) >= drop.rsvpCap) {
+        return res.status(400).json({ message: 'RSVP capacity reached' });
+      }
+      
+      // Check loyalty tier if exclusive
+      if (drop.isExclusive && drop.minLoyaltyTier) {
+        const loyaltyAccount = await storage.getLoyaltyAccount(userId);
+        const tierOrder = ['bronze', 'silver', 'gold', 'platinum'];
+        const userTierIndex = tierOrder.indexOf(loyaltyAccount?.tier || 'bronze');
+        const requiredTierIndex = tierOrder.indexOf(drop.minLoyaltyTier);
+        
+        if (userTierIndex < requiredTierIndex) {
+          return res.status(403).json({ 
+            message: `This drop requires ${drop.minLoyaltyTier} tier or higher` 
+          });
+        }
+      }
+      
+      const rsvp = await storage.createDropRsvp({ dropId, userId });
+      res.status(201).json(rsvp);
+    } catch (error) {
+      console.error('Error creating RSVP:', error);
+      res.status(500).json({ message: 'Failed to RSVP' });
+    }
+  });
+
+  app.get('/api/my-rsvps', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      
+      const rsvps = await storage.getUserDropRsvps(userId);
+      
+      // Enhance with drop details
+      const enhanced = await Promise.all(rsvps.map(async (rsvp) => {
+        const drop = await storage.getCollabDrop(rsvp.dropId);
+        return { ...rsvp, drop };
+      }));
+      
+      res.json(enhanced);
+    } catch (error) {
+      console.error('Error fetching RSVPs:', error);
+      res.status(500).json({ message: 'Failed to fetch RSVPs' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

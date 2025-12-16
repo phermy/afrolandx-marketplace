@@ -9,6 +9,22 @@ import {
   notifications,
   measurements,
   messages,
+  occasionProfiles,
+  lookbookRecommendations,
+  productFitMetrics,
+  orderFeedback,
+  measurementAlerts,
+  orderProductionSteps,
+  vendorResources,
+  eventCollections,
+  productStories,
+  loyaltyAccounts,
+  loyaltyEvents,
+  culturalQuizzes,
+  quizAttempts,
+  fabricAssets,
+  collabDrops,
+  dropRsvps,
   type User,
   type UpsertUser,
   type Vendor,
@@ -29,6 +45,36 @@ import {
   type InsertMeasurement,
   type Message,
   type InsertMessage,
+  type OccasionProfile,
+  type InsertOccasionProfile,
+  type LookbookRecommendation,
+  type InsertLookbookRecommendation,
+  type ProductFitMetric,
+  type OrderFeedback,
+  type InsertOrderFeedback,
+  type MeasurementAlert,
+  type OrderProductionStep,
+  type InsertProductionStep,
+  type VendorResource,
+  type InsertVendorResource,
+  type EventCollection,
+  type InsertEventCollection,
+  type ProductStory,
+  type InsertProductStory,
+  type LoyaltyAccount,
+  type InsertLoyaltyAccount,
+  type LoyaltyEvent,
+  type InsertLoyaltyEvent,
+  type CulturalQuiz,
+  type InsertCulturalQuiz,
+  type QuizAttempt,
+  type InsertQuizAttempt,
+  type FabricAsset,
+  type InsertFabricAsset,
+  type CollabDrop,
+  type InsertCollabDrop,
+  type DropRsvp,
+  type InsertDropRsvp,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, lt } from "drizzle-orm";
@@ -102,6 +148,79 @@ export interface IStorage {
   getConversationMessages(userId: string, otherUserId: string): Promise<(Message & { sender: User; recipient: User })[]>;
   markMessagesAsRead(userId: string, otherUserId: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
+
+  // Occasion/Lookbook operations
+  createOccasionProfile(profile: InsertOccasionProfile): Promise<OccasionProfile>;
+  getUserOccasions(userId: string): Promise<OccasionProfile[]>;
+  getOccasion(id: number): Promise<OccasionProfile | undefined>;
+  createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation>;
+  getUserLookbooks(userId: string): Promise<LookbookRecommendation[]>;
+  updateLookbookStatus(id: number, status: string): Promise<void>;
+
+  // Fit metrics & feedback operations
+  getProductFitMetrics(productId: number): Promise<ProductFitMetric | undefined>;
+  createOrderFeedback(feedback: InsertOrderFeedback): Promise<OrderFeedback>;
+  getProductFeedback(productId: number): Promise<OrderFeedback[]>;
+  calculateFitScore(productId: number, userMeasurements?: Measurement): Promise<number>;
+
+  // Measurement alerts
+  createMeasurementAlert(alert: { measurementId: number; userId: string; vendorId?: number; alertType: string; deltaSummary?: object }): Promise<MeasurementAlert>;
+  getVendorMeasurementAlerts(vendorId: number): Promise<MeasurementAlert[]>;
+  acknowledgeMeasurementAlert(id: number, vendorId: number): Promise<void>;
+
+  // Production steps operations
+  createProductionStep(step: InsertProductionStep): Promise<OrderProductionStep>;
+  getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]>;
+  updateProductionStep(id: number, completedAt: Date, notes?: string): Promise<void>;
+  getVendorOrders(vendorId: number): Promise<Order[]>;
+
+  // Vendor resources operations
+  createVendorResource(resource: InsertVendorResource): Promise<VendorResource>;
+  getVendorResources(vendorId: number): Promise<VendorResource[]>;
+  updateVendorResource(id: number, quantity: number): Promise<void>;
+  getLowStockResources(vendorId: number): Promise<VendorResource[]>;
+
+  // Event collections operations
+  createEventCollection(collection: InsertEventCollection): Promise<EventCollection>;
+  getEventCollections(eventType?: string): Promise<EventCollection[]>;
+  getEventCollection(id: number): Promise<EventCollection | undefined>;
+
+  // Product stories operations
+  createProductStory(story: InsertProductStory): Promise<ProductStory>;
+  getProductStories(productId: number): Promise<ProductStory[]>;
+  updateProductStoryPublished(id: number, isPublished: boolean): Promise<void>;
+
+  // Loyalty operations
+  getOrCreateLoyaltyAccount(userId: string): Promise<LoyaltyAccount>;
+  getLoyaltyAccount(userId: string): Promise<LoyaltyAccount | undefined>;
+  addLoyaltyPoints(userId: string, points: number, actionType: string, description: string, referenceId?: number, referenceType?: string): Promise<void>;
+  redeemLoyaltyPoints(userId: string, points: number): Promise<boolean>;
+  getLoyaltyHistory(userId: string): Promise<LoyaltyEvent[]>;
+  updateLoyaltyTier(userId: string): Promise<void>;
+  generateReferralCode(userId: string): Promise<string>;
+  applyReferralCode(userId: string, referralCode: string): Promise<boolean>;
+
+  // Quiz operations
+  createCulturalQuiz(quiz: InsertCulturalQuiz): Promise<CulturalQuiz>;
+  getActiveQuizzes(): Promise<CulturalQuiz[]>;
+  getQuiz(id: number): Promise<CulturalQuiz | undefined>;
+  submitQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt>;
+  getUserQuizAttempts(userId: string): Promise<QuizAttempt[]>;
+  hasUserCompletedQuiz(userId: string, quizId: number): Promise<boolean>;
+
+  // Fabric assets operations
+  createFabricAsset(asset: InsertFabricAsset): Promise<FabricAsset>;
+  getProductFabricAssets(productId: number): Promise<FabricAsset[]>;
+
+  // Collaboration drops operations
+  createCollabDrop(drop: InsertCollabDrop): Promise<CollabDrop>;
+  getCollabDrops(status?: string): Promise<CollabDrop[]>;
+  getCollabDrop(id: number): Promise<CollabDrop | undefined>;
+  createDropRsvp(rsvp: InsertDropRsvp): Promise<DropRsvp>;
+  getDropRsvps(dropId: number): Promise<DropRsvp[]>;
+  getUserDropRsvps(userId: string): Promise<DropRsvp[]>;
+  hasUserRsvped(userId: string, dropId: number): Promise<boolean>;
+  updateDropStatus(id: number, status: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -631,6 +750,372 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return Number(result[0]?.count || 0);
+  }
+
+  // Occasion/Lookbook operations
+  async createOccasionProfile(profile: InsertOccasionProfile): Promise<OccasionProfile> {
+    const [occasion] = await db.insert(occasionProfiles).values(profile as any).returning();
+    return occasion;
+  }
+
+  async getUserOccasions(userId: string): Promise<OccasionProfile[]> {
+    return await db.select().from(occasionProfiles).where(eq(occasionProfiles.userId, userId)).orderBy(desc(occasionProfiles.createdAt));
+  }
+
+  async getOccasion(id: number): Promise<OccasionProfile | undefined> {
+    const [occasion] = await db.select().from(occasionProfiles).where(eq(occasionProfiles.id, id));
+    return occasion;
+  }
+
+  async createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation> {
+    const [lookbook] = await db.insert(lookbookRecommendations).values(rec).returning();
+    return lookbook;
+  }
+
+  async getUserLookbooks(userId: string): Promise<LookbookRecommendation[]> {
+    return await db.select().from(lookbookRecommendations).where(eq(lookbookRecommendations.userId, userId)).orderBy(desc(lookbookRecommendations.createdAt));
+  }
+
+  async updateLookbookStatus(id: number, status: string): Promise<void> {
+    await db.update(lookbookRecommendations).set({ status }).where(eq(lookbookRecommendations.id, id));
+  }
+
+  // Fit metrics & feedback operations
+  async getProductFitMetrics(productId: number): Promise<ProductFitMetric | undefined> {
+    const [metrics] = await db.select().from(productFitMetrics).where(eq(productFitMetrics.productId, productId));
+    return metrics;
+  }
+
+  async createOrderFeedback(feedback: InsertOrderFeedback): Promise<OrderFeedback> {
+    const [newFeedback] = await db.insert(orderFeedback).values(feedback).returning();
+    
+    // Update product fit metrics
+    const productMetrics = await this.getProductFitMetrics(feedback.productId);
+    if (productMetrics) {
+      const update: any = { updatedAt: new Date() };
+      if (feedback.fitRating && feedback.fitRating >= 4) {
+        update.positiveFeedback = (productMetrics.positiveFeedback || 0) + 1;
+      } else if (feedback.fitRating && feedback.fitRating <= 2) {
+        update.negativeFeedback = (productMetrics.negativeFeedback || 0) + 1;
+      }
+      update.totalOrders = (productMetrics.totalOrders || 0) + 1;
+      await db.update(productFitMetrics).set(update).where(eq(productFitMetrics.id, productMetrics.id));
+    } else {
+      await db.insert(productFitMetrics).values({
+        productId: feedback.productId,
+        totalOrders: 1,
+        positiveFeedback: feedback.fitRating && feedback.fitRating >= 4 ? 1 : 0,
+        negativeFeedback: feedback.fitRating && feedback.fitRating <= 2 ? 1 : 0,
+      });
+    }
+    
+    return newFeedback;
+  }
+
+  async getProductFeedback(productId: number): Promise<OrderFeedback[]> {
+    return await db.select().from(orderFeedback).where(eq(orderFeedback.productId, productId)).orderBy(desc(orderFeedback.createdAt));
+  }
+
+  async calculateFitScore(productId: number, userMeasurements?: Measurement): Promise<number> {
+    const metrics = await this.getProductFitMetrics(productId);
+    if (!metrics) return 85; // Default score for products without feedback
+    
+    const total = (metrics.positiveFeedback || 0) + (metrics.negativeFeedback || 0);
+    if (total === 0) return 85;
+    
+    const positiveRate = (metrics.positiveFeedback || 0) / total;
+    return Math.round(70 + (positiveRate * 30)); // Score between 70-100
+  }
+
+  // Measurement alerts
+  async createMeasurementAlert(alert: { measurementId: number; userId: string; vendorId?: number; alertType: string; deltaSummary?: object }): Promise<MeasurementAlert> {
+    const [newAlert] = await db.insert(measurementAlerts).values(alert).returning();
+    return newAlert;
+  }
+
+  async getVendorMeasurementAlerts(vendorId: number): Promise<MeasurementAlert[]> {
+    return await db.select().from(measurementAlerts).where(eq(measurementAlerts.vendorId, vendorId)).orderBy(desc(measurementAlerts.createdAt));
+  }
+
+  async acknowledgeMeasurementAlert(id: number, vendorId: number): Promise<void> {
+    await db.update(measurementAlerts).set({ 
+      acknowledgedByVendorId: vendorId, 
+      acknowledgedAt: new Date(), 
+      status: "acknowledged" 
+    }).where(eq(measurementAlerts.id, id));
+  }
+
+  // Production steps operations
+  async createProductionStep(step: InsertProductionStep): Promise<OrderProductionStep> {
+    const [newStep] = await db.insert(orderProductionSteps).values(step).returning();
+    return newStep;
+  }
+
+  async getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]> {
+    return await db.select().from(orderProductionSteps).where(eq(orderProductionSteps.orderId, orderId)).orderBy(orderProductionSteps.createdAt);
+  }
+
+  async updateProductionStep(id: number, completedAt: Date, notes?: string): Promise<void> {
+    const update: any = { completedAt };
+    if (notes) update.notes = notes;
+    await db.update(orderProductionSteps).set(update).where(eq(orderProductionSteps.id, id));
+  }
+
+  async getVendorOrders(vendorId: number): Promise<Order[]> {
+    const vendorProducts = await db.select({ id: products.id }).from(products).where(eq(products.vendorId, vendorId));
+    const productIds = vendorProducts.map(p => p.id);
+    
+    if (productIds.length === 0) return [];
+    
+    const vendorOrderItems = await db.select().from(orderItems).where(sql`${orderItems.productId} IN ${productIds}`);
+    const orderIds = Array.from(new Set(vendorOrderItems.map(oi => oi.orderId)));
+    
+    if (orderIds.length === 0) return [];
+    
+    return await db.select().from(orders).where(sql`${orders.id} IN ${orderIds}`).orderBy(desc(orders.createdAt));
+  }
+
+  // Vendor resources operations
+  async createVendorResource(resource: InsertVendorResource): Promise<VendorResource> {
+    const [newResource] = await db.insert(vendorResources).values(resource as any).returning();
+    return newResource;
+  }
+
+  async getVendorResources(vendorId: number): Promise<VendorResource[]> {
+    return await db.select().from(vendorResources).where(eq(vendorResources.vendorId, vendorId));
+  }
+
+  async updateVendorResource(id: number, quantity: number): Promise<void> {
+    await db.update(vendorResources).set({ quantity: quantity.toString(), updatedAt: new Date() }).where(eq(vendorResources.id, id));
+  }
+
+  async getLowStockResources(vendorId: number): Promise<VendorResource[]> {
+    return await db.select().from(vendorResources).where(
+      and(
+        eq(vendorResources.vendorId, vendorId),
+        sql`CAST(${vendorResources.quantity} AS DECIMAL) <= CAST(${vendorResources.lowStockThreshold} AS DECIMAL)`
+      )
+    );
+  }
+
+  // Event collections operations
+  async createEventCollection(collection: InsertEventCollection): Promise<EventCollection> {
+    const [newCollection] = await db.insert(eventCollections).values(collection).returning();
+    return newCollection;
+  }
+
+  async getEventCollections(eventType?: string): Promise<EventCollection[]> {
+    if (eventType) {
+      return await db.select().from(eventCollections).where(eq(eventCollections.eventType, eventType));
+    }
+    return await db.select().from(eventCollections).orderBy(desc(eventCollections.createdAt));
+  }
+
+  async getEventCollection(id: number): Promise<EventCollection | undefined> {
+    const [collection] = await db.select().from(eventCollections).where(eq(eventCollections.id, id));
+    return collection;
+  }
+
+  // Product stories operations
+  async createProductStory(story: InsertProductStory): Promise<ProductStory> {
+    const [newStory] = await db.insert(productStories).values(story).returning();
+    return newStory;
+  }
+
+  async getProductStories(productId: number): Promise<ProductStory[]> {
+    return await db.select().from(productStories).where(
+      and(eq(productStories.productId, productId), eq(productStories.isPublished, true))
+    );
+  }
+
+  async updateProductStoryPublished(id: number, isPublished: boolean): Promise<void> {
+    await db.update(productStories).set({ isPublished }).where(eq(productStories.id, id));
+  }
+
+  // Loyalty operations
+  async getOrCreateLoyaltyAccount(userId: string): Promise<LoyaltyAccount> {
+    let [account] = await db.select().from(loyaltyAccounts).where(eq(loyaltyAccounts.userId, userId));
+    if (!account) {
+      const referralCode = `AFR${userId.slice(0, 6).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      [account] = await db.insert(loyaltyAccounts).values({ userId, referralCode }).returning();
+    }
+    return account;
+  }
+
+  async getLoyaltyAccount(userId: string): Promise<LoyaltyAccount | undefined> {
+    const [account] = await db.select().from(loyaltyAccounts).where(eq(loyaltyAccounts.userId, userId));
+    return account;
+  }
+
+  async addLoyaltyPoints(userId: string, points: number, actionType: string, description: string, referenceId?: number, referenceType?: string): Promise<void> {
+    const account = await this.getOrCreateLoyaltyAccount(userId);
+    
+    await db.insert(loyaltyEvents).values({
+      userId,
+      actionType,
+      pointsDelta: points,
+      description,
+      referenceId,
+      referenceType,
+    });
+    
+    await db.update(loyaltyAccounts).set({
+      points: (account.points || 0) + points,
+      lifetimePoints: (account.lifetimePoints || 0) + (points > 0 ? points : 0),
+    }).where(eq(loyaltyAccounts.userId, userId));
+    
+    await this.updateLoyaltyTier(userId);
+  }
+
+  async redeemLoyaltyPoints(userId: string, points: number): Promise<boolean> {
+    const account = await this.getLoyaltyAccount(userId);
+    if (!account || (account.points || 0) < points) return false;
+    
+    await this.addLoyaltyPoints(userId, -points, "redeem", `Redeemed ${points} points`);
+    return true;
+  }
+
+  async getLoyaltyHistory(userId: string): Promise<LoyaltyEvent[]> {
+    return await db.select().from(loyaltyEvents).where(eq(loyaltyEvents.userId, userId)).orderBy(desc(loyaltyEvents.createdAt));
+  }
+
+  async updateLoyaltyTier(userId: string): Promise<void> {
+    const account = await this.getLoyaltyAccount(userId);
+    if (!account) return;
+    
+    const lifetime = account.lifetimePoints || 0;
+    let tier = "bronze";
+    if (lifetime >= 10000) tier = "platinum";
+    else if (lifetime >= 5000) tier = "gold";
+    else if (lifetime >= 1000) tier = "silver";
+    
+    if (tier !== account.tier) {
+      await db.update(loyaltyAccounts).set({ tier, tierUpdatedAt: new Date() }).where(eq(loyaltyAccounts.userId, userId));
+    }
+  }
+
+  async generateReferralCode(userId: string): Promise<string> {
+    const account = await this.getOrCreateLoyaltyAccount(userId);
+    return account.referralCode || "";
+  }
+
+  async applyReferralCode(userId: string, referralCode: string): Promise<boolean> {
+    const [referrer] = await db.select().from(loyaltyAccounts).where(eq(loyaltyAccounts.referralCode, referralCode));
+    if (!referrer || referrer.userId === userId) return false;
+    
+    const userAccount = await this.getOrCreateLoyaltyAccount(userId);
+    if (userAccount.referredBy) return false; // Already referred
+    
+    await db.update(loyaltyAccounts).set({ referredBy: referrer.userId }).where(eq(loyaltyAccounts.userId, userId));
+    
+    await this.addLoyaltyPoints(userId, 100, "referral", "Welcome bonus for using referral code");
+    await this.addLoyaltyPoints(referrer.userId, 200, "referral", `Referral bonus for inviting a friend`);
+    
+    return true;
+  }
+
+  // Quiz operations
+  async createCulturalQuiz(quiz: InsertCulturalQuiz): Promise<CulturalQuiz> {
+    const [newQuiz] = await db.insert(culturalQuizzes).values(quiz).returning();
+    return newQuiz;
+  }
+
+  async getActiveQuizzes(): Promise<CulturalQuiz[]> {
+    return await db.select().from(culturalQuizzes).where(eq(culturalQuizzes.isActive, true));
+  }
+
+  async getQuiz(id: number): Promise<CulturalQuiz | undefined> {
+    const [quiz] = await db.select().from(culturalQuizzes).where(eq(culturalQuizzes.id, id));
+    return quiz;
+  }
+
+  async submitQuizAttempt(attempt: InsertQuizAttempt): Promise<QuizAttempt> {
+    const [newAttempt] = await db.insert(quizAttempts).values(attempt).returning();
+    
+    // Award points if passed
+    if (newAttempt.passed && newAttempt.pointsEarned && newAttempt.pointsEarned > 0) {
+      await this.addLoyaltyPoints(
+        newAttempt.userId,
+        newAttempt.pointsEarned,
+        "quiz_complete",
+        `Completed cultural quiz`,
+        newAttempt.quizId,
+        "quiz"
+      );
+    }
+    
+    return newAttempt;
+  }
+
+  async getUserQuizAttempts(userId: string): Promise<QuizAttempt[]> {
+    return await db.select().from(quizAttempts).where(eq(quizAttempts.userId, userId)).orderBy(desc(quizAttempts.createdAt));
+  }
+
+  async hasUserCompletedQuiz(userId: string, quizId: number): Promise<boolean> {
+    const [attempt] = await db.select().from(quizAttempts).where(
+      and(eq(quizAttempts.userId, userId), eq(quizAttempts.quizId, quizId), eq(quizAttempts.passed, true))
+    );
+    return !!attempt;
+  }
+
+  // Fabric assets operations
+  async createFabricAsset(asset: InsertFabricAsset): Promise<FabricAsset> {
+    const [newAsset] = await db.insert(fabricAssets).values(asset).returning();
+    return newAsset;
+  }
+
+  async getProductFabricAssets(productId: number): Promise<FabricAsset[]> {
+    return await db.select().from(fabricAssets).where(
+      and(eq(fabricAssets.productId, productId), eq(fabricAssets.isActive, true))
+    );
+  }
+
+  // Collaboration drops operations
+  async createCollabDrop(drop: InsertCollabDrop): Promise<CollabDrop> {
+    const [newDrop] = await db.insert(collabDrops).values(drop).returning();
+    return newDrop;
+  }
+
+  async getCollabDrops(status?: string): Promise<CollabDrop[]> {
+    if (status) {
+      return await db.select().from(collabDrops).where(eq(collabDrops.status, status)).orderBy(desc(collabDrops.dropStartTime));
+    }
+    return await db.select().from(collabDrops).orderBy(desc(collabDrops.dropStartTime));
+  }
+
+  async getCollabDrop(id: number): Promise<CollabDrop | undefined> {
+    const [drop] = await db.select().from(collabDrops).where(eq(collabDrops.id, id));
+    return drop;
+  }
+
+  async createDropRsvp(rsvp: InsertDropRsvp): Promise<DropRsvp> {
+    const [newRsvp] = await db.insert(dropRsvps).values(rsvp).returning();
+    
+    // Increment RSVP count
+    await db.update(collabDrops).set({ 
+      rsvpCount: sql`${collabDrops.rsvpCount} + 1` 
+    }).where(eq(collabDrops.id, rsvp.dropId));
+    
+    return newRsvp;
+  }
+
+  async getDropRsvps(dropId: number): Promise<DropRsvp[]> {
+    return await db.select().from(dropRsvps).where(eq(dropRsvps.dropId, dropId));
+  }
+
+  async getUserDropRsvps(userId: string): Promise<DropRsvp[]> {
+    return await db.select().from(dropRsvps).where(eq(dropRsvps.userId, userId));
+  }
+
+  async hasUserRsvped(userId: string, dropId: number): Promise<boolean> {
+    const [rsvp] = await db.select().from(dropRsvps).where(
+      and(eq(dropRsvps.userId, userId), eq(dropRsvps.dropId, dropId))
+    );
+    return !!rsvp;
+  }
+
+  async updateDropStatus(id: number, status: string): Promise<void> {
+    await db.update(collabDrops).set({ status }).where(eq(collabDrops.id, id));
   }
 }
 
