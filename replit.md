@@ -12,15 +12,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### December 16, 2025 - Discover Nigeria (Location-Based Services)
-- Added "Discover Nigeria" page with real-time location search powered by Google Places API
+### December 16, 2025 - Discover Africa (Location-Based Services)
+- Expanded "Discover Nigeria" to "Discover Africa" supporting all 54 African countries
+- Country selector dropdown organized by region (Northern, Western, Central, Eastern, Southern Africa)
+- Each country has major cities pre-configured (e.g., Nigeria: Lagos, Abuja; Kenya: Nairobi, Mombasa; South Africa: Johannesburg, Cape Town)
 - Search for hotels, malls, restaurants, tourist attractions, airports, car rentals, cafes, and nightlife
-- Pre-configured Nigerian cities: Lagos, Abuja, Port Harcourt, Kano, Ibadan, Enugu, Calabar, Benin City
 - "Near Me" feature uses browser geolocation to find places nearby
 - Place details modal shows ratings, reviews, contact info, opening hours, and photos
 - Direct integration with Google Maps for navigation
+- Server-side caching (10-minute TTL) to reduce API costs
 - Backend proxy endpoints secure the API key (no client-side exposure)
 - Located at /discover page
+- Config data in shared/africaLocations.ts
 
 ### December 16, 2025 - 9 Advanced Features Implementation
 

@@ -2664,10 +2664,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==========================================
-  // Google Places API Endpoints for Nigeria Discovery
+  // Google Places API Endpoints for Africa Discovery
   // ==========================================
   
-  // Search for places in Nigeria (hotels, malls, restaurants, etc.)
+  // Simple in-memory cache for places API (TTL: 10 minutes)
+  const placesCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  
+  function getCachedPlaces(key: string): any | null {
+    const cached = placesCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+    if (cached) placesCache.delete(key);
+    return null;
+  }
+  
+  function setCachedPlaces(key: string, data: any): void {
+    // Limit cache size to 500 entries - evict before inserting
+    if (placesCache.size >= 500) {
+      const oldestKey = placesCache.keys().next().value;
+      if (oldestKey) placesCache.delete(oldestKey);
+    }
+    placesCache.set(key, { data, timestamp: Date.now() });
+  }
+  
+  // Search for places across Africa
   app.get('/api/places/search', async (req, res) => {
     try {
       const { query, type, lat, lng, radius = 5000 } = req.query;
@@ -2681,15 +2703,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: 'Google Maps API not configured' });
       }
       
+      // Check cache first
+      const cacheKey = `search:${query}:${type}:${lat}:${lng}:${radius}`;
+      const cachedData = getCachedPlaces(cacheKey);
+      if (cachedData) {
+        return res.json(cachedData);
+      }
+      
       // Use Text Search if query provided, otherwise Nearby Search
       let url: string;
       let options: RequestInit;
       
       if (query) {
-        // Text Search API (New)
+        // Text Search API (New) - query already includes country/city context
         url = 'https://places.googleapis.com/v1/places:searchText';
         const body: any = {
-          textQuery: `${query} Nigeria`,
+          textQuery: query as string,
           maxResultCount: 20,
         };
         
@@ -2716,7 +2745,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         url = 'https://places.googleapis.com/v1/places:searchNearby';
         
         if (!lat || !lng) {
-          // Default to Lagos coordinates if no location provided
           return res.status(400).json({ message: 'Location (lat, lng) required for nearby search' });
         }
         
@@ -2752,6 +2780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Google Places API error:', data);
         return res.status(response.status).json({ message: 'Failed to fetch places', error: data });
       }
+      
+      // Cache successful response
+      setCachedPlaces(cacheKey, data);
       
       res.json(data);
     } catch (error) {
