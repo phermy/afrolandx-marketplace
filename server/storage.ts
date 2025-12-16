@@ -86,6 +86,7 @@ export interface IStorage {
   updateUserRoles(userId: string, roles: string[]): Promise<void>;
   addUserRole(userId: string, role: string): Promise<void>;
   removeUserRole(userId: string, role: string): Promise<void>;
+  updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   
   // Vendor operations
@@ -273,6 +274,15 @@ export class DatabaseStorage implements IStorage {
       }
       await this.updateUserRoles(userId, newRoles);
     }
+  }
+
+  async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 
   async getAllUsers(): Promise<User[]> {

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { isUnauthorizedError } from '@/lib/authUtils';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { getUserRoleDisplay } from '@/lib/roleUtils';
+import { Loader2 } from 'lucide-react';
 
 export default function Profile() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -62,17 +65,20 @@ export default function Profile() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = async () => {
-    try {
-      // For now, we'll just show a message since user profile updates
-      // would require backend implementation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { firstName: string; lastName: string }) => {
+      const response = await apiRequest('PATCH', '/api/profile', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       toast({
-        title: "Profile Update",
-        description: "Profile updates coming soon. Changes are saved locally for now.",
-        variant: "default",
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
       });
       setIsEditing(false);
-    } catch (error) {
+    },
+    onError: (error) => {
       if (isUnauthorizedError(error as Error)) {
         toast({
           title: "Unauthorized",
@@ -90,7 +96,14 @@ export default function Profile() {
         description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const handleSave = async () => {
+    updateProfileMutation.mutate({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+    });
   };
 
   const handleCancel = () => {
@@ -211,7 +224,9 @@ export default function Profile() {
                       <Button 
                         onClick={handleSave}
                         className="btn-nigerian"
+                        disabled={updateProfileMutation.isPending}
                       >
+                        {updateProfileMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                         Save Changes
                       </Button>
                     </div>
