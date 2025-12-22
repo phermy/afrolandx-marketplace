@@ -77,12 +77,12 @@ export default function Landing() {
   }, [toast]);
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
   };
 
   const handleAdminPortalClick = () => {
     // Redirect to login with admin intent
-    window.location.href = '/api/login?redirect=/admin';
+    window.location.href = '/login';
   };
 
   const handleAddToCart = (productId: number) => {
@@ -93,7 +93,7 @@ export default function Landing() {
         variant: "default",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 1000);
       return;
     }

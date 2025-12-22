@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,12 +38,18 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = () => {
-    window.location.href = '/api/logout';
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   const handleLogin = () => {
-    window.location.href = '/api/login';
+    window.location.href = '/login';
   };
 
   const getUserInitials = () => {

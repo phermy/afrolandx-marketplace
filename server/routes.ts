@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { getChatbotService } from "./chatbot";
 import { isAdmin } from "./adminAuth";
