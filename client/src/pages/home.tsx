@@ -91,7 +91,7 @@ export default function Home() {
       <Navbar />
       
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[600px]">
+      <section className="relative overflow-hidden h-[480px] sm:h-[560px] md:h-[600px]">
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
@@ -117,7 +117,7 @@ export default function Home() {
         {/* Hero Content */}
         <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-6 md:mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
                 Celebrate Cultural
               </span>
@@ -125,7 +125,7 @@ export default function Home() {
                 Heritage
               </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
+            <p className="text-base sm:text-xl md:text-2xl mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
               Discover authentic African fashion - from traditional Aso Oke to handcrafted beads. 
               Connect with local artisans and celebrate our rich cultural heritage.
             </p>

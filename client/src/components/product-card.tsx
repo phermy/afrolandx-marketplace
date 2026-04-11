@@ -136,18 +136,18 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Product Details */}
-        <div className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-nigerian-green transition-colors">
+        <div className="p-3 sm:p-6">
+          <h3 className="font-semibold text-sm sm:text-base text-gray-900 mb-1 sm:mb-2 line-clamp-2 group-hover:text-nigerian-green transition-colors">
             {product.name}
           </h3>
           
-          <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+          <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2 hidden sm:block">
             {product.description}
           </p>
 
           {/* Price and Rating */}
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-2xl font-bold text-nigerian-green">
+          <div className="flex items-center justify-between mb-2 sm:mb-4">
+            <span className="text-base sm:text-2xl font-bold text-nigerian-green">
               {formatPrice(product.price)}
             </span>
             <div className="flex items-center text-yellow-500">
@@ -159,12 +159,12 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
 
           {/* Stock Info */}
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-gray-500">
+          <div className="flex items-center justify-between mb-2 sm:mb-4">
+            <span className="text-xs sm:text-sm text-gray-500">
               {isOutOfStock ? 'Out of Stock' : `${product.stock} in stock`}
             </span>
             {product.weight && (
-              <span className="text-sm text-gray-500">
+              <span className="text-xs sm:text-sm text-gray-500 hidden sm:block">
                 {parseFloat(product.weight)}kg
               </span>
             )}

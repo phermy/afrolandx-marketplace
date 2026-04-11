@@ -136,7 +136,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[600px]">
+      <section className="relative overflow-hidden h-[480px] sm:h-[560px] md:h-[600px]">
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
@@ -162,7 +162,7 @@ export default function Landing() {
         {/* Hero Content */}
         <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h1 className="text-6xl md:text-7xl font-bold font-nigerian mb-8 text-white">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-6 md:mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
                 Discover Authentic
               </span>
@@ -170,7 +170,7 @@ export default function Landing() {
                 African Fashion
               </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
+            <p className="text-base sm:text-xl md:text-2xl mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
               From traditional Aso Oke to contemporary native wear, find the finest African fashion pieces 
               crafted by local artisans. Celebrate our rich cultural heritage with authentic designs.
             </p>
@@ -220,7 +220,7 @@ export default function Landing() {
           </div>
 
           {products.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
               {products.slice(0, 8).map((product) => (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
                   <div className="relative overflow-hidden rounded-t-lg">

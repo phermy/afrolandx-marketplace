@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap } from 'lucide-react';
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
@@ -36,6 +37,7 @@ export default function Navbar() {
     if (searchQuery.trim()) {
       window.location.href = `/products?search=${encodeURIComponent(searchQuery)}`;
     }
+    setIsMobileMenuOpen(false);
   };
 
   const handleLogout = async () => {
@@ -62,6 +64,22 @@ export default function Navbar() {
     return 'U';
   };
 
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  const navLinkClass = (path: string) =>
+    `px-3 py-2 font-medium transition-colors ${
+      location === path
+        ? 'text-nigerian-green border-b-2 border-nigerian-green'
+        : 'text-gray-700 hover:text-nigerian-green'
+    }`;
+
+  const mobileNavLinkClass = (path: string) =>
+    `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+      location === path
+        ? 'bg-green-50 text-nigerian-green'
+        : 'text-gray-700 hover:bg-gray-50 hover:text-nigerian-green'
+    }`;
+
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -69,110 +87,54 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/">
-              <div className="flex items-center text-2xl font-bold text-nigerian-green font-nigerian cursor-pointer">
-                <img 
-                  src={logoImage} 
-                  alt="Afrolandx Logo" 
-                  className="w-8 h-8 mr-2"
-                />
-                Afrolandx
+              <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian cursor-pointer">
+                <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
+                <span className="hidden sm:block">Afrolandx</span>
               </div>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:ml-8 md:flex md:space-x-8">
-              <Link href="/" className={`px-3 py-2 font-medium transition-colors ${
-                location === '/' 
-                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                  : 'text-gray-700 hover:text-nigerian-green'
-              }`}>
-                Home
-              </Link>
-              <Link href="/products" className={`px-3 py-2 font-medium transition-colors ${
-                location === '/products' 
-                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                  : 'text-gray-700 hover:text-nigerian-green'
-              }`}>
-                Products
-              </Link>
-              <Link href="/events" className={`px-3 py-2 font-medium transition-colors ${
-                location === '/events' 
-                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                  : 'text-gray-700 hover:text-nigerian-green'
-              }`} data-testid="nav-link-events">
-                Events
-              </Link>
-              <Link href="/collab-drops" className={`px-3 py-2 font-medium transition-colors ${
-                location === '/collab-drops' 
-                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                  : 'text-gray-700 hover:text-nigerian-green'
-              }`} data-testid="nav-link-collab-drops">
-                Collabs
-              </Link>
-              <Link href="/discover" className={`px-3 py-2 font-medium transition-colors ${
-                location === '/discover' 
-                  ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                  : 'text-gray-700 hover:text-nigerian-green'
-              }`} data-testid="nav-link-discover">
-                Discover
-              </Link>
+            <div className="hidden md:ml-8 md:flex md:space-x-2">
+              <Link href="/" className={navLinkClass('/')}>Home</Link>
+              <Link href="/products" className={navLinkClass('/products')}>Products</Link>
+              <Link href="/events" className={navLinkClass('/events')}>Events</Link>
+              <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
+              <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
               {isAuthenticated && isVendor(user) && (
-                <Link href="/vendor" className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/vendor' 
-                    ? 'text-nigerian-green border-b-2 border-nigerian-green' 
-                    : 'text-gray-700 hover:text-nigerian-green'
-                }`}>
-                  Vendor Portal
-                </Link>
+                <Link href="/vendor" className={navLinkClass('/vendor')}>Vendor</Link>
               )}
               {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/admin' 
-                    ? 'text-red-600 border-b-2 border-red-600' 
-                    : 'text-gray-700 hover:text-red-600'
-                }`}>
-                  Admin Panel
-                </Link>
+                  location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
+                }`}>Admin</Link>
               )}
             </div>
           </div>
 
-          {/* Search Bar */}
+          {/* Desktop Search Bar */}
           <div className="hidden md:flex flex-1 max-w-lg mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
-              <div className="relative w-full">
-                <Input
-                  type="text"
-                  placeholder="Search for traditional wear, Aso Oke, beads..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 input-nigerian h-10"
-                />
-              </div>
+              <Input
+                type="text"
+                placeholder="Search traditional wear, Aso Oke, beads..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 input-nigerian h-10"
+              />
             </form>
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             {/* Shopping Cart */}
             {isAuthenticated && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  console.log('Cart button clicked');
-                  toggleCart();
-                }}
+                onClick={toggleCart}
                 className="relative text-gray-700 hover:text-nigerian-green"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6m-8 0V9a2 2 0 012-2h4a2 2 0 012 2v4.01"
-                  />
-                </svg>
+                <ShoppingCart className="w-6 h-6" />
                 {cartCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 bg-coral text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
                     {cartCount}
@@ -181,98 +143,64 @@ export default function Navbar() {
               </Button>
             )}
 
-            {/* User Menu or Login */}
+            {/* Desktop User Menu */}
             {isAuthenticated && user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.profileImageUrl} alt={user.firstName || 'User'} />
-                      <AvatarFallback className="bg-nigerian-green text-white text-sm">
-                        {getUserInitials()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">
-                      {user.firstName && user.lastName 
-                        ? `${user.firstName} ${user.lastName}` 
-                        : user.email}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                    <Badge variant="secondary" className="w-fit text-xs">
-                      {getUserRoleDisplay(user)}
-                    </Badge>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Link href="/my-orders">
-                      <span className="cursor-pointer">My Orders</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/messages">
-                      <span className="cursor-pointer flex items-center justify-between">
-                        Messages
-                        {unreadData && unreadData.count > 0 && (
-                          <Badge variant="default" className="ml-2">{unreadData.count}</Badge>
-                        )}
-                      </span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Link href="/profile">
-                      <span className="cursor-pointer">Profile Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-measurements">
-                    <Link href="/measurements">
-                      <span className="cursor-pointer">Measurements</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-lookbook">
-                    <Link href="/lookbook">
-                      <span className="cursor-pointer">My Lookbook</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-loyalty">
-                    <Link href="/loyalty">
-                      <span className="cursor-pointer">Loyalty & Rewards</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {isVendor(user) && (
-                    <>
-                      <DropdownMenuItem>
-                        <Link href="/vendor">
-                          <span className="cursor-pointer">Vendor Dashboard</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem data-testid="menu-item-workshop">
-                        <Link href="/vendor/workshop">
-                          <span className="cursor-pointer">Workshop</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {isAdmin(user) && (
+              <div className="hidden md:block">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.profileImageUrl} alt={user.firstName || 'User'} />
+                        <AvatarFallback className="bg-nigerian-green text-white text-sm">
+                          {getUserInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <div className="flex flex-col space-y-1 p-2">
+                      <p className="text-sm font-medium leading-none">
+                        {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                      <Badge variant="secondary" className="w-fit text-xs">{getUserRoleDisplay(user)}</Badge>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem><Link href="/my-orders"><span className="cursor-pointer">My Orders</span></Link></DropdownMenuItem>
                     <DropdownMenuItem>
-                      <Link href="/admin">
-                        <span className="cursor-pointer">Admin Panel</span>
+                      <Link href="/messages">
+                        <span className="cursor-pointer flex items-center justify-between">
+                          Messages
+                          {unreadData && unreadData.count > 0 && (
+                            <Badge variant="default" className="ml-2">{unreadData.count}</Badge>
+                          )}
+                        </span>
                       </Link>
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuItem><Link href="/measurements"><span className="cursor-pointer">Measurements</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem><Link href="/lookbook"><span className="cursor-pointer">My Lookbook</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem><Link href="/loyalty"><span className="cursor-pointer">Loyalty & Rewards</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem><Link href="/profile"><span className="cursor-pointer">Profile Settings</span></Link></DropdownMenuItem>
+                    {isVendor(user) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
+                      </>
+                    )}
+                    {isAdmin(user) && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>Sign Out</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
-              <Button onClick={handleLogin} className="btn-nigerian">
+              <Button onClick={handleLogin} className="btn-nigerian hidden md:flex">
                 Sign In
               </Button>
             )}
@@ -284,86 +212,137 @@ export default function Navbar() {
               className="md:hidden"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
-                />
-              </svg>
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 py-4">
+      {/* Mobile Menu - Full Screen Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+          <div className="px-4 py-4 space-y-1 pb-24">
             {/* Mobile Search */}
             <form onSubmit={handleSearch} className="mb-4">
-              <Input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input-nigerian"
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input-nigerian pl-10"
+                />
+              </div>
             </form>
 
-            {/* Mobile Navigation Links */}
-            <div className="space-y-2">
-              <Link href="/">
-                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
-                  Home
-                </a>
-              </Link>
-              <Link href="/products">
-                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
-                  Products
-                </a>
-              </Link>
-              <Link href="/events">
-                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
-                  Events
-                </a>
-              </Link>
-              <Link href="/collab-drops">
-                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
-                  Collabs
-                </a>
-              </Link>
-              <Link href="/discover">
-                <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium" data-testid="mobile-nav-discover">
-                  Discover
-                </a>
-              </Link>
-              {isAuthenticated && isVendor(user) && (
-                <Link href="/vendor">
-                  <a className="block px-3 py-2 text-gray-700 hover:text-nigerian-green font-medium">
-                    Vendor Portal
-                  </a>
-                </Link>
-              )}
-              {isAuthenticated && isAdmin(user) && (
-                <Link href="/admin">
-                  <a className="block px-3 py-2 text-gray-700 hover:text-red-600 font-medium">
-                    Admin Panel
-                  </a>
-                </Link>
-              )}
-            </div>
+            {/* Main Navigation */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Browse</p>
+            <Link href="/" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/')}><Home className="w-5 h-5" /><span>Home</span></div>
+            </Link>
+            <Link href="/products" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/products')}><Package className="w-5 h-5" /><span>Products</span></div>
+            </Link>
+            <Link href="/events" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/events')}><Calendar className="w-5 h-5" /><span>Events</span></div>
+            </Link>
+            <Link href="/collab-drops" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/collab-drops')}><Zap className="w-5 h-5" /><span>Collab Drops</span></div>
+            </Link>
+            <Link href="/discover" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
+            </Link>
+            <Link href="/lookbook" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/lookbook')}><BookOpen className="w-5 h-5" /><span>Lookbook Studio</span></div>
+            </Link>
 
-            {/* Mobile Auth Actions */}
-            {!isAuthenticated && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <Button onClick={handleLogin} className="w-full btn-nigerian">
+            {/* Account Section - only if logged in */}
+            {isAuthenticated && user && (
+              <>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">My Account</p>
+                <Link href="/my-orders" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/my-orders')}><ClipboardList className="w-5 h-5" /><span>My Orders</span></div>
+                </Link>
+                <Link href="/messages" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/messages')}>
+                    <MessageSquare className="w-5 h-5" />
+                    <span>Messages</span>
+                    {unreadData && unreadData.count > 0 && (
+                      <Badge variant="default" className="ml-auto">{unreadData.count}</Badge>
+                    )}
+                  </div>
+                </Link>
+                <Link href="/measurements" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/measurements')}><Ruler className="w-5 h-5" /><span>Measurements</span></div>
+                </Link>
+                <Link href="/loyalty" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/loyalty')}><Gift className="w-5 h-5" /><span>Loyalty & Rewards</span></div>
+                </Link>
+                <Link href="/profile" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/profile')}><Settings className="w-5 h-5" /><span>Profile Settings</span></div>
+                </Link>
+              </>
+            )}
+
+            {/* Vendor Section */}
+            {isAuthenticated && isVendor(user) && (
+              <>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Vendor</p>
+                <Link href="/vendor" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Vendor Dashboard</span></div>
+                </Link>
+                <Link href="/vendor/workshop" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/vendor/workshop')}><Palette className="w-5 h-5" /><span>Workshop</span></div>
+                </Link>
+              </>
+            )}
+
+            {/* Admin Section */}
+            {isAuthenticated && isAdmin(user) && (
+              <>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Admin</p>
+                <Link href="/admin" onClick={closeMobileMenu}>
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
+                    <User className="w-5 h-5" /><span>Admin Panel</span>
+                  </div>
+                </Link>
+              </>
+            )}
+
+            {/* Auth Actions */}
+            <div className="pt-4 border-t border-gray-200 mt-4">
+              {isAuthenticated ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 px-4 py-2">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user?.profileImageUrl} />
+                      <AvatarFallback className="bg-nigerian-green text-white">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">
+                        {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email}
+                      </p>
+                      <Badge variant="secondary" className="text-xs">{getUserRoleDisplay(user)}</Badge>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => { handleLogout(); closeMobileMenu(); }}
+                    variant="outline"
+                    className="w-full flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" /> Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={() => { handleLogin(); closeMobileMenu(); }} className="w-full btn-nigerian">
                   Sign In
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </nav>
   );
 }
