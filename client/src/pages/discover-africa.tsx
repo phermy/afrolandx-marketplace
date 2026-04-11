@@ -76,10 +76,20 @@ const PLACE_CATEGORIES = [
   { id: "night_club", label: "Nightlife", icon: Music, query: "nightclubs lounges" },
 ];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  hotel: '🏨', hostel: '🏨', motel: '🏨', guest_house: '🏨',
+  mall: '🛍️', supermarket: '🛒', department_store: '🛍️', marketplace: '🏪',
+  restaurant: '🍽️', fast_food: '🍔', food_court: '🍱',
+  attraction: '🏛️', museum: '🏛️', theme_park: '🎡', monument: '🗿', ruins: '🏚️',
+  aerodrome: '✈️',
+  car_rental: '🚗',
+  cafe: '☕',
+  nightclub: '🎵', bar: '🍺', pub: '🍺',
+  place: '📍',
+};
+
 function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
-  const photoUrl = place.photos?.[0] 
-    ? `/api/places/photo/${place.photos[0].name}?maxWidth=400&maxHeight=300`
-    : null;
+  const emoji = CATEGORY_ICONS[place.primaryType || ''] || '📍';
 
   return (
     <Card 
@@ -87,30 +97,14 @@ function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
       onClick={onClick}
       data-testid={`place-card-${place.id}`}
     >
-      <div className="relative h-48 bg-gradient-to-br from-emerald-100 to-amber-100 rounded-t-lg overflow-hidden">
-        {photoUrl ? (
-          <img 
-            src={photoUrl} 
-            alt={place.displayName.text}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <Building2 className="h-16 w-16 text-emerald-600/30" />
-          </div>
-        )}
-        {place.currentOpeningHours && (
-          <Badge 
-            className={`absolute top-2 right-2 ${
-              place.currentOpeningHours.openNow 
-                ? 'bg-green-500' 
-                : 'bg-gray-500'
-            }`}
-          >
-            {place.currentOpeningHours.openNow ? 'Open Now' : 'Closed'}
+      <div className="relative h-48 bg-gradient-to-br from-emerald-100 to-amber-100 rounded-t-lg overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-6xl">{emoji}</span>
+          <p className="text-emerald-700 font-medium text-sm mt-2 capitalize">{place.primaryType?.replace(/_/g, ' ') || 'Place'}</p>
+        </div>
+        {place.currentOpeningHours?.weekdayDescriptions && (
+          <Badge className="absolute top-2 right-2 bg-emerald-600">
+            Hours available
           </Badge>
         )}
       </div>
@@ -152,29 +146,19 @@ function PlaceDetailsDialog({
   open: boolean; 
   onClose: () => void;
 }) {
-  const { data: details, isLoading } = useQuery<Place>({
-    queryKey: ['/api/places', place?.id],
-    enabled: !!place?.id && open,
-  });
-
-  const fullPlace: Place | null = details || place;
+  const fullPlace: Place | null = place;
   if (!fullPlace) return null;
 
-  const photoUrl = fullPlace.photos?.[0] 
-    ? `/api/places/photo/${fullPlace.photos[0].name}?maxWidth=800&maxHeight=400`
-    : null;
+  const emoji = CATEGORY_ICONS[fullPlace.primaryType || ''] || '📍';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0">
-        <div className="relative h-48 bg-gradient-to-br from-emerald-100 to-amber-100">
-          {photoUrl && (
-            <img 
-              src={photoUrl} 
-              alt={fullPlace.displayName.text}
-              className="w-full h-full object-cover"
-            />
-          )}
+        <div className="relative h-40 bg-gradient-to-br from-emerald-100 to-amber-100 flex items-center justify-center">
+          <div className="text-center">
+            <span className="text-7xl">{emoji}</span>
+            <p className="text-emerald-700 font-medium mt-1 capitalize">{fullPlace.primaryType?.replace(/_/g, ' ')}</p>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -264,7 +248,7 @@ function PlaceDetailsDialog({
               )}
             </div>
 
-            {fullPlace.reviews && fullPlace.reviews.length > 0 && (
+            {false && fullPlace.reviews && fullPlace.reviews.length > 0 && (
               <div className="pt-4 border-t">
                 <h4 className="font-semibold mb-3">Recent Reviews</h4>
                 <div className="space-y-4">
@@ -299,19 +283,21 @@ function PlaceDetailsDialog({
               </div>
             )}
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-4 flex-wrap">
               <Button 
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 onClick={() => {
+                  const lat = fullPlace.location.latitude;
+                  const lon = fullPlace.location.longitude;
                   window.open(
-                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullPlace.displayName.text)}&query_place_id=${fullPlace.id}`,
+                    `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=17`,
                     '_blank'
                   );
                 }}
                 data-testid="view-on-map-button"
               >
                 <Navigation className="h-4 w-4 mr-2" />
-                View on Google Maps
+                View on OpenStreetMap
               </Button>
               {fullPlace.internationalPhoneNumber && (
                 <Button 
@@ -364,31 +350,32 @@ export default function DiscoverAfrica() {
     }
   }, []);
 
-  const searchParams = new URLSearchParams();
-  if (searchQuery) {
-    searchParams.set('query', `${searchQuery} in ${selectedCity.name}, ${selectedCountry.name}`);
-  } else if (activeCategory) {
-    const category = PLACE_CATEGORIES.find(c => c.id === activeCategory);
-    if (category) {
-      searchParams.set('query', `${category.query} in ${selectedCity.name}, ${selectedCountry.name}`);
-    }
-  }
-  
-  const location = userLocation && selectedCityName === "near-me" 
-    ? userLocation 
+  const location = userLocation && selectedCityName === "near-me"
+    ? userLocation
     : { lat: selectedCity.lat, lng: selectedCity.lng };
-  searchParams.set('lat', location.lat.toString());
-  searchParams.set('lng', location.lng.toString());
 
   const { data: placesData, isLoading, error } = useQuery({
     queryKey: ['/api/places/search', searchQuery, activeCategory, selectedCountryCode, selectedCity.name, userLocation?.lat],
     queryFn: async () => {
       if (!searchQuery && !activeCategory) return { places: [] };
-      const response = await fetch(`/api/places/search?${searchParams.toString()}`);
+
+      const params = new URLSearchParams();
+      params.set('lat', location.lat.toString());
+      params.set('lng', location.lng.toString());
+      params.set('radius', '15000');
+      params.set('city', selectedCity.name);
+      params.set('country', selectedCountry.name);
+
+      if (activeCategory) {
+        params.set('type', activeCategory);
+      } else if (searchQuery) {
+        params.set('query', `${searchQuery} in ${selectedCity.name}, ${selectedCountry.name}`);
+      }
+
+      const response = await fetch(`/api/places/search?${params.toString()}`);
       const data = await response.json();
       if (!response.ok) {
-        const googleMsg = data?.error?.error?.message || data?.message || 'Failed to fetch places';
-        throw new Error(googleMsg);
+        throw new Error(data?.error || data?.message || 'Failed to fetch places');
       }
       return data;
     },
@@ -549,40 +536,12 @@ export default function DiscoverAfrica() {
 
         {error && (
           <div className="text-center py-12 max-w-lg mx-auto">
-            {(error as Error).message?.toLowerCase().includes('billing') ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-left">
-                <div className="flex items-start gap-3 mb-4">
-                  <span className="text-3xl">⚠️</span>
-                  <div>
-                    <h3 className="font-bold text-amber-800 text-lg mb-1">Google Maps Billing Required</h3>
-                    <p className="text-amber-700 text-sm">
-                      The Google Places API requires billing to be enabled on your Google Cloud project.
-                    </p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-amber-200 text-sm text-gray-700 space-y-2">
-                  <p className="font-semibold">To fix this:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-gray-600">
-                    <li>Go to <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google Cloud Console → Billing</a></li>
-                    <li>Enable billing on project <strong>#605402392178</strong></li>
-                    <li>Ensure <strong>Places API (New)</strong> is enabled</li>
-                    <li>Google provides $200/month free credit — no charge for normal usage</li>
-                  </ol>
-                </div>
-              </div>
-            ) : (error as Error).message?.toLowerCase().includes('not configured') ? (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <span className="text-3xl block mb-3">🔑</span>
-                <h3 className="font-bold text-red-800 text-lg mb-1">Google Maps API Key Missing</h3>
-                <p className="text-red-700 text-sm">The GOOGLE_MAPS_API_KEY environment variable is not set on the server.</p>
-              </div>
-            ) : (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <MapPin className="h-12 w-12 mx-auto text-red-400 mb-3" />
-                <h3 className="font-semibold text-red-800 mb-1">Could not load places</h3>
-                <p className="text-red-600 text-sm">{(error as Error).message || 'Please try again later.'}</p>
-              </div>
-            )}
+            <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+              <MapPin className="h-12 w-12 mx-auto text-red-400 mb-3" />
+              <h3 className="font-semibold text-red-800 mb-1">Could not load places</h3>
+              <p className="text-red-600 text-sm">{(error as Error).message || 'Please try again later.'}</p>
+              <p className="text-gray-500 text-xs mt-2">Data powered by OpenStreetMap contributors</p>
+            </div>
           </div>
         )}
 

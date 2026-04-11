@@ -511,6 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const products = await storage.getProducts(filters);
       res.json(products);
     } catch (error) {
+      console.error('Products error:', error);
       res.status(500).json({ message: 'Failed to fetch products' });
     }
   });
@@ -2664,13 +2665,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==========================================
-  // Google Places API Endpoints for Africa Discovery
+  // OpenStreetMap (Overpass + Nominatim) - Free, No API Key Required
   // ==========================================
-  
+
   // Simple in-memory cache for places API (TTL: 10 minutes)
   const placesCache = new Map<string, { data: any; timestamp: number }>();
   const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-  
+
   function getCachedPlaces(key: string): any | null {
     const cached = placesCache.get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -2679,242 +2680,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (cached) placesCache.delete(key);
     return null;
   }
-  
+
   function setCachedPlaces(key: string, data: any): void {
-    // Limit cache size to 500 entries - evict before inserting
     if (placesCache.size >= 500) {
       const oldestKey = placesCache.keys().next().value;
       if (oldestKey) placesCache.delete(oldestKey);
     }
     placesCache.set(key, { data, timestamp: Date.now() });
   }
+
+  // OSM tag sets per category
+  const OSM_CATEGORY_TAGS: Record<string, string[]> = {
+    hotel:            ['tourism=hotel', 'tourism=hostel', 'tourism=motel', 'tourism=guest_house'],
+    shopping_mall:    ['shop=mall', 'shop=supermarket', 'shop=department_store', 'amenity=marketplace'],
+    restaurant:       ['amenity=restaurant', 'amenity=fast_food', 'amenity=food_court'],
+    tourist_attraction: ['tourism=attraction', 'tourism=museum', 'tourism=theme_park', 'historic=monument', 'historic=ruins'],
+    airport:          ['aeroway=aerodrome'],
+    car_rental:       ['amenity=car_rental'],
+    cafe:             ['amenity=cafe'],
+    night_club:       ['amenity=nightclub', 'amenity=bar', 'amenity=pub'],
+  };
+
+  // Transform an OSM element into the standard Place format
+  function osmToPlace(el: any, fallbackCity: string, fallbackCountry: string): any | null {
+    const tags = el.tags || {};
+    const name = tags.name || tags['name:en'] || tags['brand'];
+    if (!name) return null;
+
+    const lat: number = el.lat ?? el.center?.lat;
+    const lon: number = el.lon ?? el.center?.lon;
+    if (!lat || !lon) return null;
+
+    const addrParts = [
+      tags['addr:housenumber'],
+      tags['addr:street'],
+      tags['addr:suburb'],
+      tags['addr:city'] || fallbackCity,
+      fallbackCountry,
+    ].filter(Boolean);
+
+    const primaryType = tags.tourism || tags.amenity || tags.shop || tags.aeroway || tags.historic || 'place';
+
+    return {
+      id: `${el.type}/${el.id}`,
+      displayName: { text: name },
+      formattedAddress: addrParts.join(', '),
+      location: { latitude: lat, longitude: lon },
+      types: [primaryType],
+      primaryType,
+      internationalPhoneNumber: tags.phone || tags['contact:phone'],
+      websiteUri: tags.website || tags['contact:website'] || tags['url'],
+      currentOpeningHours: tags.opening_hours
+        ? { openNow: null, weekdayDescriptions: [tags.opening_hours] }
+        : undefined,
+      editorialSummary: tags.description ? { text: tags.description } : undefined,
+    };
+  }
+
+  // Run an Overpass QL query and return elements
+  async function overpassQuery(ql: string): Promise<any[]> {
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(ql)}`,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!resp.ok) throw new Error(`Overpass API error: ${resp.status}`);
+    const json = await resp.json();
+    return json.elements || [];
+  }
+
+  // Build Overpass QL for a category within radius
+  function buildOverpassQuery(tags: string[], lat: number, lon: number, radius: number): string {
+    const parts = tags.flatMap(tag => {
+      const [k, v] = tag.split('=');
+      return [
+        `node["${k}"="${v}"](around:${radius},${lat},${lon});`,
+        `way["${k}"="${v}"](around:${radius},${lat},${lon});`,
+      ];
+    });
+    return `[out:json][timeout:30];\n(\n${parts.join('\n')}\n);\nout body center;`;
+  }
   
-  // Search for places across Africa
+  // Search for places across Africa using OpenStreetMap (Overpass + Nominatim) — free, no API key
   app.get('/api/places/search', async (req, res) => {
     try {
-      const { query, type, lat, lng, radius = 5000 } = req.query;
-      
+      const { query, type, lat, lng, radius = '10000', city = '', country = '' } = req.query;
+
       if (!query && !type) {
         return res.status(400).json({ message: 'Query or type parameter required' });
       }
-      
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ message: 'Google Maps API not configured' });
-      }
-      
-      // Check cache first
-      const cacheKey = `search:${query}:${type}:${lat}:${lng}:${radius}`;
+
+      const cacheKey = `osm:${query}:${type}:${lat}:${lng}:${radius}`;
       const cachedData = getCachedPlaces(cacheKey);
-      if (cachedData) {
-        return res.json(cachedData);
-      }
-      
-      // Use Text Search if query provided, otherwise Nearby Search
-      let url: string;
-      let options: RequestInit;
-      
-      if (query) {
-        // Text Search API (New) - query already includes country/city context
-        url = 'https://places.googleapis.com/v1/places:searchText';
-        const body: any = {
-          textQuery: query as string,
-          maxResultCount: 20,
-        };
-        
-        if (lat && lng) {
-          body.locationBias = {
-            circle: {
-              center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
-              radius: parseInt(radius as string)
-            }
-          };
+      if (cachedData) return res.json(cachedData);
+
+      const radiusNum = Math.min(parseInt(radius as string) || 10000, 50000);
+      const latNum = parseFloat(lat as string);
+      const lngNum = parseFloat(lng as string);
+
+      let places: any[] = [];
+
+      if (type && OSM_CATEGORY_TAGS[type as string]) {
+        // Category search via Overpass API
+        if (!lat || !lng || isNaN(latNum) || isNaN(lngNum)) {
+          return res.status(400).json({ message: 'lat/lng required for category search' });
         }
-        
-        options = {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount,places.photos,places.priceLevel,places.primaryType,places.internationalPhoneNumber,places.websiteUri,places.currentOpeningHours'
-          },
-          body: JSON.stringify(body)
-        };
-      } else {
-        // Nearby Search API (New)
-        url = 'https://places.googleapis.com/v1/places:searchNearby';
-        
-        if (!lat || !lng) {
-          return res.status(400).json({ message: 'Location (lat, lng) required for nearby search' });
-        }
-        
-        const body: any = {
-          maxResultCount: 20,
-          locationRestriction: {
-            circle: {
-              center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
-              radius: parseInt(radius as string)
-            }
-          }
-        };
-        
-        if (type) {
-          body.includedTypes = [type];
-        }
-        
-        options = {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.rating,places.userRatingCount,places.photos,places.priceLevel,places.primaryType,places.internationalPhoneNumber,places.websiteUri,places.currentOpeningHours'
-          },
-          body: JSON.stringify(body)
-        };
+        const tags = OSM_CATEGORY_TAGS[type as string];
+        const ql = buildOverpassQuery(tags, latNum, lngNum, radiusNum);
+        const elements = await overpassQuery(ql);
+        places = elements
+          .map(el => osmToPlace(el, city as string, country as string))
+          .filter(Boolean)
+          .slice(0, 30);
+      } else if (query) {
+        // Free-text search via Nominatim
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query as string)}&format=json&limit=20&addressdetails=1&extratags=1`;
+        const resp = await fetch(nominatimUrl, {
+          headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!resp.ok) throw new Error('Nominatim search failed');
+        const results: any[] = await resp.json();
+
+        places = results.map((r: any) => ({
+          id: `nominatim/${r.place_id}`,
+          displayName: { text: r.name || r.display_name.split(',')[0] },
+          formattedAddress: r.display_name,
+          location: { latitude: parseFloat(r.lat), longitude: parseFloat(r.lon) },
+          types: [r.type || r.class || 'place'],
+          primaryType: r.type || r.class || 'place',
+          internationalPhoneNumber: r.extratags?.phone,
+          websiteUri: r.extratags?.website,
+          currentOpeningHours: r.extratags?.opening_hours
+            ? { openNow: null, weekdayDescriptions: [r.extratags.opening_hours] }
+            : undefined,
+        })).filter((p: any) => p.displayName.text);
       }
-      
-      const response = await fetch(url, options);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Google Places API error:', data);
-        return res.status(response.status).json({ message: 'Failed to fetch places', error: data });
-      }
-      
-      // Cache successful response
-      setCachedPlaces(cacheKey, data);
-      
-      res.json(data);
-    } catch (error) {
-      console.error('Error searching places:', error);
-      res.status(500).json({ message: 'Failed to search places' });
+
+      const result = { places };
+      setCachedPlaces(cacheKey, result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error searching places (OSM):', error);
+      res.status(500).json({ message: 'Failed to search places', error: error.message });
     }
   });
-  
-  // Get place details by ID
-  app.get('/api/places/:placeId', async (req, res) => {
+
+  // Get place details by OSM ID (type/id) using Nominatim lookup
+  app.get('/api/places/:osmType/:osmId', async (req, res) => {
     try {
-      const { placeId } = req.params;
-      
-      // Basic validation - prevent path traversal, allow Google's documented place ID chars
-      if (!placeId || placeId.includes('..') || placeId.includes('/')) {
-        return res.status(400).json({ message: 'Invalid place ID format' });
+      const { osmType, osmId } = req.params;
+      if (!['node', 'way', 'relation', 'nominatim'].includes(osmType)) {
+        return res.status(400).json({ message: 'Invalid place type' });
       }
-      
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ message: 'Google Maps API not configured' });
+
+      const cacheKey = `detail:${osmType}/${osmId}`;
+      const cached = getCachedPlaces(cacheKey);
+      if (cached) return res.json(cached);
+
+      if (osmType === 'nominatim') {
+        const url = `https://nominatim.openstreetmap.org/details?place_id=${osmId}&format=json&addressdetails=1&extratags=1`;
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
+          signal: AbortSignal.timeout(10000),
+        });
+        const data = await resp.json();
+        setCachedPlaces(cacheKey, data);
+        return res.json(data);
       }
-      
-      const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,types,rating,userRatingCount,photos,priceLevel,primaryType,internationalPhoneNumber,websiteUri,currentOpeningHours,reviews,regularOpeningHours,editorialSummary'
-        }
+
+      const osmTypeChar = osmType === 'node' ? 'N' : osmType === 'way' ? 'W' : 'R';
+      const url = `https://nominatim.openstreetmap.org/lookup?osm_ids=${osmTypeChar}${osmId}&format=json&addressdetails=1&extratags=1`;
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
+        signal: AbortSignal.timeout(10000),
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Google Places API error:', data);
-        return res.status(response.status).json({ message: 'Failed to fetch place details', error: data });
-      }
-      
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching place details:', error);
+      const results: any[] = await resp.json();
+      const data = results[0] || null;
+      if (data) setCachedPlaces(cacheKey, data);
+      res.json(data || {});
+    } catch (error: any) {
+      console.error('Error fetching place details (OSM):', error);
       res.status(500).json({ message: 'Failed to fetch place details' });
-    }
-  });
-  
-  // Get place photo by resource name
-  app.get('/api/places/photo/:photoName(*)', async (req, res) => {
-    try {
-      const { photoName } = req.params;
-      const { maxWidth = 400, maxHeight = 400 } = req.query;
-      
-      // Basic validation - must start with "places/" and contain "/photos/"
-      if (!photoName || !photoName.startsWith('places/') || !photoName.includes('/photos/')) {
-        return res.status(400).json({ message: 'Invalid photo reference format' });
-      }
-      
-      // Sanitize max width/height to prevent abuse
-      const sanitizedMaxWidth = Math.min(Math.max(parseInt(String(maxWidth)) || 400, 100), 4000);
-      const sanitizedMaxHeight = Math.min(Math.max(parseInt(String(maxHeight)) || 400, 100), 4000);
-      
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ message: 'Google Maps API not configured' });
-      }
-      
-      // Construct photo URL for Places API (New)
-      const url = `https://places.googleapis.com/v1/${photoName}/media?key=${apiKey}&maxWidthPx=${sanitizedMaxWidth}&maxHeightPx=${sanitizedMaxHeight}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ message: 'Failed to fetch photo' });
-      }
-      
-      // Redirect to the actual image URL (Google returns a redirect)
-      res.redirect(response.url);
-    } catch (error) {
-      console.error('Error fetching place photo:', error);
-      res.status(500).json({ message: 'Failed to fetch photo' });
-    }
-  });
-  
-  // Autocomplete for place search
-  app.get('/api/places/autocomplete', async (req, res) => {
-    try {
-      const { input, lat, lng } = req.query;
-      
-      if (!input) {
-        return res.status(400).json({ message: 'Input parameter required' });
-      }
-      
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ message: 'Google Maps API not configured' });
-      }
-      
-      const body: any = {
-        input: input as string,
-        includedRegionCodes: ['NG'], // Restrict to Nigeria
-      };
-      
-      if (lat && lng) {
-        body.locationBias = {
-          circle: {
-            center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
-            radius: 50000 // 50km
-          }
-        };
-      }
-      
-      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey
-        },
-        body: JSON.stringify(body)
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Google Places Autocomplete error:', data);
-        return res.status(response.status).json({ message: 'Failed to get suggestions', error: data });
-      }
-      
-      res.json(data);
-    } catch (error) {
-      console.error('Error in autocomplete:', error);
-      res.status(500).json({ message: 'Failed to get suggestions' });
     }
   });
 
