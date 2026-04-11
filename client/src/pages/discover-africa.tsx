@@ -385,8 +385,12 @@ export default function DiscoverAfrica() {
     queryFn: async () => {
       if (!searchQuery && !activeCategory) return { places: [] };
       const response = await fetch(`/api/places/search?${searchParams.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch places');
-      return response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        const googleMsg = data?.error?.error?.message || data?.message || 'Failed to fetch places';
+        throw new Error(googleMsg);
+      }
+      return data;
     },
     enabled: !!(searchQuery || activeCategory),
   });
@@ -544,8 +548,41 @@ export default function DiscoverAfrica() {
         )}
 
         {error && (
-          <div className="text-center py-12">
-            <p className="text-red-500">Failed to load places. Please try again.</p>
+          <div className="text-center py-12 max-w-lg mx-auto">
+            {(error as Error).message?.toLowerCase().includes('billing') ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-left">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="text-3xl">⚠️</span>
+                  <div>
+                    <h3 className="font-bold text-amber-800 text-lg mb-1">Google Maps Billing Required</h3>
+                    <p className="text-amber-700 text-sm">
+                      The Google Places API requires billing to be enabled on your Google Cloud project.
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-amber-200 text-sm text-gray-700 space-y-2">
+                  <p className="font-semibold">To fix this:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-gray-600">
+                    <li>Go to <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google Cloud Console → Billing</a></li>
+                    <li>Enable billing on project <strong>#605402392178</strong></li>
+                    <li>Ensure <strong>Places API (New)</strong> is enabled</li>
+                    <li>Google provides $200/month free credit — no charge for normal usage</li>
+                  </ol>
+                </div>
+              </div>
+            ) : (error as Error).message?.toLowerCase().includes('not configured') ? (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                <span className="text-3xl block mb-3">🔑</span>
+                <h3 className="font-bold text-red-800 text-lg mb-1">Google Maps API Key Missing</h3>
+                <p className="text-red-700 text-sm">The GOOGLE_MAPS_API_KEY environment variable is not set on the server.</p>
+              </div>
+            ) : (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                <MapPin className="h-12 w-12 mx-auto text-red-400 mb-3" />
+                <h3 className="font-semibold text-red-800 mb-1">Could not load places</h3>
+                <p className="text-red-600 text-sm">{(error as Error).message || 'Please try again later.'}</p>
+              </div>
+            )}
           </div>
         )}
 
