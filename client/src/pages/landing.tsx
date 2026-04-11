@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "lucide-react";
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -30,6 +30,7 @@ const culturalImages = [
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
@@ -107,32 +108,74 @@ export default function Landing() {
       <nav className="bg-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
+            {/* Logo */}
             <div className="flex items-center">
-              <div className="flex items-center text-2xl font-bold text-nigerian-green font-nigerian">
-                <img 
-                  src={logoImage} 
-                  alt="Afrolandx Logo" 
-                  className="w-8 h-8 mr-2"
-                />
-                Afrolandx
+              <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian">
+                <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
+                <span className="hidden sm:block">Afrolandx</span>
               </div>
             </div>
 
+            {/* Desktop Nav Links */}
             <div className="hidden md:flex items-center space-x-6">
-              <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-products">Products</a>
-              <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-events">Events</a>
-              <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-collab-drops">Collabs</a>
-              <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors" data-testid="nav-link-discover">Discover</a>
-              <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors">About</a>
+              <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-products">Products</a>
+              <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
+              <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
+              <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>
+              <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">About</a>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <Button onClick={handleLogin} className="btn-nigerian">
-                Sign In / Sign Up
+            {/* Right actions */}
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleLogin} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
+                Sign In
+              </Button>
+              {/* Mobile Hamburger */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+            <div className="px-4 py-4 space-y-1 pb-24">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Explore</p>
+              <a href="/products" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-products">
+                <Package className="w-5 h-5" /><span>Products</span>
+              </a>
+              <a href="/events" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-events">
+                <Calendar className="w-5 h-5" /><span>Events</span>
+              </a>
+              <a href="/collab-drops" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-collab-drops">
+                <Zap className="w-5 h-5" /><span>Collab Drops</span>
+              </a>
+              <a href="/discover" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-discover">
+                <MapPin className="w-5 h-5" /><span>Discover Africa</span>
+              </a>
+              <a href="#about" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
+                <Info className="w-5 h-5" /><span>About</span>
+              </a>
+              <div className="pt-4 border-t border-gray-200 mt-4">
+                <Button onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }} className="w-full btn-nigerian">
+                  Sign In / Sign Up
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
