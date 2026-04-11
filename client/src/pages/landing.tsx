@@ -127,8 +127,11 @@ export default function Landing() {
 
             {/* Right actions */}
             <div className="flex items-center space-x-2">
-              <Button onClick={handleLogin} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
+              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden sm:flex border-green-700 text-green-700 hover:bg-green-50">
                 Sign In
+              </Button>
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
+                Sign Up
               </Button>
               {/* Mobile Hamburger */}
               <Button
@@ -168,9 +171,12 @@ export default function Landing() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>
               </a>
-              <div className="pt-4 border-t border-gray-200 mt-4">
-                <Button onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }} className="w-full btn-nigerian">
-                  Sign In / Sign Up
+              <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
+                <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
+                  Sign Up — Create Account
+                </Button>
+                <Button onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
+                  Sign In
                 </Button>
               </div>
             </div>
@@ -217,17 +223,24 @@ export default function Landing() {
               From traditional Aso Oke to contemporary native wear, find the finest African fashion pieces 
               crafted by local artisans. Celebrate our rich cultural heritage with authentic designs.
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button 
-                onClick={handleLogin} 
+                onClick={() => window.location.href = "/register"}
                 size="lg" 
                 className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
               >
-                Start Shopping
+                Create Free Account
+              </Button>
+              <Button 
+                onClick={handleLogin}
+                size="lg" 
+                className="bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 font-semibold border-2 border-white/50 text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+              >
+                Sign In
               </Button>
               <Button 
                 size="lg" 
-                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border-2 border-white/30 hover:border-white/50 text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 text-base px-6 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
                 onClick={() => setIsVendorModalOpen(true)}
               >
                 Become a Vendor
