@@ -383,6 +383,7 @@ export default function DiscoverAfrica() {
   });
 
   const places: Place[] = placesData?.places || [];
+  const searchWarning: string | undefined = placesData?.warning;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,13 +535,23 @@ export default function DiscoverAfrica() {
           </div>
         )}
 
+        {searchWarning && places.length === 0 && (searchQuery || activeCategory) && (
+          <div className="text-center py-12 max-w-lg mx-auto">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+              <MapPin className="h-12 w-12 mx-auto text-amber-400 mb-3" />
+              <h3 className="font-semibold text-amber-800 mb-1">Location data temporarily unavailable</h3>
+              <p className="text-amber-700 text-sm">The map service is currently under high load. Please try again in a moment.</p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="text-center py-12 max-w-lg mx-auto">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-              <MapPin className="h-12 w-12 mx-auto text-red-400 mb-3" />
-              <h3 className="font-semibold text-red-800 mb-1">Could not load places</h3>
-              <p className="text-red-600 text-sm">{(error as Error).message || 'Please try again later.'}</p>
-              <p className="text-gray-500 text-xs mt-2">Data powered by OpenStreetMap contributors</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+              <MapPin className="h-12 w-12 mx-auto text-amber-400 mb-3" />
+              <h3 className="font-semibold text-amber-800 mb-1">Location data temporarily unavailable</h3>
+              <p className="text-amber-700 text-sm">The map service is under high load. Please try again in a moment.</p>
+              <p className="text-gray-500 text-xs mt-2">Powered by OpenStreetMap contributors</p>
             </div>
           </div>
         )}

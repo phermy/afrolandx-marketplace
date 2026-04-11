@@ -2689,6 +2689,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     placesCache.set(key, { data, timestamp: Date.now() });
   }
 
+  // Human-readable labels for fallback Nominatim searches
+  const PLACE_CATEGORY_LABELS: Record<string, string> = {
+    hotel: 'hotels',
+    shopping_mall: 'shopping malls',
+    restaurant: 'restaurants',
+    tourist_attraction: 'tourist attractions',
+    airport: 'airports',
+    car_rental: 'car rental',
+    cafe: 'cafes',
+    night_club: 'nightclubs bars',
+  };
+
   // OSM tag sets per category
   const OSM_CATEGORY_TAGS: Record<string, string[]> = {
     hotel:            ['tourism=hotel', 'tourism=hostel', 'tourism=motel', 'tourism=guest_house'],
@@ -2737,17 +2749,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // Run an Overpass QL query and return elements
+  // Alternative Overpass endpoints for load balancing / fallback
+  const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+  ];
+
+  // Run an Overpass QL query with automatic fallback across endpoints
   async function overpassQuery(ql: string): Promise<any[]> {
-    const resp = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(ql)}`,
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!resp.ok) throw new Error(`Overpass API error: ${resp.status}`);
-    const json = await resp.json();
-    return json.elements || [];
+    let lastError: Error = new Error('All Overpass endpoints failed');
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(ql)}`,
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!resp.ok) {
+          lastError = new Error(`Overpass ${resp.status} at ${endpoint}`);
+          continue;
+        }
+        const json = await resp.json();
+        return json.elements || [];
+      } catch (e: any) {
+        lastError = e;
+        console.warn(`Overpass endpoint failed (${endpoint}):`, e.message);
+      }
+    }
+    throw lastError;
   }
 
   // Build Overpass QL for a category within radius
@@ -2781,29 +2815,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let places: any[] = [];
 
-      if (type && OSM_CATEGORY_TAGS[type as string]) {
-        // Category search via Overpass API
-        if (!lat || !lng || isNaN(latNum) || isNaN(lngNum)) {
-          return res.status(400).json({ message: 'lat/lng required for category search' });
-        }
-        const tags = OSM_CATEGORY_TAGS[type as string];
-        const ql = buildOverpassQuery(tags, latNum, lngNum, radiusNum);
-        const elements = await overpassQuery(ql);
-        places = elements
-          .map(el => osmToPlace(el, city as string, country as string))
-          .filter(Boolean)
-          .slice(0, 30);
-      } else if (query) {
-        // Free-text search via Nominatim
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query as string)}&format=json&limit=20&addressdetails=1&extratags=1`;
-        const resp = await fetch(nominatimUrl, {
+      // Helper: Nominatim free-text search (used as primary for queries, fallback for categories)
+      async function nominatimSearch(q: string): Promise<any[]> {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=20&addressdetails=1&extratags=1`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        const resp = await fetch(url, {
           headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
-          signal: AbortSignal.timeout(15000),
+          signal: controller.signal,
         });
-        if (!resp.ok) throw new Error('Nominatim search failed');
+        clearTimeout(timer);
+        if (!resp.ok) throw new Error(`Nominatim error: ${resp.status}`);
         const results: any[] = await resp.json();
-
-        places = results.map((r: any) => ({
+        return results.map((r: any) => ({
           id: `nominatim/${r.place_id}`,
           displayName: { text: r.name || r.display_name.split(',')[0] },
           formattedAddress: r.display_name,
@@ -2818,12 +2842,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })).filter((p: any) => p.displayName.text);
       }
 
+      if (type && OSM_CATEGORY_TAGS[type as string]) {
+        // Category search via Overpass API with Nominatim fallback
+        if (!lat || !lng || isNaN(latNum) || isNaN(lngNum)) {
+          return res.status(400).json({ message: 'lat/lng required for category search' });
+        }
+        const category = PLACE_CATEGORY_LABELS[type as string] || (type as string).replace(/_/g, ' ');
+        const fallbackQuery = `${category} in ${city || ''} ${country || ''}`.trim();
+
+        try {
+          const tags = OSM_CATEGORY_TAGS[type as string];
+          const ql = buildOverpassQuery(tags, latNum, lngNum, radiusNum);
+          const elements = await overpassQuery(ql);
+          places = elements
+            .map(el => osmToPlace(el, city as string, country as string))
+            .filter(Boolean)
+            .slice(0, 30);
+        } catch (overpassError: any) {
+          console.warn('Overpass failed, falling back to Nominatim:', overpassError.message);
+          // Fallback to Nominatim text search
+          try {
+            places = await nominatimSearch(fallbackQuery);
+          } catch (nominatimError: any) {
+            console.error('Nominatim fallback also failed:', nominatimError.message);
+            // Return empty result gracefully instead of error
+            places = [];
+          }
+        }
+      } else if (query) {
+        // Free-text search via Nominatim
+        places = await nominatimSearch(query as string);
+      }
+
       const result = { places };
       setCachedPlaces(cacheKey, result);
       res.json(result);
     } catch (error: any) {
       console.error('Error searching places (OSM):', error);
-      res.status(500).json({ message: 'Failed to search places', error: error.message });
+      // Return empty result rather than an error to avoid breaking UI
+      res.json({ places: [], warning: 'Location search temporarily unavailable' });
     }
   });
 
