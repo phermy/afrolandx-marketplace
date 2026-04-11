@@ -143,7 +143,7 @@ export default function CollabDropsPage() {
             <h1 className="text-3xl font-bold">Designer Collaboration Hub</h1>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Exclusive limited-edition collections featuring collaborations between top Nigerian designers and traditional artisans. RSVP to get notified when drops go live.
+            Exclusive limited-edition collections featuring collaborations between top African designers and traditional artisans. RSVP to get notified when drops go live.
           </p>
         </div>
 
@@ -203,7 +203,7 @@ export default function CollabDropsPage() {
               <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold mb-2">No Collaboration Drops Yet</h3>
               <p className="text-muted-foreground">
-                Stay tuned for exciting collaborations between top Nigerian designers and traditional artisans.
+                Stay tuned for exciting collaborations between top African designers and traditional artisans.
               </p>
             </CardContent>
           </Card>

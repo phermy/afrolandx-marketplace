@@ -117,7 +117,7 @@ export default function LookbookPage() {
             <h1 className="text-3xl font-bold">Bespoke Lookbook Studio</h1>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Let our AI stylist create the perfect outfit for your occasion. Tell us about your event and we'll curate personalized recommendations from our collection of authentic Nigerian fashion.
+            Let our AI stylist create the perfect outfit for your occasion. Tell us about your event and we'll curate personalized recommendations from our collection of authentic African fashion.
           </p>
         </div>
 

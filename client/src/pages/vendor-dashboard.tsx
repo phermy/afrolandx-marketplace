@@ -243,7 +243,7 @@ export default function VendorDashboard() {
             <CardHeader>
               <CardTitle className="text-2xl font-bold text-center">Become a Vendor</CardTitle>
               <p className="text-gray-600 text-center">
-                Join our community of Nigerian artisans and designers
+                Join our community of African artisans and designers
               </p>
             </CardHeader>
             <CardContent>

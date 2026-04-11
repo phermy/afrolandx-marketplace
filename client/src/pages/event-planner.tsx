@@ -91,7 +91,7 @@ export default function EventPlannerPage() {
             <h1 className="text-3xl font-bold">Event Outfit Planner</h1>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Planning a special Nigerian event? We'll help you find the perfect traditional outfits for every member of your family.
+            Planning a special African event? We'll help you find the perfect traditional outfits for every member of your family.
           </p>
         </div>
 

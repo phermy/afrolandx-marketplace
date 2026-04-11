@@ -264,7 +264,7 @@ export default function LoyaltyPage() {
                     <Sparkles className="h-5 w-5" />
                     Cultural Quizzes
                   </CardTitle>
-                  <CardDescription>Learn about Nigerian heritage and earn bonus points!</CardDescription>
+                  <CardDescription>Learn about African heritage and earn bonus points!</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3">

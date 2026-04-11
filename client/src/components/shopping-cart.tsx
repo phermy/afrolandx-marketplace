@@ -84,7 +84,7 @@ export default function ShoppingCart() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.1 5M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6m-8 0V9a2 2 0 012-2h4a2 2 0 012 2v4.01" />
               </svg>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Your cart is empty</h3>
-              <p className="text-gray-600 mb-4">Add some beautiful Nigerian fashion items to get started!</p>
+              <p className="text-gray-600 mb-4">Add some beautiful African fashion items to get started!</p>
               <Button onClick={closeCart} className="btn-nigerian">
                 Continue Shopping
               </Button>

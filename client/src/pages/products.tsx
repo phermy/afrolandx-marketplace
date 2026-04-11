@@ -143,7 +143,7 @@ export default function Products() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
-            Nigerian Fashion Collection
+            African Fashion Collection
           </h1>
           <p className="text-gray-600 text-lg">
             Discover authentic traditional wear, Aso Oke, and handcrafted jewelry

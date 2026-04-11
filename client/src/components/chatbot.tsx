@@ -15,7 +15,7 @@ export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! Welcome to Afrolandx. How can I help you today? I can assist you with product recommendations, measurement guidance, orders, or any questions about Nigerian fashion!'
+      content: 'Hello! Welcome to Afrolandx. How can I help you today? I can assist you with product recommendations, measurement guidance, orders, or any questions about African fashion!'
     }
   ]);
   const [input, setInput] = useState('');

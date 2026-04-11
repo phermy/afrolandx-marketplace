@@ -339,7 +339,7 @@ function PlaceDetailsDialog({
   );
 }
 
-export default function DiscoverNigeria() {
+export default function DiscoverAfrica() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState(NIGERIAN_CITIES[0]);
@@ -402,10 +402,10 @@ export default function DiscoverNigeria() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="discover-title">
-              Discover Nigeria
+              Discover Africa
             </h1>
             <p className="text-xl text-white/90 mb-8">
-              Find hotels, malls, restaurants, and amazing places across Nigeria
+              Find hotels, malls, restaurants, and amazing places across Africa
             </p>
             
             <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
@@ -556,10 +556,10 @@ export default function DiscoverNigeria() {
         {!searchQuery && !activeCategory && (
           <Card className="p-12 text-center bg-gradient-to-br from-emerald-50 to-amber-50">
             <Search className="h-12 w-12 mx-auto text-emerald-600 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Start Exploring Nigeria</h3>
+            <h3 className="text-xl font-semibold mb-2">Start Exploring Africa</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Search for any place or select a category above to discover amazing 
-              hotels, restaurants, malls, and attractions across Nigeria.
+              hotels, restaurants, malls, and attractions across Africa.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button 

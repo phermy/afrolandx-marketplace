@@ -99,7 +99,7 @@ export default function Home() {
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
                 <img 
                   src={image} 
-                  alt={`Nigerian cultural fashion ${index + 1}`}
+                  alt={`African cultural fashion ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-green-900/80 to-emerald-800/85"></div>
@@ -126,7 +126,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
-              Discover authentic Nigerian fashion - from traditional Aso Oke to handcrafted beads. 
+              Discover authentic African fashion - from traditional Aso Oke to handcrafted beads. 
               Connect with local artisans and celebrate our rich cultural heritage.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -205,7 +205,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Featured Categories</h2>
-              <p className="text-gray-600 text-lg">Explore our curated collection of authentic Nigerian fashion</p>
+              <p className="text-gray-600 text-lg">Explore our curated collection of authentic African fashion</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -330,7 +330,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Why Choose Afrolandx</h2>
-            <p className="text-gray-600 text-lg">Your trusted marketplace for authentic Nigerian fashion</p>
+            <p className="text-gray-600 text-lg">Your trusted marketplace for authentic African fashion</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -367,7 +367,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Support Artisans</h3>
-                <p className="text-gray-600">Direct connection with Nigerian artisans and designers, supporting local communities.</p>
+                <p className="text-gray-600">Direct connection with African artisans and designers, supporting local communities.</p>
               </CardContent>
             </Card>
           </div>
@@ -388,7 +388,7 @@ export default function Home() {
                 Afrolandx
               </div>
               <p className="text-green-100 mb-4">
-                Connecting the world to authentic Nigerian fashion and culture.
+                Connecting the world to authentic African fashion and culture.
               </p>
               <div className="flex space-x-4">
                 <a href="#" className="text-green-100 hover:text-white transition-colors">
@@ -441,7 +441,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-green-600 mt-8 pt-8 text-center text-green-100">
-            <p>&copy; 2025 Afrolandx. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
+            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
           </div>
         </div>
       </footer>

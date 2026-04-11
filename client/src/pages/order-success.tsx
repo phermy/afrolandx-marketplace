@@ -43,7 +43,7 @@ export default function OrderSuccess() {
             🎉 Order Placed Successfully!
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Thank you for celebrating Nigerian heritage with us
+            Thank you for celebrating African heritage with us
           </p>
         </div>
 
@@ -57,7 +57,7 @@ export default function OrderSuccess() {
                   </h2>
                   <p className="text-green-700 leading-relaxed">
                     We've received your payment and your order is now being processed. Our skilled artisans and vendors 
-                    are already preparing your authentic Nigerian fashion pieces with the utmost care and attention to detail.
+                    are already preparing your authentic African fashion pieces with the utmost care and attention to detail.
                   </p>
                 </div>
 
@@ -88,7 +88,7 @@ export default function OrderSuccess() {
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
-                      <p>Enjoy your beautiful Nigerian fashion pieces!</p>
+                      <p>Enjoy your beautiful African fashion pieces!</p>
                     </div>
                   </div>
                 </div>
@@ -125,7 +125,7 @@ export default function OrderSuccess() {
             Questions about your order? Contact our support team.
           </p>
           <p className="text-sm">
-            Thank you for supporting Nigerian artisans and celebrating our rich cultural heritage! 🇳🇬
+            Thank you for supporting African artisans and celebrating our rich cultural heritage! 🌍
           </p>
         </div>
       </div>

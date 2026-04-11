@@ -144,7 +144,7 @@ export default function Landing() {
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
                 <img 
                   src={image} 
-                  alt={`Nigerian cultural fashion ${index + 1}`}
+                  alt={`African cultural fashion ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-green-900/80 to-emerald-800/85"></div>
@@ -167,11 +167,11 @@ export default function Landing() {
                 Discover Authentic
               </span>
               <span className="block text-amber-300 mt-2">
-                Nigerian Fashion
+                African Fashion
               </span>
             </h1>
             <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed">
-              From traditional Aso Oke to contemporary native wear, find the finest Nigerian fashion pieces 
+              From traditional Aso Oke to contemporary native wear, find the finest African fashion pieces 
               crafted by local artisans. Celebrate our rich cultural heritage with authentic designs.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
@@ -214,7 +214,7 @@ export default function Landing() {
               Featured <span className="text-nigerian-green">Collections</span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Discover authentic Nigerian fashion pieces crafted by local artisans. 
+              Discover authentic African fashion pieces crafted by local artisans. 
               Each piece tells a story of our rich cultural heritage.
             </p>
           </div>
@@ -275,7 +275,7 @@ export default function Landing() {
           ) : (
             <div className="text-center py-12">
               <p className="text-gray-600 text-lg">
-                New products coming soon! Check back later for amazing Nigerian fashion pieces.
+                New products coming soon! Check back later for amazing African fashion pieces.
               </p>
             </div>
           )}
@@ -298,7 +298,7 @@ export default function Landing() {
               Why Choose Afrolandx?
             </h2>
             <p className="text-gray-600 text-lg">
-              Your trusted marketplace for authentic Nigerian fashion
+              Your trusted marketplace for authentic African fashion
             </p>
           </div>
 
@@ -341,7 +341,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Support Artisans</h3>
                 <p className="text-gray-600">
-                  Direct connection with Nigerian artisans and designers, supporting local communities.
+                  Direct connection with African artisans and designers, supporting local communities.
                 </p>
               </CardContent>
             </Card>
@@ -357,13 +357,13 @@ export default function Landing() {
               Explore Our Categories
             </h2>
             <p className="text-gray-600 text-lg">
-              Discover the beauty of Nigerian traditional fashion
+              Discover the beauty of African traditional fashion
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { name: "Traditional Wear", description: "Authentic Nigerian clothing", emoji: "👘" },
+              { name: "Traditional Wear", description: "Authentic African clothing", emoji: "👘" },
               { name: "Aso Oke", description: "Handwoven fabrics", emoji: "🧵" },
               { name: "Beads & Jewelry", description: "Traditional accessories", emoji: "📿" },
               { name: "Modern Fusion", description: "Contemporary designs", emoji: "✨" },
@@ -429,17 +429,17 @@ export default function Landing() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-6" style={{ lineHeight: '1.3', paddingBottom: '0.3em' }}>
-                Celebrating Nigerian Heritage
+                Celebrating African Heritage
               </h2>
               <p className="text-gray-600 text-lg mb-6">
                 Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
-                connecting Nigerian artisans with fashion enthusiasts worldwide. Our mission is 
-                to preserve and promote the rich heritage of Nigerian traditional fashion while 
+                connecting African artisans with fashion enthusiasts worldwide. Our mission is 
+                to preserve and promote the rich heritage of African traditional fashion while 
                 supporting local communities.
               </p>
               <p className="text-gray-600 text-lg mb-6">
-                Every purchase you make helps support Nigerian artisans, preserves traditional 
-                crafting techniques, and celebrates the vibrant culture of Nigeria.
+                Every purchase you make helps support African artisans, preserves traditional 
+                crafting techniques, and celebrates the vibrant culture of Africa.
               </p>
               <Button onClick={handleLogin} className="btn-nigerian">
                 Join Our Community
@@ -449,12 +449,12 @@ export default function Landing() {
               <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
                 <img 
                   src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  alt="Beautiful Nigerian woman in traditional dress"
+                  alt="Beautiful African woman in traditional dress"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
                 <div className="absolute bottom-6 left-6 right-6">
-                  <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">Nigerian Heritage</h3>
+                  <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">African Heritage</h3>
                   <p className="text-white/90 text-sm drop-shadow-md">Celebrating traditional beauty and craftsmanship</p>
                 </div>
               </div>
@@ -467,10 +467,10 @@ export default function Landing() {
       <section className="py-16 bg-nigerian-green text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold mb-6">
-            Ready to Explore Nigerian Fashion?
+            Ready to Explore African Fashion?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join thousands of fashion enthusiasts who trust NaijaFashion for authentic Nigerian clothing and accessories.
+            Join thousands of fashion enthusiasts who trust Afrolandx for authentic African clothing and accessories.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold">
@@ -501,7 +501,7 @@ export default function Landing() {
                 Afrolandx
               </div>
               <p className="text-gray-400 mb-4">
-                Connecting the world to authentic Nigerian fashion and culture.
+                Connecting the world to authentic African fashion and culture.
               </p>
             </div>
             
@@ -547,7 +547,7 @@ export default function Landing() {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Afrolandx. Proudly celebrating Nigerian heritage worldwide. 🇳🇬</p>
+            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
           </div>
         </div>
       </footer>
@@ -570,7 +570,7 @@ export default function Landing() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-600 mb-6">
-                Join our community of Nigerian artisans and designers. Share your authentic 
+                Join our community of African artisans and designers. Share your authentic 
                 fashion creations with customers worldwide.
               </p>
               <div className="space-y-4">

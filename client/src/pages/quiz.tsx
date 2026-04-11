@@ -115,7 +115,7 @@ export default function QuizPage() {
       <div className="container mx-auto py-12 text-center">
         <h1 className="text-2xl font-bold mb-4">Sign in to take quizzes</h1>
         <p className="text-muted-foreground mb-4">
-          Learn about Nigerian cultural heritage and earn loyalty points!
+          Learn about African cultural heritage and earn loyalty points!
         </p>
         <Button asChild>
           <a href="/api/login">Sign In</a>
@@ -175,7 +175,7 @@ export default function QuizPage() {
               </CardTitle>
               <CardDescription>
                 {result.passed 
-                  ? "You've demonstrated great knowledge of Nigerian culture!" 
+                  ? "You've demonstrated great knowledge of African culture!" 
                   : "Don't worry, you can try again and learn more."}
               </CardDescription>
             </CardHeader>
