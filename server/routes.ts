@@ -2668,9 +2668,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // OpenStreetMap (Overpass + Nominatim) - Free, No API Key Required
   // ==========================================
 
-  // Simple in-memory cache for places API (TTL: 10 minutes)
+  // Simple in-memory cache for places API (TTL: 60 minutes)
   const placesCache = new Map<string, { data: any; timestamp: number }>();
-  const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  const CACHE_TTL = 60 * 60 * 1000; // 60 minutes
 
   function getCachedPlaces(key: string): any | null {
     const cached = placesCache.get(key);
@@ -2757,7 +2757,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ];
 
   // Run an Overpass QL query with automatic fallback across endpoints
+  // Throws a special RateLimitError when all endpoints return 429
+  class OverpassRateLimitError extends Error {
+    constructor() { super('Overpass rate limited (429)'); this.name = 'OverpassRateLimitError'; }
+  }
+
   async function overpassQuery(ql: string): Promise<any[]> {
+    let rateLimitCount = 0;
     let lastError: Error = new Error('All Overpass endpoints failed');
     for (const endpoint of OVERPASS_ENDPOINTS) {
       try {
@@ -2770,6 +2776,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           signal: controller.signal,
         });
         clearTimeout(timer);
+        if (resp.status === 429) {
+          rateLimitCount++;
+          lastError = new OverpassRateLimitError();
+          continue; // try next endpoint immediately
+        }
         if (!resp.ok) {
           lastError = new Error(`Overpass ${resp.status} at ${endpoint}`);
           continue;
@@ -2777,11 +2788,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const json = await resp.json();
         return json.elements || [];
       } catch (e: any) {
+        if (e.name === 'OverpassRateLimitError') throw e;
         lastError = e;
         console.warn(`Overpass endpoint failed (${endpoint}):`, e.message);
       }
     }
+    if (rateLimitCount === OVERPASS_ENDPOINTS.length) throw new OverpassRateLimitError();
     throw lastError;
+  }
+
+  // Keyword search terms per category for Nominatim viewbox search
+  const NOMINATIM_CATEGORY_KEYWORDS: Record<string, string[]> = {
+    hotel:              ['hotel', 'guest house'],
+    shopping_mall:      ['mall', 'market'],
+    restaurant:         ['restaurant'],
+    tourist_attraction: ['museum', 'attraction'],
+    airport:            ['airport'],
+    car_rental:         ['car rental'],
+    cafe:               ['cafe'],
+    night_club:         ['nightclub', 'bar'],
+  };
+
+  // Nominatim viewbox-based category search (no API key, 1 req/s limit respected)
+  // Uses bounding box around lat/lng so results are geographically constrained
+  async function nominatimCategorySearch(
+    categoryId: string, lat: number, lng: number, radius: number
+  ): Promise<any[]> {
+    const keywords = (NOMINATIM_CATEGORY_KEYWORDS[categoryId] || []).slice(0, 2);
+    if (keywords.length === 0) return [];
+
+    // Build viewbox (deg): radius metres → approx degrees (1 deg lat ≈ 111 km)
+    const delta = (radius / 1000) / 111;
+    const viewbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
+
+    const all: any[] = [];
+    for (let i = 0; i < keywords.length; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 1100)); // respect 1 req/s
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.searchParams.set('q', keywords[i]);
+      url.searchParams.set('viewbox', viewbox);
+      url.searchParams.set('bounded', '1');
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('limit', '25');
+      url.searchParams.set('addressdetails', '1');
+      url.searchParams.set('extratags', '1');
+      try {
+        const resp = await fetch(url.toString(), {
+          headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!resp.ok) continue;
+        const data: any[] = await resp.json();
+        all.push(...data);
+      } catch { continue; }
+    }
+    const seen = new Set<string>();
+    return all
+      .filter(r => { const key = String(r.place_id); if (seen.has(key)) return false; seen.add(key); return true; })
+      .map((r: any) => ({
+        id: `nominatim/${r.place_id}`,
+        displayName: { text: r.name || r.display_name.split(',')[0] },
+        formattedAddress: r.display_name,
+        location: { latitude: parseFloat(r.lat), longitude: parseFloat(r.lon) },
+        types: [r.type || r.class || 'place'],
+        primaryType: r.type || r.class || 'place',
+        internationalPhoneNumber: r.extratags?.phone,
+        websiteUri: r.extratags?.website,
+        currentOpeningHours: r.extratags?.opening_hours
+          ? { weekdayDescriptions: [r.extratags.opening_hours] }
+          : undefined,
+      }))
+      .filter((p: any) => p.displayName.text);
   }
 
   // Build Overpass QL for a category within radius
@@ -2860,12 +2937,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .slice(0, 30);
         } catch (overpassError: any) {
           console.warn('Overpass failed, falling back to Nominatim:', overpassError.message);
-          // Fallback to Nominatim text search
+          // Fallback: use structured Nominatim category search first, then text search
           try {
-            places = await nominatimSearch(fallbackQuery);
+            places = await nominatimCategorySearch(type as string, latNum, lngNum, radiusNum);
+            if (places.length === 0) {
+              places = await nominatimSearch(fallbackQuery);
+            }
           } catch (nominatimError: any) {
             console.error('Nominatim fallback also failed:', nominatimError.message);
-            // Return empty result gracefully instead of error
             places = [];
           }
         }
