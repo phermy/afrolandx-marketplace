@@ -2880,7 +2880,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return `[out:json][timeout:25];\n(\n${parts.join('\n')}\n);\nout tags center;`;
   }
   
-  // Search for places across Africa using OpenStreetMap (Overpass + Nominatim) — free, no API key
+  // Wikipedia photo cache (separate from places cache to avoid re-fetching)
+  const wikiPhotoCache = new Map<string, string | null>();
+
+  // Batch-fetch Wikipedia thumbnail photos for a list of places (single API call, up to 50 titles)
+  async function enrichWithWikipediaPhotos(places: any[]): Promise<any[]> {
+    // Build list of unique names not yet in cache
+    const uncached = places
+      .map(p => p.displayName.text as string)
+      .filter((name, i, arr) => arr.indexOf(name) === i && !wikiPhotoCache.has(name));
+
+    if (uncached.length > 0) {
+      const batches: string[][] = [];
+      for (let i = 0; i < uncached.length; i += 50) batches.push(uncached.slice(i, i + 50));
+
+      for (const batch of batches) {
+        try {
+          const titlesParam = batch.map(t => encodeURIComponent(t)).join('|');
+          const url = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=500&titles=${titlesParam}&format=json&formatversion=2&redirects=1`;
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'Afrolandx/1.0 (info@afrolandx.com)' },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) { batch.forEach(n => wikiPhotoCache.set(n, null)); continue; }
+          const data = await resp.json();
+          const pages: any[] = data.query?.pages || [];
+          // Build resolved-title → thumbnail map (Wikipedia may redirect titles)
+          const photoMap = new Map<string, string>();
+          for (const page of pages) {
+            if (page.thumbnail?.source) {
+              photoMap.set(page.title.toLowerCase(), page.thumbnail.source);
+            }
+          }
+          // Handle redirects: map original title → resolved title
+          const redirects: any[] = data.query?.redirects || [];
+          const redirectMap = new Map(redirects.map((r: any) => [r.from.toLowerCase(), r.to.toLowerCase()]));
+          for (const name of batch) {
+            const resolved = redirectMap.get(name.toLowerCase()) || name.toLowerCase();
+            wikiPhotoCache.set(name, photoMap.get(resolved) || null);
+          }
+        } catch {
+          batch.forEach(n => wikiPhotoCache.set(n, null));
+        }
+      }
+    }
+
+    return places.map(p => ({
+      ...p,
+      photoUri: wikiPhotoCache.get(p.displayName.text) || undefined,
+    }));
+  }
+
+  // Search for places across Africa using OpenStreetMap (Nominatim) — free, no API key
   app.get('/api/places/search', async (req, res) => {
     try {
       const { query, type, lat, lng, radius = '10000', city = '', country = '' } = req.query;
@@ -2951,6 +3002,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (query) {
         // Free-text search via Nominatim
         places = await nominatimSearch(query as string);
+      }
+
+      // Enrich places with Wikipedia thumbnail photos (single batch API call)
+      if (places.length > 0) {
+        places = await enrichWithWikipediaPhotos(places);
       }
 
       const result = { places };

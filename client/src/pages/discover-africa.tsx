@@ -45,6 +45,7 @@ interface Place {
   websiteUri?: string;
   currentOpeningHours?: { weekdayDescriptions?: string[] };
   editorialSummary?: { text: string };
+  photoUri?: string;
 }
 
 const PLACE_CATEGORIES = [
@@ -131,12 +132,19 @@ function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; ope
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden p-0 rounded-2xl">
-        <div className="relative h-32 bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center">
-          <div className="text-center">
-            <span className="text-5xl">{emoji}</span>
-            <p className="text-white/80 text-sm mt-1 capitalize">{place.primaryType?.replace(/_/g, " ")}</p>
+        <div className="relative h-40 overflow-hidden">
+          {place.photoUri ? (
+            <img src={place.photoUri} alt={place.displayName.text} className="w-full h-full object-cover" />
+          ) : (
+            <div className={`w-full h-full bg-gradient-to-br ${getCardGradient(place.id)} flex items-center justify-center`}>
+              <span className="text-5xl">{emoji}</span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <div className="absolute bottom-3 left-4">
+            <p className="text-white/90 text-xs font-medium capitalize">{place.primaryType?.replace(/_/g, " ")}</p>
           </div>
-          <Button variant="ghost" size="icon" className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 text-white" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="absolute top-3 right-3 bg-black/30 hover:bg-black/50 text-white" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -447,8 +455,12 @@ export default function DiscoverAfrica() {
                       onClick={() => openPlace(place)}
                     >
                       <CardContent className="p-3 flex gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0 text-2xl">
-                          {emoji}
+                        <div className="h-12 w-12 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-50 flex items-center justify-center text-2xl">
+                          {place.photoUri ? (
+                            <img src={place.photoUri} alt={place.displayName.text} className="w-full h-full object-cover" />
+                          ) : (
+                            emoji
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm line-clamp-1">{place.displayName.text}</p>
@@ -492,9 +504,20 @@ export default function DiscoverAfrica() {
                   const gradient = getCardGradient(place.id);
                   return (
                     <Card key={place.id} className="cursor-pointer hover:shadow-xl transition-all hover:-translate-y-1 overflow-hidden border-0 shadow-md group" onClick={() => openPlace(place)}>
-                      <div className={`h-36 bg-gradient-to-br ${gradient} flex flex-col items-center justify-center relative gap-1`}>
-                        <span className="text-5xl drop-shadow-sm">{emoji}</span>
-                        <span className="text-white/80 text-xs font-medium capitalize">{place.primaryType?.replace(/_/g, " ") || "Place"}</span>
+                      <div className="h-36 relative overflow-hidden">
+                        {place.photoUri ? (
+                          <img
+                            src={place.photoUri}
+                            alt={place.displayName.text}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className={`w-full h-full bg-gradient-to-br ${gradient} flex flex-col items-center justify-center gap-1`}>
+                            <span className="text-5xl drop-shadow-sm">{emoji}</span>
+                            <span className="text-white/80 text-xs font-medium capitalize">{place.primaryType?.replace(/_/g, " ") || "Place"}</span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                         {place.currentOpeningHours?.weekdayDescriptions?.length && (
                           <Badge className="absolute top-2 right-2 bg-green-500/90 text-white border-0 text-xs">
                             Hours available
