@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import {
 import {
   Search,
   MapPin,
-  Star,
   Phone,
   Globe,
   Clock,
@@ -35,7 +34,9 @@ import {
   Music,
   Navigation,
   X,
-  ChevronDown,
+  ExternalLink,
+  CheckCircle2,
+  PhoneCall,
 } from "lucide-react";
 import { africaLocations, getCountriesByRegion, africanRegions, type Country, type City } from "@shared/africaLocations";
 
@@ -47,7 +48,6 @@ interface Place {
   types?: string[];
   rating?: number;
   userRatingCount?: number;
-  photos?: Array<{ name: string; widthPx: number; heightPx: number }>;
   priceLevel?: string;
   primaryType?: string;
   internationalPhoneNumber?: string;
@@ -57,79 +57,92 @@ interface Place {
     weekdayDescriptions?: string[];
   };
   editorialSummary?: { text: string };
-  reviews?: Array<{
-    text: { text: string };
-    rating: number;
-    authorAttribution: { displayName: string };
-    relativePublishTimeDescription: string;
-  }>;
 }
 
 const PLACE_CATEGORIES = [
-  { id: "hotel", label: "Hotels", icon: Hotel, query: "hotels" },
-  { id: "shopping_mall", label: "Malls", icon: ShoppingBag, query: "shopping malls" },
-  { id: "restaurant", label: "Restaurants", icon: Utensils, query: "restaurants" },
-  { id: "tourist_attraction", label: "Attractions", icon: Landmark, query: "tourist attractions" },
-  { id: "airport", label: "Airports", icon: Plane, query: "airports" },
-  { id: "car_rental", label: "Car Rentals", icon: Car, query: "car rentals" },
-  { id: "cafe", label: "Cafes", icon: Coffee, query: "cafes" },
-  { id: "night_club", label: "Nightlife", icon: Music, query: "nightclubs lounges" },
+  { id: "hotel",            label: "Hotels",       icon: Hotel,       emoji: "🏨", color: "from-blue-500 to-indigo-600",    light: "bg-blue-50 text-blue-700 border-blue-200" },
+  { id: "shopping_mall",   label: "Malls",        icon: ShoppingBag, emoji: "🛍️", color: "from-pink-500 to-rose-600",      light: "bg-pink-50 text-pink-700 border-pink-200" },
+  { id: "restaurant",      label: "Restaurants",  icon: Utensils,    emoji: "🍽️", color: "from-orange-500 to-amber-600",   light: "bg-orange-50 text-orange-700 border-orange-200" },
+  { id: "tourist_attraction", label: "Attractions", icon: Landmark,  emoji: "🏛️", color: "from-emerald-500 to-teal-600",  light: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { id: "airport",         label: "Airports",     icon: Plane,       emoji: "✈️", color: "from-sky-500 to-cyan-600",       light: "bg-sky-50 text-sky-700 border-sky-200" },
+  { id: "car_rental",      label: "Car Rentals",  icon: Car,         emoji: "🚗", color: "from-slate-500 to-gray-600",     light: "bg-slate-50 text-slate-700 border-slate-200" },
+  { id: "cafe",            label: "Cafes",        icon: Coffee,      emoji: "☕", color: "from-yellow-600 to-amber-700",   light: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  { id: "night_club",      label: "Nightlife",    icon: Music,       emoji: "🎵", color: "from-purple-500 to-violet-600",  light: "bg-purple-50 text-purple-700 border-purple-200" },
 ];
 
-const CATEGORY_ICONS: Record<string, string> = {
-  hotel: '🏨', hostel: '🏨', motel: '🏨', guest_house: '🏨',
-  mall: '🛍️', supermarket: '🛒', department_store: '🛍️', marketplace: '🏪',
-  restaurant: '🍽️', fast_food: '🍔', food_court: '🍱',
-  attraction: '🏛️', museum: '🏛️', theme_park: '🎡', monument: '🗿', ruins: '🏚️',
-  aerodrome: '✈️',
-  car_rental: '🚗',
-  cafe: '☕',
-  nightclub: '🎵', bar: '🍺', pub: '🍺',
-  place: '📍',
+const TYPE_TO_CATEGORY: Record<string, string> = {
+  hotel: "hotel", hostel: "hotel", motel: "hotel", guest_house: "hotel",
+  mall: "shopping_mall", supermarket: "shopping_mall", department_store: "shopping_mall", marketplace: "shopping_mall",
+  restaurant: "restaurant", fast_food: "restaurant", food_court: "restaurant",
+  attraction: "tourist_attraction", museum: "tourist_attraction", theme_park: "tourist_attraction", monument: "tourist_attraction", ruins: "tourist_attraction",
+  aerodrome: "airport",
+  car_rental: "car_rental",
+  cafe: "cafe",
+  nightclub: "night_club", bar: "night_club", pub: "night_club",
 };
 
+function getCategoryMeta(primaryType?: string) {
+  const categoryId = TYPE_TO_CATEGORY[primaryType || ""] || "";
+  return PLACE_CATEGORIES.find(c => c.id === categoryId) || PLACE_CATEGORIES[0];
+}
+
+function formatShortAddress(full: string): string {
+  const parts = full.split(",").map(s => s.trim()).filter(Boolean);
+  if (parts.length <= 2) return full;
+  return parts.slice(0, 3).join(", ");
+}
+
 function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
-  const emoji = CATEGORY_ICONS[place.primaryType || ''] || '📍';
+  const meta = getCategoryMeta(place.primaryType);
+  const hasContact = !!(place.internationalPhoneNumber || place.websiteUri);
+  const hasHours = !!(place.currentOpeningHours?.weekdayDescriptions?.length);
+  const shortAddress = formatShortAddress(place.formattedAddress);
 
   return (
-    <Card 
-      className="cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1"
+    <Card
+      className="cursor-pointer hover:shadow-xl transition-all hover:-translate-y-1 group overflow-hidden border-0 shadow-md"
       onClick={onClick}
-      data-testid={`place-card-${place.id}`}
     >
-      <div className="relative h-48 bg-gradient-to-br from-emerald-100 to-amber-100 rounded-t-lg overflow-hidden flex items-center justify-center">
+      <div className={`relative h-36 bg-gradient-to-br ${meta.color} flex items-center justify-center`}>
         <div className="text-center">
-          <span className="text-6xl">{emoji}</span>
-          <p className="text-emerald-700 font-medium text-sm mt-2 capitalize">{place.primaryType?.replace(/_/g, ' ') || 'Place'}</p>
+          <span className="text-5xl drop-shadow-md">{meta.emoji}</span>
         </div>
-        {place.currentOpeningHours?.weekdayDescriptions && (
-          <Badge className="absolute top-2 right-2 bg-emerald-600">
-            Hours available
+        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors" />
+        <Badge className="absolute top-3 left-3 bg-white/20 backdrop-blur-sm text-white border-white/30 text-xs">
+          {place.primaryType?.replace(/_/g, " ") || "Place"}
+        </Badge>
+        {hasHours && (
+          <Badge className="absolute top-3 right-3 bg-green-500/90 text-white border-0 text-xs">
+            <Clock className="h-3 w-3 mr-1" />
+            Hours listed
           </Badge>
         )}
       </div>
+
       <CardContent className="p-4">
-        <h3 className="font-semibold text-lg line-clamp-1" data-testid="place-name">
+        <h3 className="font-semibold text-base line-clamp-1 group-hover:text-emerald-700 transition-colors">
           {place.displayName.text}
         </h3>
-        <p className="text-sm text-muted-foreground line-clamp-2 mt-1 flex items-start gap-1">
-          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          {place.formattedAddress}
+        <p className="text-xs text-muted-foreground line-clamp-1 mt-1 flex items-center gap-1">
+          <MapPin className="h-3 w-3 flex-shrink-0 text-emerald-500" />
+          {shortAddress}
         </p>
-        <div className="flex items-center justify-between mt-3">
-          {place.rating && (
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span className="font-medium">{place.rating.toFixed(1)}</span>
-              <span className="text-sm text-muted-foreground">
-                ({place.userRatingCount || 0})
-              </span>
-            </div>
+
+        {place.editorialSummary?.text && (
+          <p className="text-xs text-muted-foreground mt-2 line-clamp-2 italic">
+            {place.editorialSummary.text}
+          </p>
+        )}
+
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          {hasContact && (
+            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+              <CheckCircle2 className="h-3 w-3" />
+              Contact info
+            </span>
           )}
-          {place.priceLevel && (
-            <Badge variant="outline" className="text-emerald-600">
-              {place.priceLevel.replace('PRICE_LEVEL_', '')}
-            </Badge>
+          {!hasContact && !hasHours && (
+            <span className="text-xs text-muted-foreground">Tap for directions</span>
           )}
         </div>
       </CardContent>
@@ -137,175 +150,137 @@ function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
   );
 }
 
-function PlaceDetailsDialog({ 
-  place, 
-  open, 
-  onClose 
-}: { 
-  place: Place | null; 
-  open: boolean; 
+function PlaceDetailsDialog({
+  place,
+  open,
+  onClose,
+}: {
+  place: Place | null;
+  open: boolean;
   onClose: () => void;
 }) {
-  const fullPlace: Place | null = place;
-  if (!fullPlace) return null;
-
-  const emoji = CATEGORY_ICONS[fullPlace.primaryType || ''] || '📍';
+  if (!place) return null;
+  const meta = getCategoryMeta(place.primaryType);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0">
-        <div className="relative h-40 bg-gradient-to-br from-emerald-100 to-amber-100 flex items-center justify-center">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden p-0 rounded-2xl">
+        <div className={`relative h-36 bg-gradient-to-br ${meta.color} flex items-center justify-center`}>
           <div className="text-center">
-            <span className="text-7xl">{emoji}</span>
-            <p className="text-emerald-700 font-medium mt-1 capitalize">{fullPlace.primaryType?.replace(/_/g, ' ')}</p>
+            <span className="text-6xl drop-shadow-lg">{meta.emoji}</span>
+            <p className="text-white/90 font-medium mt-1 capitalize text-sm">
+              {place.primaryType?.replace(/_/g, " ")}
+            </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+            className="absolute top-3 right-3 bg-white/20 hover:bg-white/40 text-white"
             onClick={onClose}
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
-        
-        <ScrollArea className="max-h-[calc(90vh-200px)]">
-          <div className="p-6 space-y-4">
+
+        <ScrollArea className="max-h-[calc(90vh-144px)]">
+          <div className="p-5 space-y-4">
             <DialogHeader className="p-0">
-              <DialogTitle className="text-2xl" data-testid="place-details-title">
-                {fullPlace.displayName.text}
+              <DialogTitle className="text-xl leading-tight">
+                {place.displayName.text}
               </DialogTitle>
             </DialogHeader>
 
-            {fullPlace.rating && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star 
-                      key={i}
-                      className={`h-5 w-5 ${
-                        i < Math.round(fullPlace.rating!) 
-                          ? 'fill-amber-400 text-amber-400' 
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="font-medium">{fullPlace.rating.toFixed(1)}</span>
-                <span className="text-muted-foreground">
-                  ({fullPlace.userRatingCount || 0} reviews)
-                </span>
-              </div>
-            )}
-
-            {fullPlace.editorialSummary?.text && (
-              <p className="text-muted-foreground">
-                {fullPlace.editorialSummary.text}
+            {place.editorialSummary?.text && (
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {place.editorialSummary.text}
               </p>
             )}
 
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-emerald-600 mt-0.5" />
-                <span>{fullPlace.formattedAddress}</span>
+            <div className="space-y-3 pt-1">
+              <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                <MapPin className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-0.5">Address</p>
+                  <p className="text-sm">{place.formattedAddress}</p>
+                </div>
               </div>
 
-              {fullPlace.internationalPhoneNumber && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-emerald-600" />
-                  <a 
-                    href={`tel:${fullPlace.internationalPhoneNumber}`}
-                    className="text-emerald-600 hover:underline"
-                  >
-                    {fullPlace.internationalPhoneNumber}
-                  </a>
+              {place.internationalPhoneNumber && (
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <Phone className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-0.5">Phone</p>
+                    <a
+                      href={`tel:${place.internationalPhoneNumber}`}
+                      className="text-sm text-emerald-600 hover:underline font-medium"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {place.internationalPhoneNumber}
+                    </a>
+                  </div>
                 </div>
               )}
 
-              {fullPlace.websiteUri && (
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-emerald-600" />
-                  <a 
-                    href={fullPlace.websiteUri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-emerald-600 hover:underline truncate"
-                  >
-                    {fullPlace.websiteUri}
-                  </a>
+              {place.websiteUri && (
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <Globe className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-0.5">Website</p>
+                    <a
+                      href={place.websiteUri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-emerald-600 hover:underline truncate block"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {place.websiteUri.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                    </a>
+                  </div>
                 </div>
               )}
 
-              {fullPlace.currentOpeningHours?.weekdayDescriptions && (
-                <div className="flex items-start gap-3">
-                  <Clock className="h-5 w-5 text-emerald-600 mt-0.5" />
-                  <div className="text-sm space-y-1">
-                    {fullPlace.currentOpeningHours.weekdayDescriptions.map((day, i) => (
-                      <div key={i}>{day}</div>
-                    ))}
+              {place.currentOpeningHours?.weekdayDescriptions?.length && (
+                <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                  <Clock className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Hours</p>
+                    <div className="text-sm space-y-0.5">
+                      {place.currentOpeningHours.weekdayDescriptions.map((d, i) => (
+                        <p key={i} className="text-muted-foreground">{d}</p>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {false && fullPlace.reviews && fullPlace.reviews.length > 0 && (
-              <div className="pt-4 border-t">
-                <h4 className="font-semibold mb-3">Recent Reviews</h4>
-                <div className="space-y-4">
-                  {fullPlace.reviews.slice(0, 3).map((review, i) => (
-                    <div key={i} className="border-l-2 border-emerald-200 pl-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="flex">
-                          {Array.from({ length: 5 }).map((_, j) => (
-                            <Star 
-                              key={j}
-                              className={`h-3 w-3 ${
-                                j < review.rating 
-                                  ? 'fill-amber-400 text-amber-400' 
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-sm font-medium">
-                          {review.authorAttribution.displayName}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {review.relativePublishTimeDescription}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-3">
-                        {review.text.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-4 flex-wrap">
-              <Button 
+            <div className="flex gap-2 pt-2">
+              <Button
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 onClick={() => {
-                  const lat = fullPlace.location.latitude;
-                  const lon = fullPlace.location.longitude;
-                  window.open(
-                    `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=17`,
-                    '_blank'
-                  );
+                  const { latitude: lat, longitude: lon } = place.location;
+                  window.open(`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=17`, "_blank");
                 }}
-                data-testid="view-on-map-button"
               >
                 <Navigation className="h-4 w-4 mr-2" />
-                View on OpenStreetMap
+                Open in Map
               </Button>
-              {fullPlace.internationalPhoneNumber && (
-                <Button 
+              {place.internationalPhoneNumber && (
+                <Button
                   variant="outline"
-                  onClick={() => window.open(`tel:${fullPlace.internationalPhoneNumber}`, '_self')}
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  onClick={() => window.open(`tel:${place.internationalPhoneNumber}`, "_self")}
                 >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call
+                  <PhoneCall className="h-4 w-4" />
+                </Button>
+              )}
+              {place.websiteUri && (
+                <Button
+                  variant="outline"
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  onClick={() => window.open(place.websiteUri, "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4" />
                 </Button>
               )}
             </div>
@@ -322,7 +297,6 @@ export default function DiscoverAfrica() {
   const [selectedCountryCode, setSelectedCountryCode] = useState("NG");
   const [selectedCityName, setSelectedCityName] = useState<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const selectedCountry = africaLocations[selectedCountryCode];
   const selectedCity = useMemo(() => {
@@ -330,60 +304,31 @@ export default function DiscoverAfrica() {
     return selectedCountry.cities.find(c => c.name === selectedCityName) || selectedCountry.cities[0];
   }, [selectedCountry, selectedCityName]);
 
-  useEffect(() => {
-    setSelectedCityName(null);
-  }, [selectedCountryCode]);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.log("Geolocation not available:", error);
-        }
-      );
-    }
-  }, []);
-
-  const location = userLocation && selectedCityName === "near-me"
-    ? userLocation
-    : { lat: selectedCity.lat, lng: selectedCity.lng };
+  const activeCategoryMeta = PLACE_CATEGORIES.find(c => c.id === activeCategory);
 
   const { data: placesData, isLoading, error } = useQuery({
-    queryKey: ['/api/places/search', searchQuery, activeCategory, selectedCountryCode, selectedCity.name, userLocation?.lat],
+    queryKey: ["/api/places/search", searchQuery, activeCategory, selectedCountryCode, selectedCity.name],
     queryFn: async () => {
       if (!searchQuery && !activeCategory) return { places: [] };
-
-      const params = new URLSearchParams();
-      params.set('lat', location.lat.toString());
-      params.set('lng', location.lng.toString());
-      params.set('radius', '15000');
-      params.set('city', selectedCity.name);
-      params.set('country', selectedCountry.name);
-
-      if (activeCategory) {
-        params.set('type', activeCategory);
-      } else if (searchQuery) {
-        params.set('query', `${searchQuery} in ${selectedCity.name}, ${selectedCountry.name}`);
-      }
-
-      const response = await fetch(`/api/places/search?${params.toString()}`);
+      const params = new URLSearchParams({
+        lat: selectedCity.lat.toString(),
+        lng: selectedCity.lng.toString(),
+        radius: "15000",
+        city: selectedCity.name,
+        country: selectedCountry.name,
+      });
+      if (activeCategory) params.set("type", activeCategory);
+      else if (searchQuery) params.set("query", `${searchQuery} in ${selectedCity.name}, ${selectedCountry.name}`);
+      const response = await fetch(`/api/places/search?${params}`);
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || 'Failed to fetch places');
-      }
+      if (!response.ok) throw new Error(data?.error || data?.message || "Failed to fetch places");
       return data;
     },
     enabled: !!(searchQuery || activeCategory),
+    staleTime: 5 * 60 * 1000,
   });
 
   const places: Place[] = placesData?.places || [];
-  const searchWarning: string | undefined = placesData?.warning;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -391,220 +336,186 @@ export default function DiscoverAfrica() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
-      <div className="relative bg-gradient-to-br from-emerald-600 via-emerald-700 to-amber-600 text-white py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4" data-testid="discover-title">
-              Discover Africa
-            </h1>
-            <p className="text-xl text-white/90 mb-8">
-              Find hotels, malls, restaurants, and amazing places across {selectedCountry.name}
+
+      {/* Hero */}
+      <div className="bg-gradient-to-br from-emerald-700 via-emerald-600 to-amber-500 text-white">
+        <div className="container mx-auto px-4 py-12 max-w-4xl">
+          <div className="text-center mb-8">
+            <p className="text-emerald-200 text-sm font-medium uppercase tracking-widest mb-2">Explore the Continent</p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-3">Discover Africa</h1>
+            <p className="text-white/80 text-lg">
+              Hotels, restaurants, attractions and more across {selectedCountry.name}
             </p>
-            
-            <div className="flex justify-center gap-3 mb-6">
-              <Select
-                value={selectedCountryCode}
-                onValueChange={setSelectedCountryCode}
-              >
-                <SelectTrigger 
-                  className="w-[220px] bg-white/20 border-white/30 text-white"
-                  data-testid="country-selector"
-                >
-                  <SelectValue placeholder="Select a country" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[400px]">
-                  {africanRegions.map((region) => (
-                    <SelectGroup key={region}>
-                      <SelectLabel className="text-emerald-600 font-semibold">{region}</SelectLabel>
-                      {getCountriesByRegion(region).map((country) => (
-                        <SelectItem 
-                          key={country.code} 
-                          value={country.code}
-                          data-testid={`country-${country.code}`}
-                        >
-                          {country.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          </div>
 
-            <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                type="text"
-                placeholder={`Search for hotels, restaurants, malls in ${selectedCountry.name}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-4 py-6 text-lg text-gray-900 rounded-full shadow-xl"
-                data-testid="search-input"
-              />
-              <Button 
-                type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-emerald-600 hover:bg-emerald-700"
-                data-testid="search-button"
-              >
-                Search
-              </Button>
-            </form>
+          {/* Country Selector */}
+          <div className="flex justify-center mb-6">
+            <Select value={selectedCountryCode} onValueChange={(v) => { setSelectedCountryCode(v); setSelectedCityName(null); }}>
+              <SelectTrigger className="w-56 bg-white/15 border-white/30 text-white backdrop-blur-sm hover:bg-white/25 transition-colors">
+                <SelectValue placeholder="Select a country" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[380px]">
+                {africanRegions.map((region) => (
+                  <SelectGroup key={region}>
+                    <SelectLabel className="text-emerald-600 font-semibold text-xs uppercase tracking-wide">{region}</SelectLabel>
+                    {getCountriesByRegion(region).map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {selectedCountry.cities.map((city) => (
-                <Button
-                  key={city.name}
-                  variant={selectedCity.name === city.name && selectedCityName !== "near-me" ? "secondary" : "ghost"}
-                  size="sm"
-                  className={`rounded-full ${
-                    selectedCity.name === city.name && selectedCityName !== "near-me"
-                      ? 'bg-white text-emerald-700' 
-                      : 'text-white/90 hover:text-white hover:bg-white/20'
-                  }`}
-                  onClick={() => setSelectedCityName(city.name)}
-                  data-testid={`city-${city.name.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  {city.name}
-                </Button>
-              ))}
-              {userLocation && (
-                <Button
-                  variant={selectedCityName === "near-me" ? "secondary" : "ghost"}
-                  size="sm"
-                  className={`rounded-full ${
-                    selectedCityName === "near-me"
-                      ? 'bg-white text-emerald-700'
-                      : 'text-white/90 hover:text-white hover:bg-white/20'
-                  }`}
-                  onClick={() => setSelectedCityName("near-me")}
-                  data-testid="my-location-button"
-                >
-                  <Navigation className="h-4 w-4 mr-1" />
-                  Near Me
-                </Button>
-              )}
-            </div>
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder={`Search in ${selectedCountry.name}…`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-12 pr-28 py-6 text-base text-gray-900 rounded-full shadow-xl border-0"
+            />
+            <Button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-emerald-600 hover:bg-emerald-700 px-5"
+            >
+              Search
+            </Button>
+          </form>
+
+          {/* City Pills */}
+          <div className="flex flex-wrap justify-center gap-2">
+            {selectedCountry.cities.map((city) => (
+              <button
+                key={city.name}
+                onClick={() => setSelectedCityName(city.name)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  selectedCity.name === city.name
+                    ? "bg-white text-emerald-700 shadow-sm"
+                    : "bg-white/15 text-white/90 hover:bg-white/25"
+                }`}
+              >
+                {city.name}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Category Grid */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Browse by Category</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            {PLACE_CATEGORIES.map((category) => {
-              const Icon = category.icon;
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Browse by Category</h2>
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+            {PLACE_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = activeCategory === cat.id;
               return (
-                <Button
-                  key={category.id}
-                  variant={activeCategory === category.id ? "default" : "outline"}
-                  className={`flex flex-col h-24 gap-2 ${
-                    activeCategory === category.id 
-                      ? 'bg-emerald-600 hover:bg-emerald-700' 
-                      : ''
+                <button
+                  key={cat.id}
+                  onClick={() => { setActiveCategory(isActive ? null : cat.id); setSearchQuery(""); }}
+                  className={`flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl border-2 transition-all ${
+                    isActive
+                      ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                      : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"
                   }`}
-                  onClick={() => {
-                    setActiveCategory(category.id);
-                    setSearchQuery("");
-                  }}
-                  data-testid={`category-${category.id}`}
                 >
-                  <Icon className="h-6 w-6" />
-                  <span className="text-sm">{category.label}</span>
-                </Button>
+                  <span className="text-2xl">{cat.emoji}</span>
+                  <span className={`text-xs font-medium text-center leading-tight ${isActive ? "text-emerald-700" : "text-gray-600"}`}>
+                    {cat.label}
+                  </span>
+                </button>
               );
             })}
           </div>
         </div>
 
+        {/* Loading */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i}>
-                <Skeleton className="h-48 rounded-t-lg" />
-                <CardContent className="p-4 space-y-3">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {searchWarning && places.length === 0 && (searchQuery || activeCategory) && (
-          <div className="text-center py-12 max-w-lg mx-auto">
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-              <MapPin className="h-12 w-12 mx-auto text-amber-400 mb-3" />
-              <h3 className="font-semibold text-amber-800 mb-1">Location data temporarily unavailable</h3>
-              <p className="text-amber-700 text-sm">The map service is currently under high load. Please try again in a moment.</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="text-center py-12 max-w-lg mx-auto">
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-              <MapPin className="h-12 w-12 mx-auto text-amber-400 mb-3" />
-              <h3 className="font-semibold text-amber-800 mb-1">Location data temporarily unavailable</h3>
-              <p className="text-amber-700 text-sm">The map service is under high load. Please try again in a moment.</p>
-              <p className="text-gray-500 text-xs mt-2">Powered by OpenStreetMap contributors</p>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !error && places.length === 0 && (searchQuery || activeCategory) && (
-          <div className="text-center py-12">
-            <Building2 className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No places found</h3>
-            <p className="text-muted-foreground">
-              Try searching for something else or selecting a different category
-            </p>
-          </div>
-        )}
-
-        {!isLoading && !error && places.length === 0 && !searchQuery && !activeCategory && (
-          <div className="text-center py-12">
-            <MapPin className="h-16 w-16 mx-auto text-emerald-600/30 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Explore {selectedCountry.name}</h3>
-            <p className="text-muted-foreground">
-              Select a category above or search to discover amazing places
-            </p>
-          </div>
-        )}
-
-        {!isLoading && places.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                {activeCategory 
-                  ? `${PLACE_CATEGORIES.find(c => c.id === activeCategory)?.label} in ${selectedCity.name}, ${selectedCountry.name}`
-                  : `Results in ${selectedCity.name}, ${selectedCountry.name}`
-                }
-              </h2>
-              <Badge variant="secondary">{places.length} places</Badge>
+            <div className="flex items-center gap-2 mb-4">
+              <Skeleton className="h-6 w-48" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden border-0 shadow-md">
+                  <Skeleton className="h-36 w-full" />
+                  <CardContent className="p-4 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {(error || placesData?.warning) && !isLoading && (
+          <div className="text-center py-16 max-w-sm mx-auto">
+            <div className="text-5xl mb-4">🗺️</div>
+            <h3 className="font-semibold text-lg mb-2">Map service temporarily unavailable</h3>
+            <p className="text-muted-foreground text-sm">
+              The location service is under high load. Please try again in a moment.
+            </p>
+          </div>
+        )}
+
+        {/* No results */}
+        {!isLoading && !error && places.length === 0 && (searchQuery || activeCategory) && !placesData?.warning && (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">🔍</div>
+            <h3 className="text-lg font-semibold mb-2">No places found</h3>
+            <p className="text-muted-foreground text-sm">
+              Try a different city, category, or search term.
+            </p>
+          </div>
+        )}
+
+        {/* Initial empty state */}
+        {!isLoading && !error && places.length === 0 && !searchQuery && !activeCategory && (
+          <div className="text-center py-16 max-w-sm mx-auto">
+            <div className="text-6xl mb-4">🌍</div>
+            <h3 className="text-xl font-semibold mb-2">Explore {selectedCountry.name}</h3>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Pick a category above or type in the search bar to find hotels, restaurants, malls and more.
+            </p>
+          </div>
+        )}
+
+        {/* Results */}
+        {!isLoading && !error && places.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {activeCategoryMeta
+                    ? `${activeCategoryMeta.label} in ${selectedCity.name}`
+                    : `Results in ${selectedCity.name}`}
+                </h2>
+                <p className="text-sm text-muted-foreground">{selectedCountry.name}</p>
+              </div>
+              <Badge variant="secondary" className="text-sm px-3 py-1">
+                {places.length} {places.length === 1 ? "place" : "places"}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {places.map((place) => (
-                <PlaceCard 
-                  key={place.id} 
-                  place={place} 
-                  onClick={() => setSelectedPlace(place)}
-                />
+                <PlaceCard key={place.id} place={place} onClick={() => setSelectedPlace(place)} />
               ))}
             </div>
           </div>
         )}
       </div>
 
-      <PlaceDetailsDialog 
-        place={selectedPlace}
-        open={!!selectedPlace}
-        onClose={() => setSelectedPlace(null)}
-      />
+      <PlaceDetailsDialog place={selectedPlace} open={!!selectedPlace} onClose={() => setSelectedPlace(null)} />
     </div>
   );
 }
