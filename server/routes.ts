@@ -2927,50 +2927,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (type && OSM_CATEGORY_TAGS[type as string]) {
-        // Category search: Nominatim viewbox (primary, no rate-limit issues) → Overpass (supplement if Nominatim < 5 results)
+        // Category search: Nominatim viewbox only — Overpass removed (too unreliable / rate-limited)
         if (!lat || !lng || isNaN(latNum) || isNaN(lngNum)) {
           return res.status(400).json({ message: 'lat/lng required for category search' });
         }
         const category = PLACE_CATEGORY_LABELS[type as string] || (type as string).replace(/_/g, ' ');
 
-        // Step 1: Nominatim viewbox search (primary — fast, reliable, no strict rate limit per IP)
         try {
           places = await nominatimCategorySearch(type as string, latNum, lngNum, radiusNum);
         } catch (nomErr: any) {
-          console.warn('Nominatim primary failed:', nomErr.message);
+          console.warn('Nominatim category search failed:', nomErr.message);
           places = [];
         }
 
-        // Step 2: If Nominatim returned few results, try Overpass to supplement
-        if (places.length < 5) {
-          try {
-            const tags = OSM_CATEGORY_TAGS[type as string];
-            const ql = buildOverpassQuery(tags, latNum, lngNum, radiusNum);
-            const elements = await overpassQuery(ql);
-            const overpassPlaces = elements
-              .map(el => osmToPlace(el, city as string, country as string))
-              .filter(Boolean);
-            // Merge, de-duping by approximate location
-            const seen = new Set(places.map((p: any) => `${p.location.latitude.toFixed(3)},${p.location.longitude.toFixed(3)}`));
-            for (const op of overpassPlaces) {
-              const key = `${(op as any).location.latitude.toFixed(3)},${(op as any).location.longitude.toFixed(3)}`;
-              if (!seen.has(key)) { places.push(op); seen.add(key); }
-            }
-          } catch (overpassError: any) {
-            // Overpass failed (likely 429) — Nominatim results are sufficient
-            console.warn('Overpass supplement failed (using Nominatim only):', overpassError.message);
-          }
-        }
-
-        // Cap results
-        places = places.slice(0, 35);
-
-        // Step 3: Last-resort text search if still empty
+        // Fallback: plain text search if viewbox search returned nothing
         if (places.length === 0) {
           try {
             places = await nominatimSearch(`${category} in ${city || ''} ${country || ''}`.trim());
           } catch { places = []; }
         }
+
+        places = places.slice(0, 35);
       } else if (query) {
         // Free-text search via Nominatim
         places = await nominatimSearch(query as string);
