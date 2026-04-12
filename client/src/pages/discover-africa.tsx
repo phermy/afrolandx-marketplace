@@ -103,6 +103,28 @@ function formatShortAddress(full: string): string {
   return parts.length <= 2 ? full : parts.slice(0, 3).join(", ");
 }
 
+// Unique gradient per card based on place name hash
+const CARD_GRADIENTS = [
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-violet-500 to-purple-600",
+  "from-sky-500 to-blue-600",
+  "from-rose-500 to-pink-600",
+  "from-lime-500 to-green-600",
+  "from-cyan-500 to-teal-600",
+  "from-fuchsia-500 to-purple-600",
+  "from-orange-400 to-red-500",
+  "from-indigo-500 to-violet-600",
+  "from-teal-400 to-emerald-600",
+  "from-yellow-500 to-amber-600",
+];
+
+function getCardGradient(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return CARD_GRADIENTS[h % CARD_GRADIENTS.length];
+}
+
 function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; open: boolean; onClose: () => void }) {
   if (!place) return null;
   const emoji = getPlaceEmoji(place.primaryType);
@@ -450,16 +472,20 @@ export default function DiscoverAfrica() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {places.map((place) => {
                   const emoji = getPlaceEmoji(place.primaryType);
+                  const gradient = getCardGradient(place.id);
                   return (
                     <Card key={place.id} className="cursor-pointer hover:shadow-xl transition-all hover:-translate-y-1 overflow-hidden border-0 shadow-md group" onClick={() => openPlace(place)}>
-                      <div className="h-32 bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center relative">
-                        <span className="text-5xl">{emoji}</span>
-                        <Badge className="absolute top-2 left-2 bg-white/20 text-white border-white/30 text-xs backdrop-blur-sm">
-                          {place.primaryType?.replace(/_/g, " ") || "Place"}
-                        </Badge>
+                      <div className={`h-36 bg-gradient-to-br ${gradient} flex flex-col items-center justify-center relative gap-1`}>
+                        <span className="text-5xl drop-shadow-sm">{emoji}</span>
+                        <span className="text-white/80 text-xs font-medium capitalize">{place.primaryType?.replace(/_/g, " ") || "Place"}</span>
                         {place.currentOpeningHours?.weekdayDescriptions?.length && (
                           <Badge className="absolute top-2 right-2 bg-green-500/90 text-white border-0 text-xs">
-                            <Clock className="h-3 w-3 mr-1" />Hours
+                            Hours available
+                          </Badge>
+                        )}
+                        {place.websiteUri && (
+                          <Badge className="absolute top-2 left-2 bg-white/20 text-white border-white/30 text-xs backdrop-blur-sm">
+                            <Globe className="h-2.5 w-2.5 mr-1" />Online
                           </Badge>
                         )}
                       </div>
@@ -468,6 +494,14 @@ export default function DiscoverAfrica() {
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-1 flex items-center gap-1">
                           <MapPin className="h-3 w-3 text-emerald-500 flex-shrink-0" />{formatShortAddress(place.formattedAddress)}
                         </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          {place.internationalPhoneNumber && (
+                            <span className="text-xs text-emerald-600 flex items-center gap-1"><Phone className="h-3 w-3" />Call</span>
+                          )}
+                          {place.websiteUri && (
+                            <span className="text-xs text-emerald-600 flex items-center gap-1"><Globe className="h-3 w-3" />Web</span>
+                          )}
+                        </div>
                         {place.editorialSummary?.text && (
                           <p className="text-xs text-muted-foreground mt-2 line-clamp-2 italic">{place.editorialSummary.text}</p>
                         )}
