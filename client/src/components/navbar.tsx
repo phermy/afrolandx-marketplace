@@ -100,6 +100,9 @@ export default function Navbar() {
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
               <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
+              {isAuthenticated && (
+                <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
+              )}
               {isAuthenticated && isVendor(user) && (
                 <Link href="/vendor" className={navLinkClass('/vendor')}>Vendor</Link>
               )}
@@ -253,11 +256,13 @@ export default function Navbar() {
             <Link href="/discover" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
             </Link>
-            <Link href="/lookbook" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/lookbook')}><BookOpen className="w-5 h-5" /><span>Lookbook Studio</span></div>
-            </Link>
 
             {/* Account Section - only if logged in */}
+            {isAuthenticated && user && (
+              <Link href="/lookbook" onClick={closeMobileMenu}>
+                <div className={mobileNavLinkClass('/lookbook')}><BookOpen className="w-5 h-5" /><span>Lookbook Studio</span></div>
+              </Link>
+            )}
             {isAuthenticated && user && (
               <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">My Account</p>

@@ -52,6 +52,7 @@ function Router() {
           <Route path="/collab-drops" component={CollabDrops} />
           <Route path="/events" component={EventPlanner} />
           <Route path="/discover" component={DiscoverAfrica} />
+          <Route path="/lookbook" component={Lookbook} />
           <Route path="/admin">
             <AdminProtectedRoute>
               <AdminDashboard />
