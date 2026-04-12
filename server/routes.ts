@@ -1934,13 +1934,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let bundleItems: any[] = [];
       try {
-        const aiResponse = await chatbotService.chat([{ role: 'user', content: prompt }]);
+        const aiResponse = await chatbotService.generateResponse([{ role: 'user', content: prompt }]);
         const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           bundleItems = JSON.parse(jsonMatch[0]);
         }
       } catch (e) {
-        // Fallback to random selection if AI fails
+        console.error('AI lookbook generation failed, using fallback:', e);
+      }
+
+      // Fallback: pick first 4 products if AI returned nothing
+      if (bundleItems.length === 0) {
         bundleItems = allProducts.slice(0, 4).map(p => ({ productId: p.id, reason: 'Recommended for you' }));
       }
       
