@@ -2750,7 +2750,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Alternative Overpass endpoints for load balancing / fallback
+  // lz4 mirror is often less congested; kumi and private.coffee as additional fallbacks
   const OVERPASS_ENDPOINTS = [
+    'https://lz4.overpass-api.de/api/interpreter',
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
@@ -2768,7 +2770,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     for (const endpoint of OVERPASS_ENDPOINTS) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
+        // 30s fetch timeout — QL already sets [timeout:25] so server-side deadline is shorter
+        const timer = setTimeout(() => controller.abort(), 30000);
         const resp = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2776,10 +2779,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           signal: controller.signal,
         });
         clearTimeout(timer);
-        if (resp.status === 429) {
+        if (resp.status === 429 || resp.status === 504) {
           rateLimitCount++;
           lastError = new OverpassRateLimitError();
-          continue; // try next endpoint immediately
+          continue; // skip this endpoint, try next immediately
         }
         if (!resp.ok) {
           lastError = new Error(`Overpass ${resp.status} at ${endpoint}`);
@@ -2793,7 +2796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn(`Overpass endpoint failed (${endpoint}):`, e.message);
       }
     }
-    if (rateLimitCount === OVERPASS_ENDPOINTS.length) throw new OverpassRateLimitError();
+    if (rateLimitCount > 0) throw new OverpassRateLimitError();
     throw lastError;
   }
 
@@ -2863,14 +2866,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Build Overpass QL for a category within radius
   function buildOverpassQuery(tags: string[], lat: number, lon: number, radius: number): string {
+    // Cap radius at 5 km — smaller queries are faster and less likely to be rate-limited
+    const r = Math.min(radius, 5000);
     const parts = tags.flatMap(tag => {
       const [k, v] = tag.split('=');
       return [
-        `node["${k}"="${v}"](around:${radius},${lat},${lon});`,
-        `way["${k}"="${v}"](around:${radius},${lat},${lon});`,
+        `node["${k}"="${v}"](around:${r},${lat},${lon});`,
+        `way["${k}"="${v}"](around:${r},${lat},${lon});`,
       ];
     });
-    return `[out:json][timeout:30];\n(\n${parts.join('\n')}\n);\nout body center;`;
+    // timeout:25 gives the server a hard deadline well within our 30s fetch window
+    // out tags center — returns only OSM tags + centroid (much smaller payload than out body)
+    return `[out:json][timeout:25];\n(\n${parts.join('\n')}\n);\nout tags center;`;
   }
   
   // Search for places across Africa using OpenStreetMap (Overpass + Nominatim) — free, no API key
