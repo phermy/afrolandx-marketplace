@@ -230,7 +230,7 @@ export default function DiscoverAfrica() {
 
   const mapCenter: [number, number] = [selectedCity.lat, selectedCity.lng];
 
-  const { data: placesData, isLoading } = useQuery({
+  const { data: placesData, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/places/search", searchQuery, activeCategory, selectedCountryCode, selectedCity.name],
     queryFn: async () => {
       if (!searchQuery && !activeCategory) return { places: [] };
@@ -249,7 +249,8 @@ export default function DiscoverAfrica() {
       return data;
     },
     enabled: !!(searchQuery || activeCategory),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
   });
 
   const places: Place[] = placesData?.places || [];
@@ -346,8 +347,24 @@ export default function DiscoverAfrica() {
       {/* Main Content */}
       <div className="flex-1 container mx-auto px-4 py-5 max-w-7xl">
 
+        {/* Error state */}
+        {hasSearch && isError && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 max-w-sm w-full">
+              <span className="text-4xl mb-4 block">🔍</span>
+              <h3 className="font-semibold text-gray-800 mb-2">Could not load places</h3>
+              <p className="text-sm text-amber-700 mb-5">
+                The map service is temporarily busy. Please try again in a moment.
+              </p>
+              <Button onClick={() => refetch()} className="bg-emerald-600 hover:bg-emerald-700 w-full">
+                Try Again
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* View toggle when there are results */}
-        {hasSearch && (
+        {hasSearch && !isError && (
           <div className="flex items-center justify-between mb-4">
             <div>
               {isLoading ? (
@@ -378,7 +395,7 @@ export default function DiscoverAfrica() {
         )}
 
         {/* Map + Results split */}
-        {hasSearch && viewMode === "map" && (
+        {hasSearch && !isError && viewMode === "map" && (
           <div className="flex flex-col lg:flex-row gap-4" style={{ height: "calc(100vh - 360px)", minHeight: "500px" }}>
 
             {/* Map */}
@@ -454,7 +471,7 @@ export default function DiscoverAfrica() {
         )}
 
         {/* List view */}
-        {hasSearch && viewMode === "list" && (
+        {hasSearch && !isError && viewMode === "list" && (
           <>
             {isLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
