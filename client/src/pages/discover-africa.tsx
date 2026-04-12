@@ -60,30 +60,49 @@ interface Place {
 }
 
 const PLACE_CATEGORIES = [
-  { id: "hotel",            label: "Hotels",       icon: Hotel,       emoji: "🏨", color: "from-blue-500 to-indigo-600",    light: "bg-blue-50 text-blue-700 border-blue-200" },
-  { id: "shopping_mall",   label: "Malls",        icon: ShoppingBag, emoji: "🛍️", color: "from-pink-500 to-rose-600",      light: "bg-pink-50 text-pink-700 border-pink-200" },
-  { id: "restaurant",      label: "Restaurants",  icon: Utensils,    emoji: "🍽️", color: "from-orange-500 to-amber-600",   light: "bg-orange-50 text-orange-700 border-orange-200" },
-  { id: "tourist_attraction", label: "Attractions", icon: Landmark,  emoji: "🏛️", color: "from-emerald-500 to-teal-600",  light: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  { id: "airport",         label: "Airports",     icon: Plane,       emoji: "✈️", color: "from-sky-500 to-cyan-600",       light: "bg-sky-50 text-sky-700 border-sky-200" },
-  { id: "car_rental",      label: "Car Rentals",  icon: Car,         emoji: "🚗", color: "from-slate-500 to-gray-600",     light: "bg-slate-50 text-slate-700 border-slate-200" },
-  { id: "cafe",            label: "Cafes",        icon: Coffee,      emoji: "☕", color: "from-yellow-600 to-amber-700",   light: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  { id: "night_club",      label: "Nightlife",    icon: Music,       emoji: "🎵", color: "from-purple-500 to-violet-600",  light: "bg-purple-50 text-purple-700 border-purple-200" },
+  { id: "hotel",            label: "Hotels",       icon: Hotel,       emoji: "🏨" },
+  { id: "shopping_mall",   label: "Malls",        icon: ShoppingBag, emoji: "🛍️" },
+  { id: "restaurant",      label: "Restaurants",  icon: Utensils,    emoji: "🍽️" },
+  { id: "tourist_attraction", label: "Attractions", icon: Landmark,  emoji: "🏛️" },
+  { id: "airport",         label: "Airports",     icon: Plane,       emoji: "✈️" },
+  { id: "car_rental",      label: "Car Rentals",  icon: Car,         emoji: "🚗" },
+  { id: "cafe",            label: "Cafes",        icon: Coffee,      emoji: "☕" },
+  { id: "night_club",      label: "Nightlife",    icon: Music,       emoji: "🎵" },
 ];
 
-const TYPE_TO_CATEGORY: Record<string, string> = {
-  hotel: "hotel", hostel: "hotel", motel: "hotel", guest_house: "hotel",
-  mall: "shopping_mall", supermarket: "shopping_mall", department_store: "shopping_mall", marketplace: "shopping_mall",
-  restaurant: "restaurant", fast_food: "restaurant", food_court: "restaurant",
-  attraction: "tourist_attraction", museum: "tourist_attraction", theme_park: "tourist_attraction", monument: "tourist_attraction", ruins: "tourist_attraction",
-  aerodrome: "airport",
-  car_rental: "car_rental",
-  cafe: "cafe",
-  nightclub: "night_club", bar: "night_club", pub: "night_club",
+const SUBTYPE_EMOJI: Record<string, string> = {
+  hotel: "🏨", hostel: "🛏️", motel: "🏩", guest_house: "🏠",
+  mall: "🛍️", supermarket: "🛒", department_store: "🏬", marketplace: "🏪",
+  restaurant: "🍽️", fast_food: "🍔", food_court: "🍱",
+  attraction: "🏛️", museum: "🏛️", theme_park: "🎡", monument: "🗿", ruins: "🏚️",
+  aerodrome: "✈️",
+  car_rental: "🚗",
+  cafe: "☕",
+  nightclub: "🎵", bar: "🍺", pub: "🍺",
 };
 
-function getCategoryMeta(primaryType?: string) {
-  const categoryId = TYPE_TO_CATEGORY[primaryType || ""] || "";
-  return PLACE_CATEGORIES.find(c => c.id === categoryId) || PLACE_CATEGORIES[0];
+const CARD_GRADIENTS = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-600",
+  "from-purple-500 to-violet-600",
+  "from-pink-500 to-rose-600",
+  "from-sky-500 to-cyan-600",
+  "from-yellow-600 to-orange-600",
+  "from-teal-500 to-emerald-700",
+  "from-indigo-500 to-blue-700",
+  "from-rose-500 to-pink-600",
+  "from-amber-500 to-yellow-600",
+  "from-cyan-500 to-sky-600",
+];
+
+function getCardGradient(id: string): string {
+  const hash = id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return CARD_GRADIENTS[hash % CARD_GRADIENTS.length];
+}
+
+function getPlaceEmoji(primaryType?: string): string {
+  return SUBTYPE_EMOJI[primaryType || ""] || "📍";
 }
 
 function formatShortAddress(full: string): string {
@@ -93,7 +112,8 @@ function formatShortAddress(full: string): string {
 }
 
 function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
-  const meta = getCategoryMeta(place.primaryType);
+  const gradient = getCardGradient(place.id);
+  const emoji = getPlaceEmoji(place.primaryType);
   const hasContact = !!(place.internationalPhoneNumber || place.websiteUri);
   const hasHours = !!(place.currentOpeningHours?.weekdayDescriptions?.length);
   const shortAddress = formatShortAddress(place.formattedAddress);
@@ -103,9 +123,9 @@ function PlaceCard({ place, onClick }: { place: Place; onClick: () => void }) {
       className="cursor-pointer hover:shadow-xl transition-all hover:-translate-y-1 group overflow-hidden border-0 shadow-md"
       onClick={onClick}
     >
-      <div className={`relative h-36 bg-gradient-to-br ${meta.color} flex items-center justify-center`}>
+      <div className={`relative h-36 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
         <div className="text-center">
-          <span className="text-5xl drop-shadow-md">{meta.emoji}</span>
+          <span className="text-5xl drop-shadow-md">{emoji}</span>
         </div>
         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors" />
         <Badge className="absolute top-3 left-3 bg-white/20 backdrop-blur-sm text-white border-white/30 text-xs">
@@ -160,14 +180,15 @@ function PlaceDetailsDialog({
   onClose: () => void;
 }) {
   if (!place) return null;
-  const meta = getCategoryMeta(place.primaryType);
+  const gradient = getCardGradient(place.id);
+  const emoji = getPlaceEmoji(place.primaryType);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden p-0 rounded-2xl">
-        <div className={`relative h-36 bg-gradient-to-br ${meta.color} flex items-center justify-center`}>
+        <div className={`relative h-36 bg-gradient-to-br ${gradient} flex items-center justify-center`}>
           <div className="text-center">
-            <span className="text-6xl drop-shadow-lg">{meta.emoji}</span>
+            <span className="text-6xl drop-shadow-lg">{emoji}</span>
             <p className="text-white/90 font-medium mt-1 capitalize text-sm">
               {place.primaryType?.replace(/_/g, " ")}
             </p>
