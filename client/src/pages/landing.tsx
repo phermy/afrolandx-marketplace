@@ -127,9 +127,6 @@ export default function Landing() {
 
             {/* Right actions */}
             <div className="flex items-center space-x-2">
-              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden sm:flex border-green-700 text-green-700 hover:bg-green-50">
-                Sign In
-              </Button>
               <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
                 Sign Up
               </Button>
