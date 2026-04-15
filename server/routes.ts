@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -157,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const { firstName, lastName } = req.body;
       
       const updatedUser = await storage.updateUserProfile(userId, { firstName, lastName });
@@ -181,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin check middleware
   const isAdmin = async (req: any, res: any, next: any) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const user = await storage.getUser(userId);
       
       if (!hasRole(user, 'admin')) {
@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor check middleware
   const isVendor = async (req: any, res: any, next: any) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const user = await storage.getUser(userId);
       const vendor = await storage.getVendorByUserId(userId);
       
@@ -328,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor routes
   app.post('/api/vendors', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const vendorData = insertVendorSchema.parse({
         ...req.body,
         userId,
@@ -360,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/vendors/me', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
       res.json(vendor);
     } catch (error) {
@@ -651,7 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart routes
   app.post('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const cartItemData = insertCartItemSchema.parse({
         ...req.body,
         userId,
@@ -671,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const cartItems = await storage.getCartItems(userId);
       res.json(cartItems);
     } catch (error) {
@@ -703,7 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       await storage.clearCart(userId);
       res.json({ message: 'Cart cleared' });
     } catch (error) {
@@ -764,7 +764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Paystack payment
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const { totalAmount, shippingAmount, shippingAddress, shippingMethod } = req.body;
 
       if (!isPaystackInitialized()) {
@@ -842,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
     try {
       const { reference } = req.body;
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured' });
@@ -1034,7 +1034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const { status } = req.body;
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
 
       // Verify vendor owns products in this order
       const order = await storage.getOrder(orderId);
@@ -1100,7 +1100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const orderData = insertOrderSchema.parse({
         ...req.body,
         userId,
@@ -1191,7 +1191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/orders/my-orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const orders = await storage.getOrdersForUser(userId);
       res.json(orders);
     } catch (error) {
@@ -1201,7 +1201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const orders = await storage.getOrdersForUser(userId);
       res.json(orders);
     } catch (error) {
@@ -1228,7 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
     try {
       const { reference } = req.body;
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured' });
@@ -1325,7 +1325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const notifications = await storage.getUserNotifications(userId);
       res.json(notifications);
     } catch (error) {
@@ -1347,7 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer: Submit measurements to a vendor
   app.post('/api/measurements', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const measurementData = insertMeasurementSchema.parse({
         ...req.body,
         userId,
@@ -1382,7 +1382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer: Get their own measurements
   app.get('/api/measurements', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const measurements = await storage.getUserMeasurements(userId);
       res.json(measurements);
     } catch (error) {
@@ -1394,7 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get specific measurement
   app.get('/api/measurements/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const measurementId = parseInt(req.params.id);
       const measurement = await storage.getMeasurement(measurementId);
 
@@ -1418,7 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer: Delete their measurement
   app.delete('/api/measurements/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const measurementId = parseInt(req.params.id);
       const measurement = await storage.getMeasurement(measurementId);
 
@@ -1441,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor: Get all measurements sent to them
   app.get('/api/vendors/measurements', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
 
       if (!vendor) {
@@ -1475,7 +1475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor: Update measurement status
   app.patch('/api/vendors/measurements/:id/status', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const measurementId = parseInt(req.params.id);
       const { status } = req.body;
 
@@ -1537,7 +1537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor order tracking - simplified implementation using storage methods
   app.get('/api/vendors/orders', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
       
       if (!vendor) {
@@ -1665,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification routes
   app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       const notifications = await storage.getUserNotifications(userId);
       res.json(notifications);
     } catch (error) {
@@ -1689,7 +1689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/notifications/:id', isAuthenticated, async (req: any, res) => {
     try {
       const notificationId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = (req.user as any)?.id;
       
       // Verify notification belongs to user for security
       await storage.dismissNotification(notificationId, userId);
