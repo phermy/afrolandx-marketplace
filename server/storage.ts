@@ -89,6 +89,10 @@ export interface IStorage {
   removeUserRole(userId: string, role: string): Promise<void>;
   updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
+  updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
+  verifyUserEmail(userId: string): Promise<void>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   
   // Vendor operations
   createVendor(vendor: InsertVendor): Promise<Vendor>;
@@ -293,6 +297,22 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void> {
+    await db.update(users).set({ emailOtp: otp, emailOtpExpiry: expiry, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void> {
+    await db.update(users).set({ passwordResetOtp: otp, passwordResetOtpExpiry: expiry, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async verifyUserEmail(userId: string): Promise<void> {
+    await db.update(users).set({ emailVerified: true, emailOtp: null, emailOtpExpiry: null, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword, passwordResetOtp: null, passwordResetOtpExpiry: null, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 
   // Vendor operations

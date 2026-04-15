@@ -26,6 +26,7 @@ import Quiz from "@/pages/quiz";
 import DiscoverAfrica from "@/pages/discover-africa";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import ForgotPassword from "@/pages/forgot-password";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
@@ -48,6 +49,7 @@ function Router() {
           <Route path="/" component={Landing} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
+          <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/products" component={Products} />
           <Route path="/collab-drops" component={CollabDrops} />
           <Route path="/events" component={EventPlanner} />

@@ -34,6 +34,11 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   roles: jsonb("roles").default(["customer"]), // array of roles: customer, vendor, admin
+  emailVerified: boolean("email_verified").default(false),
+  emailOtp: varchar("email_otp"),
+  emailOtpExpiry: timestamp("email_otp_expiry"),
+  passwordResetOtp: varchar("password_reset_otp"),
+  passwordResetOtpExpiry: timestamp("password_reset_otp_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

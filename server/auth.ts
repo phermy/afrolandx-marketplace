@@ -6,6 +6,7 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import crypto from "crypto";
+import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail } from "./email";
 
 export function getSession() {
   if (!process.env.SESSION_SECRET) {
@@ -88,7 +89,10 @@ export async function setupAuth(app: Express) {
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
-        return res.status(400).json({ message: "Email already registered" });
+        return res.status(409).json({ 
+          message: "This email is already registered",
+          hint: "sign_in"
+        });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -108,11 +112,22 @@ export async function setupAuth(app: Express) {
         return res.status(500).json({ message: "User creation failed" });
       }
 
+      // Send verification email (non-blocking)
+      const otp = generateOtp();
+      const expiry = otpExpiryTime();
+      await storage.updateEmailOtp(userId, otp, expiry);
+      sendVerificationEmail(email, firstName || "there", otp).catch(err =>
+        console.error("Failed to send verification email:", err)
+      );
+
       req.login(user, (err) => {
         if (err) {
           return res.status(500).json({ message: "Login failed after registration" });
         }
-        return res.json({ user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
+        return res.json({ 
+          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles },
+          emailVerificationSent: true
+        });
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -158,10 +173,137 @@ export async function setupAuth(app: Express) {
         firstName: user.firstName, 
         lastName: user.lastName, 
         roles: user.roles,
-        profileImageUrl: user.profileImageUrl
+        profileImageUrl: user.profileImageUrl,
+        emailVerified: user.emailVerified
       });
     }
     return res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // Verify email with OTP
+  app.post("/api/verify-email", async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) {
+        return res.status(400).json({ message: "Email and OTP are required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.json({ message: "Email already verified" });
+      }
+
+      if (!user.emailOtp || user.emailOtp !== otp) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      if (!user.emailOtpExpiry || new Date() > user.emailOtpExpiry) {
+        return res.status(400).json({ message: "Verification code has expired. Please request a new one." });
+      }
+
+      await storage.verifyUserEmail(user.id);
+      return res.json({ message: "Email verified successfully" });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      return res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  // Resend email verification OTP
+  app.post("/api/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.json({ message: "Email is already verified" });
+      }
+
+      const otp = generateOtp();
+      const expiry = otpExpiryTime();
+      await storage.updateEmailOtp(user.id, otp, expiry);
+      await sendVerificationEmail(email, user.firstName || "there", otp);
+
+      return res.json({ message: "Verification code sent to your email" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      return res.status(500).json({ message: "Failed to resend verification code" });
+    }
+  });
+
+  // Forgot password — sends OTP to email
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      // Always respond success to avoid leaking registered emails
+      if (!user) {
+        return res.json({ message: "If that email is registered, you'll receive a reset code shortly." });
+      }
+
+      const otp = generateOtp();
+      const expiry = otpExpiryTime();
+      await storage.updatePasswordResetOtp(user.id, otp, expiry);
+      sendPasswordResetEmail(email, user.firstName || "there", otp).catch(err =>
+        console.error("Failed to send password reset email:", err)
+      );
+
+      return res.json({ message: "If that email is registered, you'll receive a reset code shortly." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      return res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  // Reset password with OTP
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { email, otp, newPassword } = req.body;
+
+      if (!email || !otp || !newPassword) {
+        return res.status(400).json({ message: "Email, code, and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset code" });
+      }
+
+      if (!user.passwordResetOtp || user.passwordResetOtp !== otp) {
+        return res.status(400).json({ message: "Invalid reset code" });
+      }
+
+      if (!user.passwordResetOtpExpiry || new Date() > user.passwordResetOtpExpiry) {
+        return res.status(400).json({ message: "Reset code has expired. Please request a new one." });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      return res.json({ message: "Password reset successfully. You can now sign in." });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      return res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 }
 
