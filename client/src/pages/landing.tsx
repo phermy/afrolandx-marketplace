@@ -171,12 +171,9 @@ export default function Landing() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>
               </a>
-              <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
+              <div className="pt-4 border-t border-gray-200 mt-4">
                 <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
                   Sign Up — Create Account
-                </Button>
-                <Button onClick={() => { handleLogin(); setIsMobileMenuOpen(false); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
-                  Sign In
                 </Button>
               </div>
             </div>
@@ -230,13 +227,6 @@ export default function Landing() {
                 className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
               >
                 Create Free Account
-              </Button>
-              <Button 
-                onClick={handleLogin}
-                size="lg" 
-                className="bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 font-semibold border-2 border-white/50 text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
-              >
-                Sign In
               </Button>
               <Button 
                 size="lg" 
