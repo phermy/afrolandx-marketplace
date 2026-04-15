@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,14 +99,13 @@ export default function LookbookPage() {
     });
   };
 
-  if (!user) {
-    return (
-      <div className="container mx-auto py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">Sign in to access the Lookbook Studio</h1>
-        <p className="text-muted-foreground">Create personalized outfit recommendations for any occasion.</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!user) {
+      window.location.href = "/login";
+    }
+  }, [user]);
+
+  if (!user) return null;
 
   return (
     <div className="container mx-auto py-8 px-4">
