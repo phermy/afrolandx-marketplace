@@ -39,6 +39,8 @@ export const users = pgTable("users", {
   emailOtpExpiry: timestamp("email_otp_expiry"),
   passwordResetOtp: varchar("password_reset_otp"),
   passwordResetOtpExpiry: timestamp("password_reset_otp_expiry"),
+  loginOtp: varchar("login_otp"),
+  loginOtpExpiry: timestamp("login_otp_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -66,6 +66,33 @@ export async function sendVerificationEmail(email: string, firstName: string, ot
   await sendEmail(email, subject, html);
 }
 
+export async function sendLoginOtpEmail(email: string, firstName: string, otp: string): Promise<void> {
+  const subject = `Your ${APP_NAME} sign-in code`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 40px 20px;">
+      <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #1a5c2a; font-size: 28px; margin: 0;">Afrolandx</h1>
+          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Authentic African Fashion</p>
+        </div>
+        <h2 style="color: #1a5c2a; font-size: 22px; margin-bottom: 8px;">Your Sign-In Code 🔑</h2>
+        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
+          Hi ${firstName}, use the code below to sign in to your Afrolandx account.
+        </p>
+        <div style="background: #f0f9f0; border: 2px dashed #4caf50; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #888; font-size: 14px; margin: 0 0 8px;">Your sign-in code</p>
+          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a5c2a;">${otp}</div>
+          <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 15 minutes</p>
+        </div>
+        <p style="color: #888; font-size: 13px; line-height: 1.5;">
+          If you didn't request this code, you can safely ignore this email. Someone may have entered your email address by mistake.
+        </p>
+      </div>
+    </div>
+  `;
+  await sendEmail(email, subject, html);
+}
+
 export async function sendPasswordResetEmail(email: string, firstName: string, otp: string): Promise<void> {
   const subject = `Reset your ${APP_NAME} password`;
   const html = `

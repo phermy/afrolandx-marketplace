@@ -91,6 +91,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
+  updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   verifyUserEmail(userId: string): Promise<void>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   
@@ -305,6 +306,10 @@ export class DatabaseStorage implements IStorage {
 
   async updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void> {
     await db.update(users).set({ passwordResetOtp: otp, passwordResetOtpExpiry: expiry, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void> {
+    await db.update(users).set({ loginOtp: otp, loginOtpExpiry: expiry, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 
   async verifyUserEmail(userId: string): Promise<void> {

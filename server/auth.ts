@@ -6,7 +6,7 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import crypto from "crypto";
-import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail } from "./email";
+import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
 
 export function getSession() {
   if (!process.env.SESSION_SECRET) {
@@ -178,6 +178,77 @@ export async function setupAuth(app: Express) {
       });
     }
     return res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // Send login OTP to email (passwordless sign-in)
+  app.post("/api/send-login-otp", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with that email. Please create one first." });
+      }
+
+      const otp = generateOtp();
+      const expiry = otpExpiryTime();
+      await storage.updateLoginOtp(user.id, otp, expiry);
+
+      sendLoginOtpEmail(email, user.firstName || "there", otp).catch(err =>
+        console.error("Failed to send login OTP email:", err)
+      );
+
+      return res.json({ message: "Sign-in code sent to your email" });
+    } catch (error) {
+      console.error("Send login OTP error:", error);
+      return res.status(500).json({ message: "Failed to send sign-in code" });
+    }
+  });
+
+  // Login with OTP (passwordless)
+  app.post("/api/login-with-otp", async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) {
+        return res.status(400).json({ message: "Email and code are required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired sign-in code" });
+      }
+
+      if (!user.loginOtp || user.loginOtp !== otp) {
+        return res.status(400).json({ message: "Invalid sign-in code" });
+      }
+
+      if (!user.loginOtpExpiry || new Date() > user.loginOtpExpiry) {
+        return res.status(400).json({ message: "Sign-in code has expired. Please request a new one." });
+      }
+
+      // Clear the OTP after use
+      await storage.updateLoginOtp(user.id, null, null);
+
+      // Also mark email as verified if not already
+      if (!user.emailVerified) {
+        await storage.verifyUserEmail(user.id);
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        return res.json({
+          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles }
+        });
+      });
+    } catch (error) {
+      console.error("Login with OTP error:", error);
+      return res.status(500).json({ message: "Sign-in failed" });
+    }
   });
 
   // Verify email with OTP
