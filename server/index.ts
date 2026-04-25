@@ -3,6 +3,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializePaystack } from "./paystack";
 import { initializeCloudStorage } from "./cloudStorage";
+import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const app = express();
 app.use(express.json());
@@ -54,6 +58,24 @@ app.use((req, res, next) => {
   // Migration can be manually triggered via /api/admin/migrate-images when credentials are valid
   log('Cloud storage infrastructure ready, using optimized local image serving with automatic compression');
   
+  // Ensure designated admin accounts have admin role on every boot
+  const adminEmails = ["femi.elegbeleye@afrolandx.com", "oluwaseun.alo@afrolandx.com"];
+  for (const email of adminEmails) {
+    try {
+      const user = await storage.getUserByEmail(email);
+      if (user) {
+        const roles: string[] = Array.isArray(user.roles) ? user.roles as string[] : ["customer"];
+        if (!roles.includes("admin")) {
+          roles.push("admin");
+          await db.update(users).set({ roles }).where(eq(users.email, email));
+          log(`Admin role granted to ${email}`);
+        }
+      }
+    } catch (e) {
+      log(`Could not seed admin for ${email}`);
+    }
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

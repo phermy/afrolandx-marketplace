@@ -14,7 +14,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 // Configure multer for memory storage (for cloud upload)
 const upload = multer({

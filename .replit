@@ -42,3 +42,5 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 
 [userenv.shared]
 FROM_EMAIL = "femi.elegbeleye@afrolandx.com"
+
+[userenv.production]
