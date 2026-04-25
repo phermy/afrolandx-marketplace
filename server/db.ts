@@ -10,6 +10,8 @@ if (!process.env.PGHOST && !process.env.DATABASE_URL) {
   );
 }
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const connectionConfig = process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE
   ? {
       host: process.env.PGHOST,
@@ -17,9 +19,9 @@ const connectionConfig = process.env.PGHOST && process.env.PGUSER && process.env
       user: process.env.PGUSER,
       password: process.env.PGPASSWORD,
       database: process.env.PGDATABASE,
-      ssl: false,
+      ssl: isProduction ? { rejectUnauthorized: false } : false,
     }
-  : { connectionString: process.env.DATABASE_URL };
+  : { connectionString: process.env.DATABASE_URL, ssl: isProduction ? { rejectUnauthorized: false } : false };
 
 export const pool = new Pool(connectionConfig as pg.PoolConfig);
 export const db = drizzle({ client: pool, schema });

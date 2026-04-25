@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import crypto from "crypto";
 import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
+import { pool } from "./db";
 
 export function getSession() {
   if (!process.env.SESSION_SECRET) {
@@ -16,7 +17,7 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    pool,
     createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
