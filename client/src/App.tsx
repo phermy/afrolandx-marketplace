@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -30,6 +30,13 @@ import ForgotPassword from "@/pages/forgot-password";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
+import { useEffect } from "react";
+
+function AuthRedirect({ to }: { to: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => { setLocation(to); }, []);
+  return null;
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -44,48 +51,52 @@ function Router() {
 
   return (
     <Switch>
-      {!isAuthenticated ? (
+      {/* Auth pages — always accessible, redirect home if already logged in */}
+      <Route path="/login">
+        {isAuthenticated ? <AuthRedirect to="/" /> : <Login />}
+      </Route>
+      <Route path="/register">
+        {isAuthenticated ? <AuthRedirect to="/" /> : <Register />}
+      </Route>
+      <Route path="/forgot-password">
+        <ForgotPassword />
+      </Route>
+
+      {/* Public pages */}
+      <Route path="/products" component={Products} />
+      <Route path="/collab-drops" component={CollabDrops} />
+      <Route path="/events" component={EventPlanner} />
+      <Route path="/discover" component={DiscoverAfrica} />
+      <Route path="/lookbook" component={Lookbook} />
+
+      {/* Home — landing for guests, dashboard for logged-in users */}
+      <Route path="/">
+        {isAuthenticated ? <Home /> : <Landing />}
+      </Route>
+
+      {/* Admin — available to both, protected internally */}
+      <Route path="/admin">
+        <AdminProtectedRoute>
+          <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+
+      {/* Authenticated-only pages */}
+      {isAuthenticated ? (
         <>
-          <Route path="/" component={Landing} />
-          <Route path="/login" component={Login} />
-          <Route path="/register" component={Register} />
-          <Route path="/forgot-password" component={ForgotPassword} />
-          <Route path="/products" component={Products} />
-          <Route path="/collab-drops" component={CollabDrops} />
-          <Route path="/events" component={EventPlanner} />
-          <Route path="/discover" component={DiscoverAfrica} />
-          <Route path="/lookbook" component={Lookbook} />
-          <Route path="/admin">
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          </Route>
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Home} />
-          <Route path="/products" component={Products} />
           <Route path="/profile" component={Profile} />
           <Route path="/my-orders" component={MyOrders} />
           <Route path="/measurements" component={Measurements} />
           <Route path="/messages" component={Messages} />
-          <Route path="/lookbook" component={Lookbook} />
           <Route path="/loyalty" component={Loyalty} />
-          <Route path="/collab-drops" component={CollabDrops} />
-          <Route path="/events" component={EventPlanner} />
-          <Route path="/discover" component={DiscoverAfrica} />
           <Route path="/quizzes/:id" component={Quiz} />
           <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
-          <Route path="/admin">
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          </Route>
           <Route path="/checkout" component={Checkout} />
         </>
-      )}
+      ) : null}
+
       <Route component={NotFound} />
     </Switch>
   );
