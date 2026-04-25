@@ -87,12 +87,26 @@ export class PaystackService {
     return result;
   }
 
-  async initializeTransaction(email: string, amount: number, reference: string, metadata?: any, callbackUrl?: string): Promise<PaystackInitializeResponse> {
+  // Currencies Paystack can charge in natively
+  static readonly SUPPORTED_CURRENCIES = new Set([
+    'NGN', 'GHS', 'ZAR', 'KES', 'USD', 'GBP', 'EUR', 'EGP', 'XOF'
+  ]);
+
+  async initializeTransaction(
+    email: string,
+    amount: number,
+    reference: string,
+    metadata?: any,
+    callbackUrl?: string,
+    currency: string = 'USD'
+  ): Promise<PaystackInitializeResponse> {
+    const chargeCurrency = PaystackService.SUPPORTED_CURRENCIES.has(currency) ? currency : 'USD';
+
     const payload: any = {
       email,
-      amount: amount * 100, // Paystack expects amount in cents
+      amount: Math.round(amount * 100), // smallest denomination (kobo/pesewa/cents etc.)
       reference,
-      currency: 'USD',
+      currency: chargeCurrency,
       metadata,
     };
 

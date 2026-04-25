@@ -5,8 +5,8 @@ import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrency } from '@/hooks/useCurrency';
 import Navbar from '@/components/navbar';
-import LocalPrice from '@/components/LocalPrice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,11 +17,15 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { ShippingQuote, ShippingAddress } from '@/types';
 
+// Currencies Paystack can natively charge in
+const PAYSTACK_SUPPORTED = new Set(['NGN', 'GHS', 'ZAR', 'KES', 'USD', 'GBP', 'EUR', 'EGP', 'XOF']);
+
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { cartItems, cartTotal, clearCart } = useCart();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currencyInfo, formatLocal } = useCurrency();
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -167,23 +171,41 @@ export default function Checkout() {
       return;
     }
 
+    const usdTotal = cartTotal + selectedQuote.price;
+    const currency = currencyInfo?.code || 'USD';
+    const localTotal = currencyInfo ? usdTotal * currencyInfo.rate : null;
+
     const orderData = {
-      totalAmount: (cartTotal + selectedQuote.price).toString(),
+      totalAmount: usdTotal.toString(),
       shippingAmount: selectedQuote.price.toString(),
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
       paymentMethod,
+      currency,
+      localAmount: localTotal !== null ? localTotal.toFixed(2) : undefined,
     };
 
     createOrderMutation.mutate(orderData);
   };
 
-  const formatPrice = (price: number) => {
-    return `$${price.toLocaleString()}`;
+  // Format price in local currency (primary) with USD fallback
+  const formatPrice = (usdAmount: number) => {
+    if (currencyInfo) {
+      const local = usdAmount * currencyInfo.rate;
+      const formatted = local >= 1000
+        ? local.toLocaleString(undefined, { maximumFractionDigits: 0 })
+        : local.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return `${currencyInfo.symbol}${formatted}`;
+    }
+    return `$${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
+
+  // Show USD as small secondary label
+  const formatUsdSub = (usdAmount: number) => `≈ $${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const selectedShippingQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
+  const isNativeCurrency = currencyInfo && PAYSTACK_SUPPORTED.has(currencyInfo.code);
 
   if (isLoading) {
     return (
@@ -340,9 +362,10 @@ export default function Checkout() {
                                   <p className="font-semibold">{quote.service}</p>
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
                                 </div>
-                                <span className="font-bold text-nigerian-green">
-                                  {formatPrice(quote.price)}
-                                </span>
+                                <div className="text-right">
+                                  <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
+                                  {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(quote.price)}</span>}
+                                </div>
                               </div>
                             </Label>
                           </div>
@@ -400,26 +423,45 @@ export default function Checkout() {
                           <p className="font-semibold text-sm truncate">{item.product.name}</p>
                           <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                         </div>
-                        <span className="font-semibold text-sm">
-                          {formatPrice(parseFloat(item.product.price) * item.quantity)}
-                        </span>
+                        <div className="text-right">
+                          <span className="font-semibold text-sm">{formatPrice(parseFloat(item.product.price) * item.quantity)}</span>
+                          {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(parseFloat(item.product.price) * item.quantity)}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
 
                   <Separator />
 
+                  {/* Currency indicator */}
+                  {currencyInfo && (
+                    <div className={`text-xs px-3 py-2 rounded-md flex items-center gap-2 ${isNativeCurrency ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                      <span>{isNativeCurrency ? '✓' : 'ℹ'}</span>
+                      <span>
+                        {isNativeCurrency
+                          ? `Charging in ${currencyInfo.code} (${currencyInfo.country})`
+                          : `${currencyInfo.code} not supported by Paystack — charging in USD`}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Pricing Breakdown */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span>{formatPrice(cartTotal)}</span>
+                      <div className="text-right">
+                        <span className="font-medium">{formatPrice(cartTotal)}</span>
+                        {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(cartTotal)}</span>}
+                      </div>
                     </div>
                     
                     {selectedShippingQuote && (
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
-                        <span>{formatPrice(selectedShippingQuote.price)}</span>
+                        <div className="text-right">
+                          <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
+                          {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(selectedShippingQuote.price)}</span>}
+                        </div>
                       </div>
                     )}
                     
@@ -429,7 +471,7 @@ export default function Checkout() {
                       <span>Total</span>
                       <div className="text-right">
                         <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
-                        <LocalPrice usdAmount={totalAmount} className="block" size="md" />
+                        {currencyInfo && <span className="block text-xs text-gray-400 font-normal">{formatUsdSub(totalAmount)}</span>}
                       </div>
                     </div>
                   </div>
@@ -450,7 +492,7 @@ export default function Checkout() {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Place Order - {formatPrice(totalAmount)}
+                        Pay {formatPrice(totalAmount)}
                       </>
                     )}
                   </Button>

@@ -830,7 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
-      const { totalAmount, shippingAmount, shippingAddress, shippingMethod } = req.body;
+      const { totalAmount, shippingAmount, shippingAddress, shippingMethod, currency, localAmount } = req.body;
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured. Please contact administrator.' });
@@ -844,8 +844,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate payment reference
       const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+      // Determine charge currency & amount
+      // If buyer's currency is Paystack-supported, charge in it. Otherwise fall back to USD.
+      const { PaystackService } = await import('./paystack');
+      const requestedCurrency = (currency || 'USD').toUpperCase();
+      const chargeCurrency = PaystackService.SUPPORTED_CURRENCIES.has(requestedCurrency) ? requestedCurrency : 'USD';
+      const chargeAmount = chargeCurrency !== 'USD' && localAmount
+        ? parseFloat(localAmount)
+        : parseFloat(totalAmount);
       
-      // Create order with pending payment
+      // Create order with pending payment (always store USD total for accounting)
       const orderData = {
         userId,
         totalAmount,
@@ -870,26 +879,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Initialize Paystack payment
+      // Initialize Paystack payment in buyer's currency
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/callback`;
       const paymentData = await paystack.initializeTransaction(
         user.email,
-        parseFloat(totalAmount),
+        chargeAmount,
         reference,
         {
           orderId: order.id,
           userId,
           shippingMethod,
+          chargeCurrency,
+          usdEquivalent: totalAmount,
           custom_fields: [
             {
               display_name: "Order ID",
               variable_name: "order_id",
               value: order.id.toString()
+            },
+            {
+              display_name: "Currency",
+              variable_name: "charge_currency",
+              value: chargeCurrency
             }
           ]
         },
-        callbackUrl
+        callbackUrl,
+        chargeCurrency
       );
 
       res.json({
