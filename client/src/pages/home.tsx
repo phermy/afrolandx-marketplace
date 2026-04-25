@@ -116,7 +116,7 @@ export default function Home() {
       )}
 
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[520px] sm:h-[580px] md:h-[640px]">
+      <section className="relative overflow-hidden h-[calc(100vh-64px)]">
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
