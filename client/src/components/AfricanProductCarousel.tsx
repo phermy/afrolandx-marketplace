@@ -1,190 +1,330 @@
-const u = (id: string, label: string, country: string) => ({
-  url: `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=320&h=320&q=75`,
-  label,
-  country,
-});
+const FALLBACK = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/320px-No_image_available.svg.png";
 
-export const AFRICAN_PRODUCTS = [
-  // Nigerian Fashion
-  u("1546961342-ea5f73061da4","Aso Oke Fabric","Nigeria"),
-  u("1590845947676-fa6d1c8a0d13","Ankara Dress","Nigeria"),
-  u("1531123897727-8f129e1688ce","Adire Textile","Nigeria"),
-  u("1529626455594-4ff0802cfb7e","Iro & Buba","Nigeria"),
-  u("1544161513-0179fe746fd5","Fila Cap","Nigeria"),
-  u("1603344204980-4edb0ea63148","Agbada Robe","Nigeria"),
-  u("1573873035-cded3c5d5853","Yoruba Beads","Nigeria"),
-  u("1509631179647-0177331693ae","Kente Weave","Nigeria"),
-  u("1607748862144-a1cde25c4688","Ankara Skirt","Nigeria"),
-  u("1614887800970-53c8a6e6b8a4","Owambe Gele","Nigeria"),
-  u("1636036162-e4b4f2dab1e3","Brocade Set","Nigeria"),
-  u("1622016498782-a462db49cce2","Aso-ebi Lace","Nigeria"),
+export interface Leader {
+  url: string;
+  name: string;
+  title: string;
+  country: string;
+  era: string;
+}
 
-  // Ghanaian Products
-  u("1573567666066-18bb6ac15720","Kente Cloth","Ghana"),
-  u("1551698618-1dfe5d97d256","Kente Strips","Ghana"),
-  u("1487222477894-8a7291b2e2c4","Beaded Necklace","Ghana"),
-  u("1586023492125-27b2c045efd7","Batakari Tunic","Ghana"),
-  u("1551022372-0bdac482-af90","Smock Fabric","Ghana"),
-  u("1560707303-fc06c043e10f","Akan Jewelry","Ghana"),
-  u("1565689942609-71c7b0065b38","Leather Sandals","Ghana"),
-  u("1519225421980-9c2171e8c9bd","Wax Print Dress","Ghana"),
+export const AFRICAN_LEADERS: Leader[] = [
+  /* ── WEST AFRICA ───────────────────────────────────────── */
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Nnamdi_Azikiwe.jpg/400px-Nnamdi_Azikiwe.jpg",
+    name: "Nnamdi Azikiwe",
+    title: "First President",
+    country: "Nigeria",
+    era: "1963–1966",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/en/thumb/d/d5/Chief_Obafemi_Awolowo.jpg/400px-Chief_Obafemi_Awolowo.jpg",
+    name: "Obafemi Awolowo",
+    title: "Statesman & Premier",
+    country: "Nigeria",
+    era: "1952–1983",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Ahmadu_Bello.jpg/400px-Ahmadu_Bello.jpg",
+    name: "Ahmadu Bello",
+    title: "Premier of the North",
+    country: "Nigeria",
+    era: "1954–1966",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Kwame_Nkrumah.jpg/400px-Kwame_Nkrumah.jpg",
+    name: "Kwame Nkrumah",
+    title: "First President",
+    country: "Ghana",
+    era: "1960–1966",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Am%C3%ADlcar_Cabral.jpg/400px-Am%C3%ADlcar_Cabral.jpg",
+    name: "Amilcar Cabral",
+    title: "Liberation Leader",
+    country: "Guinea-Bissau",
+    era: "1956–1973",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sekou_Toure.jpg/400px-Sekou_Toure.jpg",
+    name: "Ahmed Sékou Touré",
+    title: "First President",
+    country: "Guinea",
+    era: "1958–1984",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/L%C3%A9opold_S%C3%A9dar_Senghor.jpg/400px-L%C3%A9opold_S%C3%A9dar_Senghor.jpg",
+    name: "Léopold Sédar Senghor",
+    title: "First President & Poet",
+    country: "Senegal",
+    era: "1960–1980",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Thomas_Sankara.jpg/400px-Thomas_Sankara.jpg",
+    name: "Thomas Sankara",
+    title: "Revolutionary President",
+    country: "Burkina Faso",
+    era: "1983–1987",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Modibo_Keita.jpg/400px-Modibo_Keita.jpg",
+    name: "Modibo Keïta",
+    title: "First President",
+    country: "Mali",
+    era: "1960–1968",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/F%C3%A9lix_Houphou%C3%ABt-Boigny.jpg/400px-F%C3%A9lix_Houphou%C3%ABt-Boigny.jpg",
+    name: "Félix Houphouët-Boigny",
+    title: "First President",
+    country: "Ivory Coast",
+    era: "1960–1993",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Sylvanus_Olympio.jpg/400px-Sylvanus_Olympio.jpg",
+    name: "Sylvanus Olympio",
+    title: "First President",
+    country: "Togo",
+    era: "1960–1963",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Hubert_Maga.jpg/400px-Hubert_Maga.jpg",
+    name: "Hubert Maga",
+    title: "First President",
+    country: "Benin",
+    era: "1960–1963",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Ahmadou_Ahidjo.jpg/400px-Ahmadou_Ahidjo.jpg",
+    name: "Ahmadou Ahidjo",
+    title: "First President",
+    country: "Cameroon",
+    era: "1960–1982",
+  },
 
-  // Kenyan Products
-  u("1614624532983-4ce3efa6a3a4","Maasai Shuka","Kenya"),
-  u("1541356665065-22676f35dd40","Kitenge Fabric","Kenya"),
-  u("1503602642458-232111b5ffd8","Beaded Bracelet","Kenya"),
-  u("1562774053-5b67f4b5e4a0","Kikoy Wrap","Kenya"),
-  u("1611095090539-c6a7b77c8b1a","Soapstone Carving","Kenya"),
-  u("1549497538-10430c27e73b","Handwoven Bag","Kenya"),
-  u("1609174543290-d0f7b9e2c3a0","Sisal Basket","Kenya"),
-  u("1620735689791-56c4fd10d24f","Maasai Jewelry","Kenya"),
+  /* ── EAST AFRICA ───────────────────────────────────────── */
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Julius_Nyerere_1965_%28cropped%29.jpg/400px-Julius_Nyerere_1965_%28cropped%29.jpg",
+    name: "Julius Nyerere",
+    title: "First President – Mwalimu",
+    country: "Tanzania",
+    era: "1961–1985",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Jomo_Kenyatta.jpg/400px-Jomo_Kenyatta.jpg",
+    name: "Jomo Kenyatta",
+    title: "First President – Mzee",
+    country: "Kenya",
+    era: "1963–1978",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Haile_Selassie_1970_%28cropped%29.jpg/400px-Haile_Selassie_1970_%28cropped%29.jpg",
+    name: "Haile Selassie",
+    title: "Emperor of Ethiopia",
+    country: "Ethiopia",
+    era: "1930–1974",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Oginga_Odinga.jpg/400px-Oginga_Odinga.jpg",
+    name: "Oginga Odinga",
+    title: "VP & Opposition Leader",
+    country: "Kenya",
+    era: "1963–1994",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Abebe_Bikila_%28cropped%29.jpg/400px-Abebe_Bikila_%28cropped%29.jpg",
+    name: "Abebe Bikila",
+    title: "Olympic Marathon Legend",
+    country: "Ethiopia",
+    era: "1960–1968",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Milton_Obote.jpg/400px-Milton_Obote.jpg",
+    name: "Milton Obote",
+    title: "First Prime Minister",
+    country: "Uganda",
+    era: "1962–1971",
+  },
 
-  // South African Products
-  u("1516026672322-375481afcd6f","Ndebele Beads","South Africa"),
-  u("1508243771214-6d5ad13a96f6","Shweshwe Fabric","South Africa"),
-  u("1592924357775-a72a4a7eb8c3","Zulu Basket","South Africa"),
-  u("1580502304784-8985b7eb7260","Xhosa Beads","South Africa"),
-  u("1573497491765-dccce02b29df","Leather Craft","South Africa"),
-  u("1507003211169-0a1dd7228f2d","Cape Malay Fabric","South Africa"),
-  u("1542272604-787c3835535d","Boho African Print","South Africa"),
-  u("1601924582970-b69f6d4ad0f3","Woven Blanket","South Africa"),
+  /* ── SOUTHERN AFRICA ───────────────────────────────────── */
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/400px-Nelson_Mandela_1994.jpg",
+    name: "Nelson Mandela",
+    title: "President – Madiba",
+    country: "South Africa",
+    era: "1994–1999",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Oliver_Tambo.jpg/400px-Oliver_Tambo.jpg",
+    name: "Oliver Tambo",
+    title: "ANC President",
+    country: "South Africa",
+    era: "1967–1991",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Albert_Luthuli.jpg/400px-Albert_Luthuli.jpg",
+    name: "Albert Luthuli",
+    title: "Nobel Peace Laureate",
+    country: "South Africa",
+    era: "1952–1967",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Steve_Biko_portrait.jpg/400px-Steve_Biko_portrait.jpg",
+    name: "Steve Biko",
+    title: "Black Consciousness Leader",
+    country: "South Africa",
+    era: "1968–1977",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Kenneth_Kaunda.jpg/400px-Kenneth_Kaunda.jpg",
+    name: "Kenneth Kaunda",
+    title: "First President",
+    country: "Zambia",
+    era: "1964–1991",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Samora_Machel.jpg/400px-Samora_Machel.jpg",
+    name: "Samora Machel",
+    title: "First President",
+    country: "Mozambique",
+    era: "1975–1986",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Eduardo_Mondlane.jpg/400px-Eduardo_Mondlane.jpg",
+    name: "Eduardo Mondlane",
+    title: "FRELIMO Founder",
+    country: "Mozambique",
+    era: "1962–1969",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Joshua_Nkomo.jpg/400px-Joshua_Nkomo.jpg",
+    name: "Joshua Nkomo",
+    title: "Father of Zimbabwe",
+    country: "Zimbabwe",
+    era: "1960–1999",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Seretse_Khama.jpg/400px-Seretse_Khama.jpg",
+    name: "Seretse Khama",
+    title: "First President",
+    country: "Botswana",
+    era: "1966–1980",
+  },
 
-  // Ethiopian Products
-  u("1587174486073-ae5e5cff23aa","Habesha Kemis","Ethiopia"),
-  u("1519334787261-ba2b0c98bab8","Tej Basket","Ethiopia"),
-  u("1499084732479-de2c02d42fc","Tibeb Fabric","Ethiopia"),
-  u("1571019613454-1cb2f99b2d8b","Gabi Scarf","Ethiopia"),
-  u("1575822440938-b671d7beb89e","Ethiopian Jewelry","Ethiopia"),
-  u("1597138804456-e7dca7f59d54","Lalibela Cross","Ethiopia"),
-  u("1614624521800-5c5c5c5c5c5c","Injera Basket","Ethiopia"),
-  u("1593030945-c73f1d32ab69","Harari Fabric","Ethiopia"),
+  /* ── NORTH AFRICA ──────────────────────────────────────── */
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Gamal_Abdel_Nasser.jpg/400px-Gamal_Abdel_Nasser.jpg",
+    name: "Gamal Abdel Nasser",
+    title: "President & Pan-Arabist",
+    country: "Egypt",
+    era: "1954–1970",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Habib_Bourguiba.jpg/400px-Habib_Bourguiba.jpg",
+    name: "Habib Bourguiba",
+    title: "Father of Tunisia",
+    country: "Tunisia",
+    era: "1956–1987",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Mohammed_V_of_Morocco.jpg/400px-Mohammed_V_of_Morocco.jpg",
+    name: "Mohammed V",
+    title: "King & Independence Leader",
+    country: "Morocco",
+    era: "1927–1961",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Ahmed_Ben_Bella.jpg/400px-Ahmed_Ben_Bella.jpg",
+    name: "Ahmed Ben Bella",
+    title: "First President",
+    country: "Algeria",
+    era: "1963–1965",
+  },
 
-  // Moroccan Products
-  u("1539037116277-4db20889f2d4","Berber Carpet","Morocco"),
-  u("1583473848882-f9a5bc7fd2ee","Leather Bag","Morocco"),
-  u("1548013146-72479768bada","Zellige Tiles","Morocco"),
-  u("1560707303-fc06c043e10f","Silver Jewelry","Morocco"),
-  u("1594938175174-bf2903ce7a58","Kaftan Robe","Morocco"),
-  u("1590736704728-f4baa4a7f09e","Argan Oil Set","Morocco"),
-  u("1580418827493-f2b22c0a76cb","Fez Hat","Morocco"),
-  u("1551817958-5c2d03aa9e89","Babouche Slipper","Morocco"),
-
-  // Senegalese / West African
-  u("1600878459138-e1123b37cb30","Boubou Robe","Senegal"),
-  u("1547226706-e8e2c20e6bc2","Bogolan Cloth","Mali"),
-  u("1524069290683-0457abfe42c3","Tie-Dye Fabric","Côte d'Ivoire"),
-  u("1519225421980-9c2171e8c9bd","Wax Print Skirt","Togo"),
-  u("1566375638-f26afaa9f5a7","Raffia Hat","Cameroon"),
-  u("1551817958-5c2d03aa9e89","Brass Figure","Benin"),
-  u("1547671527-3a3e62a40bd4","Kanga Wrap","Tanzania"),
-  u("1611095090539-c6a7b77c8b1a","Ebony Sculpture","Congo"),
-
-  // Jewelry & Accessories
-  u("1487222477894-8a7291b2e2c4","Gold Anklet","West Africa"),
-  u("1573873035-cded3c5d5853","Coral Necklace","Nigeria"),
-  u("1503602642458-232111b5ffd8","Seed Bead Necklace","Kenya"),
-  u("1580502304784-8985b7eb7260","Statement Earrings","South Africa"),
-  u("1571019613454-1cb2f99b2d8b","Amber Bracelet","Ethiopia"),
-  u("1560707303-fc06c043e10f","Silver Cuff","Morocco"),
-  u("1560707303-fc06c043e10f","Cowrie Shell Necklace","Nigeria"),
-  u("1616671276938-0a4e9bdee1ab","Beaded Headpiece","Kenya"),
-
-  // Textiles & Fabrics
-  u("1573567666066-18bb6ac15720","Adinkra Print","Ghana"),
-  u("1509631179647-0177331693ae","Mudcloth Throw","Mali"),
-  u("1539037116277-4db20889f2d4","Berber Rug","Morocco"),
-  u("1592924357775-a72a4a7eb8c3","Coil Basket","South Africa"),
-  u("1609174543290-d0f7b9e2c3a0","Sisal Tote","Kenya"),
-  u("1583473848882-f9a5bc7fd2ee","Leather Clutch","Morocco"),
-  u("1566375638-f26afaa9f5a7","Palm Leaf Hat","West Africa"),
-  u("1547226706-e8e2c20e6bc2","Hand-dyed Scarf","Senegal"),
-
-  // Modern African Fashion
-  u("1607748862144-a1cde25c4688","Afrofusion Jacket","Pan-Africa"),
-  u("1636036162-e4b4f2dab1e3","Dashiki Shirt","West Africa"),
-  u("1600878459138-e1123b37cb30","Kaftan Maxi","Senegal"),
-  u("1622016498782-a462db49cce2","Lace Blouse","Nigeria"),
-  u("1586023492125-27b2c045efd7","Peplum Top","Ghana"),
-  u("1587174486073-ae5e5cff23aa","Wrap Dress","Ethiopia"),
-  u("1614624532983-4ce3efa6a3a4","Shuka Skirt","Kenya"),
-  u("1601924582970-b69f6d4ad0f3","African Print Suit","Pan-Africa"),
-
-  // Crafts & Homewares
-  u("1548013146-72479768bada","Wooden Mask","West Africa"),
-  u("1597138804456-e7dca7f59d54","Bronze Figurine","Benin City"),
-  u("1611095090539-c6a7b77c8b1a","Soapstone Bowl","Kenya"),
-  u("1592924357775-a72a4a7eb8c3","Woven Placemat","South Africa"),
-  u("1519334787261-ba2b0c98bab8","Grass Basket","Ethiopia"),
-  u("1565689942609-71c7b0065b38","Sandal Pair","Ghana"),
-  u("1549497538-10430c27e73b","Batik Wall Art","Nigeria"),
-  u("1580418827493-f2b22c0a76cb","Terracotta Pot","Côte d'Ivoire"),
-
-  // Kids & Beauty
-  u("1544161513-0179fe746fd5","Children's Ankara","Nigeria"),
-  u("1503602642458-232111b5ffd8","Hair Beads","West Africa"),
-  u("1590736704728-f4baa4a7f09e","Shea Butter Set","Ghana"),
-  u("1629200845016-4bcb3a53bdac","Black Soap","Nigeria"),
-  u("1571019613454-1cb2f99b2d8b","Coffee Ceremony Set","Ethiopia"),
-  u("1539037116277-4db20889f2d4","Argan Skincare","Morocco"),
-  u("1547671527-3a3e62a40bd4","Kitenge Kids Wear","Tanzania"),
-  u("1524069290683-0457abfe42c3","Tie-Dye Kids Set","West Africa"),
+  /* ── CENTRAL AFRICA ────────────────────────────────────── */
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Patrice_Lumumba.jpg/400px-Patrice_Lumumba.jpg",
+    name: "Patrice Lumumba",
+    title: "First Prime Minister",
+    country: "DR Congo",
+    era: "1960",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Fulbert_Youlou.jpg/400px-Fulbert_Youlou.jpg",
+    name: "Fulbert Youlou",
+    title: "First President",
+    country: "Congo-Brazzaville",
+    era: "1960–1963",
+  },
 ];
 
-interface CarouselRowProps {
-  items: typeof AFRICAN_PRODUCTS;
-  direction?: "left" | "right";
-  speed?: number;
-}
+/* ── backward-compat alias used in landing.tsx ── */
+export const AFRICAN_PRODUCTS = AFRICAN_LEADERS.map((l) => ({
+  url: l.url,
+  label: l.name,
+  country: l.country,
+}));
 
-function CarouselRow({ items, direction = "left", speed = 35 }: CarouselRowProps) {
-  const doubled = [...items, ...items];
+const FALLBACK_IMG = FALLBACK;
+const ROWS: { speed: number; dir: "left" | "right" }[] = [
+  { speed: 35, dir: "left" },
+  { speed: 28, dir: "right" },
+  { speed: 40, dir: "left" },
+];
+
+export default function AfricanLeaderCarousel() {
+  const third = Math.ceil(AFRICAN_LEADERS.length / 3);
+  const rows = [
+    AFRICAN_LEADERS.slice(0, third),
+    AFRICAN_LEADERS.slice(third, third * 2),
+    AFRICAN_LEADERS.slice(third * 2),
+  ];
 
   return (
-    <div className="overflow-hidden relative">
-      <div
-        className="flex gap-3"
-        style={{
-          animation: `${direction === "left" ? "marqueeLeft" : "marqueeRight"} ${speed}s linear infinite`,
-          width: "max-content",
-        }}
-      >
-        {doubled.map((item, i) => (
-          <div
-            key={i}
-            className="relative flex-shrink-0 w-36 h-36 md:w-44 md:h-44 rounded-xl overflow-hidden group cursor-pointer shadow-sm"
-          >
-            <img
-              src={item.url}
-              alt={item.label}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              loading="lazy"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://images.unsplash.com/photo-1573567666066-18bb6ac15720?auto=format&fit=crop&w=320&h=320&q=75";
+    <div className="space-y-4">
+      {rows.map((leaders, rowIdx) => {
+        const doubled = [...leaders, ...leaders];
+        const { speed, dir } = ROWS[rowIdx];
+        return (
+          <div key={rowIdx} className="overflow-hidden">
+            <div
+              className="flex gap-4"
+              style={{
+                animation: `${dir === "left" ? "marqueeLeft" : "marqueeRight"} ${speed}s linear infinite`,
+                width: "max-content",
               }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <div className="absolute bottom-0 left-0 right-0 p-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-              <p className="text-white text-xs font-semibold leading-tight truncate">{item.label}</p>
-              <p className="text-amber-300 text-xs truncate">{item.country}</p>
+            >
+              {doubled.map((leader, i) => (
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-36 md:w-44 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm shadow-lg border border-white/20"
+                >
+                  <div className="relative w-full h-36 md:h-44">
+                    <img
+                      src={leader.url}
+                      alt={leader.name}
+                      className="w-full h-full object-cover object-top"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = FALLBACK_IMG;
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <span className="absolute top-2 right-2 text-xs font-bold bg-nigerian-gold text-gray-900 px-1.5 py-0.5 rounded-full">
+                      {leader.era.split("–")[0].slice(-2)}s
+                    </span>
+                  </div>
+                  <div className="px-2 py-2 text-center">
+                    <p className="text-white font-bold text-xs leading-tight truncate">{leader.name}</p>
+                    <p className="text-nigerian-gold text-[10px] leading-tight truncate">{leader.country}</p>
+                    <p className="text-white/60 text-[9px] leading-tight truncate">{leader.title}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export default function AfricanProductCarousel() {
-  const row1 = AFRICAN_PRODUCTS.slice(0, 36);
-  const row2 = AFRICAN_PRODUCTS.slice(36, 72);
-  const row3 = AFRICAN_PRODUCTS.slice(72);
-
-  return (
-    <div className="space-y-3 py-2">
-      <CarouselRow items={row1} direction="left" speed={40} />
-      <CarouselRow items={row2} direction="right" speed={32} />
-      <CarouselRow items={row3} direction="left" speed={45} />
+        );
+      })}
     </div>
   );
 }

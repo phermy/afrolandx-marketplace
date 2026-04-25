@@ -20,7 +20,7 @@ import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
 import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
 import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
-import AfricanProductCarousel, { AFRICAN_PRODUCTS } from "@/components/AfricanProductCarousel";
+import AfricanLeaderCarousel, { AFRICAN_LEADERS } from "@/components/AfricanProductCarousel";
 
 const culturalSlides = [
   { image: panAfricanImg,  country: "Pan-Africa",    label: "Unity in Diversity",            flag: "🌍" },
@@ -448,17 +448,17 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* African Products Showcase — auto-scrolling carousel */}
+      {/* Africa's Great Leaders — auto-scrolling carousel */}
       <section className="py-10 md:py-14 bg-nigerian-green overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 md:mb-8 text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white font-nigerian mb-2 md:mb-3">
-            100+ African Products
+            Africa's Great Leaders
           </h2>
           <p className="text-sm sm:text-base text-white/80">
-            Textiles · Jewelry · Fashion · Crafts · Beauty — from all 54 nations
+            Honouring the visionaries who shaped a continent — from all 54 nations
           </p>
         </div>
-        <AfricanProductCarousel />
+        <AfricanLeaderCarousel />
         <div className="text-center mt-6 md:mt-8">
           <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold text-gray-900 hover:bg-yellow-400 font-bold px-8">
             Shop All Products
@@ -534,8 +534,8 @@ export default function Landing() {
             <div className="relative overflow-hidden rounded-xl shadow-2xl bg-gray-900">
               <div className="overflow-hidden space-y-3 p-4">
                 {([
-                  { slice: AFRICAN_PRODUCTS.slice(0, 18), dir: "left", speed: 28 },
-                  { slice: AFRICAN_PRODUCTS.slice(18, 36), dir: "right", speed: 22 },
+                  { slice: AFRICAN_LEADERS.slice(0, 16), dir: "left", speed: 28 },
+                  { slice: AFRICAN_LEADERS.slice(16, 32), dir: "right", speed: 22 },
                 ] as const).map(({ slice, dir, speed }, rowIdx) => {
                   const doubled = [...slice, ...slice];
                   return (
@@ -548,17 +548,20 @@ export default function Landing() {
                         }}
                       >
                         {doubled.map((item, i) => (
-                          <div key={i} className="flex-shrink-0 w-28 h-28 rounded-lg overflow-hidden">
-                            <img
-                              src={item.url}
-                              alt={item.label}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  "https://images.unsplash.com/photo-1573567666066-18bb6ac15720?auto=format&fit=crop&w=320&h=320&q=75";
-                              }}
-                            />
+                          <div key={i} className="flex-shrink-0 w-24 rounded-lg overflow-hidden bg-black/30">
+                            <div className="w-24 h-24 overflow-hidden">
+                              <img
+                                src={item.url}
+                                alt={item.name}
+                                className="w-full h-full object-cover object-top"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/320px-No_image_available.svg.png";
+                                }}
+                              />
+                            </div>
+                            <p className="text-white text-[9px] text-center px-1 py-0.5 truncate font-semibold">{item.name}</p>
                           </div>
                         ))}
                       </div>
@@ -569,7 +572,7 @@ export default function Landing() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
               <div className="absolute bottom-4 left-4 right-4">
                 <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-lg">African Heritage</h3>
-                <p className="text-white/90 text-sm drop-shadow-md">Celebrating traditional beauty and craftsmanship</p>
+                <p className="text-white/90 text-sm drop-shadow-md">Celebrating the visionaries who shaped our continent</p>
               </div>
             </div>
           </div>
