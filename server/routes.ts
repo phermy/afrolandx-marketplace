@@ -19,16 +19,16 @@ import { eq, desc, and, sql } from "drizzle-orm";
 // Configure multer for memory storage (for cloud upload)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
+    const allowedTypes = /jpeg|jpg|png|webp|gif|avif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
+    const allowedMime = /image\/(jpeg|jpg|png|webp|gif|avif)/.test(file.mimetype);
+
+    if (allowedMime && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files are allowed (JPG, PNG, WEBP, GIF, AVIF)'));
     }
   }
 });
@@ -50,16 +50,16 @@ const localStorage = multer.diskStorage({
 
 const localUpload = multer({
   storage: localStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
+    const allowedTypes = /jpeg|jpg|png|webp|gif|avif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
+    const allowedMime = /image\/(jpeg|jpg|png|webp|gif|avif)/.test(file.mimetype);
+
+    if (allowedMime && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image files are allowed (JPG, PNG, WEBP, GIF, AVIF)'));
     }
   }
 });
@@ -462,8 +462,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               imageUrls = await Promise.all(uploadPromises);
               console.log('Successfully uploaded images to cloud storage');
             } else {
-              // Use local storage with proper file handling
-              imageUrls = files.map(file => `/uploads/${file.filename}`);
+              // Cloud storage disabled — save from memory buffer to disk
+              const fsMod = await import('fs');
+              const pathMod = await import('path');
+              const sharpMod = await import('sharp');
+              const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
+              if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
+
+              for (const file of files) {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                const filename = `product-${uniqueSuffix}.jpg`;
+                const filepath = pathMod.join(uploadDir, filename);
+                const optimizedBuffer = await sharpMod.default(file.buffer)
+                  .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                  .jpeg({ quality: 85, progressive: true })
+                  .toBuffer();
+                fsMod.writeFileSync(filepath, optimizedBuffer);
+                imageUrls.push(`/uploads/${filename}`);
+              }
             }
           } catch (error: any) {
             console.error('Cloud storage failed, falling back to local storage:', error);
@@ -504,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const filepath = path.join(uploadDir, filename);
               
               fs.writeFileSync(filepath, optimizedBuffer);
-              imageUrls.push(`/uploads/products/${filename}`);
+              imageUrls.push(`/uploads/${filename}`);
             }
             console.log('Successfully saved optimized images locally as fallback');
           }

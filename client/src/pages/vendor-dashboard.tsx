@@ -884,11 +884,11 @@ export default function VendorDashboard() {
                       name="images"
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
                       className="input-nigerian"
                     />
                     <p className="text-sm text-gray-500 mt-1">
-                      Upload up to 5 images. Supported formats: JPG, PNG, WEBP
+                      Upload up to 5 images (max 15MB each). Supported formats: JPG, PNG, WEBP, GIF, AVIF
                     </p>
                   </div>
 
