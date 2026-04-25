@@ -199,12 +199,14 @@ export default function AdminDashboard() {
   // Initialize categories mutation
   const initCategoriesMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest('POST', '/api/categories/init');
+      const res = await apiRequest('POST', '/api/categories/init');
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       toast({
-        title: 'Success',
-        description: 'Categories initialized successfully.',
+        title: 'Categories',
+        description: data?.message ?? 'Categories initialized successfully.',
       });
     },
     onError: (error) => {

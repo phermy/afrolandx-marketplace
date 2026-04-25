@@ -345,19 +345,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/categories/init', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const defaultCategories = [
-        { name: 'Traditional Wear', slug: 'traditional-wear', description: 'Authentic Nigerian traditional clothing' },
-        { name: 'Aso Oke', slug: 'aso-oke', description: 'Handwoven traditional fabrics' },
-        { name: 'Beads & Jewelry', slug: 'beads-jewelry', description: 'Traditional Nigerian beads and jewelry' },
-        { name: 'Accessories', slug: 'accessories', description: 'Fashion accessories and items' },
+        { name: 'Traditional Wear',   slug: 'traditional-wear',  description: 'Authentic African traditional clothing' },
+        { name: 'Aso Oke',            slug: 'aso-oke',           description: 'Handwoven traditional fabrics' },
+        { name: 'Beads & Jewelry',    slug: 'beads-jewelry',     description: 'Traditional African beads and jewelry' },
+        { name: 'Accessories',        slug: 'accessories',       description: 'Fashion accessories and items' },
+        { name: 'Ankara & Kente',     slug: 'ankara-kente',      description: 'Printed and woven African fabrics' },
+        { name: 'Footwear',           slug: 'footwear',          description: 'African leather sandals and shoes' },
+        { name: 'Home & Crafts',      slug: 'home-crafts',       description: 'Handmade baskets, carvings, and art' },
+        { name: 'Beauty & Wellness',  slug: 'beauty-wellness',   description: 'African natural beauty products' },
       ];
 
-      const categories = [];
+      // Fetch slugs that already exist so we never hit the unique constraint
+      const existing = await storage.getCategories();
+      const existingSlugs = new Set(existing.map((c: any) => c.slug));
+
+      const created = [];
+      const skipped = [];
       for (const cat of defaultCategories) {
+        if (existingSlugs.has(cat.slug)) {
+          skipped.push(cat.slug);
+          continue;
+        }
         const category = await storage.createCategory(cat);
-        categories.push(category);
+        created.push(category);
       }
 
-      res.json({ message: 'Categories initialized', categories });
+      const message = created.length === 0
+        ? `All categories already exist (${skipped.length} skipped)`
+        : `Created ${created.length} categor${created.length === 1 ? 'y' : 'ies'}${skipped.length ? `, ${skipped.length} already existed` : ''}`;
+
+      res.json({ message, categories: [...existing, ...created] });
     } catch (error) {
       console.error('Error initializing categories:', error);
       res.status(500).json({ message: 'Failed to initialize categories' });
