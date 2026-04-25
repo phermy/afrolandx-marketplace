@@ -187,7 +187,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[480px] sm:h-[560px] md:h-[620px]">
+      <section className="relative overflow-hidden h-[520px] sm:h-[580px] md:h-[640px]">
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
@@ -199,11 +199,11 @@ export default function Landing() {
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
-                {/* Slide culture badge — bottom left */}
-                <div className="absolute bottom-20 left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
-                  <span className="text-xl">{slide.flag}</span>
+                {/* Slide culture badge */}
+                <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
+                  <span className="text-base sm:text-xl">{slide.flag}</span>
                   <div>
-                    <p className="text-white/90 font-semibold text-sm leading-none">{slide.label}</p>
+                    <p className="text-white/90 font-semibold text-xs sm:text-sm leading-none">{slide.label}</p>
                     <p className="text-amber-300 text-xs mt-0.5">{slide.country}</p>
                   </div>
                 </div>
@@ -221,29 +221,34 @@ export default function Landing() {
         {/* Hero Content */}
         <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-6 md:mb-8 text-white">
+            <h1 className="text-2xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-3 sm:mb-6 md:mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
                 Discover Authentic
               </span>
-              <span className="block text-amber-300 mt-2">
+              <span className="block text-amber-300 mt-1 sm:mt-2">
                 African Fashion
               </span>
             </h1>
-            <p className="text-base sm:text-xl md:text-2xl mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
+            {/* Full description — hidden on small screens to save space */}
+            <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
               From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork — 
-              celebrate the rich cultural heritage of all 54 African nations with authentic handcrafted designs.
+              celebrate the rich cultural heritage of all 54 African nations.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            {/* Compact description — only on mobile */}
+            <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-2">
+              Authentic fashion from across all 54 African nations.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
               <Button
                 onClick={() => window.location.href = "/register"}
                 size="lg"
-                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200 w-full sm:w-auto max-w-xs sm:max-w-none"
               >
                 Create Free Account
               </Button>
               <Button
                 size="lg"
-                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 text-base px-6 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
+                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 text-base px-6 py-3 sm:py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200 w-full sm:w-auto max-w-xs sm:max-w-none"
                 onClick={() => setIsVendorModalOpen(true)}
               >
                 Become a Vendor
@@ -253,7 +258,7 @@ export default function Landing() {
         </div>
 
         {/* Carousel Indicators */}
-        <div className="absolute bottom-8 left-0 right-0 z-30 flex justify-center gap-2">
+        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
           {culturalSlides.map((_, index) => (
             <button
               key={index}
