@@ -271,69 +271,69 @@ export default function Landing() {
       </section>
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-white" id="products">
+      <section className="py-12 md:py-20 bg-white" id="products">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold font-nigerian mb-6 text-gray-900">
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-nigerian mb-3 md:mb-6 text-gray-900">
               Featured <span className="text-nigerian-green">Collections</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Discover authentic African fashion pieces crafted by local artisans. 
-              Each piece tells a story of our rich cultural heritage.
+            <p className="text-sm sm:text-base md:text-xl text-gray-600 max-w-3xl mx-auto px-2">
+              Discover authentic African fashion pieces crafted by local artisans.
             </p>
           </div>
 
           {products.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
               {products.slice(0, 8).map((product) => (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
                   <div className="relative overflow-hidden rounded-t-lg">
                     <img
                       src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/api/placeholder/300/400')}
                       alt={product.name}
-                      className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-36 sm:h-52 md:h-64 object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     {product.featured && (
-                      <Badge className="absolute top-3 left-3 bg-nigerian-gold text-white">
+                      <Badge className="absolute top-2 left-2 bg-nigerian-gold text-white text-xs px-1.5 py-0.5">
                         Featured
                       </Badge>
                     )}
                     {product.stock <= 5 && product.stock > 0 && (
-                      <Badge className="absolute top-3 right-3 bg-orange-500 text-white">
+                      <Badge className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-1.5 py-0.5">
                         Low Stock
                       </Badge>
                     )}
                     {product.stock === 0 && (
-                      <Badge className="absolute top-3 right-3 bg-red-500 text-white">
-                        Out of Stock
+                      <Badge className="absolute top-2 right-2 bg-red-500 text-white text-xs px-1.5 py-0.5">
+                        Sold Out
                       </Badge>
                     )}
                   </div>
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold text-lg mb-2 text-gray-900 group-hover:text-nigerian-green transition-colors">
+                  <CardContent className="p-3 sm:p-4 md:p-6">
+                    <h3 className="font-semibold text-xs sm:text-sm md:text-base mb-1 md:mb-2 text-gray-900 group-hover:text-nigerian-green transition-colors line-clamp-1">
                       {product.name}
                     </h3>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    <p className="hidden sm:block text-gray-600 text-xs md:text-sm mb-2 md:mb-4 line-clamp-2">
                       {product.description}
                     </p>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-2 md:mb-4">
                       <div className="flex flex-col">
-                        <span className="text-2xl font-bold text-nigerian-green">
+                        <span className="text-sm sm:text-base md:text-xl font-bold text-nigerian-green">
                           ${product.price.toLocaleString()}
                         </span>
                         <LocalPrice usdAmount={product.price} />
                       </div>
-                      <span className="text-sm text-gray-500">
+                      <span className="hidden sm:block text-xs text-gray-500">
                         {product.stock} left
                       </span>
                     </div>
-                    <Button 
+                    <Button
                       onClick={() => handleAddToCart(product.id)}
-                      className="w-full btn-nigerian"
+                      className="w-full btn-nigerian text-xs sm:text-sm py-1.5 sm:py-2 h-auto"
                       disabled={product.stock === 0}
                     >
-                      <ShoppingCart className="w-4 h-4 mr-2" />
-                      {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">{product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
+                      <span className="sm:hidden">{product.stock === 0 ? 'Sold Out' : 'Add'}</span>
                     </Button>
                   </CardContent>
                 </Card>
@@ -358,20 +358,20 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-16 bg-white">
+      <section id="features" className="py-10 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Why Choose Afrolandx?
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-sm sm:text-base md:text-lg text-gray-600">
               Your trusted marketplace for authentic African fashion
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
             <Card className="text-center card-hover">
-              <CardContent className="p-8">
+              <CardContent className="p-5 md:p-8">
                 <div className="w-16 h-16 bg-nigerian-green rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -385,7 +385,7 @@ export default function Landing() {
             </Card>
 
             <Card className="text-center card-hover">
-              <CardContent className="p-8">
+              <CardContent className="p-5 md:p-8">
                 <div className="w-16 h-16 bg-nigerian-gold rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
@@ -400,7 +400,7 @@ export default function Landing() {
             </Card>
 
             <Card className="text-center card-hover">
-              <CardContent className="p-8">
+              <CardContent className="p-5 md:p-8">
                 <div className="w-16 h-16 bg-coral rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
@@ -417,18 +417,18 @@ export default function Landing() {
       </section>
 
       {/* Product Categories Preview */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-10 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Explore Our Categories
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-sm sm:text-base md:text-lg text-gray-600">
               Discover the beauty of African traditional fashion
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {[
               { name: "Traditional Wear", description: "Authentic African clothing", emoji: "👘" },
               { name: "Aso Oke", description: "Handwoven fabrics", emoji: "🧵" },
@@ -436,10 +436,10 @@ export default function Landing() {
               { name: "Modern Fusion", description: "Contemporary designs", emoji: "✨" },
             ].map((category, index) => (
               <Card key={index} className="text-center card-hover">
-                <CardContent className="p-6">
-                  <div className="text-4xl mb-4">{category.emoji}</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h3>
-                  <p className="text-gray-600 text-sm">{category.description}</p>
+                <CardContent className="p-4 md:p-6">
+                  <div className="text-3xl md:text-4xl mb-2 md:mb-4">{category.emoji}</div>
+                  <h3 className="text-sm md:text-lg font-semibold text-gray-900 mb-1 md:mb-2">{category.name}</h3>
+                  <p className="hidden sm:block text-gray-600 text-xs md:text-sm">{category.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -448,13 +448,13 @@ export default function Landing() {
       </section>
 
       {/* Payment & Shipping */}
-      <section className="py-16 bg-white">
+      <section className="py-10 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Secure Payment & Fast Delivery
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-sm sm:text-base md:text-lg text-gray-600">
               We accept multiple payment methods and deliver worldwide
             </p>
           </div>
@@ -491,29 +491,29 @@ export default function Landing() {
       </section>
 
       {/* About Section */}
-      <section id="about" className="py-16 bg-gray-50">
+      <section id="about" className="py-10 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-6" style={{ lineHeight: '1.3', paddingBottom: '0.3em' }}>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-4 md:mb-6" style={{ lineHeight: '1.3' }}>
                 Celebrating African Heritage
               </h2>
-              <p className="text-gray-600 text-lg mb-6">
+              <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
                 Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
                 connecting African artisans with fashion enthusiasts worldwide. Our mission is 
                 to preserve and promote the rich heritage of African traditional fashion while 
                 supporting local communities.
               </p>
-              <p className="text-gray-600 text-lg mb-6">
+              <p className="hidden sm:block text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
                 Every purchase you make helps support African artisans, preserves traditional 
                 crafting techniques, and celebrates the vibrant culture of Africa.
               </p>
-              <Button onClick={handleLogin} className="btn-nigerian">
+              <Button onClick={handleLogin} className="btn-nigerian w-full sm:w-auto">
                 Join Our Community
               </Button>
             </div>
             <div className="relative">
-              <div className="w-full h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
+              <div className="w-full h-56 sm:h-72 md:h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
                 <img 
                   src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
                   alt="Beautiful African woman in traditional dress"
@@ -531,21 +531,21 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-nigerian-green text-white">
+      <section className="py-10 md:py-16 bg-nigerian-green text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 md:mb-6">
             Ready to Explore African Fashion?
           </h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-xl mb-6 md:mb-8 opacity-90 max-w-2xl mx-auto px-2">
             Join thousands of fashion enthusiasts who trust Afrolandx for authentic African clothing and accessories.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+            <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold w-full sm:w-auto max-w-xs sm:max-w-none">
               Start Shopping Now
             </Button>
-            <Button 
-              size="lg" 
-              className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white"
+            <Button
+              size="lg"
+              className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white w-full sm:w-auto max-w-xs sm:max-w-none"
               onClick={() => setIsVendorModalOpen(true)}
             >
               Become a Vendor
@@ -555,9 +555,9 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-gray-900 text-white py-8 md:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             <div>
               <div className="flex items-center text-2xl font-bold font-nigerian mb-4">
                 <img 

@@ -237,22 +237,22 @@ export default function Home() {
 
       {/* Featured Categories - Only show for non-authenticated users */}
       {!user && (
-        <section className="py-16 bg-white">
+        <section className="py-10 md:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Featured Categories</h2>
-              <p className="text-gray-600 text-lg">Explore our curated collection of authentic African fashion</p>
+            <div className="text-center mb-8 md:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">Featured Categories</h2>
+              <p className="text-sm sm:text-base md:text-lg text-gray-600">Explore our curated collection of authentic African fashion</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
               {categories.slice(0, 3).map((category, index) => {
                 const categoryIcons = ["👘", "🧵", "📿", "✨"];
                 return (
                   <Card key={category.id} className="text-center card-hover bg-white">
-                    <CardContent className="p-8">
-                      <div className="text-5xl mb-6">{categoryIcons[index] || "🎯"}</div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3">{category.name}</h3>
-                      <p className="text-gray-600 text-base">{category.description || "Discover our authentic collection"}</p>
+                    <CardContent className="p-4 md:p-8">
+                      <div className="text-3xl md:text-5xl mb-3 md:mb-6">{categoryIcons[index] || "🎯"}</div>
+                      <h3 className="text-sm md:text-xl font-semibold text-gray-900 mb-1 md:mb-3">{category.name}</h3>
+                      <p className="hidden sm:block text-gray-600 text-xs md:text-base">{category.description || "Discover our authentic collection"}</p>
                     </CardContent>
                   </Card>
                 );
@@ -263,15 +263,15 @@ export default function Home() {
       )}
 
       {/* Featured Products */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-10 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-12">
+          <div className="flex justify-between items-center mb-6 md:mb-12">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Featured Products</h2>
-              <p className="text-gray-600 text-lg">Handpicked by our cultural fashion experts</p>
+              <h2 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-900 font-nigerian mb-1 md:mb-4">Featured Products</h2>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-600">Handpicked by our cultural fashion experts</p>
             </div>
-            <Button variant="outline" className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white">
-              View All Products →
+            <Button variant="outline" className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white text-xs sm:text-sm px-2 sm:px-4 shrink-0">
+              <span className="hidden sm:inline">View All Products </span>→
             </Button>
           </div>
 
@@ -291,16 +291,16 @@ export default function Home() {
 
       {/* All Products */}
       {(searchQuery || selectedCategory !== null) && (
-        <section id="products-section" className="py-16 bg-white">
+        <section id="products-section" className="py-10 md:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-12">
+            <div className="flex justify-between items-center mb-6 md:mb-12">
               <div>
-                <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
-                  {searchQuery ? `Search Results for "${searchQuery}"` : 
-                   selectedCategory ? `${categories.find(c => c.id === selectedCategory)?.name || 'Category'} Products` : 
+                <h2 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-900 font-nigerian mb-1 md:mb-4">
+                  {searchQuery ? `Results: "${searchQuery}"` : 
+                   selectedCategory ? `${categories.find(c => c.id === selectedCategory)?.name || 'Category'}` : 
                    "All Products"}
                 </h2>
-                <p className="text-gray-600 text-lg">
+                <p className="text-xs sm:text-sm md:text-lg text-gray-600">
                   {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
                 </p>
               </div>
@@ -337,12 +337,12 @@ export default function Home() {
 
       {/* Show all products when no filters are active */}
       {!searchQuery && selectedCategory === null && (
-        <section id="products-section" className="py-16 bg-white">
+        <section id="products-section" className="py-10 md:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-12">
+            <div className="flex justify-between items-center mb-6 md:mb-12">
               <div>
-                <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">All Products</h2>
-                <p className="text-gray-600 text-lg">Discover our complete collection</p>
+                <h2 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-900 font-nigerian mb-1 md:mb-4">All Products</h2>
+                <p className="text-xs sm:text-sm md:text-lg text-gray-600">Discover our complete collection</p>
               </div>
             </div>
 
@@ -362,16 +362,16 @@ export default function Home() {
       )}
 
       {/* Features Section */}
-      <section className="py-16 bg-white border-t">
+      <section className="py-10 md:py-16 bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">Why Choose Afrolandx</h2>
-            <p className="text-gray-600 text-lg">Your trusted marketplace for authentic African fashion</p>
+          <div className="text-center mb-8 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">Why Choose Afrolandx</h2>
+            <p className="text-sm sm:text-base md:text-lg text-gray-600">Your trusted marketplace for authentic African fashion</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow duration-300">
-              <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+            <Card className="text-center hover:shadow-lg transition-shadow duration-300">
+              <CardContent className="p-5 md:p-6">
                 <div className="w-16 h-16 bg-nigerian-green rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -382,8 +382,8 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="text-center hover:shadow-lg transition-shadow duration-300">
+              <CardContent className="p-5 md:p-6">
                 <div className="w-16 h-16 bg-nigerian-gold rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
@@ -395,8 +395,8 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="text-center p-6 hover:shadow-lg transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="text-center hover:shadow-lg transition-shadow duration-300">
+              <CardContent className="p-5 md:p-6">
                 <div className="w-16 h-16 bg-coral rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
@@ -412,8 +412,8 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="bg-nigerian-green text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             <div>
               <div className="flex items-center text-2xl font-bold font-nigerian mb-4">
                 <img 
