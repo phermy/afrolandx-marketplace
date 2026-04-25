@@ -80,6 +80,29 @@ export async function setupAuth(app: Express) {
   });
 
   // Register endpoint
+  app.get("/api/check-email", async (req, res) => {
+    try {
+      const email = (req.query.email as string || "").toLowerCase().trim();
+      if (!email) return res.status(400).json({ message: "Email is required" });
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) return res.json({ exists: false });
+
+      const roles: string[] = (user.roles as string[]) || ["customer"];
+      const isVendor = roles.includes("vendor");
+      const isAdmin = roles.includes("admin");
+
+      return res.json({
+        exists: true,
+        accountType: isAdmin ? "admin" : isVendor ? "vendor" : "customer",
+        roles,
+        emailVerified: user.emailVerified,
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Check failed" });
+    }
+  });
+
   app.post("/api/register", async (req, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
@@ -90,8 +113,13 @@ export async function setupAuth(app: Express) {
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
+        const roles: string[] = (existingUser.roles as string[]) || ["customer"];
+        const isVendor = roles.includes("vendor");
         return res.status(409).json({ 
-          message: "This email is already registered",
+          message: isVendor
+            ? "This email is already registered as a vendor account."
+            : "This email is already registered as a customer account.",
+          roles,
           hint: "sign_in"
         });
       }
