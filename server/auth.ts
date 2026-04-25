@@ -121,14 +121,10 @@ export async function setupAuth(app: Express) {
         console.error("Failed to send verification email:", err)
       );
 
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Login failed after registration" });
-        }
-        return res.json({ 
-          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles },
-          emailVerificationSent: true
-        });
+      return res.json({ 
+        message: "Account created. Please verify your email.",
+        email: user.email,
+        emailVerificationSent: true
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -278,7 +274,13 @@ export async function setupAuth(app: Express) {
       }
 
       await storage.verifyUserEmail(user.id);
-      return res.json({ message: "Email verified successfully" });
+
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Verification succeeded but login failed. Please sign in." });
+        }
+        return res.json({ message: "Email verified successfully", user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
+      });
     } catch (error) {
       console.error("Email verification error:", error);
       return res.status(500).json({ message: "Verification failed" });

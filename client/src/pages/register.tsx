@@ -77,7 +77,6 @@ export default function RegisterPage() {
         throw new Error(result.message || "Registration failed");
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setRegisteredEmail(data.email);
       setStep("verify");
       toast({ title: "Account created!", description: "Check your email for a verification code." });
@@ -103,7 +102,6 @@ export default function RegisterPage() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message);
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setStep("done");
     } catch (error: any) {
       toast({ title: "Invalid code", description: error.message || "Please try again", variant: "destructive" });
@@ -130,10 +128,6 @@ export default function RegisterPage() {
     }
   }
 
-  function skipVerification() {
-    setLocation("/");
-  }
-
   if (step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
@@ -142,7 +136,10 @@ export default function RegisterPage() {
             <CheckCircle className="h-20 w-20 text-green-600 mx-auto" />
             <h2 className="text-2xl font-bold text-green-800">Email Verified!</h2>
             <p className="text-gray-600">Your account is fully set up and ready to go.</p>
-            <Button className="w-full bg-green-700 hover:bg-green-800" onClick={() => setLocation("/")}>
+            <Button className="w-full bg-green-700 hover:bg-green-800" onClick={async () => {
+              await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              setLocation("/");
+            }}>
               Start Shopping
             </Button>
           </CardContent>
@@ -191,9 +188,6 @@ export default function RegisterPage() {
                   {isResending ? "Sending..." : "Resend code"}
                 </button>
               </p>
-              <button onClick={skipVerification} className="text-gray-400 hover:underline text-xs">
-                Skip for now
-              </button>
             </div>
           </CardContent>
         </Card>
