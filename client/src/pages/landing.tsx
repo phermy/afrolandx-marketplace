@@ -20,6 +20,7 @@ import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
 import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
 import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
+import AfricanProductCarousel, { AFRICAN_PRODUCTS } from "@/components/AfricanProductCarousel";
 
 const culturalSlides = [
   { image: panAfricanImg,  country: "Pan-Africa",    label: "Unity in Diversity",            flag: "🌍" },
@@ -447,6 +448,24 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* African Products Showcase — auto-scrolling carousel */}
+      <section className="py-10 md:py-14 bg-nigerian-green overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 md:mb-8 text-center">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white font-nigerian mb-2 md:mb-3">
+            100+ African Products
+          </h2>
+          <p className="text-sm sm:text-base text-white/80">
+            Textiles · Jewelry · Fashion · Crafts · Beauty — from all 54 nations
+          </p>
+        </div>
+        <AfricanProductCarousel />
+        <div className="text-center mt-6 md:mt-8">
+          <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold text-gray-900 hover:bg-yellow-400 font-bold px-8">
+            Shop All Products
+          </Button>
+        </div>
+      </section>
+
       {/* Payment & Shipping */}
       <section className="py-10 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -512,18 +531,45 @@ export default function Landing() {
                 Join Our Community
               </Button>
             </div>
-            <div className="relative">
-              <div className="w-full h-56 sm:h-72 md:h-96 bg-white rounded-xl shadow-2xl overflow-hidden">
-                <img 
-                  src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80"
-                  alt="Beautiful African woman in traditional dress"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
-                <div className="absolute bottom-6 left-6 right-6">
-                  <h3 className="text-white font-bold text-xl mb-2 drop-shadow-lg">African Heritage</h3>
-                  <p className="text-white/90 text-sm drop-shadow-md">Celebrating traditional beauty and craftsmanship</p>
-                </div>
+            <div className="relative overflow-hidden rounded-xl shadow-2xl bg-gray-900">
+              <div className="overflow-hidden space-y-3 p-4">
+                {([
+                  { slice: AFRICAN_PRODUCTS.slice(0, 18), dir: "left", speed: 28 },
+                  { slice: AFRICAN_PRODUCTS.slice(18, 36), dir: "right", speed: 22 },
+                ] as const).map(({ slice, dir, speed }, rowIdx) => {
+                  const doubled = [...slice, ...slice];
+                  return (
+                    <div key={rowIdx} className="overflow-hidden">
+                      <div
+                        className="flex gap-2"
+                        style={{
+                          animation: `${dir === "left" ? "marqueeLeft" : "marqueeRight"} ${speed}s linear infinite`,
+                          width: "max-content",
+                        }}
+                      >
+                        {doubled.map((item, i) => (
+                          <div key={i} className="flex-shrink-0 w-28 h-28 rounded-lg overflow-hidden">
+                            <img
+                              src={item.url}
+                              alt={item.label}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  "https://images.unsplash.com/photo-1573567666066-18bb6ac15720?auto=format&fit=crop&w=320&h=320&q=75";
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-4 left-4 right-4">
+                <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-lg">African Heritage</h3>
+                <p className="text-white/90 text-sm drop-shadow-md">Celebrating traditional beauty and craftsmanship</p>
               </div>
             </div>
           </div>

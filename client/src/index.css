@@ -339,3 +339,14 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 }
+
+/* African Product Carousel marquee animations */
+@keyframes marqueeLeft {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes marqueeRight {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
