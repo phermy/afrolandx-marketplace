@@ -109,7 +109,7 @@ export interface IStorage {
   // Product operations
   createProduct(product: InsertProduct): Promise<Product>;
   getProduct(id: number): Promise<Product | undefined>;
-  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean }): Promise<Product[]>;
+  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; }): Promise<Product[]>;
   updateProductStatus(id: number, status: string): Promise<void>;
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;

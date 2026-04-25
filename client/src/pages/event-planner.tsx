@@ -278,7 +278,7 @@ export default function EventPlannerPage() {
                       </p>
                     </div>
                     <Button asChild>
-                      <a href="/api/login">Sign In</a>
+                      <a href="/login">Sign In</a>
                     </Button>
                   </div>
                 </CardContent>

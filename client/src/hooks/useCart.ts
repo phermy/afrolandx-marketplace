@@ -41,7 +41,7 @@ export function useCart() {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -69,7 +69,7 @@ export function useCart() {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -101,7 +101,7 @@ export function useCart() {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -133,7 +133,7 @@ export function useCart() {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -161,7 +161,7 @@ export function useCart() {
         variant: 'destructive',
       });
       setTimeout(() => {
-        window.location.href = '/api/login';
+        window.location.href = '/login';
       }, 500);
       return;
     }

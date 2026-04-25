@@ -71,7 +71,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -103,7 +103,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -135,7 +135,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }
@@ -167,7 +167,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           variant: 'destructive',
         });
         setTimeout(() => {
-          window.location.href = '/api/login';
+          window.location.href = '/login';
         }, 500);
         return;
       }

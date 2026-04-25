@@ -3,24 +3,20 @@ import { storage } from "./storage";
 
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
   try {
-    if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+    if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const userId = req.user.claims.sub;
+    const userId = req.user.id;
     const user = await storage.getUser(userId);
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // Check if user has admin role
-    const roles = user.roles ? JSON.parse(user.roles as string) : [];
+    const roles: string[] = Array.isArray(user.roles) ? user.roles as string[] : [];
     if (!roles.includes('admin')) {
-      return res.status(403).json({ 
-        message: "Access denied. Admin privileges required.",
-        userRoles: roles
-      });
+      return res.status(403).json({ message: "Access denied. Admin privileges required." });
     }
 
     next();

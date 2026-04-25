@@ -47,7 +47,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = () => {
     if (!isAuthenticated) {
       // Redirect to login if not authenticated
-      window.location.href = '/api/login';
+      window.location.href = '/login';
       return;
     }
     

@@ -118,7 +118,7 @@ export default function QuizPage() {
           Learn about African cultural heritage and earn loyalty points!
         </p>
         <Button asChild>
-          <a href="/api/login">Sign In</a>
+          <a href="/login">Sign In</a>
         </Button>
       </div>
     );

@@ -5,7 +5,6 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { getChatbotService } from "./chatbot";
-import { isAdmin } from "./adminAuth";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, insertMessageSchema, orders, orderItems, products, vendors } from "@shared/schema";
 import { z } from "zod";
@@ -875,46 +874,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderItems = await storage.getOrderItemsWithProducts(order.id);
       
       // Reduce stock for each purchased item
-      console.log('Processing stock reduction for order:', order.id);
       for (const item of orderItems) {
-        console.log('Processing item:', item);
         const product = await storage.getProduct(item.productId);
-        console.log('Product before stock reduction:', product);
         if (product && product.stock >= item.quantity) {
-          const newStock = product.stock - item.quantity;
-          console.log(`Reducing stock for product ${item.productId} from ${product.stock} to ${newStock}`);
-          await storage.updateProductStock(item.productId, newStock);
-          console.log('Stock reduction completed for product:', item.productId);
-        } else {
-          console.log(`Cannot reduce stock for product ${item.productId}: insufficient stock or product not found`);
+          await storage.updateProductStock(item.productId, product.stock - item.quantity);
         }
       }
       
-      // Create notifications for vendors and admins
-      const vendorNotifications = new Set<number>();
-      
+      // Notify vendors and admins
+      const notifiedVendors = new Set<number>();
       for (const item of orderItems) {
         const product = await storage.getProduct(item.productId);
-        if (product && !vendorNotifications.has(product.vendorId)) {
+        if (product && !notifiedVendors.has(product.vendorId)) {
           const vendor = await storage.getVendor(product.vendorId);
           if (vendor) {
             await storage.createNotification({
               userId: vendor.userId,
-              title: 'New Order Received! 🎉',
-              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
+              title: 'New Order Received!',
+              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
               type: 'order'
             });
-            vendorNotifications.add(product.vendorId);
+            notifiedVendors.add(product.vendorId);
           }
         }
       }
 
-      // Notify all admins
       const adminUsers = await storage.getAdminUsers();
       for (const admin of adminUsers) {
         await storage.createNotification({
           userId: admin.id,
-          title: 'New Order Placed! 📦',
+          title: 'New Order Placed',
           message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
           type: 'order'
         });
@@ -975,18 +964,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderItems = await storage.getOrderItemsWithProducts(order.id);
         
         // Reduce stock for each purchased item
-        console.log('Processing stock reduction for order:', order.id);
         for (const item of orderItems) {
-          console.log('Processing item:', item);
           const product = await storage.getProduct(item.productId);
-          console.log('Product before stock reduction:', product);
           if (product && product.stock >= item.quantity) {
-            const newStock = product.stock - item.quantity;
-            console.log(`Reducing stock for product ${item.productId} from ${product.stock} to ${newStock}`);
-            await storage.updateProductStock(item.productId, newStock);
-            console.log('Stock reduction completed for product:', item.productId);
-          } else {
-            console.log(`Cannot reduce stock for product ${item.productId}: insufficient stock or product not found`);
+            await storage.updateProductStock(item.productId, product.stock - item.quantity);
           }
         }
         
@@ -1049,10 +1030,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied: Vendor account required' });
       }
 
-      const vendorOwnsItems = orderItems.some(async (item) => {
+      let vendorOwnsItems = false;
+      for (const item of orderItems) {
         const product = await storage.getProduct(item.productId);
-        return product?.vendorId === vendor.id;
-      });
+        if (product?.vendorId === vendor.id) {
+          vendorOwnsItems = true;
+          break;
+        }
+      }
 
       if (!vendorOwnsItems) {
         return res.status(403).json({ message: 'Access denied: You can only update orders containing your products' });
@@ -1221,104 +1206,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch order' });
-    }
-  });
-
-  // Verify Paystack payment
-  app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
-    try {
-      const { reference } = req.body;
-      const userId = (req.user as any)?.id;
-
-      if (!isPaystackInitialized()) {
-        return res.status(503).json({ message: 'Payment service not configured' });
-      }
-
-      // Verify payment with Paystack
-      const paystack = getPaystackService();
-      const verification = await paystack.verifyTransaction(reference);
-
-      if (verification.data.status === 'success') {
-        // Update order payment status
-        await storage.updatePaymentStatus(verification.data.metadata.orderId, 'paid', reference);
-        
-        // Get the order and create notifications
-        const order = await storage.getOrder(verification.data.metadata.orderId);
-        if (order) {
-          // Get order items for vendor notifications
-          const orderItems = await storage.getOrderItemsWithProducts(order.id);
-          const vendorProductMap: { [key: string]: any[] } = {};
-          
-          for (const item of orderItems) {
-            const product = await storage.getProduct(item.productId);
-            if (product) {
-              const vendor = await storage.getVendor(product.vendorId);
-              if (vendor) {
-                const vendorId = vendor.userId;
-                if (!vendorProductMap[vendorId]) {
-                  vendorProductMap[vendorId] = [];
-                }
-                vendorProductMap[vendorId].push({
-                  product: product,
-                  quantity: item.quantity,
-                  totalPrice: parseFloat(item.priceAtTime) * item.quantity
-                });
-              }
-            }
-          }
-
-          // Notify vendors about successful payment
-          for (const vendorId in vendorProductMap) {
-            const products = vendorProductMap[vendorId];
-            const totalVendorAmount = products.reduce((sum: number, p: any) => sum + p.totalPrice, 0);
-            const productNames = products.map((p: any) => p.product.name).join(', ');
-            
-            try {
-              await storage.createNotification({
-                userId: vendorId,
-                type: 'product_sold',
-                title: 'Payment Confirmed - Products Sold!',
-                message: `Payment confirmed for your products (${productNames}) in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
-                orderId: order.id,
-                isRead: false
-              });
-            } catch (notificationError) {
-              console.error('Error creating vendor notification:', notificationError);
-            }
-          }
-
-          // Notify admins about successful payment
-          try {
-            const adminUsers = await storage.getAdminUsers();
-            for (const admin of adminUsers) {
-              await storage.createNotification({
-                userId: admin.id,
-                type: 'payment_confirmed',
-                title: 'Payment Confirmed',
-                message: `Payment confirmed for order #${order.id}. Amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
-                orderId: order.id,
-                isRead: false
-              });
-            }
-          } catch (notificationError) {
-            console.error('Error creating admin notifications:', notificationError);
-          }
-        }
-
-        res.json({
-          success: true,
-          message: 'Payment verified successfully',
-          order: verification.data.metadata.orderId
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          message: 'Payment verification failed'
-        });
-      }
-    } catch (error) {
-      console.error('Payment verification error:', error);
-      res.status(500).json({ message: 'Payment verification failed' });
     }
   });
 
@@ -1512,19 +1399,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment webhook (Paystack)
+  // Payment webhook (Paystack) — handles async payment confirmations
   app.post('/api/webhooks/paystack', async (req, res) => {
     try {
+      // Verify webhook signature
+      const secret = process.env.PAYSTACK_SECRET_KEY;
+      if (secret) {
+        const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+        if (hash !== req.headers['x-paystack-signature']) {
+          return res.status(401).json({ message: 'Invalid signature' });
+        }
+      }
+
       const { event, data } = req.body;
 
       if (event === 'charge.success') {
-        const { reference, amount } = data;
-        
-        // Find order by reference and update payment status
-        // This would need additional logic to find order by reference
-        // For now, we'll just acknowledge the webhook
-        
-        console.log('Payment successful:', { reference, amount });
+        const { reference } = data;
+
+        if (isPaystackInitialized()) {
+          const paystack = getPaystackService();
+          const verification = await paystack.verifyTransaction(reference);
+
+          if (verification?.data?.status === 'success') {
+            // Find order by payment reference
+            const orderId = verification.data.metadata?.orderId;
+            if (orderId) {
+              const order = await storage.getOrder(orderId);
+              if (order && order.paymentStatus !== 'completed') {
+                await storage.updatePaymentStatus(orderId, 'completed', reference);
+                await storage.updateOrderStatus(orderId, 'confirmed');
+                await storage.clearCart(order.userId);
+
+                const orderItems = await storage.getOrderItemsWithProducts(orderId);
+                const notifiedVendors = new Set<number>();
+                for (const item of orderItems) {
+                  const product = await storage.getProduct(item.productId);
+                  if (product && product.stock >= item.quantity) {
+                    await storage.updateProductStock(item.productId, product.stock - item.quantity);
+                  }
+                  if (product && !notifiedVendors.has(product.vendorId)) {
+                    const vendor = await storage.getVendor(product.vendorId);
+                    if (vendor) {
+                      await storage.createNotification({
+                        userId: vendor.userId,
+                        title: 'Payment Confirmed',
+                        message: `Payment confirmed for order #${orderId}. Worth ₦${parseFloat(order.totalAmount).toLocaleString()}.`,
+                        type: 'order'
+                      });
+                      notifiedVendors.add(product.vendorId);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
 
       res.status(200).json({ message: 'Webhook received' });

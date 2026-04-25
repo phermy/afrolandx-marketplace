@@ -351,7 +351,7 @@ function DropCard({
                 )
               ) : (
                 <Button variant="outline" asChild>
-                  <Link href="/api/login">Sign in to RSVP</Link>
+                  <Link href="/login">Sign in to RSVP</Link>
                 </Button>
               )}
             </CardFooter>
