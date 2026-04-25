@@ -1,0 +1,50 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "LF6rfTWeZaM6pfCJuujGq"
+uri = "file://attached_assets/stock_images/maasai_warriors_kenya.png"
+type = "image"
+title = "maasai warriors kenya"
+
+[[generated]]
+id = "WiA4LHicQASxKLaI7Mizb"
+uri = "file://attached_assets/stock_images/african_leader_mandela_tribute.png"
+type = "image"
+title = "african statesman hero tribute"
+
+[[generated]]
+id = "q41dcEoTotq6l4zSIgrXV"
+uri = "file://attached_assets/stock_images/ethiopian_traditional_timkat.png"
+type = "image"
+title = "ethiopian timkat festival"
+
+[[generated]]
+id = "USkk4ENMKw3WEcSVoO9ku"
+uri = "file://attached_assets/stock_images/ghanaian_ashanti_chief.png"
+type = "image"
+title = "ghanaian ashanti ceremony"
+
+[[generated]]
+id = "EZG1V_Y-UoufEL_dpX8je"
+uri = "file://attached_assets/stock_images/moroccan_berber_culture.png"
+type = "image"
+title = "moroccan berber tradition"
+
+[[generated]]
+id = "uIG1nM5Db2oJbh-kKndJW"
+uri = "file://attached_assets/stock_images/ndebele_south_africa.png"
+type = "image"
+title = "ndebele south africa"
+
+[[generated]]
+id = "Esj3StgQIlC6Hm0dj4o2d"
+uri = "file://attached_assets/stock_images/pan_african_diversity.png"
+type = "image"
+title = "pan african diversity"
+
+[[generated]]
+id = "atzL4nQa4p6YKWmhBa6JS"
+uri = "file://attached_assets/stock_images/rwandan_intore_dancer.png"
+type = "image"
+title = "rwandan intore dancer"

@@ -11,22 +11,26 @@ import type { Product } from "@/types";
 import LocalPrice from "@/components/LocalPrice";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import maskImg1 from '@assets/stock_images/african_tribal_mask__b9d91dc8.jpg';
-import maskImg2 from '@assets/stock_images/african_tribal_mask__a4b4950f.jpg';
-import beadsImg1 from '@assets/stock_images/traditional_african__12ea2d80.jpg';
-import beadsImg2 from '@assets/stock_images/traditional_african__e1ddf4b0.jpg';
-import potteryImg1 from '@assets/stock_images/african_pottery_clay_f297241e.jpg';
-import potteryImg2 from '@assets/stock_images/african_pottery_clay_6c61e8a3.jpg';
+import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.png';
+import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.png';
+import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.png';
+import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.png';
+import moroccanImg from '@assets/stock_images/moroccan_berber_culture.png';
+import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
+import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
+import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
 
-const culturalImages = [
-  maskImg1,
-  beadsImg1,
-  potteryImg1,
-  fabricImg,
-  maskImg2,
-  beadsImg2,
-  potteryImg2,
+const culturalSlides = [
+  { image: panAfricanImg,  country: "Pan-Africa",    label: "Unity in Diversity",            flag: "🌍" },
+  { image: maasaiImg,      country: "Kenya · Tanzania", label: "Maasai Warriors",             flag: "🇰🇪" },
+  { image: mandelaImg,     country: "South Africa",  label: "Spirit of African Heroes",       flag: "🇿🇦" },
+  { image: ethiopianImg,   country: "Ethiopia",      label: "Timkat Festival",                flag: "🇪🇹" },
+  { image: ashantImg,      country: "Ghana",         label: "Ashanti Royal Heritage",         flag: "🇬🇭" },
+  { image: moroccanImg,    country: "Morocco",       label: "Berber Tradition",               flag: "🇲🇦" },
+  { image: ndebeImg,       country: "South Africa",  label: "Ndebele Cultural Art",           flag: "🇿🇦" },
+  { image: rwandanImg,     country: "Rwanda",        label: "Intore Ceremony",                flag: "🇷🇼" },
+  { image: fabricImg,      country: "West Africa",   label: "Kente Cloth",                    flag: "🌍" },
 ];
 
 export default function Landing() {
@@ -183,18 +187,26 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[480px] sm:h-[560px] md:h-[600px]">
+      <section className="relative overflow-hidden h-[480px] sm:h-[560px] md:h-[620px]">
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
-            {culturalImages.map((image, index) => (
+            {culturalSlides.map((slide, index) => (
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
-                <img 
-                  src={image} 
-                  alt={`African cultural fashion ${index + 1}`}
+                <img
+                  src={slide.image}
+                  alt={`${slide.label} — ${slide.country}`}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-green-900/80 to-emerald-800/85"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
+                {/* Slide culture badge — bottom left */}
+                <div className="absolute bottom-20 left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
+                  <span className="text-xl">{slide.flag}</span>
+                  <div>
+                    <p className="text-white/90 font-semibold text-sm leading-none">{slide.label}</p>
+                    <p className="text-amber-300 text-xs mt-0.5">{slide.country}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -202,7 +214,7 @@ export default function Landing() {
 
         {/* Pattern Overlay */}
         <div className="absolute inset-0 z-10" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.08'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.06'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           backgroundSize: '60px 60px'
         }}></div>
 
@@ -218,19 +230,19 @@ export default function Landing() {
               </span>
             </h1>
             <p className="text-base sm:text-xl md:text-2xl mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From traditional Aso Oke to contemporary native wear, find the finest African fashion pieces 
-              crafted by local artisans. Celebrate our rich cultural heritage with authentic designs.
+              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork — 
+              celebrate the rich cultural heritage of all 54 African nations with authentic handcrafted designs.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
+              <Button
                 onClick={() => window.location.href = "/register"}
-                size="lg" 
+                size="lg"
                 className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-lg px-8 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
               >
                 Create Free Account
               </Button>
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 text-base px-6 py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200"
                 onClick={() => setIsVendorModalOpen(true)}
               >
@@ -242,7 +254,7 @@ export default function Landing() {
 
         {/* Carousel Indicators */}
         <div className="absolute bottom-8 left-0 right-0 z-30 flex justify-center gap-2">
-          {culturalImages.map((_, index) => (
+          {culturalSlides.map((_, index) => (
             <button
               key={index}
               onClick={() => emblaApi?.scrollTo(index)}
