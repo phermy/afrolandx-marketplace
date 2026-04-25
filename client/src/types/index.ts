@@ -186,8 +186,8 @@ export interface NigerianState {
 }
 
 export interface NaijaFashionConfig {
-  currency: 'NGN';
-  currencySymbol: '₦';
+  currency: 'USD';
+  currencySymbol: '$';
   supportedCountries: string[];
   defaultShippingMethods: ShippingQuote[];
   paymentMethods: {

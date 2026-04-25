@@ -28,7 +28,7 @@ export default function ShoppingCart() {
   }
 
   const formatPrice = (price: string) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+    return `$${parseFloat(price).toLocaleString()}`;
   };
 
   const handleQuantityChange = (cartItemId: number, newQuantity: number) => {
@@ -39,7 +39,7 @@ export default function ShoppingCart() {
     }
   };
 
-  const shipping = 5000; // ₦5,000 base shipping
+  const shipping = 10; // $10 base shipping
   const finalTotal = cartTotal + shipping;
 
   return (

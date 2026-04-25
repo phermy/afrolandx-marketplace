@@ -61,7 +61,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   const formatPrice = (price: string) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+    return `$${parseFloat(price).toLocaleString()}`;
   };
 
   const getStatusBadge = () => {
@@ -213,7 +213,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             className="w-full mt-2 border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
             onClick={() => {
               // Show product details in an alert for now (can be enhanced with a modal later)
-              alert(`Product Details:\n\nName: ${product.name}\nDescription: ${product.description}\nPrice: ₦${parseFloat(product.price).toLocaleString()}\nStock: ${product.stock}\nWeight: ${product.weight ? parseFloat(product.weight) + 'kg' : 'Not specified'}\nStatus: ${product.status}`);
+              alert(`Product Details:\n\nName: ${product.name}\nDescription: ${product.description}\nPrice: $${parseFloat(product.price).toLocaleString()}\nStock: ${product.stock}\nWeight: ${product.weight ? parseFloat(product.weight) + 'kg' : 'Not specified'}\nStatus: ${product.status}`);
             }}
           >
             View Details

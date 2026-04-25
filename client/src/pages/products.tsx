@@ -230,7 +230,7 @@ export default function Products() {
                 {/* Price Range */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price Range (₦)
+                    Price Range ($)
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
@@ -343,7 +343,7 @@ export default function Products() {
                   )}
                   {(priceRange.min || priceRange.max) && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      ₦{priceRange.min || '0'} - ₦{priceRange.max || '∞'}
+                      ${priceRange.min || '0'} - ${priceRange.max || '∞'}
                       <button
                         onClick={() => setPriceRange({ min: '', max: '' })}
                         className="ml-1 hover:text-red-500"

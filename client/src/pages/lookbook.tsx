@@ -162,7 +162,7 @@ export default function LookbookPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="budget">Budget (₦) (Optional)</Label>
+                <Label htmlFor="budget">Budget ($) (Optional)</Label>
                 <Input
                   id="budget"
                   type="number"
@@ -274,7 +274,7 @@ export default function LookbookPage() {
                               </div>
                             )}
                             <p className="text-sm font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">₦{parseFloat(item.price || 0).toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground">${parseFloat(item.price || 0).toLocaleString()}</p>
                             <p className="text-xs text-primary mt-1">{item.reason}</p>
                           </div>
                         ))}
@@ -282,7 +282,7 @@ export default function LookbookPage() {
                       <div className="mt-4 pt-4 border-t flex justify-between items-center">
                         <div>
                           <span className="font-semibold">Total: </span>
-                          <span className="text-lg">₦{parseFloat(lookbook.totalPrice || "0").toLocaleString()}</span>
+                          <span className="text-lg">${parseFloat(lookbook.totalPrice || "0").toLocaleString()}</span>
                         </div>
                         {lookbook.status !== "accepted" && (
                           <Button

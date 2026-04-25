@@ -121,7 +121,7 @@ export default function EventPlannerPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Budget (₦) per person</Label>
+                <Label>Budget ($) per person</Label>
                 <Input
                   type="number"
                   placeholder="e.g., 150000"
@@ -233,7 +233,7 @@ export default function EventPlannerPage() {
                         </div>
                         <p className="font-medium text-sm truncate">{product.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          ₦{parseFloat(product.price).toLocaleString()}
+                          ${parseFloat(product.price).toLocaleString()}
                         </p>
                       </div>
                     ))}
@@ -245,7 +245,7 @@ export default function EventPlannerPage() {
                         <div>
                           <span className="text-sm text-muted-foreground">Collection Total: </span>
                           <span className="text-lg font-semibold">
-                            ₦{collection.totalPrice.toLocaleString()}
+                            ${collection.totalPrice.toLocaleString()}
                           </span>
                         </div>
                       )}

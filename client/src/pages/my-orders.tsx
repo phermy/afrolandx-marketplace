@@ -41,7 +41,7 @@ export default function MyOrders() {
   }, [toast]);
 
   const formatPrice = (price: string) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+    return `$${parseFloat(price).toLocaleString()}`;
   };
 
   const getStatusBadge = (status: string) => {

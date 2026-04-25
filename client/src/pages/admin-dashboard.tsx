@@ -264,7 +264,7 @@ export default function AdminDashboard() {
   });
 
   const formatPrice = (price: string) => {
-    return `₦${parseFloat(price).toLocaleString()}`;
+    return `$${parseFloat(price).toLocaleString()}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -571,7 +571,7 @@ export default function AdminDashboard() {
                               {order.orderStatus}
                             </Badge>
                             <p className="text-red-600 font-bold text-lg mt-2">
-                              ₦{parseFloat(order.totalAmount).toLocaleString()}
+                              ${parseFloat(order.totalAmount).toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -600,7 +600,7 @@ export default function AdminDashboard() {
                                   <span className="text-gray-500 ml-2 text-sm">by {item.vendorName}</span>
                                 </div>
                                 <span className="font-semibold">
-                                  ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
+                                  ${(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
                                 </span>
                               </div>
                             ))}

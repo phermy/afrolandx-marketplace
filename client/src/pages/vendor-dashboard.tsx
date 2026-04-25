@@ -478,12 +478,12 @@ export default function VendorDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-coral rounded-lg">
-                  <span className="text-white font-bold text-lg">₦</span>
+                  <span className="text-white font-bold text-lg">$</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-gray-600 text-sm">Total Value</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    ₦{products.reduce((sum, p) => sum + parseFloat(p.price), 0).toLocaleString()}
+                    ${products.reduce((sum, p) => sum + parseFloat(p.price), 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -518,7 +518,7 @@ export default function VendorDashboard() {
                           <h3 className="font-semibold text-gray-900">{product.name}</h3>
                           <p className="text-gray-600 text-sm">{product.description}</p>
                           <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-nigerian-green font-semibold">₦{parseFloat(product.price).toLocaleString()}</span>
+                            <span className="text-nigerian-green font-semibold">${parseFloat(product.price).toLocaleString()}</span>
                             <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
                             <Badge 
                               className={
@@ -573,7 +573,7 @@ export default function VendorDashboard() {
                               {order.orderStatus}
                             </Badge>
                             <p className="text-nigerian-green font-bold text-lg mt-2">
-                              ₦{order.vendorTotal?.toLocaleString()}
+                              ${order.vendorTotal?.toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -588,7 +588,7 @@ export default function VendorDashboard() {
                                   <span className="text-gray-600 ml-2">x{item.quantity}</span>
                                 </div>
                                 <span className="font-semibold">
-                                  ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
+                                  ${(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
                                 </span>
                               </div>
                             ))}
@@ -843,7 +843,7 @@ export default function VendorDashboard() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <Label htmlFor="price">Price (₦)</Label>
+                      <Label htmlFor="price">Price ($)</Label>
                       <Input
                         id="price"
                         name="price"

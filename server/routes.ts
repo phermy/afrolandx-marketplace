@@ -623,7 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const testPayment = await paystack.initializeTransaction(
         'test@example.com',
-        10000, // 100 NGN in kobo
+        1, // $1 in cents
         testReference,
         { test: true }
       );
@@ -891,7 +891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createNotification({
               userId: vendor.userId,
               title: 'New Order Received!',
-              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
+              message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
               type: 'order'
             });
             notifiedVendors.add(product.vendorId);
@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createNotification({
           userId: admin.id,
           title: 'New Order Placed',
-          message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
+          message: `Order #${order.id} worth $${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
           type: 'order'
         });
       }
@@ -982,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createNotification({
                 userId: vendor.userId,
                 title: 'New Order Received! 🎉',
-                message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
+                message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
                 type: 'order'
               });
               vendorNotifications.add(product.vendorId);
@@ -996,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createNotification({
             userId: admin.id,
             title: 'New Order Placed! 📦',
-            message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
+            message: `Order #${order.id} worth $${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
             type: 'order'
           });
         }
@@ -1134,7 +1134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: vendorId,
             type: 'product_sold',
             title: 'Products Sold!',
-            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
+            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: $${totalVendorAmount.toLocaleString()}`,
             orderId: order.id,
             isRead: false
           });
@@ -1151,7 +1151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: admin.id,
             type: 'order_placed',
             title: 'New Order Placed',
-            message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
+            message: `A new order #${order.id} has been placed by a customer. Total amount: $${parseFloat(order.totalAmount).toLocaleString()}`,
             orderId: order.id,
             isRead: false
           });
@@ -1443,7 +1443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       await storage.createNotification({
                         userId: vendor.userId,
                         title: 'Payment Confirmed',
-                        message: `Payment confirmed for order #${orderId}. Worth ₦${parseFloat(order.totalAmount).toLocaleString()}.`,
+                        message: `Payment confirmed for order #${orderId}. Worth $${parseFloat(order.totalAmount).toLocaleString()}.`,
                         type: 'order'
                       });
                       notifiedVendors.add(product.vendorId);
@@ -1853,7 +1853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chatbotService = getChatbotService();
       const prompt = `You are a Nigerian fashion stylist. Based on the following occasion:
         Event Type: ${eventType}
-        Budget: ${budget ? `₦${budget}` : 'No limit'}
+        Budget: ${budget ? `$${budget}` : 'No limit'}
         Style Notes: ${styleNotes || 'None'}
         
         Select 3-5 items from this product catalog that would create a perfect outfit:
@@ -2279,8 +2279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Insufficient points' });
       }
       
-      // Calculate discount (100 points = ₦500 discount)
-      const discountAmount = (points / 100) * 500;
+      // Calculate discount (100 points = $5 discount)
+      const discountAmount = (points / 100) * 5;
       
       res.json({ success: true, discountAmount });
     } catch (error) {

@@ -90,9 +90,9 @@ export class PaystackService {
   async initializeTransaction(email: string, amount: number, reference: string, metadata?: any, callbackUrl?: string): Promise<PaystackInitializeResponse> {
     const payload: any = {
       email,
-      amount: amount * 100, // Paystack expects amount in kobo
+      amount: amount * 100, // Paystack expects amount in cents
       reference,
-      currency: 'NGN',
+      currency: 'USD',
       metadata,
     };
 

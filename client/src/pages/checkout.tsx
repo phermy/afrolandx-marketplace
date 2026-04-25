@@ -178,7 +178,7 @@ export default function Checkout() {
   };
 
   const formatPrice = (price: number) => {
-    return `₦${price.toLocaleString()}`;
+    return `$${price.toLocaleString()}`;
   };
 
   const selectedShippingQuote = shippingQuotes.find(q => q.carrier === selectedShipping);

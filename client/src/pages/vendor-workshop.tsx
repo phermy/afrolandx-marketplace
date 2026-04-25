@@ -258,7 +258,7 @@ export default function VendorWorkshopPage() {
                           <CardTitle className="text-lg">Order #{order.id}</CardTitle>
                           <CardDescription>
                             {new Date(order.createdAt).toLocaleDateString()} - 
-                            ₦{parseFloat(order.totalAmount).toLocaleString()}
+                            ${parseFloat(order.totalAmount).toLocaleString()}
                           </CardDescription>
                         </div>
                         <Badge variant={order.status === "completed" ? "default" : "secondary"}>

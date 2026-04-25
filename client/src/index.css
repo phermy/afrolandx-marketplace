@@ -108,9 +108,9 @@
   background-color: var(--traditional-brown);
 }
 
-/* Nigerian naira symbol */
-.naira::before {
-  content: "₦";
+/* Dollar symbol */
+.dollar::before {
+  content: "$";
 }
 
 /* Hover effects for Nigerian theme */
