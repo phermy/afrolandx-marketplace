@@ -6,6 +6,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
 import Navbar from '@/components/navbar';
+import LocalPrice from '@/components/LocalPrice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -426,7 +427,10 @@ export default function Checkout() {
                     
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
+                      <div className="text-right">
+                        <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
+                        <LocalPrice usdAmount={totalAmount} className="block" size="md" />
+                      </div>
                     </div>
                   </div>
 

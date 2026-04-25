@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
 import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "lucide-react";
 import type { Product } from "@/types";
+import LocalPrice from "@/components/LocalPrice";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
 import maskImg1 from '@assets/stock_images/african_tribal_mask__b9d91dc8.jpg';
@@ -299,9 +300,12 @@ export default function Landing() {
                       {product.description}
                     </p>
                     <div className="flex items-center justify-between mb-4">
-                      <span className="text-2xl font-bold text-nigerian-green">
-                        ${product.price.toLocaleString()}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-2xl font-bold text-nigerian-green">
+                          ${product.price.toLocaleString()}
+                        </span>
+                        <LocalPrice usdAmount={product.price} />
+                      </div>
                       <span className="text-sm text-gray-500">
                         {product.stock} left
                       </span>

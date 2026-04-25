@@ -142,6 +142,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Geo/currency detection — proxied server-side to avoid CORS
+  app.get('/api/geo', async (req: any, res) => {
+    try {
+      // Cache control — client can cache for 24h
+      res.set('Cache-Control', 'public, max-age=86400');
+
+      // Get client IP (handles proxies)
+      const forwarded = req.headers['x-forwarded-for'] as string;
+      const ip = (forwarded ? forwarded.split(',')[0].trim() : req.ip) || '';
+      
+      // Skip for localhost/private IPs
+      const isLocal = !ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.');
+      if (isLocal) {
+        return res.json({ local: true });
+      }
+
+      const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
+        headers: { 'User-Agent': 'afrolandx/1.0' },
+        signal: AbortSignal.timeout(4000),
+      });
+
+      if (!geoRes.ok) return res.json({ error: 'geo_unavailable' });
+      const data = await geoRes.json() as any;
+
+      res.json({
+        country_code: data.country_code,
+        country_name: data.country_name,
+        currency: data.currency,
+        currency_name: data.currency_name,
+      });
+    } catch {
+      res.json({ error: 'geo_unavailable' });
+    }
+  });
+
+  // Exchange rates proxy
+  app.get('/api/exchange-rates', async (_req, res) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=3600');
+      const rRes = await fetch('https://open.er-api.com/v6/latest/USD', {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!rRes.ok) return res.json({ error: 'rates_unavailable' });
+      const data = await rRes.json() as any;
+      res.json({ rates: data.rates });
+    } catch {
+      res.json({ error: 'rates_unavailable' });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

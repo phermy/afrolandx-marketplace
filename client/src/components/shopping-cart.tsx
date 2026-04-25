@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'wouter';
+import LocalPrice from '@/components/LocalPrice';
 
 export default function ShoppingCart() {
   const { 
@@ -193,7 +194,10 @@ export default function ShoppingCart() {
               <div className="space-y-2">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
+                  <div className="text-right">
+                    <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
+                    <LocalPrice usdAmount={cartTotal} className="block" size="md" />
+                  </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   Shipping cost will be calculated at checkout
