@@ -1,323 +1,348 @@
-const FALLBACK = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/320px-No_image_available.svg.png";
-
-export interface Leader {
+export interface Product {
   url: string;
-  name: string;
-  title: string;
+  label: string;
   country: string;
-  era: string;
 }
 
-export const AFRICAN_LEADERS: Leader[] = [
-  /* ── WEST AFRICA ───────────────────────────────────────── */
+export const AFRICAN_PRODUCTS: Product[] = [
+  /* ── Nigerian Fashion ───────────────────────────── */
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Nnamdi_Azikiwe.jpg/400px-Nnamdi_Azikiwe.jpg",
-    name: "Nnamdi Azikiwe",
-    title: "First President",
+    url: "https://i.pinimg.com/originals/aa/49/42/aa49422dcd79e482d52242519603d8f0.jpg",
+    label: "Ankara Dress",
     country: "Nigeria",
-    era: "1963–1966",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/en/thumb/d/d5/Chief_Obafemi_Awolowo.jpg/400px-Chief_Obafemi_Awolowo.jpg",
-    name: "Obafemi Awolowo",
-    title: "Statesman & Premier",
+    url: "https://s.alicdn.com/@sc04/kf/Hb46c92d0a5c147b885e4fac35cd7589de.jpg_300x300.jpg",
+    label: "Embroidery Gown",
     country: "Nigeria",
-    era: "1952–1983",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Ahmadu_Bello.jpg/400px-Ahmadu_Bello.jpg",
-    name: "Ahmadu Bello",
-    title: "Premier of the North",
+    url: "https://m.media-amazon.com/images/I/51hbBiueTUL.jpg",
+    label: "Agbada Robe",
     country: "Nigeria",
-    era: "1954–1966",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Kwame_Nkrumah.jpg/400px-Kwame_Nkrumah.jpg",
-    name: "Kwame Nkrumah",
-    title: "First President",
+    url: "https://m.media-amazon.com/images/I/5173dw6cc4L.jpg",
+    label: "Embroidered Agbada",
+    country: "Nigeria",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/51zak9v5DnL.jpg",
+    label: "Boubou Caftan",
+    country: "Nigeria",
+  },
+  {
+    url: "https://img4.dhresource.com/300x300/f3/albu/ys/h/09/8951652a-5684-49e6-8247-93dc32a72029.jpg",
+    label: "Aso-Oke Gele",
+    country: "Nigeria",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/81YUC-4P+KL.jpg",
+    label: "Auto Gele Headwrap",
+    country: "Nigeria",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/71IA629CrxL.jpg",
+    label: "Pre-Tied Gele",
+    country: "Nigeria",
+  },
+  {
+    url: "https://i.pinimg.com/originals/c2/a9/1e/c2a91e73fa584e4898e0987f6c1514cb.jpg",
+    label: "Dashiki Suit",
+    country: "Nigeria",
+  },
+  {
+    url: "https://i.pinimg.com/originals/d4/8e/cc/d48ecc33bb4468bdfdc0e53bc01f904c.jpg",
+    label: "White Dashiki",
+    country: "Nigeria",
+  },
+  {
+    url: "https://splendorofafrica.com/cdn/shop/products/men-splendor--9_195x195@2x.png?v=1575133950",
+    label: "Senator Kaftan",
+    country: "Nigeria",
+  },
+  {
+    url: "https://splendorofafrica.com/cdn/shop/products/il_fullxfull.2154215814_n5pv_195x195@2x.jpg?v=1592934972",
+    label: "Teal Ankara Suit",
+    country: "Nigeria",
+  },
+
+  /* ── Ghanaian Products ──────────────────────────── */
+  {
+    url: "https://s.alicdn.com/@sc04/kf/Hcbcf6dce39974b6fb9d000d35bd5ba17k.jpg_300x300.jpg",
+    label: "Kente Wax Fabric",
     country: "Ghana",
-    era: "1960–1966",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Am%C3%ADlcar_Cabral.jpg/400px-Am%C3%ADlcar_Cabral.jpg",
-    name: "Amilcar Cabral",
-    title: "Liberation Leader",
-    country: "Guinea-Bissau",
-    era: "1956–1973",
+    url: "https://s.alicdn.com/@sc04/kf/H26b021d09df645229af4ea1242d059a9w.jpg_300x300.jpg",
+    label: "Ghana Kente Cloth",
+    country: "Ghana",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sekou_Toure.jpg/400px-Sekou_Toure.jpg",
-    name: "Ahmed Sékou Touré",
-    title: "First President",
-    country: "Guinea",
-    era: "1958–1984",
+    url: "https://s.alicdn.com/@sc04/kf/Hf74214e8b1ff48c5b99c99a916667e8bR.jpg_300x300.jpg",
+    label: "Gold Kente Weave",
+    country: "Ghana",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/L%C3%A9opold_S%C3%A9dar_Senghor.jpg/400px-L%C3%A9opold_S%C3%A9dar_Senghor.jpg",
-    name: "Léopold Sédar Senghor",
-    title: "First President & Poet",
-    country: "Senegal",
-    era: "1960–1980",
+    url: "https://www.easytrackghana.com/images/photos2/thumbnails/Kente-weaver-in-Ghana.jpg",
+    label: "Kente Weaving",
+    country: "Ghana",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Thomas_Sankara.jpg/400px-Thomas_Sankara.jpg",
-    name: "Thomas Sankara",
-    title: "Revolutionary President",
-    country: "Burkina Faso",
-    era: "1983–1987",
+    url: "https://i0.wp.com/hobletsonthego.com/wp-content/uploads/2025/01/20250118-Ghana-Adanwomse-Kente-Village-Weaving-Cocoa-28-9-2.jpg?fit=1920,1080&ssl=1",
+    label: "Kente Village Craft",
+    country: "Ghana",
+  },
+
+  /* ── Jewelry & Beadwork ─────────────────────────── */
+  {
+    url: "https://hemingwaygallery.nyc/cdn/shop/files/Orange_Zulu_Beaded_Necklace_1.jpg?v=1739374463&width=400",
+    label: "Zulu Beaded Necklace",
+    country: "South Africa",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Modibo_Keita.jpg/400px-Modibo_Keita.jpg",
-    name: "Modibo Keïta",
-    title: "First President",
+    url: "https://hemingwaygallery.nyc/cdn/shop/files/Black_Brown_Zulu_Beaded_Necklace_1.jpg?v=1739375040&width=400",
+    label: "Zulu Bead Necklace",
+    country: "South Africa",
+  },
+  {
+    url: "https://i.etsystatic.com/10959979/c/905/905/7/100/il/e33e96/1942790300/il_600x600.1942790300_7sfr.jpg",
+    label: "Cowrie Shell Necklace",
+    country: "Ethiopia",
+  },
+  {
+    url: "https://i.pinimg.com/originals/25/e6/95/25e695511282cf74d2da062e6d5ef925.jpg",
+    label: "Beaded Jewelry",
+    country: "South Africa",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/51Y3WQL9ksL.jpg",
+    label: "Maasai Beaded Earrings",
+    country: "Kenya",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/51zami4euXL.jpg",
+    label: "Maasai Drop Earrings",
+    country: "Kenya",
+  },
+  {
+    url: "https://m.media-amazon.com/images/I/61FKeDkDGhL.jpg",
+    label: "Maasai Bead Necklace",
+    country: "Kenya",
+  },
+
+  /* ── Crafts & Wood Art ──────────────────────────── */
+  {
+    url: "https://artiblend.com/cdn/shop/files/2_26d0c090-e2c8-4a10-9bf5-836d1624f1d8.jpg?v=1723957727&width=400",
+    label: "Wood Sculpture",
+    country: "Africa",
+  },
+  {
+    url: "https://handmadeafricancarvings.co.uk/wp-content/uploads/2024/08/warrior_CSC009_product-600x600.png",
+    label: "Tribal Wood Carving",
+    country: "Africa",
+  },
+  {
+    url: "https://i.pinimg.com/originals/2c/e5/75/2ce57501d1903661f7f2a4ddc7136e30.jpg",
+    label: "Imigongo Art",
+    country: "Rwanda",
+  },
+
+  /* ── Textiles & Fabrics ─────────────────────────── */
+  {
+    url: "https://vondeeworld.com/wp-content/uploads/2024/09/7aeb-Vondeeworld-African-Print-Wrappers-scaled.jpg",
+    label: "Adire Tie-Dye",
+    country: "Nigeria",
+  },
+  {
+    url: "https://vondeeworld.com/wp-content/uploads/2024/09/18aec-Vondeeworld-African-Print-Wrappers-scaled.jpg",
+    label: "Adire Batik Wrap",
+    country: "Nigeria",
+  },
+  {
+    url: "https://vondeeworld.com/wp-content/uploads/2024/09/20aeb-Vondeeworld-African-Print-Wrappers-scaled.jpg",
+    label: "Hand-Dyed Adire",
+    country: "Nigeria",
+  },
+  {
+    url: "https://ethnikaantiques.com/cdn/shop/products/PhotoRoom_025_20230201_132912.png?v=1675546720&width=400",
+    label: "Bogolan Mud Cloth",
     country: "Mali",
-    era: "1960–1968",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/F%C3%A9lix_Houphou%C3%ABt-Boigny.jpg/400px-F%C3%A9lix_Houphou%C3%ABt-Boigny.jpg",
-    name: "Félix Houphouët-Boigny",
-    title: "First President",
-    country: "Ivory Coast",
-    era: "1960–1993",
+    url: "https://ethnikaantiques.com/cdn/shop/products/7_54cb5d02-ed8a-4e0d-8dd4-e73b721e4363.jpg?v=1588711843&width=400",
+    label: "Mud Cloth Textile",
+    country: "Mali",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Sylvanus_Olympio.jpg/400px-Sylvanus_Olympio.jpg",
-    name: "Sylvanus Olympio",
-    title: "First President",
-    country: "Togo",
-    era: "1960–1963",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Hubert_Maga.jpg/400px-Hubert_Maga.jpg",
-    name: "Hubert Maga",
-    title: "First President",
-    country: "Benin",
-    era: "1960–1963",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Ahmadou_Ahidjo.jpg/400px-Ahmadou_Ahidjo.jpg",
-    name: "Ahmadou Ahidjo",
-    title: "First President",
-    country: "Cameroon",
-    era: "1960–1982",
-  },
-
-  /* ── EAST AFRICA ───────────────────────────────────────── */
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Julius_Nyerere_1965_%28cropped%29.jpg/400px-Julius_Nyerere_1965_%28cropped%29.jpg",
-    name: "Julius Nyerere",
-    title: "First President – Mwalimu",
+    url: "https://i.etsystatic.com/33899776/r/il/7182c8/4240312387/il_600x600.4240312387_mimj.jpg",
+    label: "Tanzanian Kanga",
     country: "Tanzania",
-    era: "1961–1985",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Jomo_Kenyatta.jpg/400px-Jomo_Kenyatta.jpg",
-    name: "Jomo Kenyatta",
-    title: "First President – Mzee",
+    url: "https://i.etsystatic.com/18266500/r/il/1375b5/5867729845/il_600x600.5867729845_45jx.jpg",
+    label: "Khanga Fabric",
+    country: "Tanzania",
+  },
+  {
+    url: "https://i.etsystatic.com/18724801/r/il/00a07d/3654817404/il_300x300.3654817404_1p9j.jpg",
+    label: "Kenyan Kikoy",
     country: "Kenya",
-    era: "1963–1978",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Haile_Selassie_1970_%28cropped%29.jpg/400px-Haile_Selassie_1970_%28cropped%29.jpg",
-    name: "Haile Selassie",
-    title: "Emperor of Ethiopia",
-    country: "Ethiopia",
-    era: "1930–1974",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Oginga_Odinga.jpg/400px-Oginga_Odinga.jpg",
-    name: "Oginga Odinga",
-    title: "VP & Opposition Leader",
-    country: "Kenya",
-    era: "1963–1994",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Abebe_Bikila_%28cropped%29.jpg/400px-Abebe_Bikila_%28cropped%29.jpg",
-    name: "Abebe Bikila",
-    title: "Olympic Marathon Legend",
-    country: "Ethiopia",
-    era: "1960–1968",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Milton_Obote.jpg/400px-Milton_Obote.jpg",
-    name: "Milton Obote",
-    title: "First Prime Minister",
-    country: "Uganda",
-    era: "1962–1971",
   },
 
-  /* ── SOUTHERN AFRICA ───────────────────────────────────── */
+  /* ── Sandals & Leather ──────────────────────────── */
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Nelson_Mandela_1994.jpg/400px-Nelson_Mandela_1994.jpg",
-    name: "Nelson Mandela",
-    title: "President – Madiba",
-    country: "South Africa",
-    era: "1994–1999",
+    url: "https://mawuafrica.com/cdn/shop/products/OfycmYV8oE.jpg?v=1672926098&width=400",
+    label: "Beaded Leather Sandals",
+    country: "Kenya",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Oliver_Tambo.jpg/400px-Oliver_Tambo.jpg",
-    name: "Oliver Tambo",
-    title: "ANC President",
-    country: "South Africa",
-    era: "1967–1991",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Albert_Luthuli.jpg/400px-Albert_Luthuli.jpg",
-    name: "Albert Luthuli",
-    title: "Nobel Peace Laureate",
-    country: "South Africa",
-    era: "1952–1967",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Steve_Biko_portrait.jpg/400px-Steve_Biko_portrait.jpg",
-    name: "Steve Biko",
-    title: "Black Consciousness Leader",
-    country: "South Africa",
-    era: "1968–1977",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Kenneth_Kaunda.jpg/400px-Kenneth_Kaunda.jpg",
-    name: "Kenneth Kaunda",
-    title: "First President",
-    country: "Zambia",
-    era: "1964–1991",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Samora_Machel.jpg/400px-Samora_Machel.jpg",
-    name: "Samora Machel",
-    title: "First President",
-    country: "Mozambique",
-    era: "1975–1986",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Eduardo_Mondlane.jpg/400px-Eduardo_Mondlane.jpg",
-    name: "Eduardo Mondlane",
-    title: "FRELIMO Founder",
-    country: "Mozambique",
-    era: "1962–1969",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Joshua_Nkomo.jpg/400px-Joshua_Nkomo.jpg",
-    name: "Joshua Nkomo",
-    title: "Father of Zimbabwe",
-    country: "Zimbabwe",
-    era: "1960–1999",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Seretse_Khama.jpg/400px-Seretse_Khama.jpg",
-    name: "Seretse Khama",
-    title: "First President",
-    country: "Botswana",
-    era: "1966–1980",
+    url: "https://www.blackmalaika.com/wp-content/uploads/2017/11/Leather-African-Sandals-45.1-Size-45-800x800.jpg",
+    label: "African Leather Sandals",
+    country: "Africa",
   },
 
-  /* ── NORTH AFRICA ──────────────────────────────────────── */
+  /* ── Ethiopian Fashion ──────────────────────────── */
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Gamal_Abdel_Nasser.jpg/400px-Gamal_Abdel_Nasser.jpg",
-    name: "Gamal Abdel Nasser",
-    title: "President & Pan-Arabist",
-    country: "Egypt",
-    era: "1954–1970",
+    url: "https://www.ethiopian.store/cdn/shop/files/photo_3_2026-03-04_15-08-54.jpg?v=1772626620&width=400",
+    label: "Habesha Kemis",
+    country: "Ethiopia",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Habib_Bourguiba.jpg/400px-Habib_Bourguiba.jpg",
-    name: "Habib Bourguiba",
-    title: "Father of Tunisia",
-    country: "Tunisia",
-    era: "1956–1987",
+    url: "https://i.etsystatic.com/52900002/r/il/37e2ff/7769433817/il_340x270.7769433817_o0t9.jpg",
+    label: "Embroidered Habesha Dress",
+    country: "Ethiopia",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Mohammed_V_of_Morocco.jpg/400px-Mohammed_V_of_Morocco.jpg",
-    name: "Mohammed V",
-    title: "King & Independence Leader",
+    url: "https://i.etsystatic.com/56651390/r/il/dcfa28/6908991412/il_340x270.6908991412_dosd.jpg",
+    label: "Handcrafted Habesha Kemis",
+    country: "Ethiopia",
+  },
+  {
+    url: "https://i.pinimg.com/originals/04/16/1e/04161e7fe17835420633daf7849eb881.jpg",
+    label: "Eritrean Dress",
+    country: "Eritrea",
+  },
+
+  /* ── South African Traditional ──────────────────── */
+  {
+    url: "https://media.istockphoto.com/id/183781429/photo/ndebele-tribal-beadwork-south-africa.jpg?s=612x612&w=0&k=20&c=ygwowEj5b_0oWzEUuexaVdochkk3cr7T4k61wWrzI4k=",
+    label: "Ndebele Beadwork",
+    country: "South Africa",
+  },
+  {
+    url: "https://i.pinimg.com/originals/75/ed/30/75ed3033e5242ac84976999cf4a1fdf6.jpg",
+    label: "Zulu Traditional Dress",
+    country: "South Africa",
+  },
+  {
+    url: "https://i.pinimg.com/originals/22/c3/75/22c37519f4d97a72e10c1abf067a6fbd.jpg",
+    label: "Zulu Wedding Attire",
+    country: "South Africa",
+  },
+  {
+    url: "https://images.squarespace-cdn.com/content/v1/57e1d57c6b8f5b5e75aaecbb/1541287186709-ABL5TNKV3ABBC1JC6BN1/kiara_ndebele+beadwork.jpg",
+    label: "Ndebele Beadwork Art",
+    country: "South Africa",
+  },
+
+  /* ── Moroccan & North African ───────────────────── */
+  {
+    url: "https://karimbouriad.com/media/2023/11/@Redwalls_MG_0274-1.jpg",
+    label: "Moroccan Djellaba",
     country: "Morocco",
-    era: "1927–1961",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Ahmed_Ben_Bella.jpg/400px-Ahmed_Ben_Bella.jpg",
-    name: "Ahmed Ben Bella",
-    title: "First President",
-    country: "Algeria",
-    era: "1963–1965",
+    url: "https://www.lbeldi.com/wp-content/uploads/2025/04/Moroccan-Traditional-Clothing-for-Women-768x511.webp",
+    label: "Moroccan Traditional Dress",
+    country: "Morocco",
   },
 
-  /* ── CENTRAL AFRICA ────────────────────────────────────── */
+  /* ── West African / Senegalese ──────────────────── */
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Patrice_Lumumba.jpg/400px-Patrice_Lumumba.jpg",
-    name: "Patrice Lumumba",
-    title: "First Prime Minister",
-    country: "DR Congo",
-    era: "1960",
+    url: "https://i.pinimg.com/originals/29/c7/2f/29c72fa22a7648259deb982e4a0c9e14.jpg",
+    label: "Senegalese Boubou",
+    country: "Senegal",
   },
   {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Fulbert_Youlou.jpg/400px-Fulbert_Youlou.jpg",
-    name: "Fulbert Youlou",
-    title: "First President",
-    country: "Congo-Brazzaville",
-    era: "1960–1963",
+    url: "https://i.etsystatic.com/48577373/r/il/dee874/6062375555/il_340x270.6062375555_mmko.jpg",
+    label: "Bazin Boubou Kaftan",
+    country: "Senegal",
+  },
+
+  /* ── Woven Baskets ──────────────────────────────── */
+  {
+    url: "https://www.africantradingport.com/cdn/shop/products/b16.jpg?v=1677150137&width=400",
+    label: "Woven Basket",
+    country: "Africa",
+  },
+  {
+    url: "https://i.ebayimg.com/images/g/O9UAAeSw9YBpcB86/s-l400.webp",
+    label: "Sisal Basket Bowl",
+    country: "Africa",
   },
 ];
 
-/* ── backward-compat alias used in landing.tsx ── */
-export const AFRICAN_PRODUCTS = AFRICAN_LEADERS.map((l) => ({
-  url: l.url,
-  label: l.name,
-  country: l.country,
+/* ── backward-compat alias ── */
+export const AFRICAN_LEADERS = AFRICAN_PRODUCTS.map((p) => ({
+  url: p.url,
+  name: p.label,
+  title: p.label,
+  country: p.country,
+  era: "",
 }));
 
-const FALLBACK_IMG = FALLBACK;
+const FALLBACK_IMG =
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/320px-No_image_available.svg.png";
+
 const ROWS: { speed: number; dir: "left" | "right" }[] = [
-  { speed: 35, dir: "left" },
-  { speed: 28, dir: "right" },
-  { speed: 40, dir: "left" },
+  { speed: 38, dir: "left" },
+  { speed: 30, dir: "right" },
+  { speed: 42, dir: "left" },
 ];
 
-export default function AfricanLeaderCarousel() {
-  const third = Math.ceil(AFRICAN_LEADERS.length / 3);
+export default function AfricanProductCarousel() {
+  const third = Math.ceil(AFRICAN_PRODUCTS.length / 3);
   const rows = [
-    AFRICAN_LEADERS.slice(0, third),
-    AFRICAN_LEADERS.slice(third, third * 2),
-    AFRICAN_LEADERS.slice(third * 2),
+    AFRICAN_PRODUCTS.slice(0, third),
+    AFRICAN_PRODUCTS.slice(third, third * 2),
+    AFRICAN_PRODUCTS.slice(third * 2),
   ];
 
   return (
-    <div className="space-y-4">
-      {rows.map((leaders, rowIdx) => {
-        const doubled = [...leaders, ...leaders];
+    <div className="space-y-3">
+      {rows.map((products, rowIdx) => {
+        const doubled = [...products, ...products];
         const { speed, dir } = ROWS[rowIdx];
         return (
           <div key={rowIdx} className="overflow-hidden">
             <div
-              className="flex gap-4"
+              className="flex gap-3"
               style={{
                 animation: `${dir === "left" ? "marqueeLeft" : "marqueeRight"} ${speed}s linear infinite`,
                 width: "max-content",
               }}
             >
-              {doubled.map((leader, i) => (
+              {doubled.map((product, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-36 md:w-44 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm shadow-lg border border-white/20"
+                  className="flex-shrink-0 w-36 md:w-44 rounded-xl overflow-hidden bg-white/10 border border-white/20 shadow-lg"
                 >
                   <div className="relative w-full h-36 md:h-44">
                     <img
-                      src={leader.url}
-                      alt={leader.name}
+                      src={product.url}
+                      alt={product.label}
                       className="w-full h-full object-cover object-top"
                       loading="lazy"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = FALLBACK_IMG;
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    <span className="absolute top-2 right-2 text-xs font-bold bg-nigerian-gold text-gray-900 px-1.5 py-0.5 rounded-full">
-                      {leader.era.split("–")[0].slice(-2)}s
-                    </span>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                   </div>
-                  <div className="px-2 py-2 text-center">
-                    <p className="text-white font-bold text-xs leading-tight truncate">{leader.name}</p>
-                    <p className="text-nigerian-gold text-[10px] leading-tight truncate">{leader.country}</p>
-                    <p className="text-white/60 text-[9px] leading-tight truncate">{leader.title}</p>
+                  <div className="px-2 py-1.5 text-center">
+                    <p className="text-white font-semibold text-xs leading-tight truncate">{product.label}</p>
+                    <p className="text-nigerian-gold text-[10px] leading-tight">{product.country}</p>
                   </div>
                 </div>
               ))}
