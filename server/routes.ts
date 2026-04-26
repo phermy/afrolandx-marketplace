@@ -796,27 +796,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shipping quotes endpoint
   app.get('/api/shipping/quote', isAuthenticated, async (req: any, res) => {
     try {
-      // Return available shipping methods for Nigeria
-      const shippingQuotes = [
-        {
-          carrier: 'UPS',
-          service: 'UPS Standard',
-          price: 2500,
-          duration: '3-5 business days'
-        },
-        {
-          carrier: 'FedEx',
-          service: 'FedEx Express',
-          price: 3000,
-          duration: '2-3 business days'
-        },
-        {
-          carrier: 'DHL',
-          service: 'DHL Express',
-          price: 3500,
-          duration: '1-2 business days'
-        }
+      // Base rates in USD
+      const BASE_QUOTES = [
+        { carrier: 'UPS',   service: 'UPS Standard',  price: 25, duration: '5-7 business days' },
+        { carrier: 'FedEx', service: 'FedEx Express',  price: 40, duration: '3-5 business days' },
+        { carrier: 'DHL',   service: 'DHL Express',    price: 60, duration: '1-2 business days' },
       ];
+
+      // Optional local currency conversion: ?currency=NGN&rate=1800&symbol=₦
+      const currency = req.query.currency as string | undefined;
+      const rate     = parseFloat(req.query.rate as string) || 0;
+      const symbol   = req.query.symbol as string | undefined;
+
+      const shippingQuotes = BASE_QUOTES.map(q => {
+        const quote: any = { ...q };
+        if (currency && rate > 0) {
+          quote.localPrice    = Math.round(q.price * rate);
+          quote.localCurrency = currency;
+          quote.localSymbol   = symbol || currency;
+        }
+        return quote;
+      });
+
       res.json(shippingQuotes);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch shipping quotes' });

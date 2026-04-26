@@ -101,6 +101,9 @@ export interface ShippingQuote {
   service: string;
   price: number;
   duration: string;
+  localPrice?: number;
+  localCurrency?: string;
+  localSymbol?: string;
 }
 
 export interface AdminStats {

@@ -79,9 +79,20 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Fetch shipping quotes
+  // Fetch shipping quotes — pass buyer's local currency so the API returns localPrice
   const { data: shippingQuotes = [], isLoading: isLoadingShipping } = useQuery<ShippingQuote[]>({
-    queryKey: ['/api/shipping/quote'],
+    queryKey: ['/api/shipping/quote', currencyInfo?.code, currencyInfo?.rate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (currencyInfo) {
+        params.set('currency', currencyInfo.code);
+        params.set('rate', String(currencyInfo.rate));
+        params.set('symbol', currencyInfo.symbol);
+      }
+      const res = await fetch(`/api/shipping/quote?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch shipping quotes');
+      return res.json();
+    },
     enabled: !!cartItems.length,
     retry: false,
   });
@@ -370,8 +381,19 @@ export default function Checkout() {
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
                                 </div>
                                 <div className="text-right">
-                                  <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
-                                  {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(quote.price)}</span>}
+                                  {quote.localPrice && quote.localSymbol ? (
+                                    <>
+                                      <span className="font-bold text-nigerian-green">
+                                        {quote.localSymbol}{quote.localPrice.toLocaleString()}
+                                      </span>
+                                      <span className="block text-xs text-gray-400">≈ ${quote.price.toFixed(2)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
+                                      {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(quote.price)}</span>}
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </Label>
@@ -467,8 +489,17 @@ export default function Checkout() {
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
                         <div className="text-right">
-                          <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
-                          {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(selectedShippingQuote.price)}</span>}
+                          {selectedShippingQuote.localPrice && selectedShippingQuote.localSymbol ? (
+                            <>
+                              <span className="font-medium">{selectedShippingQuote.localSymbol}{selectedShippingQuote.localPrice.toLocaleString()}</span>
+                              <span className="block text-xs text-gray-400">≈ ${selectedShippingQuote.price.toFixed(2)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
+                              {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(selectedShippingQuote.price)}</span>}
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
