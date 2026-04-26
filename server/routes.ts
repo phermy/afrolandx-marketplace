@@ -3091,6 +3091,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Startup migration: fix broken /uploads/ product images ──────────────
+  // Runs on every server start. Idempotent: only touches rows that still have
+  // local /uploads/ paths (which don't work on the deployed production server).
+  (async () => {
+    try {
+      const AGBADA_IMAGES: Record<string, string> = {
+        default1: "https://m.media-amazon.com/images/I/51dhIB-F6xL.jpg",
+        default2: "https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946",
+        default3: "https://i.pinimg.com/originals/27/73/87/27738735dbab5c94bbb5bbcd3dfdd427.jpg",
+      };
+      const BEADS_IMAGES: Record<string, string> = {
+        default1: "https://ohsocolorfulco.com/cdn/shop/files/african-traditional-coral-beads-jewelry-set-2.jpg?v=1723168870",
+        default2: "https://ohsocolorfulco.com/cdn/shop/files/african-traditional-coral-beads-jewelry-set_1200x.jpg?v=1723168867",
+        default3: "https://prestigeapplause.com/cdn/shop/products/DSC05171-copy_large.jpg?v=1736905501",
+      };
+
+      // Name-to-image mapping for known broken products
+      const NAME_MAP: Array<{ pattern: RegExp; image: string; nameOverride?: string; descOverride?: string }> = [
+        {
+          pattern: /agbada/i,
+          image: AGBADA_IMAGES.default1,
+          nameOverride: "Agbada for Men (3-Piece Set)",
+          descOverride: "Premium 3-piece Agbada set with intricate embroidery, perfect for weddings and special occasions.",
+        },
+        {
+          pattern: /idanre|bead|coral/i,
+          image: BEADS_IMAGES.default1,
+          nameOverride: "Idanre Coral Beads Set",
+          descOverride: "Authentic Nigerian Idanre coral beads necklace and earrings set for weddings and ceremonies.",
+        },
+        {
+          pattern: /lace/i,
+          image: AGBADA_IMAGES.default3,
+          nameOverride: "Agbada for Men (White & Gold)",
+          descOverride: "Elegant white Agbada with gold embroidery – the perfect groomsmen outfit.",
+        },
+        {
+          pattern: /adire/i,
+          image: BEADS_IMAGES.default2,
+          nameOverride: "Yoruba Coral Beads Necklace",
+          descOverride: "Traditional Yoruba coral bead necklace, handcrafted with genuine coral beads.",
+        },
+        {
+          pattern: /aso.?ofi|ofi/i,
+          image: AGBADA_IMAGES.default2,
+          nameOverride: "Agbada for Men (Embroidered Robe)",
+          descOverride: "Traditional Nigerian Agbada with stunning hand embroidery. Available in custom sizes.",
+        },
+        {
+          pattern: /aso.?oke/i,
+          image: BEADS_IMAGES.default3,
+          nameOverride: "Edo Coral Beads Jewelry Set",
+          descOverride: "Royal Edo/Benin coral beads jewelry set for brides and cultural ceremonies.",
+        },
+      ];
+
+      const allProducts = await storage.getProducts();
+      let fixed = 0;
+      for (const product of allProducts) {
+        const hasBrokenImage =
+          !product.images ||
+          product.images.length === 0 ||
+          product.images.some((img: string) => img.startsWith('/uploads/'));
+
+        if (!hasBrokenImage) continue;
+
+        // Find matching rule
+        const rule = NAME_MAP.find(r => r.pattern.test(product.name));
+        if (rule) {
+          await storage.updateProductImages(
+            product.id,
+            [rule.image],
+            rule.nameOverride,
+            rule.descOverride,
+          );
+          fixed++;
+          console.log(`[startup] Fixed product #${product.id} "${product.name}" → "${rule.nameOverride ?? product.name}"`);
+        }
+      }
+      if (fixed > 0) console.log(`[startup] Fixed ${fixed} broken product images`);
+    } catch (err) {
+      console.error('[startup] Error fixing product images:', err);
+    }
+  })();
+  // ────────────────────────────────────────────────────────────────────────
+
   const httpServer = createServer(app);
   return httpServer;
 }
