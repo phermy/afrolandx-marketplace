@@ -3094,16 +3094,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fix products whose images use CDNs that block hotlinking (Amazon, Pinterest, Jumia).
   // Runs silently on startup; no-ops once all images are already on allowlisted hosts.
   (async () => {
-    const BLOCKED = ['amazon.com', 'pinimg.com', 'jumia.is'];
+    const BLOCKED_IMAGE_DOMAINS = ['amazon.com', 'pinimg.com', 'jumia.is'];
+    const BROKEN_URL_PATTERNS = ['share.google', 'drive.google', 'docs.google'];
     const AGBADA_RELIABLE = 'https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946';
     try {
       const all = await storage.getProducts();
       for (const p of all) {
+        // 1. Clear broken imageUrl values (Google share links etc.) that shadow the images[] array
+        if (p.imageUrl && BROKEN_URL_PATTERNS.some(pat => p.imageUrl!.includes(pat))) {
+          await db.update(products).set({ imageUrl: null } as any).where(eq(products.id, p.id));
+          console.log(`[img-fix] Cleared bad imageUrl for product #${p.id} "${p.name}"`);
+        }
+        // 2. Replace images[] that use CDNs which block hotlinking
         if (!p.images) continue;
-        const hasBlocked = p.images.some((u: string) => BLOCKED.some(d => u.includes(d)));
+        const hasBlocked = p.images.some((u: string) => BLOCKED_IMAGE_DOMAINS.some(d => u.includes(d)));
         if (!hasBlocked) continue;
         await storage.updateProductImages(p.id, [AGBADA_RELIABLE]);
-        console.log(`[img-fix] Updated product #${p.id} "${p.name}" to reliable CDN`);
+        console.log(`[img-fix] Updated images for product #${p.id} "${p.name}" to reliable CDN`);
       }
     } catch (e) {
       console.error('[img-fix] error:', e);

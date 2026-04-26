@@ -286,10 +286,11 @@ export default function Landing() {
           {products.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
               {products.slice(0, 8).map((product) => {
-                const rawSrc = product.imageUrl ||
+                // images[] is the authoritative source; imageUrl is a legacy fallback
+                const rawSrc =
                   (product.images && product.images.length > 0
-                    ? product.images[0].split('?')[0]   // strip stale query params
-                    : '');
+                    ? product.images[0]
+                    : product.imageUrl) || '';
                 return (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
                   {/* Padding-bottom trick: universally supported 1:1 aspect ratio */}
