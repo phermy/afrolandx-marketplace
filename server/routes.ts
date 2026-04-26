@@ -3091,6 +3091,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fix products whose images use CDNs that block hotlinking (Amazon, Pinterest, Jumia).
+  // Runs silently on startup; no-ops once all images are already on allowlisted hosts.
+  (async () => {
+    const BLOCKED = ['amazon.com', 'pinimg.com', 'jumia.is'];
+    const AGBADA_RELIABLE = 'https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946';
+    try {
+      const all = await storage.getProducts();
+      for (const p of all) {
+        if (!p.images) continue;
+        const hasBlocked = p.images.some((u: string) => BLOCKED.some(d => u.includes(d)));
+        if (!hasBlocked) continue;
+        await storage.updateProductImages(p.id, [AGBADA_RELIABLE]);
+        console.log(`[img-fix] Updated product #${p.id} "${p.name}" to reliable CDN`);
+      }
+    } catch (e) {
+      console.error('[img-fix] error:', e);
+    }
+  })();
+
   const httpServer = createServer(app);
   return httpServer;
 }
