@@ -107,44 +107,35 @@ export default function Checkout() {
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      // Try Paystack integration first
       try {
         const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
         return response.json();
-      } catch (error) {
-        // Fall back to direct order creation if Paystack not configured
-        const response = await apiRequest('POST', '/api/orders', orderData);
-        return response.json();
+      } catch (error: any) {
+        // Only fall back to direct order creation if Paystack is not configured (503)
+        // For all other errors (500 = payment failure), surface the error to the user
+        if (error?.message?.startsWith('503')) {
+          const response = await apiRequest('POST', '/api/orders', orderData);
+          return response.json();
+        }
+        throw error;
       }
     },
     onSuccess: (result) => {
       if (result.paymentUrl) {
-        // Redirect to Paystack payment page
         toast({
           title: 'Redirecting to Payment',
-          description: 'You will be redirected to complete your payment...',
+          description: 'You will be redirected to Paystack to complete your payment...',
         });
-        
-        // Store order reference for verification
         localStorage.setItem('pending_payment_reference', result.reference);
-        
-        // Redirect to Paystack
         window.location.href = result.paymentUrl;
       } else {
-        // Direct order creation (fallback)
+        // Paystack not configured — direct order creation
         toast({
-          title: 'Order Created',
-          description: 'Simulating payment completion...',
+          title: 'Order Placed!',
+          description: `Order #${result.id} has been created. Our team will contact you to arrange payment.`,
         });
-        
-        setTimeout(() => {
-          toast({
-            title: 'Order Placed Successfully!',
-            description: `Order #${result.id} has been created. You will receive a confirmation email shortly.`,
-          });
-          clearCart();
-          window.location.href = '/';
-        }, 2000);
+        clearCart();
+        setTimeout(() => { window.location.href = '/my-orders'; }, 1500);
       }
     },
     onError: (error) => {
@@ -159,9 +150,12 @@ export default function Checkout() {
         }, 500);
         return;
       }
+      const msg = (error as any)?.message || '';
       toast({
-        title: 'Error',
-        description: 'Failed to create order. Please try again.',
+        title: 'Payment Failed',
+        description: msg.includes('500')
+          ? 'We could not process your payment. Please try again or contact support.'
+          : 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
     },

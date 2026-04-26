@@ -900,41 +900,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Initialize Paystack payment in buyer's currency
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/callback`;
-      const paymentData = await paystack.initializeTransaction(
-        user.email,
-        chargeAmount,
-        reference,
-        {
-          orderId: order.id,
-          userId,
-          shippingMethod,
-          chargeCurrency,
-          usdEquivalent: totalAmount,
-          custom_fields: [
-            {
-              display_name: "Order ID",
-              variable_name: "order_id",
-              value: order.id.toString()
-            },
-            {
-              display_name: "Currency",
-              variable_name: "charge_currency",
-              value: chargeCurrency
+
+      const buildMetadata = (finalCurrency: string) => ({
+        orderId: order.id,
+        userId,
+        shippingMethod,
+        chargeCurrency: finalCurrency,
+        usdEquivalent: totalAmount,
+        custom_fields: [
+          { display_name: 'Order ID',  variable_name: 'order_id',        value: order.id.toString() },
+          { display_name: 'Currency',  variable_name: 'charge_currency',  value: finalCurrency },
+        ],
+      });
+
+      let paymentData: any;
+      try {
+        paymentData = await paystack.initializeTransaction(
+          user.email, chargeAmount, reference,
+          buildMetadata(chargeCurrency), callbackUrl, chargeCurrency
+        );
+      } catch (firstErr: any) {
+        // Paystack merchant account doesn't support the requested currency.
+        // Retry with NGN (most likely the merchant's home currency).
+        if (firstErr?.message?.toLowerCase().includes('currency not supported')) {
+          console.log(`[paystack] ${chargeCurrency} rejected by merchant — retrying with NGN`);
+          let ngnRate = 1800; // safe fallback
+          try {
+            const ratesRes = await fetch('https://open.er-api.com/v6/latest/USD', {
+              signal: AbortSignal.timeout(5000),
+            });
+            if (ratesRes.ok) {
+              const ratesData = await ratesRes.json() as any;
+              ngnRate = ratesData.rates?.NGN || ngnRate;
             }
-          ]
-        },
-        callbackUrl,
-        chargeCurrency
-      );
+          } catch { /* use fallback rate */ }
+
+          const ngnAmount = parseFloat(totalAmount) * ngnRate;
+          paymentData = await paystack.initializeTransaction(
+            user.email, ngnAmount, reference,
+            buildMetadata('NGN'), callbackUrl, 'NGN'
+          );
+        } else {
+          throw firstErr;
+        }
+      }
 
       res.json({
         order,
         paymentUrl: paymentData.data.authorization_url,
-        reference: paymentData.data.reference
+        reference: paymentData.data.reference,
       });
     } catch (error) {
       console.error('Error initializing payment:', error);
-      res.status(500).json({ message: 'Failed to initialize payment' });
+      res.status(500).json({ message: 'Failed to initialize payment. Please try again.' });
     }
   });
 
