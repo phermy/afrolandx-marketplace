@@ -680,7 +680,7 @@ export default function Landing() {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
+            <p>&copy; 2026 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
           </div>
         </div>
       </footer>
