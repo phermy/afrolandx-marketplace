@@ -86,6 +86,13 @@ export default function Checkout() {
     retry: false,
   });
 
+  // Auto-select the cheapest (first) shipping option when quotes load
+  useEffect(() => {
+    if (shippingQuotes.length > 0 && !selectedShipping) {
+      setSelectedShipping(shippingQuotes[0].carrier);
+    }
+  }, [shippingQuotes, selectedShipping]);
+
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {

@@ -2239,7 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const collectionProducts = await Promise.all(
           productIds.map(id => storage.getProduct(id))
         );
-        return { ...collection, products: collectionProducts.filter(Boolean) };
+        return { ...collection, title: collection.name, products: collectionProducts.filter(Boolean) };
       }));
       
       res.json(enhanced);
@@ -2291,6 +2291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return {
           ...collection,
+          title: collection.name,
           products: collectionProducts.filter(Boolean),
           totalPrice,
           avgFitScore: collectionProducts.reduce((sum, p: any) => sum + (p?.fitScore || 85), 0) / collectionProducts.length,
@@ -2579,6 +2580,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return {
           ...drop,
+          title: drop.name,
+          teaserImageUrl: drop.coverImage,
           designer,
           artisan,
           products: dropProducts.filter(Boolean),
@@ -2607,6 +2610,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...drop,
+        title: drop.name,
+        teaserImageUrl: drop.coverImage,
         designer,
         artisan,
         products: dropProducts.filter(Boolean),
@@ -3114,6 +3119,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (e) {
       console.error('[img-fix] error:', e);
+    }
+  })();
+
+  // Seed event_collections and collab_drops tables if empty.
+  // Safe to re-run: checks row count before inserting.
+  (async () => {
+    try {
+      const existingCollections = await storage.getEventCollections();
+      if (existingCollections.length === 0) {
+        const collections = [
+          {
+            name: 'Royal Agbada Wedding Set',
+            eventType: 'wedding',
+            description: 'A full matching Agbada ensemble for groom, groomsmen and family – rich embroidery, flowing fabric, timeless royalty.',
+            productIds: [1, 3, 4, 5],
+            familyGrouping: 'groomsmen',
+            genderTarget: 'male',
+            priceRange: { min: 120, max: 500 },
+            featured: true,
+          },
+          {
+            name: 'Coral Beads Bridal Package',
+            eventType: 'wedding',
+            description: 'Authentic Benin coral bead sets for the bride, mothers and bridal party – the ultimate symbol of grace and heritage.',
+            productIds: [6, 7, 8, 9],
+            familyGrouping: 'bridal_party',
+            genderTarget: 'female',
+            priceRange: { min: 80, max: 350 },
+            featured: true,
+          },
+          {
+            name: 'Festival Aso-Ebi Collection',
+            eventType: 'festival',
+            description: 'Vibrant coordinated Aso-Ebi outfits for cultural festivals – bring your entire family group together in colour and style.',
+            productIds: [3, 4, 8, 9, 10],
+            familyGrouping: 'family',
+            genderTarget: 'unisex',
+            priceRange: { min: 60, max: 280 },
+            featured: false,
+          },
+          {
+            name: 'Naming Ceremony Welcome Set',
+            eventType: 'naming_ceremony',
+            description: 'Elegant attire for parents and grandparents celebrating the arrival of a new life – soft tones, cultural pride.',
+            productIds: [4, 5, 6, 7],
+            familyGrouping: 'family',
+            genderTarget: 'unisex',
+            priceRange: { min: 50, max: 200 },
+            featured: false,
+          },
+          {
+            name: 'Chieftaincy Title Regalia',
+            eventType: 'chieftaincy',
+            description: 'Full ceremonial regalia for a chieftaincy installation – commanding presence, intricate hand-embroidery, authentic beadwork.',
+            productIds: [1, 6, 7],
+            familyGrouping: 'couple',
+            genderTarget: 'unisex',
+            priceRange: { min: 200, max: 800 },
+            featured: true,
+          },
+        ] as const;
+        for (const col of collections) {
+          await storage.createEventCollection(col as any);
+        }
+        console.log(`[seed] Inserted ${collections.length} event collections`);
+      }
+
+      const existingDrops = await storage.getCollabDrops();
+      if (existingDrops.length === 0) {
+        const now = new Date();
+        const drops = [
+          {
+            designerId: 1,
+            artisanId: null,
+            name: 'Adire x Ankara: The Lagos Drop',
+            description: 'A groundbreaking fusion of hand-dyed Adire and modern Ankara prints — only 50 pieces available. RSVP to secure your spot when the drop goes live.',
+            dropStartTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+            dropEndTime: new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000),
+            rsvpCap: 50,
+            rsvpCount: 12,
+            productIds: [3, 4],
+            status: 'upcoming',
+            isExclusive: false,
+            minLoyaltyTier: null,
+            coverImage: 'https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946',
+          },
+          {
+            designerId: 1,
+            artisanId: null,
+            name: 'Gold & Coral: Heritage Edition',
+            description: 'Live now — our most celebrated collaboration featuring 24-carat gold thread Agbada paired with authentic Benin coral bead accessories. Strictly limited.',
+            dropStartTime: new Date(now.getTime() - 2 * 60 * 60 * 1000), // started 2h ago
+            dropEndTime: new Date(now.getTime() + 22 * 60 * 60 * 1000),
+            rsvpCap: 30,
+            rsvpCount: 28,
+            productIds: [1, 6, 7],
+            status: 'live',
+            isExclusive: true,
+            minLoyaltyTier: 'silver',
+            coverImage: 'https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946',
+          },
+          {
+            designerId: 1,
+            artisanId: null,
+            name: 'Ekiti Indigo Summer Series',
+            description: 'Upcoming drop — hand-spun indigo from Ekiti artisans reimagined for the modern wardrobe. Set your reminder now.',
+            dropStartTime: new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days from now
+            dropEndTime: new Date(now.getTime() + 11 * 24 * 60 * 60 * 1000),
+            rsvpCap: 100,
+            rsvpCount: 5,
+            productIds: [5, 9, 10],
+            status: 'upcoming',
+            isExclusive: false,
+            minLoyaltyTier: null,
+            coverImage: 'https://www.abbiexpress.com/cdn/shop/files/abbiexpress-african-s-men-s-wear-m-african-men-agbada-embroidery-45379580789035.jpg?v=1717126713&width=1946',
+          },
+        ];
+        for (const drop of drops) {
+          await storage.createCollabDrop(drop as any);
+        }
+        console.log(`[seed] Inserted ${drops.length} collab drops`);
+      }
+    } catch (e) {
+      console.error('[seed] error:', e);
     }
   })();
 
