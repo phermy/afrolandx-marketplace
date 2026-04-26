@@ -20,6 +20,7 @@ import Messages from "@/pages/messages";
 import Lookbook from "@/pages/lookbook";
 import Loyalty from "@/pages/loyalty";
 import CollabDrops from "@/pages/collab-drops";
+import CollabDropDetail from "@/pages/collab-drop-detail";
 import VendorWorkshop from "@/pages/vendor-workshop";
 import EventPlanner from "@/pages/event-planner";
 import Quiz from "@/pages/quiz";
@@ -65,6 +66,7 @@ function Router() {
       {/* Public pages */}
       <Route path="/products" component={Products} />
       <Route path="/collab-drops" component={CollabDrops} />
+      <Route path="/collab-drops/:id" component={CollabDropDetail} />
       <Route path="/events" component={EventPlanner} />
       <Route path="/discover" component={DiscoverAfrica} />
       <Route path="/lookbook" component={Lookbook} />

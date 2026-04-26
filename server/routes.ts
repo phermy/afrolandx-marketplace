@@ -1968,17 +1968,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get available products
       const allProducts = await storage.getProducts({ status: 'approved' });
       
-      // Use AI to generate outfit recommendations
+      // Use AI to generate adaptive outfit recommendations
       const chatbotService = getChatbotService();
-      const prompt = `You are a Nigerian fashion stylist. Based on the following occasion:
-        Event Type: ${eventType}
-        Budget: ${budget ? `$${budget}` : 'No limit'}
-        Style Notes: ${styleNotes || 'None'}
-        
-        Select 3-5 items from this product catalog that would create a perfect outfit:
-        ${JSON.stringify(allProducts.slice(0, 20).map(p => ({ id: p.id, name: p.name, price: p.price, category: p.categoryId })))}
-        
-        Return a JSON array of product IDs with reasons, like: [{"productId": 1, "reason": "Perfect Agbada for wedding"}]`;
+      const productCatalog = allProducts.slice(0, 30).map(p => ({
+        id: p.id,
+        name: p.name,
+        price: `$${p.price}`,
+        categoryId: p.categoryId,
+        description: p.description?.substring(0, 80) || '',
+      }));
+
+      const prompt = `You are an expert African fashion stylist for Afrolandx. Create a personalised outfit selection.
+
+USER REQUEST:
+${styleNotes ? `"${styleNotes}"` : '(no description provided)'}
+Event Type: ${eventType || 'general'}
+Budget: ${budget ? `up to $${budget}` : 'no budget limit'}
+
+AVAILABLE PRODUCTS:
+${JSON.stringify(productCatalog)}
+
+INSTRUCTIONS:
+- Select 3-5 products that work together as a complete, cohesive outfit
+- Prioritise products that best match the user's description and occasion
+- Stay within budget if specified
+- Write a specific, encouraging reason for each pick (mention colours, occasion fit, or cultural significance)
+- Return ONLY a valid JSON array, no other text:
+[{"productId": <number>, "reason": "<specific reason why this fits the request>"}]`;
       
       let bundleItems: any[] = [];
       try {
@@ -1999,7 +2015,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enhance bundle items with product details
       const enhancedItems = await Promise.all(bundleItems.map(async (item: any) => {
         const product = await storage.getProduct(item.productId);
-        return product ? { ...item, name: product.name, price: product.price, imageUrl: product.imageUrl } : null;
+        if (!product) return null;
+        const imageUrl = (product.images && product.images[0]) || product.imageUrl || null;
+        return { ...item, name: product.name, price: product.price, imageUrl };
       }));
       
       const filteredItems = enhancedItems.filter(Boolean);
@@ -2639,6 +2657,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching collab drop:', error);
       res.status(500).json({ message: 'Failed to fetch drop' });
+    }
+  });
+
+  // AI-powered collab drop suggestion based on free-text user query
+  app.post('/api/collab-drops/ai-suggest', async (req, res) => {
+    try {
+      const { query } = req.body as { query: string };
+      if (!query || query.trim().length < 3) {
+        return res.status(400).json({ message: 'Please provide a search query.' });
+      }
+
+      const allDrops = await storage.getCollabDrops();
+      if (allDrops.length === 0) return res.json({ dropIds: [], explanation: 'No drops available yet.' });
+
+      const chatbotService = getChatbotService();
+      const dropSummary = allDrops.map(d => ({
+        id: d.id,
+        name: d.name,
+        description: (d.description || '').substring(0, 120),
+        status: d.status,
+        isExclusive: d.isExclusive,
+        minLoyaltyTier: d.minLoyaltyTier,
+      }));
+
+      const prompt = `You are an African fashion expert. A user is searching for a collaboration drop.
+
+USER QUERY: "${query}"
+
+AVAILABLE DROPS:
+${JSON.stringify(dropSummary)}
+
+Return a JSON object with:
+- "dropIds": array of matching drop IDs (best matches first, max 5)
+- "explanation": one sentence explaining why these match
+
+Return ONLY valid JSON:
+{"dropIds": [1, 2], "explanation": "These drops match because..."}`;
+
+      const aiResponse = await chatbotService.generateResponse([{ role: 'user', content: prompt }]);
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return res.json(parsed);
+      }
+      res.json({ dropIds: allDrops.map(d => d.id), explanation: 'Showing all available drops.' });
+    } catch (error) {
+      console.error('Error in AI collab suggest:', error);
+      res.status(500).json({ message: 'AI suggestion failed. Try a different query.' });
     }
   });
 
