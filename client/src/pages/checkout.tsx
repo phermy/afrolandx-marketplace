@@ -414,6 +414,7 @@ export default function Checkout() {
                               src={item.product.images[0]}
                               alt={item.product.name}
                               className="w-full h-full object-cover rounded"
+                              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
                             />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded"></div>

@@ -285,26 +285,42 @@ export default function Landing() {
 
           {products.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
-              {products.slice(0, 8).map((product) => (
+              {products.slice(0, 8).map((product) => {
+                const rawSrc = product.imageUrl ||
+                  (product.images && product.images.length > 0
+                    ? product.images[0].split('?')[0]   // strip stale query params
+                    : '');
+                return (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
-                  <div className="relative overflow-hidden rounded-t-lg">
+                  {/* Padding-bottom trick: universally supported 1:1 aspect ratio */}
+                  <div
+                    className="relative w-full overflow-hidden rounded-t-lg bg-gray-100"
+                    style={{ height: 0, paddingBottom: '100%' }}
+                  >
                     <img
-                      src={product.imageUrl || (product.images && product.images.length > 0 ? product.images[0] : '/api/placeholder/300/400')}
+                      src={rawSrc || 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&h=400&q=75'}
                       alt={product.name}
-                      className="w-full h-36 sm:h-52 md:h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="eager"
+                      decoding="async"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.onerror = null;
+                        img.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&h=400&q=75';
+                      }}
                     />
                     {product.featured && (
-                      <Badge className="absolute top-2 left-2 bg-nigerian-gold text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 left-2 z-10 bg-nigerian-gold text-white text-xs px-1.5 py-0.5">
                         Featured
                       </Badge>
                     )}
                     {product.stock <= 5 && product.stock > 0 && (
-                      <Badge className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 right-2 z-10 bg-orange-500 text-white text-xs px-1.5 py-0.5">
                         Low Stock
                       </Badge>
                     )}
                     {product.stock === 0 && (
-                      <Badge className="absolute top-2 right-2 bg-red-500 text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 right-2 z-10 bg-red-500 text-white text-xs px-1.5 py-0.5">
                         Sold Out
                       </Badge>
                     )}
@@ -338,7 +354,8 @@ export default function Landing() {
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+              );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
