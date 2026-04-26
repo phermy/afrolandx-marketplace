@@ -477,7 +477,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-green-600 mt-8 pt-8 text-center text-green-100">
-            <p>&copy; 2026 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
+            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
           </div>
         </div>
       </footer>
