@@ -127,31 +127,46 @@ export default function VendorDashboard() {
   // Vendor registration mutation
   const registerVendorMutation = useMutation({
     mutationFn: async (vendorData: { businessName: string; description: string }) => {
-      await apiRequest("POST", "/api/vendors", vendorData);
+      const res = await apiRequest("POST", "/api/vendors", vendorData);
+      if (!res.ok) {
+        const body = await res.json();
+        if (res.status === 409) {
+          throw Object.assign(new Error(body.message), { alreadyRegistered: true, vendor: body.vendor });
+        }
+        throw new Error(body.message || "Failed to register as vendor");
+      }
+      return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Vendor registration submitted! Please wait for admin approval.",
+        title: "Application submitted!",
+        description: "Your vendor application is under review. We'll notify you once approved.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] });
       setIsRegistering(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      if (error.alreadyRegistered) {
+        // Refetch vendor data — they're already in the system
+        queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] });
+        toast({
+          title: "Already registered",
+          description: "You already have a vendor account. Redirecting to your dashboard.",
+        });
+        return;
+      }
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
+        setTimeout(() => { window.location.href = "/login"; }, 500);
         return;
       }
       toast({
         title: "Error",
-        description: "Failed to register as vendor. Please try again.",
+        description: error.message || "Failed to register as vendor. Please try again.",
         variant: "destructive",
       });
     },
@@ -247,6 +262,19 @@ export default function VendorDashboard() {
               </p>
             </CardHeader>
             <CardContent>
+              {/* Already-registered notice */}
+              {isVendor(user) && (
+                <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-center">
+                  <p className="text-amber-800 font-medium mb-1">You already have a vendor account.</p>
+                  <p className="text-amber-700 text-sm mb-3">
+                    Your account may still be under review. You can add products once you're approved.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] })}>
+                    Refresh status
+                  </Button>
+                </div>
+              )}
+
               <form onSubmit={handleVendorRegistration} className="space-y-6">
                 <div>
                   <Label htmlFor="businessName">Business Name</Label>
@@ -272,10 +300,19 @@ export default function VendorDashboard() {
                 <Button
                   type="submit"
                   className="w-full btn-nigerian"
-                  disabled={registerVendorMutation.isPending}
+                  disabled={registerVendorMutation.isPending || isVendor(user)}
                 >
-                  {registerVendorMutation.isPending ? "Submitting..." : "Register as Vendor"}
+                  {registerVendorMutation.isPending
+                    ? "Submitting…"
+                    : isVendor(user)
+                    ? "Already Registered"
+                    : "Register as Vendor"}
                 </Button>
+                {isVendor(user) && (
+                  <p className="text-center text-sm text-gray-500">
+                    You're already a vendor — registration is not needed again.
+                  </p>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -813,6 +850,9 @@ export default function VendorDashboard() {
                               {category.name}
                             </SelectItem>
                           ))}
+                          {!categories.some((c) => c.name.toLowerCase() === 'others') && (
+                            <SelectItem value="others">Others</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>

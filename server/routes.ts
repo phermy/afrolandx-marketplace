@@ -353,6 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { name: 'Footwear',           slug: 'footwear',          description: 'African leather sandals and shoes' },
         { name: 'Home & Crafts',      slug: 'home-crafts',       description: 'Handmade baskets, carvings, and art' },
         { name: 'Beauty & Wellness',  slug: 'beauty-wellness',   description: 'African natural beauty products' },
+        { name: 'Others',             slug: 'others',            description: 'Other African fashion products not listed above' },
       ];
 
       // Fetch slugs that already exist so we never hit the unique constraint
@@ -395,6 +396,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/vendors', isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
+
+      // Prevent duplicate vendor registration
+      const existingVendor = await storage.getVendorByUserId(userId);
+      if (existingVendor) {
+        return res.status(409).json({
+          message: 'You are already registered as a vendor.',
+          vendor: existingVendor,
+          alreadyRegistered: true,
+        });
+      }
+
       const vendorData = insertVendorSchema.parse({
         ...req.body,
         userId,

@@ -221,6 +221,9 @@ export default function Products() {
                           {category.name}
                         </SelectItem>
                       ))}
+                      {!categories.some((c: any) => c.name.toLowerCase() === 'others') && (
+                        <SelectItem value="others">Others</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

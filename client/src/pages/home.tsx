@@ -230,6 +230,14 @@ export default function Home() {
                   {category.name}
                 </Button>
               ))}
+              {!categories.some((c: any) => c.name.toLowerCase() === 'others') && (
+                <Button
+                  variant="outline"
+                  onClick={() => handleCategorySelect(null)}
+                >
+                  Others
+                </Button>
+              )}
             </div>
           </div>
         </div>
