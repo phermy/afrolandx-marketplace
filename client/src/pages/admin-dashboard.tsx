@@ -1,477 +1,463 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
-import { isAdmin, hasRole, getUserRoleDisplay, toggleUserRole } from '@/lib/roleUtils';
+import { isAdmin, hasRole } from '@/lib/roleUtils';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package, Mail, Calendar, User as UserIcon } from 'lucide-react';
-import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
+import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
+  Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
+  Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap,
+} from 'lucide-react';
+import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+
+const MAX_FEATURED = 8;
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  processing: 'bg-blue-100 text-blue-800',
+  shipped: 'bg-purple-100 text-purple-800',
+  delivered: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
+};
+const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'];
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // State for vendor review modal
   const [reviewVendor, setReviewVendor] = useState<any | null>(null);
-  // State for expanded product detail
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
 
-  // Redirect if not authenticated or not admin
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !isAdmin(user))) {
-      toast({
-        title: "Admin Access Required",
-        description: "You need admin privileges to access this page.",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 500);
-      return;
+      toast({ title: 'Admin Access Required', description: 'You need admin privileges.', variant: 'destructive' });
+      setTimeout(() => { window.location.href = '/login'; }, 500);
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
-  // Fetch admin stats
-  const { data: stats } = useQuery<AdminStats>({
-    queryKey: ['/api/admin/stats'],
+  // ── Queries ──────────────────────────────────────────────────────────────
+  const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: adminOrders = [] } = useQuery({ queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000 });
+  const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000 });
+  const { data: analytics, isLoading: analyticsLoading } = useQuery<any>({
+    queryKey: ['/api/admin/analytics', analyticsRefresh],
     enabled: isAuthenticated && isAdmin(user),
     retry: false,
+    refetchInterval: 60000,
   });
 
-  // Fetch notifications
-  const { data: notifications = [] } = useQuery({
-    queryKey: ['/api/notifications'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-  });
-
-  // Fetch all vendors
-  const { data: vendors = [] } = useQuery<Vendor[]>({
-    queryKey: ['/api/vendors'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-  });
-
-  // Fetch products with details for approval
-  const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({
-    queryKey: ['/api/products/with-details'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-  });
-
-  // Fetch all orders for admin tracking
-  const { data: adminOrders = [] } = useQuery({
-    queryKey: ['/api/admin/orders'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-  });
-
-  // Fetch all users for management
-  const { data: allUsers = [] } = useQuery<User[]>({
-    queryKey: ['/api/admin/users'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-  });
-
-  // Fetch admin notifications
-  const { data: adminNotifications = [] } = useQuery({
-    queryKey: ['/api/notifications'],
-    enabled: isAuthenticated && isAdmin(user),
-    retry: false,
-    refetchInterval: 30000,
-  });
-
-  // Admin notification dismiss mutation
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const dismissNotificationMutation = useMutation({
-    mutationFn: async (notificationId: number) => {
-      return await apiRequest("DELETE", `/api/notifications/${notificationId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-    }
+    mutationFn: async (id: number) => apiRequest('DELETE', `/api/notifications/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/notifications'] }),
   });
 
-  // Update vendor status mutation
   const updateVendorStatusMutation = useMutation({
     mutationFn: async ({ vendorId, status }: { vendorId: number; status: string }) => {
       await apiRequest('PATCH', `/api/vendors/${vendorId}/status`, { status });
     },
     onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Vendor status updated successfully.',
-      });
+      toast({ title: 'Done', description: 'Vendor status updated.' });
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
     },
     onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "Admin session expired. Please log in again.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: 'Error',
-        description: 'Failed to update vendor status.',
-        variant: 'destructive',
-      });
+      if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
+      toast({ title: 'Error', description: 'Failed to update vendor.', variant: 'destructive' });
     },
   });
 
-  // Toggle featured status mutation
   const toggleFeaturedMutation = useMutation({
     mutationFn: async ({ productId, featured }: { productId: number; featured: boolean }) => {
       await apiRequest('PATCH', `/api/products/${productId}/featured`, { featured });
     },
     onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Product featured status updated successfully.',
-      });
+      toast({ title: 'Featured updated', description: 'Homepage will reflect the change.' });
       queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "Admin session expired. Please log in again.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: 'Error',
-        description: 'Failed to update featured status.',
-        variant: 'destructive',
-      });
-    },
   });
 
-  // Update product status mutation
   const updateProductStatusMutation = useMutation({
     mutationFn: async ({ productId, status }: { productId: number; status: string }) => {
       await apiRequest('PATCH', `/api/products/${productId}/status`, { status });
     },
     onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'Product status updated successfully.',
-      });
+      toast({ title: 'Product status updated.' });
       queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "Admin session expired. Please log in again.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: 'Error',
-        description: 'Failed to update product status.',
-        variant: 'destructive',
-      });
-    },
   });
 
-  // Initialize categories mutation
-  const initCategoriesMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/categories/init');
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
-      toast({
-        title: 'Categories',
-        description: data?.message ?? 'Categories initialized successfully.',
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "Admin session expired. Please log in again.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: 'Error',
-        description: 'Failed to initialize categories.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Toggle user role mutation
-  const toggleUserRoleMutation = useMutation({
-    mutationFn: async ({ userId, role, hasRole }: { userId: string; role: string; hasRole: boolean }) => {
-      if (hasRole) {
-        await apiRequest('DELETE', `/api/admin/users/${userId}/roles/${role}`);
-      } else {
-        await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
-      }
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
+      await apiRequest('PATCH', `/api/admin/orders/${orderId}/status`, { status });
     },
     onSuccess: () => {
-      toast({
-        title: 'Success',
-        description: 'User role updated successfully.',
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "Admin session expired. Please log in again.",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: 'Error',
-        description: 'Failed to update user role.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Order updated', description: 'Fulfillment status saved.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
     },
   });
 
-  const formatPrice = (price: string) => {
-    return `$${parseFloat(price).toLocaleString()}`;
-  };
+  const initCategoriesMutation = useMutation({
+    mutationFn: async () => { const res = await apiRequest('POST', '/api/categories/init'); return res.json(); },
+    onSuccess: (data: any) => { queryClient.invalidateQueries({ queryKey: ['/api/categories'] }); toast({ title: data?.message ?? 'Categories initialised.' }); },
+  });
 
-  const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      pending: 'badge-pending',
-      approved: 'badge-approved',
-      rejected: 'badge-rejected',
-      suspended: 'badge-rejected',
-    };
+  const toggleUserRoleMutation = useMutation({
+    mutationFn: async ({ userId, role, hasRole: has }: { userId: string; role: string; hasRole: boolean }) => {
+      if (has) await apiRequest('DELETE', `/api/admin/users/${userId}/roles/${role}`);
+      else await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
+    },
+    onSuccess: () => { toast({ title: 'Role updated.' }); queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] }); },
+  });
 
-    return (
-      <Badge className={statusStyles[status as keyof typeof statusStyles] || 'badge-pending'}>
-        {status}
-      </Badge>
-    );
-  };
-
+  // ── Derived data ──────────────────────────────────────────────────────────
   const pendingProducts = allProducts.filter(p => p.status === 'pending');
   const approvedProducts = allProducts.filter(p => p.status === 'approved');
-  const pendingVendors = vendors.filter(v => v.status === 'pending');
+  const featuredProducts = approvedProducts.filter(p => p.featured);
+  const pendingVendors = (vendors as any[]).filter(v => v.status === 'pending');
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner-nigerian"></div>
-      </div>
-    );
-  }
+  const filteredOrders = useMemo(() => {
+    let list = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    if (orderStatusFilter !== 'all') list = list.filter((o: any) => o.orderStatus === orderStatusFilter);
+    if (orderSearch.trim()) {
+      const q = orderSearch.toLowerCase();
+      list = list.filter((o: any) =>
+        String(o.id).includes(q) ||
+        o.customer?.email?.toLowerCase().includes(q) ||
+        `${o.customer?.firstName} ${o.customer?.lastName}`.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [adminOrders, orderStatusFilter, orderSearch]);
 
-  if (!isAuthenticated || !isAdmin(user)) {
-    return null; // Will redirect in useEffect
-  }
+  const orderRevenueSummary = useMemo(() => {
+    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const total = orders.reduce((s: number, o: any) => s + parseFloat(o.totalAmount || '0'), 0);
+    const paid = orders.filter((o: any) => o.paymentStatus === 'paid' || o.paymentStatus === 'completed');
+    return { total, paid: paid.length, pending: orders.filter((o: any) => o.orderStatus === 'pending').length };
+  }, [adminOrders]);
+
+  // Recommended products to feature (not featured, approved, best stock/rating)
+  const recommendedToFeature = useMemo(() => {
+    return approvedProducts
+      .filter(p => !p.featured)
+      .sort((a, b) => {
+        const scoreA = parseFloat(a.price) * 0.3 + (a.stock || 0) * 0.7;
+        const scoreB = parseFloat(b.price) * 0.3 + (b.stock || 0) * 0.7;
+        return scoreB - scoreA;
+      })
+      .slice(0, 6);
+  }, [approvedProducts]);
+
+  const lowStockProducts = useMemo(() =>
+    approvedProducts.filter(p => p.stock <= 5).slice(0, 10), [approvedProducts]);
+
+  const formatPrice = (p: string | number) => `$${parseFloat(String(p)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmtCurrency = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected', suspended: 'badge-rejected',
+    };
+    return <Badge className={styles[status] || 'badge-pending'}>{status}</Badge>;
+  };
+
+  const exportOrdersCSV = () => {
+    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const rows = [
+      ['Order ID', 'Customer', 'Email', 'Total', 'Payment', 'Status', 'Date'],
+      ...orders.map((o: any) => [
+        o.id, `${o.customer?.firstName || ''} ${o.customer?.lastName || ''}`.trim(),
+        o.customer?.email || '', `$${parseFloat(o.totalAmount || 0).toFixed(2)}`,
+        o.paymentStatus, o.orderStatus, new Date(o.createdAt).toLocaleDateString('en-GB'),
+      ]),
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'afrolandx-orders.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner-nigerian"></div></div>;
+  if (!isAuthenticated || !isAdmin(user)) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-red-600 font-nigerian">
-                🛡️ Admin Dashboard
-              </h1>
-              <p className="text-gray-600">Manage vendors, products, and platform oversight</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="destructive" className="text-sm">
-                Admin Access
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-red-600 font-nigerian">🛡️ Admin Dashboard</h1>
+            <p className="text-gray-600 text-sm">AfrolandX Platform Control Centre</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="destructive">Admin Access</Badge>
+            {lowStockProducts.length > 0 && (
+              <Badge variant="outline" className="border-orange-400 text-orange-600 gap-1">
+                <AlertTriangle className="w-3 h-3" />{lowStockProducts.length} Low Stock
               </Badge>
-              <Button
-                onClick={() => initCategoriesMutation.mutate()}
-                disabled={initCategoriesMutation.isPending}
-                variant="outline"
-                size="sm"
-              >
-                {initCategoriesMutation.isPending ? 'Initializing...' : 'Initialize Categories'}
-              </Button>
-            </div>
+            )}
+            <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
+              {initCategoriesMutation.isPending ? 'Initialising…' : 'Init Categories'}
+            </Button>
           </div>
         </div>
 
-        {/* Admin Warning */}
-        <div className="mb-8">
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span className="text-red-800 font-medium">
-                  You are accessing the admin panel. All actions are logged and audited.
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Admin warning */}
+        <Card className="border-red-200 bg-red-50 mb-6">
+          <CardContent className="p-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+            <span className="text-red-800 text-sm font-medium">All admin actions are logged and audited for compliance.</span>
+          </CardContent>
+        </Card>
 
         {/* Notifications */}
         {Array.isArray(adminNotifications) && adminNotifications.length > 0 && (
-          <div className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-red-600">Recent Order Notifications</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {adminNotifications.slice(0, 5).map((notification: any) => (
-                    <div key={notification.id} className="flex items-start justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-start space-x-3">
-                        <div className="text-red-600 text-lg">
-                          {notification.type === 'order' ? '📦' : '📢'}
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-red-800">{notification.title}</h4>
-                          <p className="text-red-700 text-sm">{notification.message}</p>
-                          <p className="text-red-600 text-xs mt-1">
-                            {new Date(notification.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
+          <Card className="mb-6">
+            <CardHeader className="pb-2"><CardTitle className="text-base text-red-600">Notifications</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {(adminNotifications as any[]).slice(0, 4).map((n: any) => (
+                  <div key={n.id} className="flex items-start justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg">{n.type === 'order' ? '📦' : '📢'}</span>
+                      <div>
+                        <p className="font-semibold text-red-800 text-sm">{n.title}</p>
+                        <p className="text-red-700 text-xs">{n.message}</p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => dismissNotificationMutation.mutate(notification.id)}
-                        className="h-8 w-8 p-0 hover:bg-red-200"
-                        disabled={dismissNotificationMutation.isPending}
-                      >
-                        <X className="w-4 h-4 text-red-600" />
-                      </Button>
                     </div>
-                  ))}
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => dismissNotificationMutation.mutate(n.id)}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Total Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} paid orders` : '' },
+            { label: 'Total Orders', value: Array.isArray(adminOrders) ? String((adminOrders as any[]).length) : '0', icon: ShoppingBag, color: 'bg-blue-500', sub: `${orderRevenueSummary.pending} pending` },
+            { label: 'Active Vendors', value: String((vendors as any[]).filter((v: any) => v.status === 'approved').length), icon: Users, color: 'bg-purple-500', sub: `${pendingVendors.length} pending approval` },
+            { label: 'Fulfilment Rate', value: analytics ? `${analytics.fulfillmentRate}%` : '—', icon: TrendingUp, color: 'bg-orange-500', sub: `${analytics?.totalApprovedProducts || approvedProducts.length} live products` },
+          ].map(({ label, value, icon: Icon, color, sub }) => (
+            <Card key={label}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-gray-500 text-xs mb-1">{label}</p>
+                    <p className="text-2xl font-bold text-gray-900">{value}</p>
+                    {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+                  </div>
+                  <div className={`p-2 ${color} rounded-lg`}><Icon className="w-5 h-5 text-white" /></div>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-500 rounded-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-gray-600 text-sm">Total Vendors</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalVendors || vendors.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-500 rounded-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-gray-600 text-sm">Total Products</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalProducts || allProducts.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-yellow-500 rounded-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-gray-600 text-sm">Pending Approvals</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.pendingApprovals || pendingProducts.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-red-500 rounded-lg">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-gray-600 text-sm">Vendor Requests</p>
-                  <p className="text-2xl font-bold text-gray-900">{pendingVendors.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          ))}
         </div>
 
-        <Tabs defaultValue="products" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="products">Product Approvals</TabsTrigger>
-            <TabsTrigger value="orders">Order Management</TabsTrigger>
+        {/* Main Tabs */}
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>
+            <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="featured">Featured Products</TabsTrigger>
-            <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
 
+          {/* ═══ ANALYTICS TAB ═══════════════════════════════════════════════ */}
+          <TabsContent value="analytics">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Real-Time Platform Analytics</h2>
+                <Button variant="outline" size="sm" onClick={() => setAnalyticsRefresh(r => r + 1)} disabled={analyticsLoading}>
+                  <RefreshCw className={`w-3 h-3 mr-1 ${analyticsLoading ? 'animate-spin' : ''}`} />Refresh
+                </Button>
+              </div>
+
+              {analyticsLoading ? (
+                <div className="flex justify-center py-16"><div className="spinner-nigerian"></div></div>
+              ) : analytics ? (
+                <>
+                  {/* Revenue Trend */}
+                  <Card>
+                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Revenue Trend — Last 30 Days</CardTitle></CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <AreaChart data={analytics.revenueTrend}>
+                          <defs>
+                            <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v}`} />
+                          <Tooltip formatter={(v: any) => [`$${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
+                          <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="url(#revGrad)" strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Orders by Status */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">Orders by Status</CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie data={analytics.ordersByStatus.filter((d: any) => d.count > 0)} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={70} label={({ status, count }) => `${status} (${count})`} labelLine={false}>
+                              {analytics.ordersByStatus.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {analytics.ordersByStatus.map((d: any, i: number) => (
+                            <div key={d.status} className="flex items-center gap-1 text-xs">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                              <span className="capitalize">{d.status}: {d.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Geographic Distribution */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Globe className="w-4 h-4" />Orders by Country</CardTitle></CardHeader>
+                      <CardContent>
+                        {analytics.geoDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={analytics.geoDistribution} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                              <XAxis type="number" tick={{ fontSize: 10 }} />
+                              <YAxis dataKey="country" type="category" tick={{ fontSize: 10 }} width={90} />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. Orders will populate this chart.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Vendor Performance */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Award className="w-4 h-4 text-yellow-500" />Vendor Rankings by Inventory Value</CardTitle></CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {analytics.vendorPerformance.slice(0, 6).map((v: any, i: number) => (
+                            <div key={v.id}>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-gray-400 w-4">#{i + 1}</span>
+                                  <span className="text-sm font-medium truncate max-w-[140px]">{v.businessName}</span>
+                                  {i === 0 && <span className="text-xs">🏆</span>}
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xs font-semibold text-green-700">{fmtCurrency(v.totalInventoryValue)}</span>
+                                  <span className="text-xs text-gray-400 ml-2">{v.productCount} products</span>
+                                </div>
+                              </div>
+                              <Progress value={Math.min((v.totalInventoryValue / (analytics.vendorPerformance[0]?.totalInventoryValue || 1)) * 100, 100)} className="h-1.5" />
+                            </div>
+                          ))}
+                          {analytics.vendorPerformance.length === 0 && <p className="text-gray-400 text-sm text-center py-4">No approved vendors yet.</p>}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Customer Metrics */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Customer Insights</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { label: 'Total Customers', value: analytics.totalCustomers, icon: '👤' },
+                            { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: '✨' },
+                            { label: 'Avg Order Value', value: fmtCurrency(analytics.avgOrderValue), icon: '💰' },
+                            { label: 'Inventory Value', value: fmtCurrency(analytics.totalInventoryValue), icon: '📦' },
+                          ].map(({ label, value, icon }) => (
+                            <div key={label} className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-lg mb-0.5">{icon}</p>
+                              <p className="text-xl font-bold text-gray-900">{value}</p>
+                              <p className="text-xs text-gray-500">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Low stock alert */}
+                        {analytics.lowStockProducts.length > 0 && (
+                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                            <p className="text-sm font-semibold text-orange-700 flex items-center gap-1 mb-2">
+                              <AlertTriangle className="w-3.5 h-3.5" />Low Stock Alerts ({analytics.lowStockProducts.length})
+                            </p>
+                            <div className="space-y-1">
+                              {analytics.lowStockProducts.slice(0, 4).map((p: any) => (
+                                <div key={p.id} className="flex justify-between text-xs">
+                                  <span className="truncate max-w-[160px] text-orange-800">{p.name}</span>
+                                  <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-600'}`}>{p.stock === 0 ? 'OUT' : `${p.stock} left`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              ) : (
+                <Card><CardContent className="py-12 text-center text-gray-400">Analytics data unavailable. Try refreshing.</CardContent></Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ═══ PRODUCT APPROVALS TAB ══════════════════════════════════════ */}
           <TabsContent value="products">
             <Card>
               <CardHeader>
@@ -479,153 +465,96 @@ export default function AdminDashboard() {
                   <span>Product Approval Queue</span>
                   <Badge variant="secondary">{pendingProducts.length} pending</Badge>
                 </CardTitle>
+                <CardDescription>Review each product against quality standards before approving for the storefront.</CardDescription>
               </CardHeader>
               <CardContent>
                 {pendingProducts.length === 0 ? (
                   <div className="text-center py-12">
-                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">All caught up!</h3>
-                    <p className="text-gray-600">No products pending approval at the moment.</p>
+                    <CheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
+                    <h3 className="font-semibold text-gray-700">All caught up!</h3>
+                    <p className="text-gray-500 text-sm">No products awaiting approval.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {pendingProducts.map((product) => (
                       <div key={product.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                        {/* Summary row */}
                         <div className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-4">
                               <div className="w-20 h-20 flex-shrink-0">
-                                {product.images && product.images.length > 0 ? (
-                                  <img
-                                    src={product.images[0]}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover rounded"
-                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
-                                  />
+                                {product.images?.[0] ? (
+                                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover rounded" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                                    <span className="text-white text-xs">No Image</span>
+                                    <Package className="w-6 h-6 text-white" />
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                                <p className="text-gray-600 text-sm mb-2 line-clamp-2">{product.description}</p>
-                                <div className="flex flex-wrap items-center gap-3 text-sm">
-                                  <span className="text-nigerian-green font-semibold">{formatPrice(product.price)}</span>
-                                  <span className="text-gray-500 flex items-center gap-1"><Package className="w-3 h-3" />Qty: {product.quantity}</span>
+                              <div>
+                                <h3 className="font-semibold mb-1">{product.name}</h3>
+                                <p className="text-gray-500 text-sm line-clamp-2 mb-2">{product.description}</p>
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  <span className="text-green-700 font-semibold">{formatPrice(product.price)}</span>
+                                  <span className="text-gray-500">Stock: {product.stock}</span>
                                   <span className="text-gray-500">by <strong>{product.vendor.businessName}</strong></span>
                                   <Badge variant="outline" className="text-xs">{product.category.name}</Badge>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                {expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            <div className="flex gap-2 shrink-0">
+                              <Button size="sm" variant="outline" onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
+                                <Eye className="w-3 h-3 mr-1" />{expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}
-                                disabled={updateProductStatusMutation.isPending}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateProductStatusMutation.isPending} onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}>
                                 <CheckCircle className="w-3 h-3 mr-1" />Approve
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' })}
-                                disabled={updateProductStatusMutation.isPending}
-                              >
+                              <Button size="sm" variant="destructive" disabled={updateProductStatusMutation.isPending} onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' })}>
                                 <XCircle className="w-3 h-3 mr-1" />Reject
                               </Button>
                             </div>
                           </div>
                         </div>
 
-                        {/* Expanded detail panel */}
                         {expandedProductId === product.id && (
-                          <div className="border-t border-gray-200 bg-gray-50 p-4 space-y-4">
-                            {/* Image gallery */}
+                          <div className="border-t bg-gray-50 p-4 space-y-4">
                             {product.images && product.images.length > 0 && (
                               <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                                  <Eye className="w-3 h-3" />Product Images ({product.images.length})
-                                </h4>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">All Images ({product.images.length})</p>
                                 <div className="flex gap-2 overflow-x-auto pb-1">
                                   {product.images.map((img, i) => (
-                                    <img
-                                      key={i}
-                                      src={img}
-                                      alt={`${product.name} ${i + 1}`}
-                                      className="w-28 h-28 object-cover rounded-lg flex-shrink-0 border border-gray-200"
-                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
+                                    <img key={i} src={img} alt={`img ${i+1}`} className="w-28 h-28 object-cover rounded-lg flex-shrink-0 border" onError={(e) => { e.currentTarget.style.display='none'; }} />
                                   ))}
                                 </div>
                               </div>
                             )}
-
-                            {/* Full description */}
                             <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-1">Full Description</h4>
-                              <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
+                              <p className="text-xs font-semibold text-gray-600 mb-1">Full Description</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">{product.description}</p>
                             </div>
-
-                            {/* Standards checklist */}
                             <div>
-                              <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3" />Quality Standards Check
-                              </h4>
+                              <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1"><ShieldCheck className="w-3 h-3" />Quality Standards</p>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {[
                                   { label: 'Has product images', pass: product.images && product.images.length > 0 },
-                                  { label: 'Has description', pass: product.description && product.description.length > 20 },
-                                  { label: 'Price set', pass: parseFloat(product.price) > 0 },
-                                  { label: 'Stock > 0', pass: product.quantity > 0 },
+                                  { label: 'Description (20+ chars)', pass: product.description?.length > 20 },
+                                  { label: 'Price set (> $0)', pass: parseFloat(product.price) > 0 },
+                                  { label: 'In stock (> 0)', pass: product.stock > 0 },
                                   { label: 'Category assigned', pass: !!product.category?.name },
-                                  { label: 'Vendor verified', pass: product.vendor?.status === 'approved' },
+                                  { label: 'Vendor approved', pass: product.vendor?.status === 'approved' },
                                 ].map(({ label, pass }) => (
-                                  <div key={label} className={`flex items-center gap-2 p-2 rounded text-xs ${pass ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                    {pass ? <CheckCircle className="w-3 h-3 flex-shrink-0" /> : <XCircle className="w-3 h-3 flex-shrink-0" />}
-                                    <span>{label}</span>
+                                  <div key={label} className={`flex items-center gap-1.5 p-2 rounded text-xs ${pass ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                    {pass ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}{label}
                                   </div>
                                 ))}
                               </div>
                             </div>
-
-                            {/* Product metadata */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              <div><span className="text-gray-500 block text-xs">Price (USD)</span><span className="font-semibold">{formatPrice(product.price)}</span></div>
-                              <div><span className="text-gray-500 block text-xs">Stock</span><span className="font-semibold">{product.quantity} units</span></div>
-                              <div><span className="text-gray-500 block text-xs">Category</span><span className="font-semibold">{product.category.name}</span></div>
-                              <div><span className="text-gray-500 block text-xs">Vendor</span><span className="font-semibold">{product.vendor.businessName}</span></div>
-                            </div>
-
-                            {/* Action buttons in expanded view */}
-                            <div className="flex gap-2 pt-2 border-t border-gray-200">
-                              <Button
-                                size="sm"
-                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' }); setExpandedProductId(null); }}
-                                disabled={updateProductStatusMutation.isPending}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateProductStatusMutation.isPending}
+                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' }); setExpandedProductId(null); }}>
                                 <CheckCircle className="w-3 h-3 mr-1" />Approve Product
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' }); setExpandedProductId(null); }}
-                                disabled={updateProductStatusMutation.isPending}
-                              >
+                              <Button size="sm" variant="destructive" disabled={updateProductStatusMutation.isPending}
+                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' }); setExpandedProductId(null); }}>
                                 <XCircle className="w-3 h-3 mr-1" />Reject Product
                               </Button>
                             </div>
@@ -639,522 +568,459 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
+          {/* ═══ ORDER MANAGEMENT TAB ═══════════════════════════════════════ */}
           <TabsContent value="orders">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Management</CardTitle>
-                <p className="text-gray-600">Monitor all platform orders and transactions</p>
-              </CardHeader>
-              <CardContent>
-                {Array.isArray(adminOrders) && adminOrders.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No orders in the system yet.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {Array.isArray(adminOrders) && adminOrders.map((order: any) => (
-                      <div key={order.id} className="border border-gray-200 rounded-lg p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="font-semibold text-lg">Order #{order.id}</h3>
-                            <p className="text-gray-600 text-sm">
-                              Customer: {order.customer?.firstName} {order.customer?.lastName}
-                            </p>
-                            <p className="text-gray-600 text-sm">
-                              Email: {order.customer?.email}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <Badge className={
-                              order.orderStatus === 'confirmed' ? 'badge-approved' :
-                              order.orderStatus === 'pending' ? 'badge-pending' :
-                              'badge-rejected'
-                            }>
-                              {order.orderStatus}
-                            </Badge>
-                            <p className="text-red-600 font-bold text-lg mt-2">
-                              ${parseFloat(order.totalAmount).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <h4 className="font-medium text-sm text-gray-700 mb-1">Payment Status</h4>
-                            <Badge className={order.paymentStatus === 'completed' ? 'badge-approved' : 'badge-pending'}>
-                              {order.paymentStatus}
-                            </Badge>
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-sm text-gray-700 mb-1">Order Date</h4>
-                            <p className="text-sm">{new Date(order.createdAt).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="border-t pt-4">
-                          <h4 className="font-medium mb-3">Order Items:</h4>
-                          <div className="space-y-2">
-                            {order.items?.map((item: any) => (
-                              <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
-                                <div>
-                                  <span className="font-medium">{item.productName}</span>
-                                  <span className="text-gray-600 ml-2">x{item.quantity}</span>
-                                  <span className="text-gray-500 ml-2 text-sm">by {item.vendorName}</span>
-                                </div>
-                                <span className="font-semibold">
-                                  ${(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {order.shippingAddress && (
-                          <div className="border-t pt-4 mt-4">
-                            <h4 className="font-medium text-sm text-gray-700 mb-2">Shipping Address</h4>
-                            <div className="text-sm text-gray-600">
-                              {(() => {
-                                try {
-                                  const address = typeof order.shippingAddress === 'string' 
-                                    ? JSON.parse(order.shippingAddress) 
-                                    : order.shippingAddress;
-                                  return (
-                                    <>
-                                      <p>{address.address1}</p>
-                                      <p>{address.city}, {address.state}</p>
-                                      <p>{address.country} {address.postalCode}</p>
-                                    </>
-                                  );
-                                } catch (e) {
-                                  return <p>Invalid address format</p>;
-                                }
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <div className="space-y-4">
+              {/* Summary row */}
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'Total Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700' },
+                  { label: 'Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700' },
+                  { label: 'Pending', value: String(orderRevenueSummary.pending), color: 'text-orange-700' },
+                ].map(({ label, value, color }) => (
+                  <Card key={label}><CardContent className="p-4 text-center">
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                    <p className="text-xs text-gray-500">{label}</p>
+                  </CardContent></Card>
+                ))}
+              </div>
 
-          <TabsContent value="featured">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Featured Products Management</span>
-                  <Badge variant="secondary">{approvedProducts.filter(p => p.featured).length} featured</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="flex flex-col space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Current Featured Products</h3>
-                    {approvedProducts.filter(p => p.featured).length === 0 ? (
-                      <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                        <svg className="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                        </svg>
-                        <h4 className="text-md font-medium text-gray-900 mb-2">No Featured Products</h4>
-                        <p className="text-gray-500">Select products below to feature them on the homepage.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {approvedProducts.filter(p => p.featured).map((product) => (
-                          <div key={product.id} className="border border-gray-200 rounded-lg p-4 bg-yellow-50">
-                            <div className="flex items-start space-x-3">
-                              <div className="w-16 h-16 flex-shrink-0">
-                                {product.images && product.images.length > 0 ? (
-                                  <img
-                                    src={product.images[0]}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover rounded"
-                                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                                    <span className="text-white text-xs">No Image</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 mb-1">{product.name}</h4>
-                                <p className="text-sm text-gray-600 mb-2">{formatPrice(product.price)}</p>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-gray-500">by {product.vendor.businessName}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => toggleFeaturedMutation.mutate({ productId: product.id, featured: false })}
-                                    disabled={toggleFeaturedMutation.isPending}
-                                    className="text-xs"
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex flex-col space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Available Products</h3>
-                    <p className="text-gray-600 text-sm">Select approved products to feature on the homepage. Featured products will be highlighted for customers.</p>
-                    {approvedProducts.filter(p => !p.featured).length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-gray-500">All approved products are already featured.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {approvedProducts.filter(p => !p.featured).map((product) => (
-                          <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 flex-shrink-0">
-                                  {product.images && product.images.length > 0 ? (
-                                    <img
-                                      src={product.images[0]}
-                                      alt={product.name}
-                                      className="w-full h-full object-cover rounded"
-                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                                      <span className="text-white text-xs">No Image</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-gray-900">{product.name}</h4>
-                                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                    <span>{formatPrice(product.price)}</span>
-                                    <span>by {product.vendor.businessName}</span>
-                                    <span>in {product.category.name}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                onClick={() => toggleFeaturedMutation.mutate({ productId: product.id, featured: true })}
-                                disabled={toggleFeaturedMutation.isPending}
-                                className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                              >
-                                ⭐ Feature
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="vendors">
-            <Card>
-              <CardHeader>
-                <CardTitle>Vendor Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {vendors.length === 0 ? (
-                  <div className="text-center py-12">
-                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No vendors yet</h3>
-                    <p className="text-gray-600">Vendor applications will appear here for review.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {vendors.map((vendor: any) => (
-                      <div key={vendor.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4">
-                            <Avatar className="w-12 h-12">
-                              <AvatarImage src={vendor.user?.profileImageUrl} />
-                              <AvatarFallback className="bg-nigerian-green text-white">
-                                {vendor.businessName[0].toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 mb-1">{vendor.businessName}</h3>
-                              {vendor.user && (
-                                <p className="text-sm text-gray-500 mb-1 flex items-center gap-1">
-                                  <UserIcon className="w-3 h-3" />
-                                  {vendor.user.firstName} {vendor.user.lastName} — {vendor.user.email}
-                                  {vendor.user.emailVerified && <ShieldCheck className="w-3 h-3 text-green-500 ml-1" />}
-                                </p>
-                              )}
-                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{vendor.description || 'No description provided.'}</p>
-                              <div className="flex items-center space-x-4 text-sm">
-                                <span className="text-gray-500 flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
-                                  Applied: {new Date(vendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </span>
-                                {getStatusBadge(vendor.status)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setReviewVendor(vendor)}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />Review Profile
-                            </Button>
-                            {vendor.status === 'pending' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}
-                                  disabled={updateVendorStatusMutation.isPending}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
-                                >
-                                  <CheckCircle className="w-3 h-3 mr-1" />Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}
-                                  disabled={updateVendorStatusMutation.isPending}
-                                >
-                                  <XCircle className="w-3 h-3 mr-1" />Reject
-                                </Button>
-                              </>
-                            )}
-                            {vendor.status === 'approved' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}
-                                disabled={updateVendorStatusMutation.isPending}
-                              >
-                                Suspend
-                              </Button>
-                            )}
-                            {vendor.status === 'suspended' && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}
-                                disabled={updateVendorStatusMutation.isPending}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
-                                Reactivate
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Platform Health</CardTitle>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <CardTitle>Order Management</CardTitle>
+                    <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
+                      <Download className="w-3 h-3" />Export CSV
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Active Vendors</span>
-                      <span className="font-semibold text-green-600">
-                        {vendors.filter(v => v.status === 'approved').length}
-                      </span>
+                  {/* Filters */}
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    <div className="relative flex-1 min-w-48">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <Input placeholder="Search by order ID or customer…" className="pl-9 h-8 text-sm" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Approved Products</span>
-                      <span className="font-semibold text-green-600">
-                        {allProducts.filter(p => p.status === 'approved').length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Pending Reviews</span>
-                      <span className="font-semibold text-yellow-600">
-                        {pendingProducts.length + pendingVendors.length}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Total Platform Value</span>
-                      <span className="font-semibold text-nigerian-green">
-                        {formatPrice(allProducts.filter(p => p.status === 'approved').reduce((sum, p) => sum + parseFloat(p.price), 0).toString())}
-                      </span>
+                    <div className="flex gap-1">
+                      {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => (
+                        <Button key={s} size="sm" variant={orderStatusFilter === s ? 'default' : 'outline'} className="capitalize h-8 px-2 text-xs" onClick={() => setOrderStatusFilter(s)}>
+                          {s}
+                        </Button>
+                      ))}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      if (pendingProducts.length > 0) {
-                        document.querySelector('[value="products"]')?.click();
-                      } else {
-                        toast({
-                          title: 'No pending products',
-                          description: 'All products have been reviewed.',
-                        });
-                      }
-                    }}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-                    </svg>
-                    Review Pending Products ({pendingProducts.length})
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      if (pendingVendors.length > 0) {
-                        document.querySelector('[value="vendors"]')?.click();
-                      } else {
-                        toast({
-                          title: 'No pending vendors',
-                          description: 'All vendor applications have been reviewed.',
-                        });
-                      }
-                    }}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                    </svg>
-                    Review Vendor Applications ({pendingVendors.length})
-                  </Button>
+                  {filteredOrders.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8">No orders match your filters.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredOrders.map((order: any) => (
+                        <div key={order.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between flex-wrap gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold">Order #{order.id}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-700'}`}>{order.orderStatus}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.paymentStatus}</span>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {order.customer?.firstName} {order.customer?.lastName} · {order.customer?.email}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {order.shippingMethod && ` · ${order.shippingMethod.toUpperCase()}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-green-700 text-lg">${parseFloat(order.totalAmount || 0).toFixed(2)}</span>
+                              <Select
+                                value={order.orderStatus}
+                                onValueChange={(status) => updateOrderStatusMutation.mutate({ orderId: order.id, status })}
+                              >
+                                <SelectTrigger className="w-36 h-8 text-xs">
+                                  <Truck className="w-3 h-3 mr-1" /><SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => (
+                                    <SelectItem key={s} value={s} className="capitalize text-xs">{s}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
 
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => initCategoriesMutation.mutate()}
-                    disabled={initCategoriesMutation.isPending}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    {initCategoriesMutation.isPending ? 'Initializing...' : 'Initialize Categories'}
-                  </Button>
+                          {order.items && order.items.length > 0 && (
+                            <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                              {order.items.map((item: any) => (
+                                <div key={item.id} className="bg-gray-50 rounded px-2 py-1 text-xs">
+                                  <span className="font-medium">{item.productName}</span>
+                                  <span className="text-gray-500 ml-1">×{item.quantity}</span>
+                                  <span className="text-gray-400 ml-1">· {item.vendorName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          {/* ═══ FEATURED PRODUCTS TAB ══════════════════════════════════════ */}
+          <TabsContent value="featured">
+            <div className="space-y-6">
+              {/* Slot usage indicator */}
+              <Card className={featuredProducts.length >= MAX_FEATURED ? 'border-orange-300 bg-orange-50' : ''}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      Featured Slots Used
+                    </span>
+                    <span className={`text-sm font-bold ${featuredProducts.length >= MAX_FEATURED ? 'text-orange-600' : 'text-green-600'}`}>
+                      {featuredProducts.length} / {MAX_FEATURED}
+                    </span>
+                  </div>
+                  <Progress value={(featuredProducts.length / MAX_FEATURED) * 100} className="h-2" />
+                  {featuredProducts.length >= MAX_FEATURED && (
+                    <p className="text-orange-600 text-xs mt-2 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />Maximum slots reached. Remove a product before featuring another.
+                    </p>
+                  )}
+                  {featuredProducts.length === 0 && (
+                    <p className="text-gray-400 text-xs mt-2">Feature approved products to showcase them on the homepage.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Currently Featured */}
+              {featuredProducts.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Currently Featured ({featuredProducts.length})</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {featuredProducts.map(p => (
+                        <div key={p.id} className="border rounded-lg p-3 bg-yellow-50 border-yellow-200">
+                          <div className="flex gap-3">
+                            <div className="w-14 h-14 shrink-0">
+                              {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover rounded" onError={(e) => { e.currentTarget.style.display='none'; }} />
+                                : <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{p.name}</p>
+                              <p className="text-xs text-gray-500 truncate">by {p.vendor.businessName}</p>
+                              <p className="text-xs font-semibold text-green-700">{formatPrice(p.price)}</p>
+                              {p.stock <= 5 && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 mt-1">Low Stock: {p.stock}</Badge>}
+                            </div>
+                          </div>
+                          <Button size="sm" variant="outline" className="w-full mt-2 text-xs h-7" onClick={() => toggleFeaturedMutation.mutate({ productId: p.id, featured: false })} disabled={toggleFeaturedMutation.isPending}>
+                            Remove from Featured
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* AI-Recommended to Feature */}
+              {recommendedToFeature.length > 0 && featuredProducts.length < MAX_FEATURED && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-blue-500" />Recommended to Feature
+                    </CardTitle>
+                    <CardDescription>Top non-featured products ranked by inventory value and availability.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {recommendedToFeature.map((p, i) => (
+                        <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50">
+                          <span className="text-xs text-gray-400 font-bold w-4">#{i + 1}</span>
+                          <div className="w-12 h-12 shrink-0">
+                            {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover rounded" onError={(e) => { e.currentTarget.style.display='none'; }} />
+                              : <div className="w-full h-full bg-muted rounded" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{p.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>{formatPrice(p.price)}</span>
+                              <span>·</span>
+                              <span>{p.stock} in stock</span>
+                              <span>·</span>
+                              <span>{p.vendor.businessName}</span>
+                            </div>
+                          </div>
+                          <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white shrink-0"
+                            onClick={() => toggleFeaturedMutation.mutate({ productId: p.id, featured: true })}
+                            disabled={toggleFeaturedMutation.isPending || featuredProducts.length >= MAX_FEATURED}>
+                            <Star className="w-3 h-3 mr-1" />Feature
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Low Stock Warning for Featured */}
+              {featuredProducts.some(p => p.stock <= 5) && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader><CardTitle className="text-base text-orange-700 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Featured Products — Low Stock Warning</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {featuredProducts.filter(p => p.stock <= 5).map(p => (
+                        <div key={p.id} className="flex justify-between items-center text-sm">
+                          <span className="text-orange-800">{p.name}</span>
+                          <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                            {p.stock === 0 ? 'OUT OF STOCK' : `${p.stock} remaining`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-orange-600 text-xs mt-3">Consider replacing these with products that have adequate stock.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ═══ VENDOR MANAGEMENT TAB ══════════════════════════════════════ */}
+          <TabsContent value="vendors">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  Vendor Management
+                  <Badge variant="secondary">{(vendors as any[]).length} total</Badge>
+                </CardTitle>
+                <CardDescription>Review applications and manage active vendor accounts.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(vendors as any[]).length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">No vendor applications yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {(vendors as any[]).map((vendor: any) => (
+                      <div key={vendor.id} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="w-12 h-12">
+                              <AvatarImage src={vendor.user?.profileImageUrl} />
+                              <AvatarFallback className="bg-nigerian-green text-white">{vendor.businessName[0].toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold mb-0.5">{vendor.businessName}</h3>
+                              {vendor.user && (
+                                <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
+                                  <UserIcon className="w-3 h-3" />
+                                  {vendor.user.firstName} {vendor.user.lastName} — {vendor.user.email}
+                                  {vendor.user.emailVerified && <ShieldCheck className="w-3 h-3 text-green-500" />}
+                                </p>
+                              )}
+                              <p className="text-gray-500 text-sm line-clamp-2 mb-2">{vendor.description || 'No description provided.'}</p>
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="text-gray-400 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {new Date(vendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                                {getStatusBadge(vendor.status)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                            <Button size="sm" variant="outline" onClick={() => setReviewVendor(vendor)}>
+                              <Eye className="w-3 h-3 mr-1" />Review
+                            </Button>
+                            {vendor.status === 'pending' && (
+                              <>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                                  <CheckCircle className="w-3 h-3 mr-1" />Approve
+                                </Button>
+                                <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>
+                                  <XCircle className="w-3 h-3 mr-1" />Reject
+                                </Button>
+                              </>
+                            )}
+                            {vendor.status === 'approved' && (
+                              <Button size="sm" variant="outline" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>Suspend</Button>
+                            )}
+                            {vendor.status === 'suspended' && (
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                                <CheckCircle className="w-3 h-3 mr-1" />Reactivate
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══ USER MANAGEMENT TAB ════════════════════════════════════════ */}
           <TabsContent value="users">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>User Management</span>
-                  <Badge variant="outline">{allUsers.length} total users</Badge>
+                  User Management
+                  <Badge variant="outline">{allUsers.length} users</Badge>
                 </CardTitle>
-                <p className="text-gray-600">Manage user roles and assign admin privileges</p>
+                <CardDescription>Assign and revoke platform roles.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {allUsers.map((managedUser) => (
-                    <div key={managedUser.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-4">
+                <div className="space-y-3">
+                  {allUsers.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={managedUser.profileImageUrl} alt={managedUser.firstName || 'User'} />
+                          <AvatarImage src={u.profileImageUrl} />
                           <AvatarFallback className="bg-nigerian-green text-white">
-                            {managedUser.firstName && managedUser.lastName 
-                              ? `${managedUser.firstName[0]}${managedUser.lastName[0]}`.toUpperCase()
-                              : managedUser.email ? managedUser.email[0].toUpperCase() : 'U'
-                            }
+                            {u.firstName?.[0]}{u.lastName?.[0] || u.email?.[0] || 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {managedUser.firstName && managedUser.lastName 
-                              ? `${managedUser.firstName} ${managedUser.lastName}` 
-                              : managedUser.email}
-                          </h3>
-                          <p className="text-sm text-gray-600">{managedUser.email}</p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <div className="flex space-x-1">
-                              {managedUser.roles?.map((role: string) => (
-                                <Badge 
-                                  key={role}
-                                  variant={
-                                    role === 'admin' ? 'destructive' :
-                                    role === 'vendor' ? 'default' : 'secondary'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {role}
-                                </Badge>
-                              ))}
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              Joined {new Date(managedUser.createdAt).toLocaleDateString()}
-                            </span>
+                          <p className="font-semibold text-sm">{u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}</p>
+                          <p className="text-xs text-gray-500">{u.email}</p>
+                          <div className="flex gap-1 mt-1">
+                            {(u.roles as string[] || []).map(r => (
+                              <Badge key={r} variant={r === 'admin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
+                            ))}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-3">
-                          {['customer', 'vendor', 'admin'].map((role) => {
-                            const userHasRole = hasRole(managedUser, role);
-                            const isSelfAdminRemoval = managedUser.id === user?.id && role === 'admin' && userHasRole;
-                            
-                            return (
-                              <div key={role} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`${managedUser.id}-${role}`}
-                                  checked={userHasRole}
-                                  disabled={isSelfAdminRemoval}
-                                  onCheckedChange={(checked) => {
-                                    if (isSelfAdminRemoval) {
-                                      toast({
-                                        title: 'Cannot modify own admin role',
-                                        description: 'You cannot remove admin privileges from yourself.',
-                                        variant: 'destructive',
-                                      });
-                                      return;
-                                    }
-                                    toggleUserRoleMutation.mutate({ 
-                                      userId: managedUser.id, 
-                                      role, 
-                                      hasRole: userHasRole 
-                                    });
-                                  }}
-                                />
-                                <label 
-                                  htmlFor={`${managedUser.id}-${role}`}
-                                  className={`text-sm capitalize cursor-pointer ${isSelfAdminRemoval ? 'text-gray-400' : ''}`}
-                                >
-                                  {role}
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
+                      <div className="flex items-center gap-4">
+                        {['customer', 'vendor', 'admin'].map(role => {
+                          const uHasRole = hasRole(u, role);
+                          const isSelf = u.id === user?.id && role === 'admin' && uHasRole;
+                          return (
+                            <div key={role} className="flex items-center gap-1.5">
+                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole} disabled={isSelf}
+                                onCheckedChange={() => {
+                                  if (isSelf) { toast({ title: 'Cannot remove your own admin role.', variant: 'destructive' }); return; }
+                                  toggleUserRoleMutation.mutate({ userId: u.id, role, hasRole: uHasRole });
+                                }} />
+                              <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer">{role}</label>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ═══ SYSTEM OVERVIEW TAB ════════════════════════════════════════ */}
+          <TabsContent value="overview">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Platform Health */}
+              <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="w-4 h-4" />Platform Health</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { label: 'Active Vendors', value: (vendors as any[]).filter(v => v.status === 'approved').length, total: (vendors as any[]).length, color: 'bg-green-500' },
+                    { label: 'Approved Products', value: approvedProducts.length, total: allProducts.length, color: 'bg-blue-500' },
+                    { label: 'Featured Slots Used', value: featuredProducts.length, total: MAX_FEATURED, color: 'bg-yellow-500' },
+                    { label: 'Verified Users', value: allUsers.filter(u => (u as any).emailVerified).length, total: allUsers.length, color: 'bg-purple-500' },
+                  ].map(({ label, value, total, color }) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">{label}</span>
+                        <span className="font-semibold">{value} / {total}</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 text-sm">Total Inventory Value</span>
+                    <span className="font-bold text-green-700">
+                      {formatPrice(approvedProducts.reduce((s, p) => s + parseFloat(p.price) * p.stock, 0).toString())}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Top Products */}
+              <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Top Products by Value</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {[...approvedProducts].sort((a, b) => parseFloat(b.price) * b.stock - parseFloat(a.price) * a.stock).slice(0, 8).map((p, i) => (
+                      <div key={p.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 font-bold w-4">#{i + 1}</span>
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[180px]">{p.name}</p>
+                            <p className="text-xs text-gray-400">{p.vendor.businessName}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-green-700">{formatPrice((parseFloat(p.price) * p.stock).toString())}</p>
+                          <p className="text-xs text-gray-400">{p.stock} units @ {formatPrice(p.price)}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {approvedProducts.length === 0 && <p className="text-gray-400 text-sm text-center py-4">No approved products yet.</p>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Low Stock Alerts */}
+              {lowStockProducts.length > 0 && (
+                <Card className="border-orange-200">
+                  <CardHeader><CardTitle className="text-base text-orange-700 flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Low Stock Alerts</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {lowStockProducts.map(p => (
+                        <div key={p.id} className="flex justify-between items-center text-sm py-1 border-b last:border-0">
+                          <div>
+                            <p className="font-medium truncate max-w-[200px]">{p.name}</p>
+                            <p className="text-xs text-gray-400">{p.vendor.businessName}</p>
+                          </div>
+                          <Badge variant="outline" className={p.stock === 0 ? 'border-red-400 text-red-600' : 'border-orange-400 text-orange-600'}>
+                            {p.stock === 0 ? 'Out of Stock' : `${p.stock} left`}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  {[
+                    { label: `Review Pending Products (${pendingProducts.length})`, tab: 'products', icon: Package },
+                    { label: `Review Vendor Applications (${pendingVendors.length})`, tab: 'vendors', icon: Users },
+                    { label: 'View Analytics Dashboard', tab: 'analytics', icon: BarChart3 },
+                    { label: 'Manage Featured Products', tab: 'featured', icon: Star },
+                  ].map(({ label, tab, icon: Icon }) => (
+                    <Button key={tab} variant="outline" className="w-full justify-start gap-2 text-sm"
+                      onClick={() => document.querySelector<HTMLButtonElement>(`[value="${tab}"]`)?.click()}>
+                      <Icon className="w-4 h-4" />{label}
+                    </Button>
+                  ))}
+                  <Separator />
+                  <Button variant="outline" className="w-full justify-start gap-2 text-sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
+                    <RefreshCw className="w-4 h-4" />{initCategoriesMutation.isPending ? 'Initialising…' : 'Initialise Categories'}
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2 text-sm" onClick={exportOrdersCSV}>
+                    <Download className="w-4 h-4" />Export All Orders (CSV)
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
@@ -1166,118 +1032,60 @@ export default function AdminDashboard() {
             <DialogTitle className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
                 <AvatarImage src={reviewVendor?.user?.profileImageUrl} />
-                <AvatarFallback className="bg-nigerian-green text-white text-sm">
-                  {reviewVendor?.businessName?.[0]?.toUpperCase()}
-                </AvatarFallback>
+                <AvatarFallback className="bg-nigerian-green text-white text-sm">{reviewVendor?.businessName?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
               Vendor Profile Review
             </DialogTitle>
-            <DialogDescription>
-              Review all details for <strong>{reviewVendor?.businessName}</strong> before making a decision.
-            </DialogDescription>
+            <DialogDescription>Full details for <strong>{reviewVendor?.businessName}</strong></DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="flex-1 pr-4">
             {reviewVendor && (
               <div className="space-y-5">
-                {/* Status */}
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(reviewVendor.status)}
-                  <span className="text-sm text-gray-500">Current status</span>
-                </div>
-
+                <div className="flex items-center gap-3">{getStatusBadge(reviewVendor.status)}<span className="text-sm text-gray-500">Current status</span></div>
                 <Separator />
-
-                {/* Business details */}
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Package className="w-4 h-4" />Business Details
-                  </h3>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2"><Package className="w-4 h-4" />Business Details</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-xs text-gray-500 block">Business Name</span>
-                      <span className="font-medium">{reviewVendor.businessName}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500 block">Applied Date</span>
-                      <span className="font-medium">
-                        {new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </span>
-                    </div>
+                    <div><span className="text-xs text-gray-400 block">Business Name</span><span className="font-medium">{reviewVendor.businessName}</span></div>
+                    <div><span className="text-xs text-gray-400 block">Applied</span><span className="font-medium">{new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
                   </div>
-                  {reviewVendor.description && (
-                    <div className="mt-3">
-                      <span className="text-xs text-gray-500 block mb-1">Business Description</span>
-                      <p className="text-gray-700 text-sm leading-relaxed bg-gray-50 p-3 rounded-lg">{reviewVendor.description}</p>
-                    </div>
-                  )}
-                  {!reviewVendor.description && (
-                    <div className="mt-3 bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                      <p className="text-yellow-700 text-sm">No business description provided.</p>
-                    </div>
-                  )}
+                  <div className="mt-3">
+                    <span className="text-xs text-gray-400 block mb-1">Business Description</span>
+                    {reviewVendor.description
+                      ? <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{reviewVendor.description}</p>
+                      : <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">No description provided.</p>}
+                  </div>
                 </div>
-
                 <Separator />
-
-                {/* Account owner details */}
                 {reviewVendor.user && (
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <UserIcon className="w-4 h-4" />Account Owner
-                    </h3>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2"><UserIcon className="w-4 h-4" />Account Owner</h3>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-xs text-gray-500 block">Full Name</span>
-                        <span className="font-medium">
-                          {reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}
+                      <div><span className="text-xs text-gray-400 block">Full Name</span><span className="font-medium">{reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}</span></div>
+                      <div><span className="text-xs text-gray-400 block">Email</span><span className="font-medium text-sm">{reviewVendor.user.email || 'N/A'}</span></div>
+                      <div><span className="text-xs text-gray-400 block">Email Verified</span>
+                        <span className={`font-medium flex items-center gap-1 text-sm ${reviewVendor.user.emailVerified ? 'text-green-600' : 'text-red-500'}`}>
+                          {reviewVendor.user.emailVerified ? <><ShieldCheck className="w-3 h-3" />Verified</> : <><XCircle className="w-3 h-3" />Not verified</>}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-xs text-gray-500 block">Email Address</span>
-                        <span className="font-medium flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {reviewVendor.user.email || 'N/A'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-500 block">Email Verified</span>
-                        <span className={`font-medium flex items-center gap-1 ${reviewVendor.user.emailVerified ? 'text-green-600' : 'text-red-500'}`}>
-                          {reviewVendor.user.emailVerified
-                            ? <><ShieldCheck className="w-3 h-3" />Verified</>
-                            : <><XCircle className="w-3 h-3" />Not verified</>}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-500 block">Account Created</span>
-                        <span className="font-medium">
-                          {reviewVendor.user.createdAt
-                            ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-                            : 'N/A'}
-                        </span>
-                      </div>
+                      <div><span className="text-xs text-gray-400 block">Account Created</span><span className="font-medium text-sm">{reviewVendor.user.createdAt ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</span></div>
                     </div>
                   </div>
                 )}
-
                 <Separator />
-
-                {/* Compliance checklist */}
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4" />Compliance Checklist
-                  </h3>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Compliance Checklist</h3>
                   <div className="space-y-2">
                     {[
                       { label: 'Business name provided', pass: !!reviewVendor.businessName },
-                      { label: 'Business description provided', pass: !!reviewVendor.description && reviewVendor.description.length > 10 },
-                      { label: 'Account owner name on file', pass: !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
+                      { label: 'Business description (10+ chars)', pass: reviewVendor.description?.length > 10 },
+                      { label: 'Owner name on file', pass: !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
                       { label: 'Valid email address', pass: !!reviewVendor.user?.email },
                       { label: 'Email address verified', pass: !!reviewVendor.user?.emailVerified },
                     ].map(({ label, pass }) => (
-                      <div key={label} className={`flex items-center gap-2 p-2 rounded text-sm ${pass ? 'text-green-700' : 'text-red-600'}`}>
-                        {pass ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <XCircle className="w-4 h-4 flex-shrink-0" />}
-                        <span>{label}</span>
+                      <div key={label} className={`flex items-center gap-2 p-2 rounded text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                        {pass ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}{label}
                       </div>
                     ))}
                   </div>
@@ -1287,54 +1095,28 @@ export default function AdminDashboard() {
           </ScrollArea>
 
           <DialogFooter className="flex gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setReviewVendor(null)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => setReviewVendor(null)}>Close</Button>
             {reviewVendor?.status === 'pending' && (
               <>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' });
-                    setReviewVendor(null);
-                  }}
-                  disabled={updateVendorStatusMutation.isPending}
-                >
-                  <XCircle className="w-4 h-4 mr-2" />Reject Application
+                <Button variant="destructive" disabled={updateVendorStatusMutation.isPending}
+                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
+                  <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' });
-                    setReviewVendor(null);
-                  }}
-                  disabled={updateVendorStatusMutation.isPending}
-                >
+                <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                   <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
                 </Button>
               </>
             )}
             {reviewVendor?.status === 'approved' && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' });
-                  setReviewVendor(null);
-                }}
-                disabled={updateVendorStatusMutation.isPending}
-              >
+              <Button variant="outline" disabled={updateVendorStatusMutation.isPending}
+                onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
                 Suspend Vendor
               </Button>
             )}
             {reviewVendor?.status === 'suspended' && (
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' });
-                  setReviewVendor(null);
-                }}
-                disabled={updateVendorStatusMutation.isPending}
-              >
+              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+                onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                 <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
               </Button>
             )}

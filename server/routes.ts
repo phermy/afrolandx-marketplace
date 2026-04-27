@@ -1810,6 +1810,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: update order fulfillment status
+  app.patch('/api/admin/orders/:id/status', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const { status } = req.body;
+      const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+      await storage.updateOrderStatus(orderId, status);
+      res.json({ message: 'Order status updated' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update order status' });
+    }
+  });
+
+  // Admin: rich analytics endpoint
+  app.get('/api/admin/analytics', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const [allOrders, allProducts, allVendors, allUsers] = await Promise.all([
+        storage.getAllOrders(),
+        storage.getProducts({}),
+        storage.getAllVendors(),
+        storage.getAllUsers(),
+      ]);
+
+      // Revenue metrics
+      const paidOrders = allOrders.filter(o => o.paymentStatus === 'paid' || o.paymentStatus === 'completed');
+      const totalRevenue = paidOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount as string || '0'), 0);
+      const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
+
+      // Orders by status
+      const ordersByStatus = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => ({
+        status,
+        count: allOrders.filter(o => o.orderStatus === status).length,
+      }));
+
+      // Revenue trend – last 30 days bucketed by day
+      const now = new Date();
+      const revenueTrend: Array<{ date: string; revenue: number; orders: number }> = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayOrders = paidOrders.filter(o => {
+          const od = new Date(o.createdAt as any).toISOString().split('T')[0];
+          return od === dateStr;
+        });
+        revenueTrend.push({
+          date: dateStr,
+          revenue: dayOrders.reduce((s, o) => s + parseFloat(o.totalAmount as string || '0'), 0),
+          orders: dayOrders.length,
+        });
+      }
+
+      // Low stock alerts
+      const lowStockProducts = allProducts
+        .filter(p => p.status === 'approved' && (p.stock ?? 0) <= 5)
+        .map(p => ({ id: p.id, name: p.name, quantity: p.stock ?? 0, price: p.price }));
+
+      // Top products by inventory value
+      const approvedProducts = allProducts.filter(p => p.status === 'approved');
+      const topProductsByValue = [...approvedProducts]
+        .sort((a, b) => (parseFloat(b.price) * (b.stock ?? 0)) - (parseFloat(a.price) * (a.stock ?? 0)))
+        .slice(0, 8)
+        .map(p => ({ id: p.id, name: p.name, price: p.price, quantity: p.stock ?? 0, value: parseFloat(p.price) * (p.stock ?? 0) }));
+
+      // Vendor performance (products & revenue proxy)
+      const vendorPerformance = await Promise.all(allVendors.filter(v => v.status === 'approved').map(async v => {
+        const vProducts = allProducts.filter(p => p.vendorId === v.id && p.status === 'approved');
+        return {
+          id: v.id,
+          businessName: v.businessName,
+          productCount: vProducts.length,
+          totalInventoryValue: vProducts.reduce((s, p) => s + parseFloat(p.price) * (p.stock ?? 0), 0),
+          featuredCount: vProducts.filter(p => p.featured).length,
+        };
+      }));
+      vendorPerformance.sort((a, b) => b.totalInventoryValue - a.totalInventoryValue);
+
+      // Geographic distribution from shipping addresses
+      const countryMap: Record<string, number> = {};
+      for (const o of allOrders) {
+        try {
+          const addr = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : o.shippingAddress;
+          const country = addr?.country || 'Unknown';
+          countryMap[country] = (countryMap[country] || 0) + 1;
+        } catch (_) {}
+      }
+      const geoDistribution = Object.entries(countryMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([country, count]) => ({ country, count }));
+
+      // Customer segments
+      const newUsersThisMonth = allUsers.filter(u => {
+        const d = new Date(u.createdAt as any);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }).length;
+
+      res.json({
+        totalRevenue,
+        avgOrderValue,
+        totalOrders: allOrders.length,
+        paidOrders: paidOrders.length,
+        fulfillmentRate: allOrders.length > 0 ? Math.round((allOrders.filter(o => o.orderStatus === 'delivered').length / allOrders.length) * 100) : 0,
+        ordersByStatus,
+        revenueTrend,
+        lowStockProducts,
+        topProductsByValue,
+        vendorPerformance: vendorPerformance.slice(0, 8),
+        geoDistribution,
+        totalCustomers: allUsers.length,
+        newCustomersThisMonth: newUsersThisMonth,
+        totalApprovedProducts: approvedProducts.length,
+        totalInventoryValue: approvedProducts.reduce((s, p) => s + parseFloat(p.price) * (p.stock ?? 0), 0),
+      });
+    } catch (error) {
+      console.error('Analytics error:', error);
+      res.status(500).json({ message: 'Failed to fetch analytics' });
+    }
+  });
+
   // Admin endpoint to refresh AWS credentials
   app.post('/api/admin/refresh-cloud-storage', isAuthenticated, isAdmin, async (req, res) => {
     try {
