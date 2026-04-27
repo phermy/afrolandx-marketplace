@@ -5,21 +5,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Calendar, 
-  Users, 
+import {
+  Calendar,
+  Users,
   ShoppingBag,
   Sparkles,
   Star,
   Heart,
-  Loader2
+  Loader2,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
@@ -31,7 +32,74 @@ const eventTypes = [
   { value: "party", label: "Party / Celebration", icon: Calendar },
   { value: "burial", label: "Burial / Memorial", icon: Calendar },
   { value: "chieftaincy", label: "Chieftaincy Title", icon: Star },
+  { value: "graduation", label: "Graduation Ceremony", icon: Star },
+  { value: "engagement", label: "Engagement / Courtship", icon: Heart },
+  { value: "corporate", label: "Corporate / Business Event", icon: Users },
+  { value: "religious", label: "Religious / Church Event", icon: Sparkles },
+  { value: "others", label: "Others / Custom Event", icon: Calendar },
 ];
+
+const eventSizes = [
+  { value: "1", label: "Solo — Just me (1)" },
+  { value: "2", label: "Couple (2)" },
+  { value: "4", label: "Small family (3–4)" },
+  { value: "6", label: "Family (5–6)" },
+  { value: "10", label: "Extended family (7–10)" },
+  { value: "15", label: "Wedding party / Bridal train (10–20)" },
+  { value: "25", label: "Small group / Aso-ebi (20–30)" },
+  { value: "50", label: "Large group (30–60)" },
+  { value: "100", label: "Corporate / Community event (60+)" },
+  { value: "others", label: "Others — custom size" },
+];
+
+// Country → currency mapping
+const LOCATION_CURRENCIES: Record<string, { code: string; symbol: string; name: string }> = {
+  NG: { code: "NGN", symbol: "₦", name: "Nigeria" },
+  GH: { code: "GHS", symbol: "₵", name: "Ghana" },
+  ZA: { code: "ZAR", symbol: "R", name: "South Africa" },
+  KE: { code: "KES", symbol: "KSh", name: "Kenya" },
+  ET: { code: "ETB", symbol: "Br", name: "Ethiopia" },
+  EG: { code: "EGP", symbol: "E£", name: "Egypt" },
+  MA: { code: "MAD", symbol: "MAD", name: "Morocco" },
+  TZ: { code: "TZS", symbol: "TSh", name: "Tanzania" },
+  UG: { code: "UGX", symbol: "UGX", name: "Uganda" },
+  SN: { code: "XOF", symbol: "CFA", name: "Senegal" },
+  CI: { code: "XOF", symbol: "CFA", name: "Côte d'Ivoire" },
+  CM: { code: "XAF", symbol: "CFA", name: "Cameroon" },
+  RW: { code: "RWF", symbol: "RF", name: "Rwanda" },
+  MW: { code: "MWK", symbol: "MK", name: "Malawi" },
+  ZM: { code: "ZMW", symbol: "ZK", name: "Zambia" },
+  ZW: { code: "USD", symbol: "$", name: "Zimbabwe" },
+  TG: { code: "XOF", symbol: "CFA", name: "Togo" },
+  BJ: { code: "XOF", symbol: "CFA", name: "Benin" },
+  BF: { code: "XOF", symbol: "CFA", name: "Burkina Faso" },
+  ML: { code: "XOF", symbol: "CFA", name: "Mali" },
+  NE: { code: "XOF", symbol: "CFA", name: "Niger" },
+  TD: { code: "XAF", symbol: "CFA", name: "Chad" },
+  SD: { code: "SDG", symbol: "SDG", name: "Sudan" },
+  SO: { code: "SOS", symbol: "Sh", name: "Somalia" },
+  LY: { code: "LYD", symbol: "LD", name: "Libya" },
+  TN: { code: "TND", symbol: "DT", name: "Tunisia" },
+  DZ: { code: "DZD", symbol: "DA", name: "Algeria" },
+  AO: { code: "AOA", symbol: "Kz", name: "Angola" },
+  MZ: { code: "MZN", symbol: "MT", name: "Mozambique" },
+  BW: { code: "BWP", symbol: "P", name: "Botswana" },
+  NA: { code: "NAD", symbol: "N$", name: "Namibia" },
+  LS: { code: "LSL", symbol: "L", name: "Lesotho" },
+  SZ: { code: "SZL", symbol: "E", name: "Eswatini" },
+  GB: { code: "GBP", symbol: "£", name: "United Kingdom" },
+  US: { code: "USD", symbol: "$", name: "United States" },
+  EU: { code: "EUR", symbol: "€", name: "Europe (EU)" },
+  CA: { code: "CAD", symbol: "CA$", name: "Canada" },
+  AU: { code: "AUD", symbol: "A$", name: "Australia" },
+  AE: { code: "AED", symbol: "AED", name: "UAE" },
+  SA: { code: "SAR", symbol: "SR", name: "Saudi Arabia" },
+  CN: { code: "CNY", symbol: "¥", name: "China" },
+  JP: { code: "JPY", symbol: "¥", name: "Japan" },
+  IN: { code: "INR", symbol: "₹", name: "India" },
+  BR: { code: "BRL", symbol: "R$", name: "Brazil" },
+  OTHER: { code: "USD", symbol: "$", name: "Other / International" },
+};
 
 interface EventCollection {
   id: number;
@@ -53,21 +121,25 @@ export default function EventPlannerPage() {
   const { user } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState("");
   const [budget, setBudget] = useState("");
-  const [familySize, setFamilySize] = useState("");
+  const [eventSize, setEventSize] = useState("");
+  const [customSize, setCustomSize] = useState("");
+  const [eventLocation, setEventLocation] = useState("NG");
+
+  const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
+  const familySizeParam = eventSize === "others" ? customSize : eventSize;
 
   const { data: collections = [], isLoading } = useQuery<EventCollection[]>({
-    queryKey: ["/api/events/recommend", selectedEvent, budget, familySize],
+    queryKey: ["/api/events/recommend", selectedEvent, budget, familySizeParam],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedEvent) params.append("eventType", selectedEvent);
       if (budget) params.append("budget", budget);
-      if (familySize) params.append("familySize", familySize);
-      
+      if (familySizeParam) params.append("familySize", familySizeParam);
+
       const res = await fetch(`/api/events/recommend?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) {
-        // Fall back to public collections endpoint
         const fallbackRes = await fetch(`/api/events/collections?eventType=${selectedEvent}`);
         return fallbackRes.json();
       }
@@ -82,6 +154,11 @@ export default function EventPlannerPage() {
     return "text-orange-600 bg-orange-50";
   };
 
+  const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({
+    key,
+    label: `${val.name} (${val.symbol})`,
+  }));
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-5xl mx-auto">
@@ -91,7 +168,7 @@ export default function EventPlannerPage() {
             <h1 className="text-3xl font-bold">Event Outfit Planner</h1>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Planning a special African event? We'll help you find the perfect traditional outfits for every member of your family.
+            Planning a special African event? We'll help you find the perfect traditional outfits for every attendee.
           </p>
         </div>
 
@@ -103,7 +180,8 @@ export default function EventPlannerPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Event Type */}
               <div className="space-y-2">
                 <Label>Event Type</Label>
                 <Select value={selectedEvent} onValueChange={setSelectedEvent}>
@@ -120,31 +198,68 @@ export default function EventPlannerPage() {
                 </Select>
               </div>
 
+              {/* Event Location → determines currency */}
               <div className="space-y-2">
-                <Label>Budget ($) per person</Label>
-                <Input
-                  type="number"
-                  placeholder="e.g., 150000"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  data-testid="input-budget"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Family Size</Label>
-                <Select value={familySize} onValueChange={setFamilySize}>
-                  <SelectTrigger data-testid="select-family-size">
-                    <SelectValue placeholder="How many outfits?" />
+                <Label className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                  Event Location (sets budget currency)
+                </Label>
+                <Select value={eventLocation} onValueChange={setEventLocation}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Where is the event?" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Just me</SelectItem>
-                    <SelectItem value="2">Couple (2)</SelectItem>
-                    <SelectItem value="4">Small family (3-4)</SelectItem>
-                    <SelectItem value="6">Large family (5-6)</SelectItem>
-                    <SelectItem value="10">Extended family (7+)</SelectItem>
+                  <SelectContent className="max-h-64">
+                    {locationOptions.map(({ key, label }) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Budget with dynamic currency */}
+              <div className="space-y-2">
+                <Label>Budget per person ({currency.code})</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm select-none">
+                    {currency.symbol}
+                  </span>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    data-testid="input-budget"
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+
+              {/* Event Size */}
+              <div className="space-y-2">
+                <Label>Event Size</Label>
+                <Select value={eventSize} onValueChange={setEventSize}>
+                  <SelectTrigger data-testid="select-event-size">
+                    <SelectValue placeholder="How many outfits needed?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventSizes.map(size => (
+                      <SelectItem key={size.value} value={size.value}>
+                        {size.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {eventSize === "others" && (
+                  <Input
+                    type="number"
+                    placeholder="Enter exact number of outfits"
+                    value={customSize}
+                    onChange={(e) => setCustomSize(e.target.value)}
+                    className="mt-2"
+                  />
+                )}
               </div>
             </div>
           </CardContent>
@@ -153,8 +268,8 @@ export default function EventPlannerPage() {
         {!selectedEvent ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {eventTypes.map(type => (
-              <Card 
-                key={type.value} 
+              <Card
+                key={type.value}
                 className="cursor-pointer hover:border-primary transition-colors"
                 onClick={() => setSelectedEvent(type.value)}
                 data-testid={`event-type-card-${type.value}`}
@@ -213,8 +328,8 @@ export default function EventPlannerPage() {
                       <div key={product.id} className="group">
                         <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2 relative">
                           {product.imageUrl ? (
-                            <img 
-                              src={product.imageUrl} 
+                            <img
+                              src={product.imageUrl}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
@@ -224,7 +339,7 @@ export default function EventPlannerPage() {
                             </div>
                           )}
                           {product.fitScore && user && (
-                            <Badge 
+                            <Badge
                               className={`absolute top-2 right-2 ${getFitScoreColor(product.fitScore)}`}
                             >
                               {product.fitScore}% Fit
@@ -233,7 +348,7 @@ export default function EventPlannerPage() {
                         </div>
                         <p className="font-medium text-sm truncate">{product.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          ${parseFloat(product.price).toLocaleString()}
+                          {currency.symbol}{parseFloat(product.price).toLocaleString()}
                         </p>
                       </div>
                     ))}
@@ -245,7 +360,7 @@ export default function EventPlannerPage() {
                         <div>
                           <span className="text-sm text-muted-foreground">Collection Total: </span>
                           <span className="text-lg font-semibold">
-                            ${collection.totalPrice.toLocaleString()}
+                            {currency.symbol}{collection.totalPrice.toLocaleString()}
                           </span>
                         </div>
                       )}
