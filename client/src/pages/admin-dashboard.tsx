@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
@@ -50,6 +50,8 @@ export default function AdminDashboard() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
+  const [activityLog, setActivityLog] = useState<Array<{ id: number; orderId: number; status: string; amount: string; time: Date }>>([]);
+  const prevOrderStatusRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !isAdmin(user))) {
@@ -62,15 +64,43 @@ export default function AdminDashboard() {
   const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: adminOrders = [] } = useQuery({ queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000 });
+  const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
+    queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
+  });
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000 });
+  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
   const { data: analytics, isLoading: analyticsLoading } = useQuery<any>({
     queryKey: ['/api/admin/analytics', analyticsRefresh],
     enabled: isAuthenticated && isAdmin(user),
     retry: false,
     refetchInterval: 60000,
   });
+
+  // ── Real-time order change detection ────────────────────────────────────
+  useEffect(() => {
+    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    if (!orders.length) return;
+    const prev = prevOrderStatusRef.current;
+    const newActivity: typeof activityLog = [];
+    for (const o of orders) {
+      const oldStatus = prev[o.id];
+      if (oldStatus && oldStatus !== o.orderStatus) {
+        if (['delivered', 'cancelled'].includes(o.orderStatus)) {
+          newActivity.push({ id: Date.now() + o.id, orderId: o.id, status: o.orderStatus, amount: o.totalAmount, time: new Date() });
+          toast({
+            title: o.orderStatus === 'delivered' ? `✅ Order #${o.id} Delivered` : `❌ Order #${o.id} Cancelled`,
+            description: `$${parseFloat(o.totalAmount || 0).toFixed(2)} order has been ${o.orderStatus}.`,
+          });
+        }
+      }
+    }
+    if (newActivity.length) {
+      setActivityLog(prev => [...newActivity, ...prev].slice(0, 20));
+    }
+    const next: Record<number, string> = {};
+    for (const o of orders) next[o.id] = o.orderStatus;
+    prevOrderStatusRef.current = next;
+  }, [adminOrders, toast]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const dismissNotificationMutation = useMutation({
@@ -571,16 +601,66 @@ export default function AdminDashboard() {
           {/* ═══ ORDER MANAGEMENT TAB ═══════════════════════════════════════ */}
           <TabsContent value="orders">
             <div className="space-y-4">
+              {/* Real-time header */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full ${ordersFetching ? 'bg-green-400 animate-pulse' : 'bg-green-500'}`} />
+                    <span className="text-xs text-gray-500">
+                      Live tracking · auto-refreshes every 30s
+                      {ordersUpdatedAt ? ` · last: ${new Date(ordersUpdatedAt).toLocaleTimeString()}` : ''}
+                    </span>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] })} disabled={ordersFetching} className="gap-1">
+                  <RefreshCw className={`w-3 h-3 ${ordersFetching ? 'animate-spin' : ''}`} />Refresh Now
+                </Button>
+              </div>
+
+              {/* Activity feed — delivered/cancelled */}
+              {activityLog.length > 0 && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-green-800 flex items-center gap-2">
+                      <Zap className="w-4 h-4" />Live Activity Feed
+                      <Badge className="ml-1 bg-green-600 text-white text-xs">{activityLog.length} events</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1.5">
+                      {activityLog.slice(0, 8).map(ev => (
+                        <div key={ev.id} className="flex items-center justify-between text-xs bg-white border rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            {ev.status === 'delivered'
+                              ? <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                              : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                            <span className="font-semibold capitalize">Order #{ev.orderId} {ev.status}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-gray-400">
+                            <span className="font-semibold text-gray-700">${parseFloat(ev.amount || '0').toFixed(2)}</span>
+                            <span>{ev.time.toLocaleTimeString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Summary row */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label: 'Total Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700' },
-                  { label: 'Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700' },
-                  { label: 'Pending', value: String(orderRevenueSummary.pending), color: 'text-orange-700' },
-                ].map(({ label, value, color }) => (
-                  <Card key={label}><CardContent className="p-4 text-center">
-                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                    <p className="text-xs text-gray-500">{label}</p>
+                  { label: 'Total Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
+                  { label: 'Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
+                  { label: 'Pending', value: String(orderRevenueSummary.pending), color: 'text-orange-700', icon: AlertTriangle },
+                  { label: 'Total Orders', value: String(Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0), color: 'text-gray-700', icon: ShoppingBag },
+                ].map(({ label, value, color, icon: Icon }) => (
+                  <Card key={label}><CardContent className="p-4 flex items-center gap-3">
+                    <Icon className={`w-5 h-5 ${color}`} />
+                    <div>
+                      <p className={`text-xl font-bold ${color}`}>{value}</p>
+                      <p className="text-xs text-gray-500">{label}</p>
+                    </div>
                   </CardContent></Card>
                 ))}
               </div>
@@ -588,7 +668,7 @@ export default function AdminDashboard() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    <CardTitle>Order Management</CardTitle>
+                    <CardTitle>All Orders</CardTitle>
                     <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
                       <Download className="w-3 h-3" />Export CSV
                     </Button>
@@ -601,12 +681,18 @@ export default function AdminDashboard() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                       <Input placeholder="Search by order ID or customer…" className="pl-9 h-8 text-sm" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
                     </div>
-                    <div className="flex gap-1">
-                      {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => (
-                        <Button key={s} size="sm" variant={orderStatusFilter === s ? 'default' : 'outline'} className="capitalize h-8 px-2 text-xs" onClick={() => setOrderStatusFilter(s)}>
-                          {s}
-                        </Button>
-                      ))}
+                    <div className="flex flex-wrap gap-1">
+                      {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => {
+                        const count = s === 'all'
+                          ? (Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0)
+                          : (Array.isArray(adminOrders) ? (adminOrders as any[]).filter((o: any) => o.orderStatus === s).length : 0);
+                        return (
+                          <Button key={s} size="sm" variant={orderStatusFilter === s ? 'default' : 'outline'} className="capitalize h-8 px-2 text-xs gap-1" onClick={() => setOrderStatusFilter(s)}>
+                            {s}
+                            {count > 0 && <span className={`px-1 rounded-full text-xs ${orderStatusFilter === s ? 'bg-white text-gray-800' : 'bg-gray-100'}`}>{count}</span>}
+                          </Button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -615,16 +701,16 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="space-y-3">
                       {filteredOrders.map((order: any) => (
-                        <div key={order.id} className="border rounded-lg p-4">
+                        <div key={order.id} className={`border rounded-lg p-4 transition-all ${order.orderStatus === 'delivered' ? 'border-green-200 bg-green-50/30' : order.orderStatus === 'cancelled' ? 'border-red-200 bg-red-50/30' : ''}`}>
                           <div className="flex items-start justify-between flex-wrap gap-3">
                             <div>
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="font-semibold">Order #{order.id}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-700'}`}>{order.orderStatus}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.paymentStatus}</span>
                               </div>
                               <p className="text-sm text-gray-600">
-                                {order.customer?.firstName} {order.customer?.lastName} · {order.customer?.email}
+                                {order.customer?.firstName} {order.customer?.lastName} · <span className="text-gray-400">{order.customer?.email}</span>
                               </p>
                               <p className="text-xs text-gray-400 mt-0.5">
                                 {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -636,8 +722,9 @@ export default function AdminDashboard() {
                               <Select
                                 value={order.orderStatus}
                                 onValueChange={(status) => updateOrderStatusMutation.mutate({ orderId: order.id, status })}
+                                disabled={order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
                               >
-                                <SelectTrigger className="w-36 h-8 text-xs">
+                                <SelectTrigger className="w-38 h-8 text-xs">
                                   <Truck className="w-3 h-3 mr-1" /><SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -652,10 +739,13 @@ export default function AdminDashboard() {
                           {order.items && order.items.length > 0 && (
                             <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
                               {order.items.map((item: any) => (
-                                <div key={item.id} className="bg-gray-50 rounded px-2 py-1 text-xs">
+                                <div key={item.id} className="bg-gray-50 rounded px-2 py-1 text-xs flex items-center gap-1.5">
+                                  {item.productImage && (
+                                    <img src={item.productImage} alt={item.productName} className="w-5 h-5 object-cover rounded" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                  )}
                                   <span className="font-medium">{item.productName}</span>
-                                  <span className="text-gray-500 ml-1">×{item.quantity}</span>
-                                  <span className="text-gray-400 ml-1">· {item.vendorName}</span>
+                                  <span className="text-gray-500">×{item.quantity}</span>
+                                  <span className="text-gray-400">· {item.vendorName}</span>
                                 </div>
                               ))}
                             </div>

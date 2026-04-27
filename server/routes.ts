@@ -1337,7 +1337,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req.user as any)?.id;
       const orders = await storage.getOrdersForUser(userId);
-      res.json(orders);
+      // Enrich each order with items + product details
+      const enriched = await Promise.all(orders.map(async (order) => {
+        const rawItems = await storage.getOrderItemsWithProducts(order.id);
+        const items = await Promise.all(rawItems.map(async (item) => {
+          const product = await storage.getProduct(item.productId);
+          const vendor = product ? await storage.getVendor(product.vendorId) : null;
+          return {
+            ...item,
+            productName: product?.name || 'Product',
+            productImage: (product?.images as string[])?.[0] || product?.imageUrl || null,
+            vendorName: vendor?.businessName || 'Unknown Vendor',
+          };
+        }));
+        return { ...order, items };
+      }));
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch orders' });
     }
@@ -1353,18 +1368,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/orders/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/orders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const order = await storage.getOrder(orderId);
-      
-      if (!order) {
-        return res.status(404).json({ message: 'Order not found' });
-      }
-      
-      res.json(order);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+      // Return with items
+      const rawItems = await storage.getOrderItemsWithProducts(orderId);
+      const items = await Promise.all(rawItems.map(async (item) => {
+        const product = await storage.getProduct(item.productId);
+        const vendor = product ? await storage.getVendor(product.vendorId) : null;
+        return {
+          ...item,
+          productName: product?.name || 'Product',
+          productImage: (product?.images as string[])?.[0] || product?.imageUrl || null,
+          vendorName: vendor?.businessName || 'Unknown Vendor',
+        };
+      }));
+      res.json({ ...order, items });
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch order' });
+    }
+  });
+
+  // Customer: cancel own order (only if pending or processing)
+  app.patch('/api/orders/:id/cancel', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const userId = (req.user as any)?.id;
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+      if (order.userId !== userId) return res.status(403).json({ message: 'Forbidden' });
+      if (!['pending', 'processing'].includes(order.orderStatus || '')) {
+        return res.status(400).json({ message: 'Order cannot be cancelled at this stage' });
+      }
+      await storage.updateOrderStatus(orderId, 'cancelled');
+      // Notify admins
+      const admins = await storage.getAdminUsers();
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          title: '❌ Order Cancelled',
+          message: `Customer cancelled Order #${orderId}.`,
+          type: 'order',
+        });
+      }
+      res.json({ message: 'Order cancelled successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to cancel order' });
     }
   });
 
@@ -1810,7 +1861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: update order fulfillment status
+  // Admin: update order fulfillment status with automatic notifications
   app.patch('/api/admin/orders/:id/status', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
@@ -1819,9 +1870,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
       }
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+
       await storage.updateOrderStatus(orderId, status);
-      res.json({ message: 'Order status updated' });
+
+      // Automatically notify the customer when status changes
+      const statusMessages: Record<string, { title: string; message: string }> = {
+        processing: {
+          title: '🔄 Order Being Processed',
+          message: `Great news! Your Order #${orderId} is now being processed by our vendors.`,
+        },
+        shipped: {
+          title: '🚚 Order Shipped!',
+          message: `Your Order #${orderId} has been shipped and is on its way to you. Expected delivery: 3–5 business days.`,
+        },
+        delivered: {
+          title: '✅ Order Delivered!',
+          message: `Your Order #${orderId} has been delivered successfully. Enjoy your African fashion! 🎉`,
+        },
+        cancelled: {
+          title: '❌ Order Cancelled',
+          message: `Your Order #${orderId} has been cancelled. If you have questions, please contact our support.`,
+        },
+      };
+
+      if (statusMessages[status]) {
+        await storage.createNotification({
+          userId: order.userId,
+          title: statusMessages[status].title,
+          message: statusMessages[status].message,
+          type: 'order',
+        });
+      }
+
+      // Notify admins when delivered or cancelled (for their dashboard activity feed)
+      if (status === 'delivered' || status === 'cancelled') {
+        const admins = await storage.getAdminUsers();
+        for (const admin of admins) {
+          await storage.createNotification({
+            userId: admin.id,
+            title: status === 'delivered' ? `✅ Order #${orderId} Delivered` : `❌ Order #${orderId} Cancelled`,
+            message: `Order #${orderId} worth $${parseFloat(order.totalAmount as string).toFixed(2)} has been marked as ${status}.`,
+            type: 'order',
+          });
+        }
+      }
+
+      res.json({ message: 'Order status updated', status });
     } catch (error) {
+      console.error('Error updating order status:', error);
       res.status(500).json({ message: 'Failed to update order status' });
     }
   });
