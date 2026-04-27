@@ -12,6 +12,8 @@ import {
   Search, MapPin, Phone, Globe, Clock, Hotel, ShoppingBag,
   Utensils, Landmark, Car, Plane, Coffee, Music, Navigation,
   X, ExternalLink, CheckCircle2, PhoneCall, ChevronRight,
+  Star, TrendingUp, Users, Crown, Briefcase, Tag, Sparkles,
+  BadgePercent, Building2, ArrowRight,
 } from "lucide-react";
 import { africaLocations, getCountriesByRegion, africanRegions } from "@shared/africaLocations";
 
@@ -533,6 +535,65 @@ export default function DiscoverAfrica() {
         </div>
       </div>
 
+      {/* ══ REVENUE STREAM 1: AfrolandX Travel Deals (Commission-based bookings) ══ */}
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4 max-w-7xl py-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BadgePercent className="h-5 w-5 text-rose-500" />
+              <h2 className="font-bold text-gray-900">AfrolandX Exclusive Deals</h2>
+              <Badge className="bg-rose-100 text-rose-700 border-0 text-xs font-semibold">Save up to 40%</Badge>
+            </div>
+            <button className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+              See all deals <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {[
+              { emoji:"🏨", title:"Lagos Luxury Stay", sub:"Eko Hotels & Suites", off:"25%", badge:"Hotel Deal", color:"from-blue-500 to-indigo-600", country:"Nigeria" },
+              { emoji:"🍽️", title:"Dinner for Two", sub:"Nkoyo Restaurant, Abuja", off:"30%", badge:"Dining Deal", color:"from-amber-500 to-orange-600", country:"Nigeria" },
+              { emoji:"✈️", title:"Cairo City Tour", sub:"Guided Pyramid Experience", off:"20%", badge:"Tour Deal", color:"from-yellow-500 to-amber-600", country:"Egypt" },
+              { emoji:"🏖️", title:"Cape Town Getaway", sub:"V&A Waterfront Hotel", off:"35%", badge:"Stay & Explore", color:"from-sky-500 to-blue-600", country:"S. Africa" },
+              { emoji:"🌿", title:"Nairobi Safari", sub:"Maasai Mara Day Trip", off:"15%", badge:"Adventure Deal", color:"from-emerald-500 to-teal-600", country:"Kenya" },
+              { emoji:"☕", title:"Marrakech Medina Tour", sub:"Old City Walking Guide", off:"40%", badge:"Experience", color:"from-rose-500 to-pink-600", country:"Morocco" },
+            ].map((deal, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-56 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group"
+                onClick={() => {}}
+              >
+                <div className={`h-28 bg-gradient-to-br ${deal.color} flex flex-col items-center justify-center relative`}>
+                  <span className="text-4xl group-hover:scale-110 transition-transform duration-300">{deal.emoji}</span>
+                  <div className="absolute top-2 left-2">
+                    <Badge className="bg-white/90 text-gray-800 border-0 text-xs font-bold shadow">{deal.badge}</Badge>
+                  </div>
+                  <div className="absolute top-2 right-2 bg-rose-500 text-white text-xs font-black px-2 py-0.5 rounded-full shadow">
+                    -{deal.off}
+                  </div>
+                </div>
+                <div className="bg-white p-3">
+                  <p className="font-bold text-sm text-gray-900 line-clamp-1">{deal.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{deal.sub}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-emerald-600 font-semibold">{deal.country}</span>
+                    <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3">Book</Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* CTA to list your own deal */}
+            <div className="flex-shrink-0 w-44 rounded-2xl overflow-hidden border-2 border-dashed border-emerald-300 bg-emerald-50 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-100 transition-all group">
+              <Tag className="h-8 w-8 text-emerald-500 mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-bold text-emerald-700 text-center">List a Deal</p>
+              <p className="text-xs text-emerald-600 text-center mt-1">Reach 50K+ travellers</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            AfrolandX earns a small commission on bookings made through these deals. Partners keep 85–95% of the booking value.
+          </p>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* ── Results Section ──────────────────────────────────────────────────── */}
@@ -579,13 +640,40 @@ export default function DiscoverAfrica() {
                 /* Masonry-style grid */
                 <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                   {places.map((place, idx) => (
-                    <div key={place.id} className="break-inside-avoid mb-4">
-                      <PlaceCard
-                        place={place}
-                        tall={idx % 5 === 0}
-                        onClick={() => setSelectedPlace(place)}
-                      />
-                    </div>
+                    <>
+                      <div key={place.id} className="break-inside-avoid mb-4">
+                        <PlaceCard
+                          place={place}
+                          tall={idx % 5 === 0}
+                          onClick={() => setSelectedPlace(place)}
+                        />
+                      </div>
+                      {/* ══ REVENUE STREAM 3: "Claim Your Business" inline ad (every 8th card) ══ */}
+                      {idx > 0 && (idx + 1) % 8 === 0 && (
+                        <div key={`claim-${idx}`} className="break-inside-avoid mb-4">
+                          <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 flex flex-col items-center text-center cursor-pointer hover:border-emerald-500 hover:shadow-lg transition-all group">
+                            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
+                              <Building2 className="h-6 w-6 text-emerald-600" />
+                            </div>
+                            <p className="font-bold text-gray-900 text-sm mb-1">Is this your business?</p>
+                            <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                              Claim your listing, add photos, respond to reviews and get discovered by thousands.
+                            </p>
+                            <div className="space-y-1 w-full mb-3">
+                              {["Priority placement in search", "Direct booking link", "Analytics dashboard"].map(f => (
+                                <div key={f} className="flex items-center gap-2 text-xs text-emerald-700">
+                                  <CheckCircle2 className="h-3 w-3 flex-shrink-0" />{f}
+                                </div>
+                              ))}
+                            </div>
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 rounded-xl w-full text-xs">
+                              Claim Free Listing
+                            </Button>
+                            <p className="text-xs text-gray-400 mt-2">Free tier available · Premium from ₦5,000/mo</p>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ))}
                 </div>
               ) : null}
@@ -605,6 +693,53 @@ export default function DiscoverAfrica() {
               <ChevronRight className="h-4 w-4 ml-0.5" />
             </div>
           </div>
+
+          {/* ══ REVENUE STREAM 2: Sponsored Destination Feature (Tourism board paid placement) ══ */}
+          <div className="relative rounded-2xl overflow-hidden mb-6 cursor-pointer group shadow-xl hover:shadow-2xl transition-all">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600" />
+            <img
+              src={lf("Nigeria,Lagos,Africa,culture", 42)}
+              alt="Featured Destination"
+              className="absolute inset-0 w-full h-full object-cover opacity-40"
+              style={{ opacity: 0 }}
+              onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = "0.4"; }}
+            />
+            <div className="relative p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-5">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold text-xs shadow">
+                    ⭐ Sponsored Destination
+                  </Badge>
+                  <Badge className="bg-white/20 text-white border-white/30 text-xs">
+                    Featured Partner
+                  </Badge>
+                </div>
+                <h3 className="text-2xl font-black text-white mb-1">🇳🇬 Discover Nigeria</h3>
+                <p className="text-white/80 text-sm mb-3">
+                  From Lagos's vibrant nightlife to Abuja's modern skyline and Calabar's cultural festivals — Nigeria is calling.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {["🏙️ Lagos", "🏛️ Abuja", "🎭 Calabar", "🌊 Port Harcourt"].map(tag => (
+                    <span key={tag} className="px-3 py-1 bg-white/15 text-white text-xs rounded-full border border-white/20">{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="bg-white text-orange-600 hover:bg-white/90 font-bold rounded-xl shadow-lg px-6"
+                  onClick={() => { selectCountry("NG"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                >
+                  Explore Now <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+                <p className="text-white/60 text-xs text-center">Promoted by Nigeria Tourism</p>
+              </div>
+            </div>
+          </div>
+
+          {/* "Feature your destination" upsell note */}
+          <p className="text-xs text-gray-400 text-right mb-4">
+            <span className="font-semibold text-emerald-600 cursor-pointer hover:underline">Feature your country or city here</span> — reach 50,000+ monthly travellers.
+          </p>
 
           {/* Region tabs */}
           <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
@@ -680,6 +815,97 @@ export default function DiscoverAfrica() {
             </div>
           </div>
         )}
+
+        {/* ══ REVENUE STREAM 4: Become a Local Expert Guide (Platform takes 15% fee) ══ */}
+        <div className="mt-14 rounded-3xl overflow-hidden shadow-2xl relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-600" />
+          <img
+            src={lf("Africa,guide,tour,culture,people", 77)}
+            alt="Local Guides"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ opacity: 0 }}
+            onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+          />
+          <div className="relative p-8 md:p-12">
+            <div className="max-w-2xl">
+              <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold mb-4">New Opportunity</Badge>
+              <h2 className="text-3xl font-black text-white mb-3">
+                Turn Your Local Knowledge Into Income
+              </h2>
+              <p className="text-white/80 text-base mb-6 leading-relaxed">
+                Are you a local in Lagos, Nairobi, Cairo, Cape Town or any African city? 
+                Register as an AfrolandX Expert Guide and earn by showing visitors the real, 
+                authentic side of your city — street food, hidden markets, cultural tours and more.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
+                {[
+                  { icon: "💰", title: "Keep 85% of fees", desc: "AfrolandX takes only a 15% platform fee per tour" },
+                  { icon: "📅", title: "Set your schedule", desc: "Accept bookings on your own terms, any time" },
+                  { icon: "⭐", title: "Build your reputation", desc: "Collect reviews and grow your guide profile" },
+                ].map(b => (
+                  <div key={b.title} className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/15">
+                    <span className="text-2xl mb-2 block">{b.icon}</span>
+                    <p className="font-bold text-white text-sm mb-1">{b.title}</p>
+                    <p className="text-white/70 text-xs leading-relaxed">{b.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <Button className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold rounded-xl px-6 shadow-lg">
+                  <Users className="h-4 w-4 mr-2" /> Register as a Guide
+                </Button>
+                <Button variant="outline" className="border-white/30 text-white hover:bg-white/15 rounded-xl">
+                  Learn more
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ══ REVENUE STREAM 5: Explorer Premium Membership (Monthly subscription) ══ */}
+        <div className="mt-10 mb-6">
+          <div className="rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-8 md:p-10 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <Crown className="h-5 w-5 text-yellow-400" />
+                <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold">Premium</Badge>
+                <span className="text-white/60 text-xs">Monthly subscription · ₦2,500/mo</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-white mb-2">
+                AfrolandX Explorer Premium
+              </h2>
+              <p className="text-white/70 text-sm mb-6 max-w-xl">
+                Unlock the full power of AfrolandX Discover — curated city guides, exclusive deals, 
+                offline access and priority support for travellers who want more.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
+                {[
+                  { icon: <Sparkles className="h-5 w-5 text-yellow-400" />, title: "Curated City Guides", desc: "Expert-written guides for 20+ African cities" },
+                  { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Members-Only Deals", desc: "Exclusive discounts you won't find anywhere else" },
+                  { icon: <TrendingUp className="h-5 w-5 text-emerald-400" />, title: "Trending Alerts", desc: "Get notified when hot new places open nearby" },
+                  { icon: <Star className="h-5 w-5 text-sky-400" />, title: "Priority Listings", desc: "Your business listed at the top of every search" },
+                ].map(f => (
+                  <div key={f.title} className="bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur-sm">
+                    <div className="mb-2">{f.icon}</div>
+                    <p className="font-bold text-white text-sm mb-1">{f.title}</p>
+                    <p className="text-white/60 text-xs leading-relaxed">{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <Button className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl px-8 py-5 text-base shadow-xl">
+                  <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium — ₦2,500/mo
+                </Button>
+                <div className="text-white/60 text-xs">
+                  Cancel anytime · 7-day free trial
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <PlaceDetailsDialog
