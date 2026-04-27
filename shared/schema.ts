@@ -738,6 +738,58 @@ export const insertDropRsvpSchema = createInsertSchema(dropRsvps).omit({
   status: z.enum(["confirmed", "cancelled", "attended"]).default("confirmed"),
 });
 
+// ── Discover page: inquiries (guide registration, business claim, deal listing, destination feature) ──
+export const discoverInquiries = pgTable("discover_inquiries", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { length: 64 }).notNull(), // "guide_registration" | "business_claim" | "deal_listing" | "destination_feature"
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 64 }),
+  details: jsonb("details"),
+  status: varchar("status", { length: 32 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDiscoverInquirySchema = createInsertSchema(discoverInquiries).omit({ id: true, createdAt: true });
+export type InsertDiscoverInquiry = z.infer<typeof insertDiscoverInquirySchema>;
+export type DiscoverInquiry = typeof discoverInquiries.$inferSelect;
+
+// ── Discover page: deal bookings ──
+export const discoverBookings = pgTable("discover_bookings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  dealTitle: varchar("deal_title", { length: 255 }).notNull(),
+  dealType: varchar("deal_type", { length: 64 }).notNull(),
+  guestName: varchar("guest_name", { length: 255 }).notNull(),
+  guestEmail: varchar("guest_email", { length: 255 }).notNull(),
+  guestCount: integer("guest_count").notNull().default(1),
+  bookingDate: varchar("booking_date", { length: 32 }).notNull(),
+  totalAmountNgn: integer("total_amount_ngn").notNull(),
+  paymentReference: varchar("payment_reference", { length: 128 }),
+  paymentStatus: varchar("payment_status", { length: 32 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDiscoverBookingSchema = createInsertSchema(discoverBookings).omit({ id: true, createdAt: true });
+export type InsertDiscoverBooking = z.infer<typeof insertDiscoverBookingSchema>;
+export type DiscoverBooking = typeof discoverBookings.$inferSelect;
+
+// ── Discover premium subscriptions ──
+export const discoverPremium = pgTable("discover_premium", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  guestEmail: varchar("guest_email", { length: 255 }),
+  paymentReference: varchar("payment_reference", { length: 128 }),
+  paymentStatus: varchar("payment_status", { length: 32 }).default("pending"),
+  subscriptionStart: timestamp("subscription_start"),
+  subscriptionEnd: timestamp("subscription_end"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDiscoverPremiumSchema = createInsertSchema(discoverPremium).omit({ id: true, createdAt: true });
+export type InsertDiscoverPremium = z.infer<typeof insertDiscoverPremiumSchema>;
+export type DiscoverPremium = typeof discoverPremium.$inferSelect;
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

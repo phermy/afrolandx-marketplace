@@ -1,21 +1,26 @@
 import { useState, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, MapPin, Phone, Globe, Clock, Hotel, ShoppingBag,
   Utensils, Landmark, Car, Plane, Coffee, Music, Navigation,
   X, ExternalLink, CheckCircle2, PhoneCall, ChevronRight,
   Star, TrendingUp, Users, Crown, Briefcase, Tag, Sparkles,
-  BadgePercent, Building2, ArrowRight,
+  BadgePercent, Building2, ArrowRight, Loader2, PartyPopper,
 } from "lucide-react";
 import { africaLocations, getCountriesByRegion, africanRegions } from "@shared/africaLocations";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Place {
@@ -377,7 +382,423 @@ const REGION_LABELS: Record<string, string> = {
   "Southern Africa": "South",
 };
 
+// ─── BASE DEAL PRICES (NGN) ────────────────────────────────────────────────────
+const DEAL_BASE_PRICES: Record<string, number> = {
+  "Lagos Luxury Stay": 120000,
+  "Dinner for Two": 35000,
+  "Cairo City Tour": 45000,
+  "Cape Town Getaway": 180000,
+  "Nairobi Safari": 220000,
+  "Marrakech Medina Tour": 55000,
+};
+
+// ─── BookingDialog ─────────────────────────────────────────────────────────────
+interface DealInfo { title: string; emoji: string; badge: string; off: string; country: string; type: string }
+
+function BookingDialog({ deal, open, onClose }: { deal: DealInfo | null; open: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [name, setName] = useState((user as any)?.firstName || "");
+  const [email, setEmail] = useState((user as any)?.email || "");
+  const [guests, setGuests] = useState(1);
+  const [date, setDate] = useState("");
+  const [done, setDone] = useState(false);
+
+  const basePrice = deal ? (DEAL_BASE_PRICES[deal.title] || 50000) : 50000;
+  const discountPct = deal ? parseInt(deal.off) / 100 : 0;
+  const perPerson = Math.round(basePrice * (1 - discountPct));
+  const total = perPerson * guests;
+
+  const bookMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/discover/bookings/initialize", {
+        dealTitle: deal!.title, dealType: deal!.type,
+        guestName: name, guestEmail: email, guestCount: guests,
+        bookingDate: date, totalAmountNgn: total,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.authorizationUrl) {
+        window.open(data.authorizationUrl, "_blank");
+        setDone(true);
+      }
+    },
+    onError: () => toast({ title: "Booking failed", description: "Please try again.", variant: "destructive" }),
+  });
+
+  if (!deal) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
+        <div className={`h-32 bg-gradient-to-br ${CARD_GRADIENTS[Object.keys(DEAL_BASE_PRICES).indexOf(deal.title) % CARD_GRADIENTS.length]} flex items-center justify-center relative`}>
+          <span className="text-6xl">{deal.emoji}</span>
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="absolute bottom-3 left-4">
+            <Badge className="bg-white/90 text-gray-800 border-0 font-bold text-xs">{deal.badge}</Badge>
+          </div>
+          <div className="absolute top-3 right-3 bg-rose-500 text-white text-sm font-black px-2 py-0.5 rounded-full">-{deal.off}</div>
+        </div>
+        <div className="p-5">
+          {done ? (
+            <div className="text-center py-4">
+              <PartyPopper className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
+              <h3 className="text-lg font-black text-gray-900 mb-1">Booking Initiated!</h3>
+              <p className="text-sm text-muted-foreground">Complete your payment in the Paystack window to confirm your booking.</p>
+              <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 rounded-xl w-full" onClick={onClose}>Done</Button>
+            </div>
+          ) : (
+            <>
+              <DialogHeader className="mb-4 p-0">
+                <DialogTitle>{deal.title}</DialogTitle>
+                <DialogDescription>{deal.country} · Exclusive AfrolandX deal</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-gray-600 mb-1 block">Full Name</Label>
+                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="rounded-xl" required />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-gray-600 mb-1 block">Email</Label>
+                    <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" type="email" className="rounded-xl" required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-gray-600 mb-1 block">Date</Label>
+                    <Input value={date} onChange={e => setDate(e.target.value)} type="date" min={new Date().toISOString().split("T")[0]} className="rounded-xl" required />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-gray-600 mb-1 block">Guests</Label>
+                    <Input value={guests} onChange={e => setGuests(Math.max(1, parseInt(e.target.value) || 1))} type="number" min={1} max={20} className="rounded-xl" />
+                  </div>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">{guests} guest{guests > 1 ? "s" : ""} × ₦{perPerson.toLocaleString()}</p>
+                    <p className="font-black text-lg text-emerald-700">₦{total.toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs line-through text-gray-400">₦{(basePrice * guests).toLocaleString()}</p>
+                    <Badge className="bg-rose-100 text-rose-700 border-0 text-xs">You save ₦{((basePrice - perPerson) * guests).toLocaleString()}</Badge>
+                  </div>
+                </div>
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl py-5 font-bold text-base"
+                  disabled={!name || !email || !date || bookMutation.isPending}
+                  onClick={() => bookMutation.mutate()}
+                >
+                  {bookMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : `Pay ₦${total.toLocaleString()} with Paystack`}
+                </Button>
+                <p className="text-xs text-center text-gray-400">Secure payment · Cancel anytime before your booking date</p>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── InquiryDialog (Guide Registration, Business Claim, Deal Listing, Destination Feature) ──
+interface InquiryConfig {
+  type: string;
+  title: string;
+  description: string;
+  emoji: string;
+  fields: { key: string; label: string; type: string; placeholder: string; required?: boolean }[];
+  submitLabel: string;
+  successTitle: string;
+  successMsg: string;
+}
+
+const INQUIRY_CONFIGS: Record<string, InquiryConfig> = {
+  guide_registration: {
+    type: "guide_registration",
+    title: "Register as a Local Expert Guide",
+    description: "Join our network of African city experts and earn by hosting tours.",
+    emoji: "🧭",
+    submitLabel: "Submit Application",
+    successTitle: "Application Received!",
+    successMsg: "We'll review your application and contact you within 3 business days.",
+    fields: [
+      { key: "name", label: "Full Name", type: "text", placeholder: "Your full name", required: true },
+      { key: "email", label: "Email Address", type: "email", placeholder: "you@email.com", required: true },
+      { key: "phone", label: "Phone Number", type: "tel", placeholder: "+234 xxx xxx xxxx" },
+      { key: "city", label: "City / Country", type: "text", placeholder: "e.g. Lagos, Nigeria", required: true },
+      { key: "languages", label: "Languages Spoken", type: "text", placeholder: "e.g. English, Yoruba, French" },
+      { key: "specialty", label: "Tour Specialty", type: "textarea", placeholder: "Describe what tours you'd like to offer…" },
+    ],
+  },
+  business_claim: {
+    type: "business_claim",
+    title: "Claim Your Business Listing",
+    description: "Manage your business profile, add photos and get discovered by thousands.",
+    emoji: "🏢",
+    submitLabel: "Claim Listing",
+    successTitle: "Claim Request Sent!",
+    successMsg: "We'll verify your ownership and activate your listing within 24 hours.",
+    fields: [
+      { key: "name", label: "Your Name", type: "text", placeholder: "Your full name", required: true },
+      { key: "email", label: "Business Email", type: "email", placeholder: "business@email.com", required: true },
+      { key: "phone", label: "Business Phone", type: "tel", placeholder: "+234 xxx xxx xxxx" },
+      { key: "businessName", label: "Business Name", type: "text", placeholder: "Name of your business", required: true },
+      { key: "website", label: "Website (optional)", type: "url", placeholder: "https://yourbusiness.com" },
+      { key: "description", label: "Brief Description", type: "textarea", placeholder: "What does your business do?" },
+    ],
+  },
+  deal_listing: {
+    type: "deal_listing",
+    title: "List Your Deal on AfrolandX",
+    description: "Reach 50,000+ monthly travellers and promote your exclusive offer.",
+    emoji: "🏷️",
+    submitLabel: "Submit Deal",
+    successTitle: "Deal Submitted!",
+    successMsg: "Our partnerships team will review your deal and get in touch within 48 hours.",
+    fields: [
+      { key: "name", label: "Contact Name", type: "text", placeholder: "Your name", required: true },
+      { key: "email", label: "Business Email", type: "email", placeholder: "contact@yourbusiness.com", required: true },
+      { key: "phone", label: "Phone Number", type: "tel", placeholder: "+234 xxx xxx xxxx" },
+      { key: "dealTitle", label: "Deal Title", type: "text", placeholder: "e.g. 30% off dinner for two", required: true },
+      { key: "discount", label: "Discount Offered", type: "text", placeholder: "e.g. 20%, buy one get one free" },
+      { key: "details", label: "Deal Details", type: "textarea", placeholder: "Describe your deal, validity, and terms…" },
+    ],
+  },
+  destination_feature: {
+    type: "destination_feature",
+    title: "Feature Your Destination",
+    description: "Get your country, city or region promoted to thousands of AfrolandX users.",
+    emoji: "🌍",
+    submitLabel: "Request Feature",
+    successTitle: "Request Received!",
+    successMsg: "Our advertising team will contact you with a custom sponsorship package.",
+    fields: [
+      { key: "name", label: "Contact Name", type: "text", placeholder: "Your name", required: true },
+      { key: "email", label: "Email", type: "email", placeholder: "you@organization.com", required: true },
+      { key: "phone", label: "Phone", type: "tel", placeholder: "+234 xxx xxx xxxx" },
+      { key: "organization", label: "Organisation", type: "text", placeholder: "e.g. Nigeria Tourism Board", required: true },
+      { key: "destination", label: "Destination to Feature", type: "text", placeholder: "Country, city or region", required: true },
+      { key: "budget", label: "Estimated Budget (NGN)", type: "text", placeholder: "e.g. ₦500,000" },
+      { key: "goals", label: "Campaign Goals", type: "textarea", placeholder: "What do you hope to achieve?" },
+    ],
+  },
+};
+
+function InquiryDialog({ configKey, open, onClose }: { configKey: string | null; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [done, setDone] = useState(false);
+  const config = configKey ? INQUIRY_CONFIGS[configKey] : null;
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/discover/inquiries", {
+        type: config!.type,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        details: form,
+      });
+      return res.json();
+    },
+    onSuccess: () => setDone(true),
+    onError: () => toast({ title: "Submission failed", description: "Please try again.", variant: "destructive" }),
+  });
+
+  if (!config) return null;
+
+  function handleClose() { setDone(false); setForm({}); onClose(); }
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden max-h-[92vh]">
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 pb-4">
+          <div className="text-4xl mb-2">{config.emoji}</div>
+          <DialogHeader className="p-0">
+            <DialogTitle className="text-white text-xl">{config.title}</DialogTitle>
+            <DialogDescription className="text-white/75 text-sm mt-1">{config.description}</DialogDescription>
+          </DialogHeader>
+        </div>
+        <ScrollArea className="max-h-[60vh]">
+          <div className="p-5">
+            {done ? (
+              <div className="text-center py-6">
+                <PartyPopper className="h-14 w-14 text-emerald-500 mx-auto mb-3" />
+                <h3 className="text-lg font-black text-gray-900 mb-1">{config.successTitle}</h3>
+                <p className="text-sm text-muted-foreground mb-5">{config.successMsg}</p>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 rounded-xl w-full" onClick={handleClose}>Close</Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {config.fields.map(f => (
+                  <div key={f.key}>
+                    <Label className="text-xs font-semibold text-gray-600 mb-1 block">
+                      {f.label}{f.required && <span className="text-rose-500 ml-0.5">*</span>}
+                    </Label>
+                    {f.type === "textarea" ? (
+                      <Textarea
+                        placeholder={f.placeholder}
+                        value={form[f.key] || ""}
+                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        className="rounded-xl text-sm resize-none"
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        type={f.type}
+                        placeholder={f.placeholder}
+                        value={form[f.key] || ""}
+                        onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        className="rounded-xl"
+                      />
+                    )}
+                  </div>
+                ))}
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 rounded-xl py-5 font-bold mt-2"
+                  disabled={!form.name || !form.email || submitMutation.isPending}
+                  onClick={() => submitMutation.mutate()}
+                >
+                  {submitMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting…</> : config.submitLabel}
+                </Button>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── PremiumDialog ─────────────────────────────────────────────────────────────
+function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [email, setEmail] = useState((user as any)?.email || "");
+  const [done, setDone] = useState(false);
+
+  const subscribeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/discover/premium/initialize", { email });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.authorizationUrl) {
+        window.open(data.authorizationUrl, "_blank");
+        setDone(true);
+      }
+    },
+    onError: () => toast({ title: "Payment failed", description: "Please try again.", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={() => { setDone(false); onClose(); }}>
+      <DialogContent className="max-w-lg rounded-2xl p-0 overflow-hidden">
+        <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Crown className="h-6 w-6 text-yellow-400" />
+            <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold">Premium</Badge>
+          </div>
+          <h2 className="text-2xl font-black text-white mb-1">AfrolandX Explorer Premium</h2>
+          <p className="text-white/75 text-sm">₦2,500/month · Cancel anytime · 7-day free trial</p>
+        </div>
+        <div className="p-5">
+          {done ? (
+            <div className="text-center py-4">
+              <Crown className="h-12 w-12 text-violet-500 mx-auto mb-3" />
+              <h3 className="text-lg font-black text-gray-900 mb-1">Premium Activated!</h3>
+              <p className="text-sm text-muted-foreground">Complete your payment in the Paystack window. Your Premium access will activate automatically.</p>
+              <Button className="mt-4 bg-violet-600 hover:bg-violet-700 rounded-xl w-full" onClick={onClose}>Done</Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-5">
+                {[
+                  { icon: "📖", text: "Curated city guides for 20+ African cities" },
+                  { icon: "🏷️", text: "Exclusive members-only deals & discounts" },
+                  { icon: "🔔", text: "Trending spot alerts & early access" },
+                  { icon: "⭐", text: "Your business at the top of every search" },
+                ].map(f => (
+                  <div key={f.text} className="flex items-start gap-2 bg-violet-50 rounded-xl p-3">
+                    <span className="text-lg flex-shrink-0">{f.icon}</span>
+                    <p className="text-xs text-gray-700 leading-relaxed">{f.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs font-semibold text-gray-600 mb-1 block">Email Address</Label>
+                  <Input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="rounded-xl"
+                  />
+                </div>
+                <Button
+                  className="w-full bg-violet-600 hover:bg-violet-700 rounded-xl py-5 font-bold text-base"
+                  disabled={!email || subscribeMutation.isPending}
+                  onClick={() => subscribeMutation.mutate()}
+                >
+                  {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Start Free Trial — ₦2,500/mo</>}
+                </Button>
+                <p className="text-xs text-center text-gray-400">Secure payment via Paystack · No charge during 7-day trial</p>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── GuideLearnMoreDialog ──────────────────────────────────────────────────────
+function GuideLearnMoreDialog({ open, onClose, onRegister }: { open: boolean; onClose: () => void; onRegister: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl">How AfrolandX Expert Guides Work</DialogTitle>
+          <DialogDescription>Everything you need to know about earning as a local guide</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh]">
+          <div className="space-y-4 pr-2">
+            {[
+              { step: "1", title: "Register & Get Verified", body: "Submit your application with your city, specialties, and languages. Our team verifies guides within 3 business days." },
+              { step: "2", title: "Create Your Tours", body: "Build custom tour packages — street food walks, cultural visits, market tours, nightlife guides, or anything unique to your city." },
+              { step: "3", title: "Accept Bookings", body: "Travellers book directly through AfrolandX. You receive confirmed bookings with guest details and payment guaranteed upfront." },
+              { step: "4", title: "Earn & Grow", body: "Keep 85% of every booking fee. AfrolandX takes 15% to cover platform, insurance, and marketing. Build reviews to command higher prices." },
+            ].map(s => (
+              <div key={s.step} className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0">{s.step}</div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900">{s.title}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{s.body}</p>
+                </div>
+              </div>
+            ))}
+            <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+              <p className="font-semibold text-emerald-800 text-sm mb-1">Typical earnings</p>
+              <p className="text-sm text-emerald-700">City tour guide in Lagos charging ₦15,000 per person with 5 guests earns <strong>₦63,750</strong> for a 3-hour tour.</p>
+            </div>
+          </div>
+        </ScrollArea>
+        <div className="flex gap-2 pt-2">
+          <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-xl" onClick={() => { onClose(); onRegister(); }}>
+            <Users className="h-4 w-4 mr-2" /> Register as a Guide
+          </Button>
+          <Button variant="outline" className="rounded-xl" onClick={onClose}>Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DiscoverAfrica() {
+  // ── Discovery state ───────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedCountryCode, setSelectedCountryCode] = useState("NG");
@@ -385,6 +806,13 @@ export default function DiscoverAfrica() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [activeRegion, setActiveRegion] = useState<string>("all");
   const resultsRef = useRef<HTMLDivElement>(null);
+  const dealsRef = useRef<HTMLDivElement>(null);
+
+  // ── Monetization dialog state ─────────────────────────────────────────────
+  const [bookingDeal, setBookingDeal] = useState<DealInfo | null>(null);
+  const [inquiryType, setInquiryType] = useState<string | null>(null);
+  const [showPremium, setShowPremium] = useState(false);
+  const [showGuideLearnMore, setShowGuideLearnMore] = useState(false);
 
   const selectedCountry = africaLocations[selectedCountryCode];
   const selectedCity = useMemo(() => {
@@ -536,7 +964,7 @@ export default function DiscoverAfrica() {
       </div>
 
       {/* ══ REVENUE STREAM 1: AfrolandX Travel Deals (Commission-based bookings) ══ */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b" ref={dealsRef}>
         <div className="container mx-auto px-4 max-w-7xl py-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -544,23 +972,26 @@ export default function DiscoverAfrica() {
               <h2 className="font-bold text-gray-900">AfrolandX Exclusive Deals</h2>
               <Badge className="bg-rose-100 text-rose-700 border-0 text-xs font-semibold">Save up to 40%</Badge>
             </div>
-            <button className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline">
+            <button
+              className="text-xs text-emerald-600 font-semibold flex items-center gap-1 hover:underline"
+              onClick={() => dealsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            >
               See all deals <ArrowRight className="h-3 w-3" />
             </button>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {[
-              { emoji:"🏨", title:"Lagos Luxury Stay", sub:"Eko Hotels & Suites", off:"25%", badge:"Hotel Deal", color:"from-blue-500 to-indigo-600", country:"Nigeria" },
-              { emoji:"🍽️", title:"Dinner for Two", sub:"Nkoyo Restaurant, Abuja", off:"30%", badge:"Dining Deal", color:"from-amber-500 to-orange-600", country:"Nigeria" },
-              { emoji:"✈️", title:"Cairo City Tour", sub:"Guided Pyramid Experience", off:"20%", badge:"Tour Deal", color:"from-yellow-500 to-amber-600", country:"Egypt" },
-              { emoji:"🏖️", title:"Cape Town Getaway", sub:"V&A Waterfront Hotel", off:"35%", badge:"Stay & Explore", color:"from-sky-500 to-blue-600", country:"S. Africa" },
-              { emoji:"🌿", title:"Nairobi Safari", sub:"Maasai Mara Day Trip", off:"15%", badge:"Adventure Deal", color:"from-emerald-500 to-teal-600", country:"Kenya" },
-              { emoji:"☕", title:"Marrakech Medina Tour", sub:"Old City Walking Guide", off:"40%", badge:"Experience", color:"from-rose-500 to-pink-600", country:"Morocco" },
+              { emoji:"🏨", title:"Lagos Luxury Stay", sub:"Eko Hotels & Suites", off:"25%", badge:"Hotel Deal", color:"from-blue-500 to-indigo-600", country:"Nigeria", type:"hotel" },
+              { emoji:"🍽️", title:"Dinner for Two", sub:"Nkoyo Restaurant, Abuja", off:"30%", badge:"Dining Deal", color:"from-amber-500 to-orange-600", country:"Nigeria", type:"restaurant" },
+              { emoji:"✈️", title:"Cairo City Tour", sub:"Guided Pyramid Experience", off:"20%", badge:"Tour Deal", color:"from-yellow-500 to-amber-600", country:"Egypt", type:"tour" },
+              { emoji:"🏖️", title:"Cape Town Getaway", sub:"V&A Waterfront Hotel", off:"35%", badge:"Stay & Explore", color:"from-sky-500 to-blue-600", country:"S. Africa", type:"hotel" },
+              { emoji:"🌿", title:"Nairobi Safari", sub:"Maasai Mara Day Trip", off:"15%", badge:"Adventure Deal", color:"from-emerald-500 to-teal-600", country:"Kenya", type:"adventure" },
+              { emoji:"☕", title:"Marrakech Medina Tour", sub:"Old City Walking Guide", off:"40%", badge:"Experience", color:"from-rose-500 to-pink-600", country:"Morocco", type:"tour" },
             ].map((deal, i) => (
               <div
                 key={i}
                 className="flex-shrink-0 w-56 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group"
-                onClick={() => {}}
+                onClick={() => setBookingDeal({ title: deal.title, emoji: deal.emoji, badge: deal.badge, off: deal.off, country: deal.country, type: deal.type })}
               >
                 <div className={`h-28 bg-gradient-to-br ${deal.color} flex flex-col items-center justify-center relative`}>
                   <span className="text-4xl group-hover:scale-110 transition-transform duration-300">{deal.emoji}</span>
@@ -576,13 +1007,20 @@ export default function DiscoverAfrica() {
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{deal.sub}</p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-emerald-600 font-semibold">{deal.country}</span>
-                    <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3">Book</Button>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3"
+                      onClick={e => { e.stopPropagation(); setBookingDeal({ title: deal.title, emoji: deal.emoji, badge: deal.badge, off: deal.off, country: deal.country, type: deal.type }); }}
+                    >Book</Button>
                   </div>
                 </div>
               </div>
             ))}
             {/* CTA to list your own deal */}
-            <div className="flex-shrink-0 w-44 rounded-2xl overflow-hidden border-2 border-dashed border-emerald-300 bg-emerald-50 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-100 transition-all group">
+            <div
+              className="flex-shrink-0 w-44 rounded-2xl overflow-hidden border-2 border-dashed border-emerald-300 bg-emerald-50 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-100 transition-all group"
+              onClick={() => setInquiryType("deal_listing")}
+            >
               <Tag className="h-8 w-8 text-emerald-500 mb-2 group-hover:scale-110 transition-transform" />
               <p className="text-sm font-bold text-emerald-700 text-center">List a Deal</p>
               <p className="text-xs text-emerald-600 text-center mt-1">Reach 50K+ travellers</p>
@@ -666,7 +1104,11 @@ export default function DiscoverAfrica() {
                                 </div>
                               ))}
                             </div>
-                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 rounded-xl w-full text-xs">
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 rounded-xl w-full text-xs"
+                              onClick={() => setInquiryType("business_claim")}
+                            >
                               Claim Free Listing
                             </Button>
                             <p className="text-xs text-gray-400 mt-2">Free tier available · Premium from ₦5,000/mo</p>
@@ -738,7 +1180,10 @@ export default function DiscoverAfrica() {
 
           {/* "Feature your destination" upsell note */}
           <p className="text-xs text-gray-400 text-right mb-4">
-            <span className="font-semibold text-emerald-600 cursor-pointer hover:underline">Feature your country or city here</span> — reach 50,000+ monthly travellers.
+            <span
+              className="font-semibold text-emerald-600 cursor-pointer hover:underline"
+              onClick={() => setInquiryType("destination_feature")}
+            >Feature your country or city here</span> — reach 50,000+ monthly travellers.
           </p>
 
           {/* Region tabs */}
@@ -851,10 +1296,17 @@ export default function DiscoverAfrica() {
                 ))}
               </div>
               <div className="flex gap-3">
-                <Button className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold rounded-xl px-6 shadow-lg">
+                <Button
+                  className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold rounded-xl px-6 shadow-lg"
+                  onClick={() => setInquiryType("guide_registration")}
+                >
                   <Users className="h-4 w-4 mr-2" /> Register as a Guide
                 </Button>
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/15 rounded-xl">
+                <Button
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/15 rounded-xl"
+                  onClick={() => setShowGuideLearnMore(true)}
+                >
                   Learn more
                 </Button>
               </div>
@@ -895,7 +1347,10 @@ export default function DiscoverAfrica() {
                 ))}
               </div>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <Button className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl px-8 py-5 text-base shadow-xl">
+                <Button
+                  className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl px-8 py-5 text-base shadow-xl"
+                  onClick={() => setShowPremium(true)}
+                >
                   <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium — ₦2,500/mo
                 </Button>
                 <div className="text-white/60 text-xs">
@@ -912,6 +1367,27 @@ export default function DiscoverAfrica() {
         place={selectedPlace}
         open={!!selectedPlace}
         onClose={() => setSelectedPlace(null)}
+      />
+
+      {/* ── Monetization dialogs ───────────────────────────────────────────── */}
+      <BookingDialog
+        deal={bookingDeal}
+        open={!!bookingDeal}
+        onClose={() => setBookingDeal(null)}
+      />
+      <InquiryDialog
+        configKey={inquiryType}
+        open={!!inquiryType}
+        onClose={() => setInquiryType(null)}
+      />
+      <PremiumDialog
+        open={showPremium}
+        onClose={() => setShowPremium(false)}
+      />
+      <GuideLearnMoreDialog
+        open={showGuideLearnMore}
+        onClose={() => setShowGuideLearnMore(false)}
+        onRegister={() => setInquiryType("guide_registration")}
       />
     </div>
   );

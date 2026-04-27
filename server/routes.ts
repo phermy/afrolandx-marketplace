@@ -3605,6 +3605,122 @@ Return ONLY valid JSON:
     }
   })();
 
+  // ══ Discover Page Monetization Routes ════════════════════════════════════
+
+  // Save any inquiry (guide registration, business claim, deal listing, destination feature)
+  app.post('/api/discover/inquiries', async (req, res) => {
+    try {
+      const { discoverInquiries } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { type, name, email, phone, details } = req.body;
+      if (!type || !name || !email) {
+        return res.status(400).json({ message: 'type, name and email are required' });
+      }
+      const [inquiry] = await db.insert(discoverInquiries).values({ type, name, email, phone, details, status: 'pending' }).returning();
+      res.json({ success: true, inquiry });
+    } catch (err) {
+      console.error('[discover/inquiries]', err);
+      res.status(500).json({ message: 'Failed to save inquiry' });
+    }
+  });
+
+  // Initialize a deal booking + Paystack payment
+  app.post('/api/discover/bookings/initialize', async (req: any, res) => {
+    try {
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
+      const { discoverBookings } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { dealTitle, dealType, guestName, guestEmail, guestCount, bookingDate, totalAmountNgn } = req.body;
+      if (!dealTitle || !guestEmail || !guestName || !bookingDate || !totalAmountNgn) {
+        return res.status(400).json({ message: 'Missing required booking fields' });
+      }
+      const reference = `discover_booking_${Date.now()}_${require('crypto').randomBytes(4).toString('hex')}`;
+      const [booking] = await db.insert(discoverBookings).values({
+        userId: req.user?.id || null,
+        dealTitle, dealType, guestName, guestEmail,
+        guestCount: parseInt(guestCount) || 1,
+        bookingDate, totalAmountNgn: parseInt(totalAmountNgn),
+        paymentReference: reference, paymentStatus: 'pending',
+      }).returning();
+      const paystack = getPaystackService();
+      const callbackUrl = `${req.protocol}://${req.get('host')}/discover?booking_ref=${reference}`;
+      const txn = await paystack.initializeTransaction({
+        email: guestEmail,
+        amount: parseInt(totalAmountNgn) * 100,
+        currency: 'NGN',
+        reference,
+        callback_url: callbackUrl,
+        metadata: { bookingId: booking.id, dealTitle, guestName },
+      });
+      res.json({ success: true, bookingId: booking.id, authorizationUrl: txn.authorization_url, reference });
+    } catch (err) {
+      console.error('[discover/bookings/initialize]', err);
+      res.status(500).json({ message: 'Failed to initialize booking payment' });
+    }
+  });
+
+  // Initialize Premium subscription payment
+  app.post('/api/discover/premium/initialize', async (req: any, res) => {
+    try {
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
+      const { discoverPremium } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: 'Email required' });
+      const reference = `discover_premium_${Date.now()}_${require('crypto').randomBytes(4).toString('hex')}`;
+      const now = new Date();
+      const monthLater = new Date(now); monthLater.setMonth(monthLater.getMonth() + 1);
+      const [sub] = await db.insert(discoverPremium).values({
+        userId: req.user?.id || null,
+        guestEmail: email,
+        paymentReference: reference,
+        paymentStatus: 'pending',
+        subscriptionStart: now,
+        subscriptionEnd: monthLater,
+      }).returning();
+      const paystack = getPaystackService();
+      const callbackUrl = `${req.protocol}://${req.get('host')}/discover?premium_ref=${reference}`;
+      const txn = await paystack.initializeTransaction({
+        email,
+        amount: 250000, // ₦2,500 in kobo
+        currency: 'NGN',
+        reference,
+        callback_url: callbackUrl,
+        metadata: { subscriptionId: sub.id, plan: 'Explorer Premium Monthly' },
+      });
+      res.json({ success: true, subscriptionId: sub.id, authorizationUrl: txn.authorization_url, reference });
+    } catch (err) {
+      console.error('[discover/premium/initialize]', err);
+      res.status(500).json({ message: 'Failed to initialize premium payment' });
+    }
+  });
+
+  // Verify discover payment (booking or premium)
+  app.post('/api/discover/payment/verify', async (req, res) => {
+    try {
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
+      const { reference } = req.body;
+      if (!reference) return res.status(400).json({ message: 'reference required' });
+      const paystack = getPaystackService();
+      const verification = await paystack.verifyTransaction(reference);
+      if (verification.status !== 'success') {
+        return res.status(400).json({ message: 'Payment not successful', status: verification.status });
+      }
+      const { discoverBookings, discoverPremium } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { eq } = await import('drizzle-orm');
+      if (reference.includes('booking')) {
+        await db.update(discoverBookings).set({ paymentStatus: 'paid' }).where(eq(discoverBookings.paymentReference, reference));
+      } else if (reference.includes('premium')) {
+        await db.update(discoverPremium).set({ paymentStatus: 'active' }).where(eq(discoverPremium.paymentReference, reference));
+      }
+      res.json({ success: true, status: 'paid' });
+    } catch (err) {
+      console.error('[discover/payment/verify]', err);
+      res.status(500).json({ message: 'Verification failed' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
