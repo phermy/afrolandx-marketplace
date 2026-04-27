@@ -2108,9 +2108,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const response = await chatbot.generateResponse(messages);
       
       res.json({ response });
-    } catch (error) {
-      console.error('Error in chatbot endpoint:', error);
-      res.status(500).json({ message: 'Failed to generate response' });
+    } catch (error: any) {
+      console.error('Error in chatbot endpoint:', error?.message ?? error);
+      // Return a 200 with a user-friendly message so the frontend can display it cleanly
+      res.json({ response: "I'm having a brief technical issue. Please try your question again in a moment!" });
     }
   });
 

@@ -35,18 +35,45 @@ export class ChatbotService {
   async generateResponse(messages: ChatMessage[]): Promise<string> {
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini", // Using gpt-5-mini for faster responses
+        model: "gpt-5-mini",
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages
         ],
-        max_completion_tokens: 500,
-        // Note: temperature parameter is not supported for gpt-5 models (always defaults to 1)
+        max_completion_tokens: 1000,
       });
 
-      return completion.choices[0]?.message?.content || "I apologize, but I'm having trouble responding right now. Please try again.";
+      const choice = completion.choices[0];
+      if (!choice) {
+        console.error('Chatbot: no choices returned from API');
+        return "I'm here to help! Could you please rephrase your question?";
+      }
+
+      // Check for content (standard response)
+      const content = choice.message?.content;
+      if (content && content.trim().length > 0) {
+        return content;
+      }
+
+      // Check for refusal (newer models surface refusals here)
+      const refusal = (choice.message as any)?.refusal;
+      if (refusal && refusal.trim().length > 0) {
+        console.warn('Chatbot: model returned a refusal:', refusal);
+        return "I'm not able to help with that specific request, but I'm happy to assist with product recommendations, outfit advice, sizing guidance, or order questions for Afrolandx!";
+      }
+
+      // Log the full choice for debugging
+      console.error('Chatbot: empty content and no refusal. finish_reason:', choice.finish_reason, 'choice:', JSON.stringify(choice));
+      return "I'm here and ready to help! Could you try asking your question again?";
+
     } catch (error: any) {
-      console.error('Chatbot error:', error);
+      console.error('Chatbot API error:', error?.message ?? error);
+      if (error?.status === 429) {
+        return "I'm receiving a lot of questions right now — please try again in a moment!";
+      }
+      if (error?.status === 503 || error?.code === 'ECONNREFUSED') {
+        return "Our AI assistant is briefly unavailable. Please try again shortly.";
+      }
       throw new Error('Failed to generate response');
     }
   }
