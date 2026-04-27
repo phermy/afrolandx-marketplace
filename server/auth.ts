@@ -199,7 +199,9 @@ export async function setupAuth(app: Express) {
         lastName: user.lastName, 
         roles: user.roles,
         profileImageUrl: user.profileImageUrl,
-        emailVerified: user.emailVerified
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       });
     }
     return res.status(401).json({ message: "Not authenticated" });
