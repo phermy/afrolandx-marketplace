@@ -233,7 +233,10 @@ export default function Home() {
               {!categories.some((c: any) => c.name.toLowerCase() === 'others') && (
                 <Button
                   variant="outline"
-                  onClick={() => handleCategorySelect(null)}
+                  onClick={() => {
+                    const otherscat = categories.find((c: any) => c.name.toLowerCase() === 'others');
+                    handleCategorySelect(otherscat ? otherscat.id : null);
+                  }}
                 >
                   Others
                 </Button>

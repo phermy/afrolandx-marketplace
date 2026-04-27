@@ -24,6 +24,7 @@ export default function VendorDashboard() {
   const queryClient = useQueryClient();
   const [isRegistering, setIsRegistering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [customCategoryName, setCustomCategoryName] = useState<string>('');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -231,12 +232,22 @@ export default function VendorDashboard() {
   const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
-    // Manually add the selected category since Select component doesn't auto-populate FormData
-    if (selectedCategory) {
-      formData.set('categoryId', selectedCategory);
+
+    // Resolve category: if "others" string somehow slipped through, find the real DB id
+    let catId = selectedCategory;
+    if (catId === 'others') {
+      const othersCat = categories.find((c: any) => c.name.toLowerCase() === 'others');
+      catId = othersCat ? String(othersCat.id) : '';
     }
-    
+    if (catId) formData.set('categoryId', catId);
+
+    // If the selected category is "Others" and a custom name was given, prepend it to the description
+    const isOthersCategory = categories.find((c: any) => c.id === parseInt(catId))?.name?.toLowerCase() === 'others';
+    if (isOthersCategory && customCategoryName.trim()) {
+      const existingDesc = (formData.get('description') as string) || '';
+      formData.set('description', `[Product type: ${customCategoryName.trim()}]\n\n${existingDesc}`);
+    }
+
     addProductMutation.mutate(formData);
   };
 
@@ -855,6 +866,29 @@ export default function VendorDashboard() {
                           )}
                         </SelectContent>
                       </Select>
+
+                      {/* Custom product type input when "Others" is selected */}
+                      {(() => {
+                        const selectedCat = categories.find((c: any) => c.id === parseInt(selectedCategory) || selectedCategory === 'others' && c.name.toLowerCase() === 'others');
+                        return selectedCat?.name?.toLowerCase() === 'others';
+                      })() && (
+                        <div className="mt-2">
+                          <Label htmlFor="customCategoryName" className="text-xs text-gray-600">
+                            Describe your product type <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="customCategoryName"
+                            placeholder="e.g., Hand-woven Raffia Bag, Beaded Crown, Coral Necklace…"
+                            value={customCategoryName}
+                            onChange={(e) => setCustomCategoryName(e.target.value)}
+                            className="input-nigerian mt-1"
+                            required
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            This helps buyers find your product in the "Others" category.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

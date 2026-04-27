@@ -209,14 +209,23 @@ export default function Products() {
                   </label>
                   <Select
                     value={selectedCategory?.toString() || 'all'}
-                    onValueChange={(value) => setSelectedCategory(value === 'all' ? null : parseInt(value))}
+                    onValueChange={(value) => {
+                      if (value === 'all') { setSelectedCategory(null); return; }
+                      if (value === 'others') {
+                        // Resolve to the actual "Others" category ID if it's in the DB
+                        const otherscat = categories.find((c: any) => c.name.toLowerCase() === 'others');
+                        setSelectedCategory(otherscat ? otherscat.id : null);
+                      } else {
+                        setSelectedCategory(parseInt(value));
+                      }
+                    }}
                   >
                     <SelectTrigger className="input-nigerian">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map((category) => (
+                      {categories.map((category: any) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>

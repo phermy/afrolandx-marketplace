@@ -76,6 +76,22 @@ app.use((req, res, next) => {
     }
   }
 
+  // Ensure "Others" category always exists so the frontend filter works
+  try {
+    const existingCategories = await storage.getCategories();
+    const hasOthers = existingCategories.some((c: any) => c.slug === 'others');
+    if (!hasOthers) {
+      await storage.createCategory({
+        name: 'Others',
+        slug: 'others',
+        description: 'Other African fashion products not listed in standard categories',
+      });
+      log('Created "Others" category');
+    }
+  } catch (e) {
+    log('Could not seed Others category: ' + e);
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
