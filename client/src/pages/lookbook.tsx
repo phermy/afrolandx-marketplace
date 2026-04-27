@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Loader2, Sparkles, CheckCircle, ShoppingBag, Palette, Trash2, RefreshCw, Star
+  Loader2, Sparkles, CheckCircle, ShoppingBag, Palette, RefreshCw, Star, MapPin
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,74 @@ const EVENT_TYPES = [
   { value: "casual", label: "Casual Outing" },
   { value: "burial", label: "Burial / Memorial" },
   { value: "chieftaincy", label: "Chieftaincy Title" },
+  { value: "graduation", label: "Graduation Ceremony" },
+  { value: "engagement", label: "Engagement / Courtship" },
+  { value: "corporate", label: "Corporate / Business Event" },
+  { value: "religious", label: "Religious / Church Event" },
+  { value: "others", label: "Others / Custom Event" },
 ];
+
+const EVENT_SIZES = [
+  { value: "1", label: "Solo — Just me (1)" },
+  { value: "2", label: "Couple (2)" },
+  { value: "4", label: "Small family (3–4)" },
+  { value: "6", label: "Family (5–6)" },
+  { value: "10", label: "Extended family (7–10)" },
+  { value: "15", label: "Wedding party / Bridal train (10–20)" },
+  { value: "25", label: "Small group / Aso-ebi (20–30)" },
+  { value: "50", label: "Large group (30–60)" },
+  { value: "100", label: "Corporate / Community event (60+)" },
+  { value: "others", label: "Others — custom size" },
+];
+
+// Country → currency mapping
+const LOCATION_CURRENCIES: Record<string, { code: string; symbol: string; name: string }> = {
+  NG: { code: "NGN", symbol: "₦", name: "Nigeria" },
+  GH: { code: "GHS", symbol: "₵", name: "Ghana" },
+  ZA: { code: "ZAR", symbol: "R", name: "South Africa" },
+  KE: { code: "KES", symbol: "KSh", name: "Kenya" },
+  ET: { code: "ETB", symbol: "Br", name: "Ethiopia" },
+  EG: { code: "EGP", symbol: "E£", name: "Egypt" },
+  MA: { code: "MAD", symbol: "MAD", name: "Morocco" },
+  TZ: { code: "TZS", symbol: "TSh", name: "Tanzania" },
+  UG: { code: "UGX", symbol: "UGX", name: "Uganda" },
+  SN: { code: "XOF", symbol: "CFA", name: "Senegal" },
+  CI: { code: "XOF", symbol: "CFA", name: "Côte d'Ivoire" },
+  CM: { code: "XAF", symbol: "CFA", name: "Cameroon" },
+  RW: { code: "RWF", symbol: "RF", name: "Rwanda" },
+  MW: { code: "MWK", symbol: "MK", name: "Malawi" },
+  ZM: { code: "ZMW", symbol: "ZK", name: "Zambia" },
+  ZW: { code: "USD", symbol: "$", name: "Zimbabwe" },
+  TG: { code: "XOF", symbol: "CFA", name: "Togo" },
+  BJ: { code: "XOF", symbol: "CFA", name: "Benin" },
+  BF: { code: "XOF", symbol: "CFA", name: "Burkina Faso" },
+  ML: { code: "XOF", symbol: "CFA", name: "Mali" },
+  NE: { code: "XOF", symbol: "CFA", name: "Niger" },
+  TD: { code: "XAF", symbol: "CFA", name: "Chad" },
+  SD: { code: "SDG", symbol: "SDG", name: "Sudan" },
+  SO: { code: "SOS", symbol: "Sh", name: "Somalia" },
+  LY: { code: "LYD", symbol: "LD", name: "Libya" },
+  TN: { code: "TND", symbol: "DT", name: "Tunisia" },
+  DZ: { code: "DZD", symbol: "DA", name: "Algeria" },
+  AO: { code: "AOA", symbol: "Kz", name: "Angola" },
+  MZ: { code: "MZN", symbol: "MT", name: "Mozambique" },
+  BW: { code: "BWP", symbol: "P", name: "Botswana" },
+  NA: { code: "NAD", symbol: "N$", name: "Namibia" },
+  LS: { code: "LSL", symbol: "L", name: "Lesotho" },
+  SZ: { code: "SZL", symbol: "E", name: "Eswatini" },
+  GB: { code: "GBP", symbol: "£", name: "United Kingdom" },
+  US: { code: "USD", symbol: "$", name: "United States" },
+  EU: { code: "EUR", symbol: "€", name: "Europe (EU)" },
+  CA: { code: "CAD", symbol: "CA$", name: "Canada" },
+  AU: { code: "AUD", symbol: "A$", name: "Australia" },
+  AE: { code: "AED", symbol: "AED", name: "UAE" },
+  SA: { code: "SAR", symbol: "SR", name: "Saudi Arabia" },
+  CN: { code: "CNY", symbol: "¥", name: "China" },
+  JP: { code: "JPY", symbol: "¥", name: "Japan" },
+  IN: { code: "INR", symbol: "₹", name: "India" },
+  BR: { code: "BRL", symbol: "R$", name: "Brazil" },
+  OTHER: { code: "USD", symbol: "$", name: "Other / International" },
+};
 
 const STYLE_EXAMPLES = [
   "Royal blue Agbada with gold embroidery for a Yoruba wedding",
@@ -59,9 +126,14 @@ export default function LookbookPage() {
   const { addToCart, openCart } = useCart();
 
   const [eventType, setEventType] = useState("");
+  const [eventSize, setEventSize] = useState("");
+  const [customSize, setCustomSize] = useState("");
+  const [eventLocation, setEventLocation] = useState("NG");
   const [budget, setBudget] = useState("");
   const [stylePrompt, setStylePrompt] = useState("");
   const [placeholder] = useState(STYLE_EXAMPLES[Math.floor(Math.random() * STYLE_EXAMPLES.length)]);
+
+  const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
 
   const { data: lookbooks = [], isLoading: loadingLookbooks } = useQuery<Lookbook[]>({
     queryKey: ["/api/lookbooks"],
@@ -103,8 +175,20 @@ export default function LookbookPage() {
       });
       return;
     }
-    generateMutation.mutate({ eventType, budget: budget ? parseFloat(budget) : undefined, styleNotes: stylePrompt });
+    const sizeParam = eventSize === "others" ? customSize : eventSize;
+    generateMutation.mutate({
+      eventType,
+      budget: budget ? parseFloat(budget) : undefined,
+      styleNotes: stylePrompt,
+      familySize: sizeParam || undefined,
+      currency: currency.code,
+    });
   };
+
+  const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({
+    key,
+    label: `${val.name} (${val.symbol})`,
+  }));
 
   if (!user) {
     return (
@@ -147,10 +231,13 @@ export default function LookbookPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Free-text prompt — primary input */}
+            {/* Free-text prompt */}
             <div className="space-y-2">
               <Label htmlFor="stylePrompt" className="text-base font-semibold">
-                Describe your style <span className="text-muted-foreground font-normal text-sm">(e.g. "Red and gold Ankara dress for my friend's wedding in Lagos")</span>
+                Describe your style{" "}
+                <span className="text-muted-foreground font-normal text-sm">
+                  (e.g. "Red and gold Ankara dress for my friend's wedding in Lagos")
+                </span>
               </Label>
               <Textarea
                 id="stylePrompt"
@@ -162,8 +249,9 @@ export default function LookbookPage() {
               />
             </div>
 
-            {/* Optional structured fields */}
+            {/* Structured fields — row 1 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Event Type */}
               <div className="space-y-2">
                 <Label>Event Type <span className="text-muted-foreground text-xs">(optional)</span></Label>
                 <Select value={eventType} onValueChange={setEventType}>
@@ -177,15 +265,68 @@ export default function LookbookPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Event Size */}
               <div className="space-y-2">
-                <Label htmlFor="budget">Budget ($) <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input
-                  id="budget"
-                  type="number"
-                  placeholder="e.g. 300"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                />
+                <Label>Event Size <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Select value={eventSize} onValueChange={setEventSize}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="How many outfits needed?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_SIZES.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {eventSize === "others" && (
+                  <Input
+                    type="number"
+                    placeholder="Enter exact number of outfits"
+                    value={customSize}
+                    onChange={(e) => setCustomSize(e.target.value)}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+
+              {/* Event Location → currency */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                  Event Location <span className="text-muted-foreground text-xs ml-1">(sets budget currency)</span>
+                </Label>
+                <Select value={eventLocation} onValueChange={setEventLocation}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Where is the event?" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {locationOptions.map(({ key, label }) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Budget with dynamic currency */}
+              <div className="space-y-2">
+                <Label htmlFor="budget">
+                  Budget per person ({currency.code}){" "}
+                  <span className="text-muted-foreground text-xs">(optional)</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm select-none">
+                    {currency.symbol}
+                  </span>
+                  <Input
+                    id="budget"
+                    type="number"
+                    placeholder="e.g. 50000"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
@@ -275,7 +416,9 @@ export default function LookbookPage() {
                               )}
                             </div>
                             <p className="text-sm font-medium leading-tight line-clamp-1">{item.name}</p>
-                            <p className="text-sm font-bold text-nigerian-green">${parseFloat(item.price || "0").toLocaleString()}</p>
+                            <p className="text-sm font-bold text-nigerian-green">
+                              {currency.symbol}{parseFloat(item.price || "0").toLocaleString()}
+                            </p>
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{item.reason}</p>
                             <Button
                               variant="outline"
@@ -298,13 +441,24 @@ export default function LookbookPage() {
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div>
                           <span className="text-sm text-muted-foreground">Total estimate: </span>
-                          <span className="text-xl font-bold">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xl font-bold">
+                            {currency.symbol}{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => generateMutation.mutate({ eventType, budget: budget ? parseFloat(budget) : undefined, styleNotes: stylePrompt })}
+                            onClick={() => {
+                              const sizeParam = eventSize === "others" ? customSize : eventSize;
+                              generateMutation.mutate({
+                                eventType,
+                                budget: budget ? parseFloat(budget) : undefined,
+                                styleNotes: stylePrompt,
+                                familySize: sizeParam || undefined,
+                                currency: currency.code,
+                              });
+                            }}
                             disabled={generateMutation.isPending}
                           >
                             <RefreshCw className="h-3 w-3 mr-1" />Regenerate
