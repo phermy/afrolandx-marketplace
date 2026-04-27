@@ -186,13 +186,17 @@ export default function Profile() {
                   <div>
                     <Label className="text-sm font-medium text-gray-700">Member Since</Label>
                     <p className="text-sm text-gray-600">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                      {user.createdAt
+                        ? new Date(user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'N/A'}
                     </p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-700">Last Updated</Label>
                     <p className="text-sm text-gray-600">
-                      {user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : 'N/A'}
+                      {user.updatedAt
+                        ? new Date(user.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'N/A'}
                     </p>
                   </div>
                 </div>

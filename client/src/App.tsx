@@ -31,6 +31,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
+import SessionTimeout from "@/components/session-timeout";
 import { useEffect } from "react";
 
 function AuthRedirect({ to }: { to: string }) {
@@ -113,6 +114,7 @@ function App() {
           <Router />
           <ShoppingCart />
           <Chatbot />
+          <SessionTimeout />
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>

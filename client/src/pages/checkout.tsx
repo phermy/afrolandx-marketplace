@@ -336,15 +336,48 @@ export default function Checkout() {
                       <SelectTrigger className="input-nigerian">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Nigeria">Nigeria</SelectItem>
-                        <SelectItem value="United States">United States</SelectItem>
-                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                        <SelectItem value="Canada">Canada</SelectItem>
-                        <SelectItem value="Germany">Germany</SelectItem>
-                        <SelectItem value="France">France</SelectItem>
-                        <SelectItem value="Ghana">Ghana</SelectItem>
-                        <SelectItem value="South Africa">South Africa</SelectItem>
+                      <SelectContent className="max-h-72">
+                        <SelectItem value="Nigeria">🇳🇬 Nigeria</SelectItem>
+                        <SelectItem value="Ghana">🇬🇭 Ghana</SelectItem>
+                        <SelectItem value="Kenya">🇰🇪 Kenya</SelectItem>
+                        <SelectItem value="South Africa">🇿🇦 South Africa</SelectItem>
+                        <SelectItem value="Egypt">🇪🇬 Egypt</SelectItem>
+                        <SelectItem value="Senegal">🇸🇳 Senegal</SelectItem>
+                        <SelectItem value="Ivory Coast">🇨🇮 Ivory Coast</SelectItem>
+                        <SelectItem value="Tanzania">🇹🇿 Tanzania</SelectItem>
+                        <SelectItem value="Ethiopia">🇪🇹 Ethiopia</SelectItem>
+                        <SelectItem value="Uganda">🇺🇬 Uganda</SelectItem>
+                        <SelectItem value="Rwanda">🇷🇼 Rwanda</SelectItem>
+                        <SelectItem value="Cameroon">🇨🇲 Cameroon</SelectItem>
+                        <SelectItem value="United States">🇺🇸 United States</SelectItem>
+                        <SelectItem value="United Kingdom">🇬🇧 United Kingdom</SelectItem>
+                        <SelectItem value="Canada">🇨🇦 Canada</SelectItem>
+                        <SelectItem value="Australia">🇦🇺 Australia</SelectItem>
+                        <SelectItem value="New Zealand">🇳🇿 New Zealand</SelectItem>
+                        <SelectItem value="Germany">🇩🇪 Germany</SelectItem>
+                        <SelectItem value="France">🇫🇷 France</SelectItem>
+                        <SelectItem value="Netherlands">🇳🇱 Netherlands</SelectItem>
+                        <SelectItem value="Sweden">🇸🇪 Sweden</SelectItem>
+                        <SelectItem value="Norway">🇳🇴 Norway</SelectItem>
+                        <SelectItem value="Denmark">🇩🇰 Denmark</SelectItem>
+                        <SelectItem value="Ireland">🇮🇪 Ireland</SelectItem>
+                        <SelectItem value="Spain">🇪🇸 Spain</SelectItem>
+                        <SelectItem value="Italy">🇮🇹 Italy</SelectItem>
+                        <SelectItem value="Portugal">🇵🇹 Portugal</SelectItem>
+                        <SelectItem value="Belgium">🇧🇪 Belgium</SelectItem>
+                        <SelectItem value="Switzerland">🇨🇭 Switzerland</SelectItem>
+                        <SelectItem value="Austria">🇦🇹 Austria</SelectItem>
+                        <SelectItem value="United Arab Emirates">🇦🇪 United Arab Emirates</SelectItem>
+                        <SelectItem value="Saudi Arabia">🇸🇦 Saudi Arabia</SelectItem>
+                        <SelectItem value="Qatar">🇶🇦 Qatar</SelectItem>
+                        <SelectItem value="Brazil">🇧🇷 Brazil</SelectItem>
+                        <SelectItem value="Jamaica">🇯🇲 Jamaica</SelectItem>
+                        <SelectItem value="Trinidad and Tobago">🇹🇹 Trinidad and Tobago</SelectItem>
+                        <SelectItem value="Barbados">🇧🇧 Barbados</SelectItem>
+                        <SelectItem value="India">🇮🇳 India</SelectItem>
+                        <SelectItem value="China">🇨🇳 China</SelectItem>
+                        <SelectItem value="Japan">🇯🇵 Japan</SelectItem>
+                        <SelectItem value="Singapore">🇸🇬 Singapore</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -7,20 +7,29 @@ import { useToast } from '@/hooks/use-toast';
 import { isAdmin, hasRole, getUserRoleDisplay, toggleUserRole } from '@/lib/roleUtils';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X } from 'lucide-react';
+import { X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package, Mail, Calendar, User as UserIcon } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // State for vendor review modal
+  const [reviewVendor, setReviewVendor] = useState<any | null>(null);
+  // State for expanded product detail
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
@@ -483,55 +492,145 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {pendingProducts.map((product) => (
-                      <div key={product.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4">
-                            <div className="w-20 h-20 flex-shrink-0">
-                              {product.images && product.images.length > 0 ? (
-                                <img
-                                  src={product.images[0]}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover rounded"
-                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                                  <span className="text-white text-xs">No Image</span>
+                      <div key={product.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Summary row */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <div className="w-20 h-20 flex-shrink-0">
+                                {product.images && product.images.length > 0 ? (
+                                  <img
+                                    src={product.images[0]}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover rounded"
+                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=100&h=100&q=75'; }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
+                                    <span className="text-white text-xs">No Image</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                                <p className="text-gray-600 text-sm mb-2 line-clamp-2">{product.description}</p>
+                                <div className="flex flex-wrap items-center gap-3 text-sm">
+                                  <span className="text-nigerian-green font-semibold">{formatPrice(product.price)}</span>
+                                  <span className="text-gray-500 flex items-center gap-1"><Package className="w-3 h-3" />Qty: {product.quantity}</span>
+                                  <span className="text-gray-500">by <strong>{product.vendor.businessName}</strong></span>
+                                  <Badge variant="outline" className="text-xs">{product.category.name}</Badge>
                                 </div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
-                              <p className="text-gray-600 text-sm mb-2">{product.description}</p>
-                              <div className="flex items-center space-x-4 text-sm">
-                                <span className="text-nigerian-green font-semibold">
-                                  {formatPrice(product.price)}
-                                </span>
-                                <span className="text-gray-500">Qty: {product.quantity}</span>
-                                <span className="text-gray-500">by {product.vendor.businessName}</span>
-                                <span className="text-gray-500">in {product.category.name}</span>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-2 ml-4">
-                            <Button
-                              size="sm"
-                              onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}
-                              disabled={updateProductStatusMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              ✓ Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' })}
-                              disabled={updateProductStatusMutation.isPending}
-                            >
-                              ✗ Reject
-                            </Button>
+                            <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                {expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}
+                                disabled={updateProductStatusMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' })}
+                                disabled={updateProductStatusMutation.isPending}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" />Reject
+                              </Button>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Expanded detail panel */}
+                        {expandedProductId === product.id && (
+                          <div className="border-t border-gray-200 bg-gray-50 p-4 space-y-4">
+                            {/* Image gallery */}
+                            {product.images && product.images.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />Product Images ({product.images.length})
+                                </h4>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                  {product.images.map((img, i) => (
+                                    <img
+                                      key={i}
+                                      src={img}
+                                      alt={`${product.name} ${i + 1}`}
+                                      className="w-28 h-28 object-cover rounded-lg flex-shrink-0 border border-gray-200"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Full description */}
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-1">Full Description</h4>
+                              <p className="text-gray-600 text-sm leading-relaxed">{product.description}</p>
+                            </div>
+
+                            {/* Standards checklist */}
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" />Quality Standards Check
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {[
+                                  { label: 'Has product images', pass: product.images && product.images.length > 0 },
+                                  { label: 'Has description', pass: product.description && product.description.length > 20 },
+                                  { label: 'Price set', pass: parseFloat(product.price) > 0 },
+                                  { label: 'Stock > 0', pass: product.quantity > 0 },
+                                  { label: 'Category assigned', pass: !!product.category?.name },
+                                  { label: 'Vendor verified', pass: product.vendor?.status === 'approved' },
+                                ].map(({ label, pass }) => (
+                                  <div key={label} className={`flex items-center gap-2 p-2 rounded text-xs ${pass ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                    {pass ? <CheckCircle className="w-3 h-3 flex-shrink-0" /> : <XCircle className="w-3 h-3 flex-shrink-0" />}
+                                    <span>{label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Product metadata */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div><span className="text-gray-500 block text-xs">Price (USD)</span><span className="font-semibold">{formatPrice(product.price)}</span></div>
+                              <div><span className="text-gray-500 block text-xs">Stock</span><span className="font-semibold">{product.quantity} units</span></div>
+                              <div><span className="text-gray-500 block text-xs">Category</span><span className="font-semibold">{product.category.name}</span></div>
+                              <div><span className="text-gray-500 block text-xs">Vendor</span><span className="font-semibold">{product.vendor.businessName}</span></div>
+                            </div>
+
+                            {/* Action buttons in expanded view */}
+                            <div className="flex gap-2 pt-2 border-t border-gray-200">
+                              <Button
+                                size="sm"
+                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' }); setExpandedProductId(null); }}
+                                disabled={updateProductStatusMutation.isPending}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" />Approve Product
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => { updateProductStatusMutation.mutate({ productId: product.id, status: 'rejected' }); setExpandedProductId(null); }}
+                                disabled={updateProductStatusMutation.isPending}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" />Reject Product
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -776,27 +875,43 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {vendors.map((vendor) => (
+                    {vendors.map((vendor: any) => (
                       <div key={vendor.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-4">
                             <Avatar className="w-12 h-12">
+                              <AvatarImage src={vendor.user?.profileImageUrl} />
                               <AvatarFallback className="bg-nigerian-green text-white">
                                 {vendor.businessName[0].toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <h3 className="font-semibold text-gray-900 mb-1">{vendor.businessName}</h3>
-                              <p className="text-gray-600 text-sm mb-2">{vendor.description}</p>
+                              {vendor.user && (
+                                <p className="text-sm text-gray-500 mb-1 flex items-center gap-1">
+                                  <UserIcon className="w-3 h-3" />
+                                  {vendor.user.firstName} {vendor.user.lastName} — {vendor.user.email}
+                                  {vendor.user.emailVerified && <ShieldCheck className="w-3 h-3 text-green-500 ml-1" />}
+                                </p>
+                              )}
+                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{vendor.description || 'No description provided.'}</p>
                               <div className="flex items-center space-x-4 text-sm">
-                                <span className="text-gray-500">
-                                  Applied: {new Date(vendor.createdAt).toLocaleDateString()}
+                                <span className="text-gray-500 flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  Applied: {new Date(vendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </span>
                                 {getStatusBadge(vendor.status)}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2 ml-4">
+                          <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setReviewVendor(vendor)}
+                            >
+                              <Eye className="w-3 h-3 mr-1" />Review Profile
+                            </Button>
                             {vendor.status === 'pending' && (
                               <>
                                 <Button
@@ -805,7 +920,7 @@ export default function AdminDashboard() {
                                   disabled={updateVendorStatusMutation.isPending}
                                   className="bg-green-600 hover:bg-green-700 text-white"
                                 >
-                                  ✓ Approve
+                                  <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
                                 <Button
                                   size="sm"
@@ -813,7 +928,7 @@ export default function AdminDashboard() {
                                   onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}
                                   disabled={updateVendorStatusMutation.isPending}
                                 >
-                                  ✗ Reject
+                                  <XCircle className="w-3 h-3 mr-1" />Reject
                                 </Button>
                               </>
                             )}
@@ -1043,6 +1158,189 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Vendor Review Modal */}
+      <Dialog open={!!reviewVendor} onOpenChange={(open) => !open && setReviewVendor(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={reviewVendor?.user?.profileImageUrl} />
+                <AvatarFallback className="bg-nigerian-green text-white text-sm">
+                  {reviewVendor?.businessName?.[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              Vendor Profile Review
+            </DialogTitle>
+            <DialogDescription>
+              Review all details for <strong>{reviewVendor?.businessName}</strong> before making a decision.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 pr-4">
+            {reviewVendor && (
+              <div className="space-y-5">
+                {/* Status */}
+                <div className="flex items-center gap-3">
+                  {getStatusBadge(reviewVendor.status)}
+                  <span className="text-sm text-gray-500">Current status</span>
+                </div>
+
+                <Separator />
+
+                {/* Business details */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Package className="w-4 h-4" />Business Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-xs text-gray-500 block">Business Name</span>
+                      <span className="font-medium">{reviewVendor.businessName}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500 block">Applied Date</span>
+                      <span className="font-medium">
+                        {new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                  {reviewVendor.description && (
+                    <div className="mt-3">
+                      <span className="text-xs text-gray-500 block mb-1">Business Description</span>
+                      <p className="text-gray-700 text-sm leading-relaxed bg-gray-50 p-3 rounded-lg">{reviewVendor.description}</p>
+                    </div>
+                  )}
+                  {!reviewVendor.description && (
+                    <div className="mt-3 bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                      <p className="text-yellow-700 text-sm">No business description provided.</p>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Account owner details */}
+                {reviewVendor.user && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <UserIcon className="w-4 h-4" />Account Owner
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-xs text-gray-500 block">Full Name</span>
+                        <span className="font-medium">
+                          {reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500 block">Email Address</span>
+                        <span className="font-medium flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {reviewVendor.user.email || 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500 block">Email Verified</span>
+                        <span className={`font-medium flex items-center gap-1 ${reviewVendor.user.emailVerified ? 'text-green-600' : 'text-red-500'}`}>
+                          {reviewVendor.user.emailVerified
+                            ? <><ShieldCheck className="w-3 h-3" />Verified</>
+                            : <><XCircle className="w-3 h-3" />Not verified</>}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-500 block">Account Created</span>
+                        <span className="font-medium">
+                          {reviewVendor.user.createdAt
+                            ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                            : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Compliance checklist */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" />Compliance Checklist
+                  </h3>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Business name provided', pass: !!reviewVendor.businessName },
+                      { label: 'Business description provided', pass: !!reviewVendor.description && reviewVendor.description.length > 10 },
+                      { label: 'Account owner name on file', pass: !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
+                      { label: 'Valid email address', pass: !!reviewVendor.user?.email },
+                      { label: 'Email address verified', pass: !!reviewVendor.user?.emailVerified },
+                    ].map(({ label, pass }) => (
+                      <div key={label} className={`flex items-center gap-2 p-2 rounded text-sm ${pass ? 'text-green-700' : 'text-red-600'}`}>
+                        {pass ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <XCircle className="w-4 h-4 flex-shrink-0" />}
+                        <span>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setReviewVendor(null)}>
+              Close
+            </Button>
+            {reviewVendor?.status === 'pending' && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' });
+                    setReviewVendor(null);
+                  }}
+                  disabled={updateVendorStatusMutation.isPending}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />Reject Application
+                </Button>
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' });
+                    setReviewVendor(null);
+                  }}
+                  disabled={updateVendorStatusMutation.isPending}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
+                </Button>
+              </>
+            )}
+            {reviewVendor?.status === 'approved' && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' });
+                  setReviewVendor(null);
+                }}
+                disabled={updateVendorStatusMutation.isPending}
+              >
+                Suspend Vendor
+              </Button>
+            )}
+            {reviewVendor?.status === 'suspended' && (
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' });
+                  setReviewVendor(null);
+                }}
+                disabled={updateVendorStatusMutation.isPending}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

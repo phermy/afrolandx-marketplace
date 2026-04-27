@@ -418,9 +418,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/vendors', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const vendors = await storage.getAllVendors();
-      res.json(vendors);
+      // Enrich with user profile for admin review
+      const enriched = await Promise.all(vendors.map(async (v) => {
+        const user = await storage.getUser(v.userId);
+        return {
+          ...v,
+          user: user ? {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            emailVerified: user.emailVerified,
+            profileImageUrl: user.profileImageUrl,
+            createdAt: user.createdAt,
+          } : null,
+        };
+      }));
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch vendors' });
+    }
+  });
+
+  // Get single vendor with user details (admin)
+  app.get('/api/vendors/:id', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const vendorId = parseInt(req.params.id);
+      const allVendors = await storage.getAllVendors();
+      const vendor = allVendors.find(v => v.id === vendorId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      const user = await storage.getUser(vendor.userId);
+      const products = await storage.getProducts({ vendorId });
+      res.json({
+        ...vendor,
+        user: user ? {
+          id: user.id, firstName: user.firstName, lastName: user.lastName,
+          email: user.email, emailVerified: user.emailVerified,
+          profileImageUrl: user.profileImageUrl, createdAt: user.createdAt,
+        } : null,
+        productCount: products.length,
+        approvedProductCount: products.filter(p => p.status === 'approved').length,
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch vendor' });
     }
   });
 
