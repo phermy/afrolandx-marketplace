@@ -1,4 +1,4 @@
-bimport {
+import {
   pgTable,
   text,
   varchar,
