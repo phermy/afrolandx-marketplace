@@ -1519,27 +1519,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Notification routes
-  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = (req.user as any)?.id;
-      const notifications = await storage.getUserNotifications(userId);
-      res.json(notifications);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch notifications' });
-    }
-  });
-
-  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
-    try {
-      const notificationId = parseInt(req.params.id);
-      await storage.markNotificationAsRead(notificationId);
-      res.json({ message: 'Notification marked as read' });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to mark notification as read' });
-    }
-  });
-
   // Measurement routes
   // Customer: Submit measurements to a vendor
   app.post('/api/measurements', isAuthenticated, async (req: any, res) => {
