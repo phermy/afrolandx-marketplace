@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle } from "lucide-react";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -30,6 +31,9 @@ export default function VendorDashboard() {
   const [profileForm, setProfileForm] = useState({ businessName: '', description: '' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [addPreviewUrl, setAddPreviewUrl] = useState('');
+  const [addImageMode, setAddImageMode] = useState<'upload' | 'url'>('upload');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -232,23 +236,21 @@ export default function VendorDashboard() {
     },
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Product submitted for approval!",
+        title: "Product submitted!",
+        description: "It will appear in your list once an admin approves it.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
-      
-      // Reset form and category selection
       setSelectedCategory('');
-      // Use setTimeout to ensure form reset happens after state update
+      setCustomCategoryName('');
+      setAddPreviewUrl('');
+      setAddImageMode('upload');
+      setIsAddSheetOpen(false);
       setTimeout(() => {
         const productForm = document.querySelector('form[data-form="add-product"]') as HTMLFormElement;
         if (productForm) {
           productForm.reset();
-          // Also clear file inputs specifically
           const fileInputs = productForm.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
-          fileInputs.forEach(input => {
-            input.value = '';
-          });
+          fileInputs.forEach(input => { input.value = ''; });
         }
       }, 100);
     },
@@ -564,61 +566,90 @@ export default function VendorDashboard() {
 
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="products">My Products</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="measurements">Measurements</TabsTrigger>
-            <TabsTrigger value="add-product">Add Product</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products">
             <Card>
               <CardHeader>
-                <CardTitle>Your Products</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>My Products</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {products.length === 0 ? 'No products yet' : `${products.length} product${products.length !== 1 ? 's' : ''} — ${products.filter(p => p.status === 'approved').length} live in shop`}
+                    </p>
+                  </div>
+                  <Button className="btn-nigerian gap-2" onClick={() => setIsAddSheetOpen(true)}>
+                    <Plus className="w-4 h-4" />
+                    Add Product
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {products.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No products yet. Add your first product!</p>
+                  <div className="text-center py-16 space-y-4">
+                    <div className="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
+                      <Package className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-gray-700 font-semibold text-lg">You haven't added any products yet</p>
+                      <p className="text-gray-400 text-sm mt-1">Products are reviewed by admin before going live in the shop.</p>
+                    </div>
+                    <Button className="btn-nigerian gap-2 mt-2" onClick={() => setIsAddSheetOpen(true)}>
+                      <Plus className="w-4 h-4" />
+                      Add Your First Product
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {products.map((product) => {
                       const imgSrc = product.imageUrl || (Array.isArray((product as any).images) && (product as any).images[0]) || null;
+                      const statusColor = product.status === 'approved' ? 'text-green-700 bg-green-50 border-green-200' : product.status === 'pending' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-700 bg-red-50 border-red-200';
+                      const statusLabel = product.status === 'approved' ? 'Live' : product.status === 'pending' ? 'Under Review' : 'Rejected';
                       return (
-                        <div key={product.id} className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors">
+                        <div key={product.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:shadow-sm transition-all bg-white">
                           {/* Thumbnail */}
-                          <div className="w-16 h-16 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                          <div className="w-20 h-20 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden border border-gray-200">
                             {imgSrc ? (
                               <img src={imgSrc} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                              <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 gap-1">
                                 <ImageIcon className="w-6 h-6" />
+                                <span className="text-xs">No image</span>
                               </div>
                             )}
                           </div>
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
-                            <p className="text-gray-500 text-xs truncate">{product.description}</p>
-                            <div className="flex items-center gap-3 mt-1 flex-wrap">
-                              <span className="text-nigerian-green font-bold text-sm">₦{parseFloat(product.price).toLocaleString()}</span>
-                              <span className="text-gray-500 text-xs">Stock: {product.stock}</span>
-                              <Badge className={
-                                product.status === 'approved' ? 'badge-approved' :
-                                product.status === 'pending' ? 'badge-pending' :
-                                'badge-rejected'
-                              }>
-                                {product.status}
-                              </Badge>
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="font-semibold text-gray-900 leading-tight">{product.name}</h3>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${statusColor}`}>{statusLabel}</span>
                             </div>
+                            <p className="text-gray-400 text-xs mt-0.5 line-clamp-1">{product.description}</p>
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="text-nigerian-green font-bold">₦{parseFloat(product.price).toLocaleString()}</span>
+                              <span className="text-gray-500 text-sm">{product.stock} in stock</span>
+                            </div>
+                            {product.status === 'pending' && (
+                              <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Waiting for admin approval — usually within 24 hrs
+                              </p>
+                            )}
+                            {product.status === 'rejected' && (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" /> Rejected — edit and resubmit
+                              </p>
+                            )}
                           </div>
                           {/* Actions */}
-                          <div className="flex gap-1 shrink-0">
+                          <div className="flex flex-col gap-2 shrink-0">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-8 w-8 p-0 hover:bg-blue-100"
+                              className="gap-1 text-xs h-8"
                               title="Edit product"
                               onClick={() => {
                                 setEditingProduct(product);
@@ -631,12 +662,12 @@ export default function VendorDashboard() {
                                 });
                               }}
                             >
-                              <Pencil className="w-4 h-4 text-blue-500" />
+                              <Pencil className="w-3 h-3" /> Edit
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 hover:bg-red-100"
+                              className="gap-1 text-xs h-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                               title="Delete product"
                               onClick={() => {
                                 if (confirm(`Delete "${product.name}"? This cannot be undone.`)) {
@@ -645,7 +676,7 @@ export default function VendorDashboard() {
                               }}
                               disabled={deleteProductMutation.isPending}
                             >
-                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <Trash2 className="w-3 h-3" /> Delete
                             </Button>
                           </div>
                         </div>
@@ -900,153 +931,6 @@ export default function VendorDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="add-product">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add New Product</CardTitle>
-                <p className="text-gray-600">Add a new product for admin approval</p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleAddProduct} className="space-y-6" data-form="add-product">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="name">Product Name</Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        placeholder="e.g., Premium Ankara Dress"
-                        required
-                        className="input-nigerian"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="categoryId">Category</Label>
-                      <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
-                        <SelectTrigger className="input-nigerian">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                          {!categories.some((c) => c.name.toLowerCase() === 'others') && (
-                            <SelectItem value="others">Others</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-
-                      {/* Custom product type input when "Others" is selected */}
-                      {(() => {
-                        const selectedCat = categories.find((c: any) => c.id === parseInt(selectedCategory) || selectedCategory === 'others' && c.name.toLowerCase() === 'others');
-                        return selectedCat?.name?.toLowerCase() === 'others';
-                      })() && (
-                        <div className="mt-2">
-                          <Label htmlFor="customCategoryName" className="text-xs text-gray-600">
-                            Describe your product type <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            id="customCategoryName"
-                            placeholder="e.g., Hand-woven Raffia Bag, Beaded Crown, Coral Necklace…"
-                            value={customCategoryName}
-                            onChange={(e) => setCustomCategoryName(e.target.value)}
-                            className="input-nigerian mt-1"
-                            required
-                          />
-                          <p className="text-xs text-gray-400 mt-1">
-                            This helps buyers find your product in the "Others" category.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      placeholder="Describe your product..."
-                      rows={4}
-                      required
-                      className="input-nigerian"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="imageUrl">Product Image URL</Label>
-                    <Input
-                      id="imageUrl"
-                      name="imageUrl"
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      className="input-nigerian"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <Label htmlFor="price">Price (₦)</Label>
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        placeholder="45000"
-                        required
-                        className="input-nigerian"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="stock">Stock Quantity</Label>
-                      <Input
-                        id="stock"
-                        name="stock"
-                        type="number"
-                        placeholder="10"
-                        required
-                        className="input-nigerian"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="weight">Weight (kg)</Label>
-                      <Input
-                        id="weight"
-                        name="weight"
-                        type="number"
-                        step="0.1"
-                        placeholder="0.5"
-                        className="input-nigerian"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="images">Product Images</Label>
-                    <Input
-                      id="images"
-                      name="images"
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
-                      className="input-nigerian"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Upload up to 5 images (max 15MB each). Supported formats: JPG, PNG, WEBP, GIF, AVIF
-                    </p>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full btn-nigerian"
-                    disabled={addProductMutation.isPending}
-                  >
-                    {addProductMutation.isPending ? "Adding Product..." : "Add Product"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="profile">
             <Card>
@@ -1137,6 +1021,153 @@ export default function VendorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Product Sheet */}
+      <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle className="text-xl">Add New Product</SheetTitle>
+            <SheetDescription>
+              Fill in the details below. Your product will be reviewed by our team before going live — usually within 24 hours.
+            </SheetDescription>
+          </SheetHeader>
+
+          <form onSubmit={handleAddProduct} className="space-y-5" data-form="add-product">
+            {/* Product Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="font-medium">Product Name <span className="text-red-500">*</span></Label>
+              <Input id="name" name="name" placeholder="e.g., Premium Ankara Dress" required className="input-nigerian" />
+            </div>
+
+            {/* Category */}
+            <div className="space-y-1.5">
+              <Label htmlFor="categoryId" className="font-medium">Category <span className="text-red-500">*</span></Label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
+                <SelectTrigger className="input-nigerian">
+                  <SelectValue placeholder="What type of product is this?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
+                  ))}
+                  {!categories.some((c) => c.name.toLowerCase() === 'others') && (
+                    <SelectItem value="others">Others</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {(() => {
+                const selectedCat = categories.find((c: any) => c.id === parseInt(selectedCategory) || (selectedCategory === 'others' && c.name.toLowerCase() === 'others'));
+                return selectedCat?.name?.toLowerCase() === 'others';
+              })() && (
+                <div className="mt-2">
+                  <Input
+                    id="customCategoryName"
+                    placeholder="Describe your product type, e.g. Beaded Crown, Raffia Bag…"
+                    value={customCategoryName}
+                    onChange={(e) => setCustomCategoryName(e.target.value)}
+                    className="input-nigerian"
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="font-medium">Description <span className="text-red-500">*</span></Label>
+              <Textarea id="description" name="description" placeholder="Tell buyers what makes this product special — fabric, craftsmanship, size, occasion…" rows={4} required className="input-nigerian" />
+            </div>
+
+            {/* Price & Stock */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="price" className="font-medium">Price (₦) <span className="text-red-500">*</span></Label>
+                <Input id="price" name="price" type="number" min="0" placeholder="e.g. 45000" required className="input-nigerian" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="stock" className="font-medium">Stock Qty <span className="text-red-500">*</span></Label>
+                <Input id="stock" name="stock" type="number" min="0" placeholder="e.g. 10" required className="input-nigerian" />
+              </div>
+            </div>
+
+            {/* Weight */}
+            <div className="space-y-1.5">
+              <Label htmlFor="weight" className="font-medium">Weight (kg) <span className="text-gray-400 font-normal">— optional, helps with shipping</span></Label>
+              <Input id="weight" name="weight" type="number" step="0.1" min="0" placeholder="e.g. 0.5" className="input-nigerian" />
+            </div>
+
+            {/* Image section */}
+            <div className="space-y-2">
+              <Label className="font-medium">Product Image</Label>
+              {/* Toggle */}
+              <div className="flex rounded-lg border border-gray-200 p-1 gap-1 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => { setAddImageMode('upload'); setAddPreviewUrl(''); }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-colors ${addImageMode === 'upload' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <Upload className="w-4 h-4" /> Upload file
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddImageMode('url')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-colors ${addImageMode === 'url' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <LinkIcon className="w-4 h-4" /> Paste URL
+                </button>
+              </div>
+
+              {addImageMode === 'upload' ? (
+                <div>
+                  <label htmlFor="images" className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-nigerian-green hover:bg-green-50 transition-colors">
+                    <ImageIcon className="w-7 h-7 text-gray-400 mb-1" />
+                    <span className="text-sm text-gray-500">Click to upload photos</span>
+                    <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — up to 15 MB each</span>
+                  </label>
+                  <Input id="images" name="images" type="file" multiple accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif" className="hidden" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    name="imageUrl"
+                    type="url"
+                    placeholder="https://example.com/photo.jpg"
+                    className="input-nigerian"
+                    value={addPreviewUrl}
+                    onChange={(e) => setAddPreviewUrl(e.target.value)}
+                  />
+                  {addPreviewUrl && (
+                    <div className="w-full h-36 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                      <img
+                        src={addPreviewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Notice */}
+            <div className="flex gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <Clock className="w-4 h-4 mt-0.5 shrink-0 text-yellow-600" />
+              <span>Products are reviewed by an admin before appearing in the shop. This usually takes less than 24 hours.</span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <Button type="submit" className="btn-nigerian flex-1" disabled={addProductMutation.isPending}>
+                {addProductMutation.isPending ? "Submitting…" : "Submit Product"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsAddSheetOpen(false)} disabled={addProductMutation.isPending}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Product Dialog */}
       <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
