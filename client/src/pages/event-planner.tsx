@@ -21,9 +21,13 @@ import {
   Heart,
   Loader2,
   MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import Navbar from "@/components/navbar";
 
 const eventTypes = [
   { value: "wedding", label: "Wedding / Traditional Marriage", icon: Heart },
@@ -119,11 +123,14 @@ interface EventCollection {
 
 export default function EventPlannerPage() {
   const { user } = useAuth();
+  const { addToCart, openCart } = useCart();
+  const { toast } = useToast();
   const [selectedEvent, setSelectedEvent] = useState("");
   const [budget, setBudget] = useState("");
   const [eventSize, setEventSize] = useState("");
   const [customSize, setCustomSize] = useState("");
   const [eventLocation, setEventLocation] = useState("NG");
+  const [addedCollections, setAddedCollections] = useState<Set<number>>(new Set());
 
   const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
   const familySizeParam = eventSize === "others" ? customSize : eventSize;
@@ -159,17 +166,49 @@ export default function EventPlannerPage() {
     label: `${val.name} (${val.symbol})`,
   }));
 
+  function handleAddAllToCart(collection: EventCollection) {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to add items to your cart.", variant: "destructive" });
+      return;
+    }
+    collection.products.forEach(p => addToCart(p.id, 1));
+    setAddedCollections(prev => new Set(prev).add(collection.id));
+    toast({
+      title: "Collection added!",
+      description: `${collection.products.length} item${collection.products.length !== 1 ? "s" : ""} from "${collection.title}" added to your cart.`,
+    });
+    openCart();
+  }
+
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Calendar className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Event Outfit Planner</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+
+      {/* Hero Banner */}
+      <div className="bg-gradient-to-br from-green-800 via-emerald-700 to-yellow-600 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-12 md:py-16">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-white/80 font-medium text-sm uppercase tracking-wider">AfrolandX Event Planner</span>
           </div>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Planning a special African event? We'll help you find the perfect traditional outfits for every attendee.
+          <h1 className="text-3xl md:text-4xl font-black mb-3">Event Outfit Planner</h1>
+          <p className="text-white/80 max-w-2xl text-base leading-relaxed">
+            Planning a special African occasion? Select your event and we'll curate the perfect traditional outfit collections for everyone attending.
           </p>
+          <div className="flex flex-wrap gap-3 mt-6">
+            {["Wedding", "Naming Ceremony", "Festival", "Chieftaincy"].map(tag => (
+              <span key={tag} className="px-3 py-1 bg-white/15 border border-white/25 rounded-full text-sm text-white/90">{tag}</span>
+            ))}
+            <span className="px-3 py-1 bg-white/15 border border-white/25 rounded-full text-sm text-white/90">& more…</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="text-center mb-8 sr-only">
+          <h2 className="text-2xl font-bold">Find Your Collection</h2>
         </div>
 
         <Card className="mb-8">
@@ -371,9 +410,16 @@ export default function EventPlannerPage() {
                           View Details
                         </Link>
                       </Button>
-                      <Button data-testid={`button-add-collection-${collection.id}`}>
-                        <ShoppingBag className="h-4 w-4 mr-2" />
-                        Add All to Cart
+                      <Button
+                        data-testid={`button-add-collection-${collection.id}`}
+                        onClick={() => handleAddAllToCart(collection)}
+                        className={addedCollections.has(collection.id) ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
+                        {addedCollections.has(collection.id) ? (
+                          <><CheckCircle2 className="h-4 w-4 mr-2" />Added to Cart</>
+                        ) : (
+                          <><ShoppingBag className="h-4 w-4 mr-2" />Add All to Cart</>
+                        )}
                       </Button>
                     </div>
                   </div>

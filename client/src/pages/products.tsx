@@ -114,14 +114,7 @@ export default function Products() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Update URL without page reload
-    const url = new URL(window.location.href);
-    if (searchQuery.trim()) {
-      url.searchParams.set('search', searchQuery.trim());
-    } else {
-      url.searchParams.delete('search');
-    }
-    window.history.pushState({}, '', url.toString());
+    // State already drives the query — nothing else needed
   };
 
   const clearFilters = () => {
@@ -129,8 +122,6 @@ export default function Products() {
     setSelectedCategory(null);
     setPriceRange({ min: '', max: '' });
     setSortBy('newest');
-    // Clear URL params
-    window.history.pushState({}, '', window.location.pathname);
   };
 
   const hasActiveFilters = searchQuery || selectedCategory || priceRange.min || priceRange.max;

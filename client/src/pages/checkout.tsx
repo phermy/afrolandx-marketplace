@@ -41,6 +41,29 @@ export default function Checkout() {
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [paymentMethod] = useState('paystack'); // Only Paystack for now
 
+  // Show error/cancelled message if Paystack redirected back with an error
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const cancelled = params.get('cancelled');
+    if (cancelled) {
+      toast({
+        title: 'Payment Cancelled',
+        description: 'Your payment was cancelled. Your cart is still saved — complete your order when ready.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (error) {
+      toast({
+        title: 'Payment Failed',
+        description: decodeURIComponent(error) || 'Something went wrong with your payment. Please try again.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
