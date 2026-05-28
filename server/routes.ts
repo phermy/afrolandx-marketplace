@@ -2570,51 +2570,116 @@ INSTRUCTIONS:
     }
   });
 
-  app.get('/api/events/recommend', isAuthenticated, async (req, res) => {
+  app.get('/api/events/recommend', async (req: any, res) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-      
+      const userId = req.user?.id ?? null;
       const { eventType, budget, familySize } = req.query;
-      
-      // Get collections for this event type
-      const collections = await storage.getEventCollections(eventType as string);
-      
-      // Get user's measurements
-      const measurements = await storage.getUserMeasurements(userId);
+
+      // Try pre-seeded collections first
+      let collections = await storage.getEventCollections(eventType as string);
+
+      // ---------- Dynamic fallback: build collections from real products ----------
+      if (collections.length === 0) {
+        const allProducts = await storage.getProducts({ status: 'approved' });
+
+        // Keyword map per event type → used to score/filter products
+        const eventKeywords: Record<string, string[]> = {
+          wedding:         ['agbada','aso oke','lace','gele','bride','groom','traditional','bridal','velvet','ankara'],
+          naming_ceremony: ['ankara','baby','wrapper','george','lace','iro','buba'],
+          festival:        ['festival','masquerade','native','ankara','adire','aso oke','tie dye','batik'],
+          chieftaincy:     ['agbada','chief','royal','velvet','cap','beads','coral'],
+          party:           ['ankara','kaftan','senator','native','lace','skirt'],
+          burial:          ['ankara','lace','wrapper','iro','buba','george'],
+          graduation:      ['senator','native','kaftan','lace','ankara'],
+          engagement:      ['lace','george','silk','velvet','bridal','aso oke'],
+          corporate:       ['senator','kaftan','native','suit','formal'],
+          religious:       ['lace','ankara','george','wrapper','iro','buba'],
+          others:          ['ankara','native','lace','senator','kaftan'],
+        };
+
+        const keywords = eventKeywords[(eventType as string)?.toLowerCase()] ?? eventKeywords.others;
+
+        // Score every product by keyword match
+        const scored = allProducts
+          .map(p => {
+            const text = `${p.name} ${p.description ?? ''}`.toLowerCase();
+            const score = keywords.filter(k => text.includes(k)).length;
+            return { product: p, score };
+          })
+          .sort((a, b) => b.score - a.score);
+
+        // Take best 12 products, split into up to 3 collections of 4
+        const top = scored.slice(0, 12).map(s => s.product);
+        const chunkSize = 4;
+        const chunks: typeof top[] = [];
+        for (let i = 0; i < top.length; i += chunkSize) chunks.push(top.slice(i, i + chunkSize));
+
+        const eventLabel: Record<string, string> = {
+          wedding: 'Wedding', naming_ceremony: 'Naming Ceremony', festival: 'Festival',
+          chieftaincy: 'Chieftaincy', party: 'Party', burial: 'Burial',
+          graduation: 'Graduation', engagement: 'Engagement', corporate: 'Corporate', religious: 'Religious', others: 'Special Event',
+        };
+        const label = eventLabel[(eventType as string)] ?? 'Event';
+
+        const collectionNames = [
+          `${label} Essentials`, `${label} Premium Selection`, `${label} Complete Package`,
+        ];
+        const collectionDescs = [
+          `A curated selection of traditional pieces perfect for your ${label.toLowerCase()}.`,
+          `Premium authentic African wear handpicked for ${label.toLowerCase()} occasions.`,
+          `Everything you need to dress your whole family for the ${label.toLowerCase()}.`,
+        ];
+
+        // Build synthetic collection objects
+        collections = chunks.map((chunk, idx) => ({
+          id: -(idx + 1), // negative IDs signal synthetic collections
+          name: collectionNames[idx] ?? `${label} Collection ${idx + 1}`,
+          description: collectionDescs[idx] ?? '',
+          eventType: eventType as string,
+          productIds: chunk.map(p => p.id),
+          createdAt: new Date(),
+        }) as any);
+      }
+      // ---------- End dynamic fallback ----------
+
+      // Get user measurements if logged in
+      const measurements = userId ? await storage.getUserMeasurements(userId) : [];
       const hasMeasurements = measurements.length > 0;
-      
-      // Enhance collections with fit compatibility
+
+      // Enhance collections with product details + fit scores + totals
       const recommendations = await Promise.all(collections.map(async (collection) => {
         const productIds = (collection.productIds as number[]) || [];
         const collectionProducts = await Promise.all(
           productIds.map(async (id) => {
             const product = await storage.getProduct(id);
             if (!product) return null;
-            const fitScore = hasMeasurements ? await storage.calculateFitScore(id, measurements[0]) : 85;
+            const fitScore = hasMeasurements ? await storage.calculateFitScore(id, measurements[0]) : undefined;
             return { ...product, fitScore };
           })
         );
-        
-        const totalPrice = collectionProducts
-          .filter(Boolean)
-          .reduce((sum, p: any) => sum + parseFloat(p?.price || '0'), 0);
-        
+
+        const validProducts = collectionProducts.filter(Boolean) as any[];
+        const totalPrice = validProducts.reduce((sum, p) => sum + parseFloat(p?.price || '0'), 0);
+        const avgFitScore = hasMeasurements && validProducts.length > 0
+          ? validProducts.reduce((sum, p) => sum + (p?.fitScore ?? 85), 0) / validProducts.length
+          : undefined;
+
         return {
           ...collection,
           title: collection.name,
-          products: collectionProducts.filter(Boolean),
+          products: validProducts,
           totalPrice,
-          avgFitScore: collectionProducts.reduce((sum, p: any) => sum + (p?.fitScore || 85), 0) / collectionProducts.length,
+          avgFitScore,
         };
       }));
-      
+
       // Filter by budget if specified
-      const filtered = budget 
-        ? recommendations.filter(r => r.totalPrice <= parseFloat(budget as string))
+      const budgetNum = budget ? parseFloat(budget as string) : null;
+      const filtered = budgetNum
+        ? recommendations.filter(r => r.totalPrice <= budgetNum)
         : recommendations;
-      
-      res.json(filtered);
+
+      res.json(filtered.filter(r => r.products.length > 0));
     } catch (error) {
       console.error('Error getting event recommendations:', error);
       res.status(500).json({ message: 'Failed to get recommendations' });

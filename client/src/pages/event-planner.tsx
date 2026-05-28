@@ -142,14 +142,10 @@ export default function EventPlannerPage() {
       if (selectedEvent) params.append("eventType", selectedEvent);
       if (budget) params.append("budget", budget);
       if (familySizeParam) params.append("familySize", familySizeParam);
-
       const res = await fetch(`/api/events/recommend?${params.toString()}`, {
         credentials: "include",
       });
-      if (!res.ok) {
-        const fallbackRes = await fetch(`/api/events/collections?eventType=${selectedEvent}`);
-        return fallbackRes.json();
-      }
+      if (!res.ok) throw new Error("Failed to load collections");
       return res.json();
     },
     enabled: !!selectedEvent,
@@ -198,10 +194,26 @@ export default function EventPlannerPage() {
             Planning a special African occasion? Select your event and we'll curate the perfect traditional outfit collections for everyone attending.
           </p>
           <div className="flex flex-wrap gap-3 mt-6">
-            {["Wedding", "Naming Ceremony", "Festival", "Chieftaincy"].map(tag => (
-              <span key={tag} className="px-3 py-1 bg-white/15 border border-white/25 rounded-full text-sm text-white/90">{tag}</span>
+            {[
+              { label: "Wedding", value: "wedding" },
+              { label: "Naming Ceremony", value: "naming_ceremony" },
+              { label: "Festival", value: "festival" },
+              { label: "Chieftaincy", value: "chieftaincy" },
+              { label: "Engagement", value: "engagement" },
+              { label: "Party", value: "party" },
+            ].map(tag => (
+              <button
+                key={tag.value}
+                onClick={() => setSelectedEvent(tag.value)}
+                className={`px-3 py-1 border rounded-full text-sm transition-all ${
+                  selectedEvent === tag.value
+                    ? "bg-white text-green-800 font-semibold border-white"
+                    : "bg-white/15 border-white/25 text-white/90 hover:bg-white/25"
+                }`}
+              >
+                {tag.label}
+              </button>
             ))}
-            <span className="px-3 py-1 bg-white/15 border border-white/25 rounded-full text-sm text-white/90">& more…</span>
           </div>
         </div>
       </div>
