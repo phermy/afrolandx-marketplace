@@ -1135,6 +1135,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Award loyalty points for purchase (1 point per ₦1,000 spent)
+      const orderTotal = parseFloat(order.totalAmount) || 0;
+      const pointsToAward = Math.floor(orderTotal);
+      if (pointsToAward > 0) {
+        await storage.addLoyaltyPoints(
+          userId,
+          pointsToAward,
+          'purchase',
+          `Points for Order #${order.id}`,
+          order.id,
+          'order'
+        );
+      }
+
       // Notify vendors and admins
       const notifiedVendors = new Set<number>();
       for (const item of orderItems) {
@@ -1145,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createNotification({
               userId: vendor.userId,
               title: 'New Order Received!',
-              message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
+              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
               type: 'order'
             });
             notifiedVendors.add(product.vendorId);
@@ -1158,7 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createNotification({
           userId: admin.id,
           title: 'New Order Placed',
-          message: `Order #${order.id} worth $${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
+          message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
           type: 'order'
         });
       }
@@ -1382,6 +1396,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Award loyalty points for purchase (1 point per ₦1,000 spent)
+      try {
+        const orderTotal = parseFloat(order.totalAmount) || 0;
+        const pointsToAward = Math.floor(orderTotal);
+        if (pointsToAward > 0) {
+          await storage.addLoyaltyPoints(userId, pointsToAward, 'purchase', `Points for Order #${order.id}`, order.id, 'order');
+        }
+      } catch (loyaltyError) {
+        console.error('Error awarding loyalty points:', loyaltyError);
+      }
+
       // Notify each vendor about their products sold
       for (const vendorId in vendorProductMap) {
         const products = vendorProductMap[vendorId];
@@ -1393,7 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: vendorId,
             type: 'product_sold',
             title: 'Products Sold!',
-            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: $${totalVendorAmount.toLocaleString()}`,
+            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
             orderId: order.id,
             isRead: false
           });
@@ -1410,7 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: admin.id,
             type: 'order_placed',
             title: 'New Order Placed',
-            message: `A new order #${order.id} has been placed by a customer. Total amount: $${parseFloat(order.totalAmount).toLocaleString()}`,
+            message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
             orderId: order.id,
             isRead: false
           });
@@ -2823,8 +2848,8 @@ INSTRUCTIONS:
         return res.status(400).json({ message: 'Insufficient points' });
       }
       
-      // Calculate discount (100 points = $5 discount)
-      const discountAmount = (points / 100) * 5;
+      // Calculate discount (100 points = ₦500 discount)
+      const discountAmount = (points / 100) * 500;
       
       res.json({ success: true, discountAmount });
     } catch (error) {

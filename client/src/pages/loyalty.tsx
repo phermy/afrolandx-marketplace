@@ -19,6 +19,7 @@ import {
   Loader2,
   Sparkles
 } from "lucide-react";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,8 +32,8 @@ const tierColors: Record<string, string> = {
 };
 
 const tierBenefits: Record<string, string[]> = {
-  bronze: ["Earn 1 point per $1 spent", "Birthday bonus points", "Exclusive deals"],
-  silver: ["2x points on selected items", "Early access to sales", "Free shipping over $500"],
+  bronze: ["Earn 1 point per ₦1,000 spent", "Birthday bonus points", "Exclusive deals"],
+  silver: ["2x points on selected items", "Early access to sales", "Free shipping over ₦50,000"],
   gold: ["3x points on all orders", "Priority customer support", "Exclusive VIP sales"],
   platinum: ["5x points always", "Free express shipping", "Designer collaboration access", "Personal stylist"],
 };
@@ -108,7 +109,7 @@ export default function LoyaltyPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/loyalty"] });
       toast({
         title: "Points Redeemed!",
-        description: `You received $${data.discountAmount.toLocaleString()} discount. Apply it at checkout!`,
+        description: `You received ₦${data.discountAmount.toLocaleString()} discount. Apply it at checkout!`,
       });
       setRedeemAmount("");
     },
@@ -190,7 +191,7 @@ export default function LoyaltyPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              = ${(((points / 100) * 5)).toLocaleString()} discount
+              = ₦{(((points / 100) * 500)).toLocaleString()} discount
             </CardContent>
           </Card>
 
@@ -287,7 +288,7 @@ export default function LoyaltyPage() {
                             </Badge>
                           ) : (
                             <Button size="sm" asChild>
-                              <a href={`/quizzes/${quiz.id}`}>Take Quiz</a>
+                              <Link href={`/quizzes/${quiz.id}`}>Take Quiz</Link>
                             </Button>
                           )}
                         </div>
@@ -307,7 +308,7 @@ export default function LoyaltyPage() {
                   Redeem Points
                 </CardTitle>
                 <CardDescription>
-                  Convert your points to store credit (100 points = $5 discount)
+                  Convert your points to store credit (100 points = ₦500 discount)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -323,7 +324,7 @@ export default function LoyaltyPage() {
                   />
                   {redeemAmount && parseInt(redeemAmount) >= 100 && (
                     <p className="text-sm text-muted-foreground">
-                      = ${(((parseInt(redeemAmount) / 100) * 5)).toLocaleString()} discount
+                      = ₦{(((parseInt(redeemAmount) / 100) * 500)).toLocaleString()} discount
                     </p>
                   )}
                 </div>

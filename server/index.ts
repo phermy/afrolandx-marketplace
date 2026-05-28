@@ -5,7 +5,7 @@ import { initializePaystack } from "./paystack";
 import { initializeCloudStorage } from "./cloudStorage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, culturalQuizzes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const app = express();
@@ -101,6 +101,94 @@ app.use((req, res, next) => {
     if (created > 0) log(`Seeded ${created} default categor${created === 1 ? 'y' : 'ies'}`);
   } catch (e) {
     log('Could not seed categories: ' + e);
+  }
+
+  // Seed sample cultural quizzes if none exist
+  try {
+    const [existing] = await db.select().from(culturalQuizzes).limit(1);
+    if (!existing) {
+      await db.insert(culturalQuizzes).values([
+        {
+          title: 'Nigerian Fashion Basics',
+          description: 'Test your knowledge of traditional Nigerian clothing and fabrics.',
+          rewardPoints: 50,
+          isActive: true,
+          questions: [
+            {
+              question: 'What is Aso Oke?',
+              options: ['A type of food', 'A handwoven traditional Yoruba fabric', 'A Nigerian dance style', 'A traditional instrument'],
+              correctIndex: 1,
+              explanation: 'Aso Oke is a hand-loomed cloth woven by the Yoruba people of Nigeria, often used for ceremonial occasions.'
+            },
+            {
+              question: 'Which fabric is most associated with West African fashion internationally?',
+              options: ['Denim', 'Ankara (African wax print)', 'Silk', 'Linen'],
+              correctIndex: 1,
+              explanation: 'Ankara, also called African wax print, is a colourful cotton fabric widely associated with West African fashion.'
+            },
+            {
+              question: 'What is a "Agbada"?',
+              options: ['A type of headwear', 'A musical instrument', 'A flowing wide-sleeved robe worn by men', 'A traditional shoe'],
+              correctIndex: 2,
+              explanation: 'Agbada is an elegant flowing robe with wide sleeves, traditionally worn by men in West Africa for important ceremonies.'
+            },
+            {
+              question: 'The "Gele" is a traditional Nigerian:',
+              options: ['Necklace', 'Shoe', 'Head wrap / headgear', 'Belt'],
+              correctIndex: 2,
+              explanation: 'A Gele is an elaborate head wrap worn by Nigerian women, especially at events and celebrations.'
+            },
+            {
+              question: 'Kente cloth originates from which country?',
+              options: ['Nigeria', 'Senegal', 'Ghana', 'Ethiopia'],
+              correctIndex: 2,
+              explanation: 'Kente cloth is a silk and cotton fabric made of interwoven cloth strips, originating from the Ashanti people of Ghana.'
+            },
+          ]
+        },
+        {
+          title: 'African Cultural Heritage',
+          description: 'Explore the rich traditions and heritage across the African continent.',
+          rewardPoints: 75,
+          isActive: true,
+          questions: [
+            {
+              question: 'What does "Ubuntu" mean in African philosophy?',
+              options: ['A type of food', 'I am because we are / human interconnectedness', 'A traditional dance', 'A warrior spirit'],
+              correctIndex: 1,
+              explanation: 'Ubuntu is an African philosophical concept meaning "I am because we are," emphasising community and human interconnectedness.'
+            },
+            {
+              question: 'The "Durbar" festival is a traditional celebration in:',
+              options: ['South Africa', 'Northern Nigeria and West Africa', 'Kenya', 'Morocco'],
+              correctIndex: 1,
+              explanation: 'Durbar is a grand traditional festival celebrated in northern Nigeria and other parts of West Africa, featuring horse riding and colourful regalia.'
+            },
+            {
+              question: 'What are "Adire" textiles?',
+              options: ['Machine-made Nigerian prints', 'Yoruba tie-dye and resist-dyed textiles', 'Imported Chinese fabrics', 'A type of leather'],
+              correctIndex: 1,
+              explanation: 'Adire is a traditional Yoruba textile art using tie-dye and resist-dyeing techniques, producing beautiful indigo-dyed patterns.'
+            },
+            {
+              question: 'Which of these is a traditional Igbo attire?',
+              options: ['Dashiki', 'George wrapper with blouse', 'Boubou', 'Kanga'],
+              correctIndex: 1,
+              explanation: 'The George wrapper with a blouse is a traditional Igbo women\'s attire, often worn at important ceremonies and celebrations.'
+            },
+            {
+              question: 'What is "Batik" in the context of African textiles?',
+              options: ['A type of embroidery', 'A wax-resist dyeing technique for fabric', 'A weaving loom', 'A dye plant'],
+              correctIndex: 1,
+              explanation: 'Batik is a fabric dyeing technique using wax to create resist patterns, widely used across Africa and Indonesia.'
+            },
+          ]
+        }
+      ]);
+      log('Seeded 2 sample cultural quizzes');
+    }
+  } catch (e) {
+    log('Could not seed quizzes: ' + e);
   }
 
   const server = await registerRoutes(app);
