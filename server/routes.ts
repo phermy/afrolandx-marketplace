@@ -713,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vendor: update their own product (name, description, price, stock, imageUrl)
+  // Vendor: update their own product (name, description, price, stock, imageUrl, removeImages)
   app.patch('/api/products/:id', isAuthenticated, async (req: any, res) => {
     try {
       const productId = parseInt(req.params.id);
@@ -724,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vendor || product.vendorId !== vendor.id) {
         return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
       }
-      const { name, description, price, stock, imageUrl } = req.body;
+      const { name, description, price, stock, imageUrl, removeImages } = req.body;
       const updates: Record<string, unknown> = {};
       if (name !== undefined && name.trim()) updates.name = name.trim();
       if (description !== undefined) updates.description = description.trim();
@@ -732,11 +732,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stock !== undefined) updates.stock = parseInt(stock);
       if (imageUrl !== undefined) updates.imageUrl = imageUrl.trim() || null;
       const updated = await storage.updateProduct(productId, updates as any);
-      res.json(updated);
+
+      // Handle image removal — filter URLs the vendor wants gone
+      if (removeImages) {
+        const toRemove: string[] = Array.isArray(removeImages)
+          ? removeImages
+          : JSON.parse(removeImages);
+        if (toRemove.length > 0) {
+          const refreshed = await storage.getProduct(productId);
+          const currentImages = (refreshed?.images as string[]) || [];
+          const kept = currentImages.filter(url => !toRemove.includes(url));
+          await storage.updateProductImages(productId, kept);
+          // If imageUrl itself was removed, clear it too
+          if (refreshed?.imageUrl && toRemove.includes(refreshed.imageUrl)) {
+            await storage.updateProduct(productId, { imageUrl: null as any });
+          }
+        }
+      }
+
+      const final = await storage.getProduct(productId);
+      res.json(final);
     } catch (error) {
       console.error('Error updating product:', error);
       res.status(500).json({ message: 'Failed to update product' });
     }
+  });
+
+  // Vendor: upload additional images to an existing product
+  app.post('/api/products/:id/images', isAuthenticated, async (req: any, res) => {
+    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
+    uploadHandler(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message });
+      try {
+        const productId = parseInt(req.params.id);
+        const userId = (req.user as any)?.id;
+        const product = await storage.getProduct(productId);
+        if (!product) return res.status(404).json({ message: 'Product not found' });
+        const vendor = await storage.getVendorByUserId(userId);
+        if (!vendor || product.vendorId !== vendor.id) {
+          return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
+        }
+
+        const files = req.files as Express.Multer.File[];
+        if (!files || files.length === 0) {
+          return res.status(400).json({ message: 'No images provided' });
+        }
+
+        let newImageUrls: string[] = [];
+        try {
+          if (isCloudStorageEnabled()) {
+            const cloudStorage = getCloudStorageService();
+            newImageUrls = await Promise.all(files.map(f => cloudStorage.uploadImage(f.buffer, f.mimetype, 'products')));
+          } else {
+            for (const file of files) {
+              if (file.filename) {
+                newImageUrls.push(`/uploads/${file.filename}`);
+              } else if (file.buffer) {
+                const fsMod = await import('fs');
+                const pathMod = await import('path');
+                const sharpMod = await import('sharp');
+                const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
+                if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
+                const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+                const optimized = await sharpMod.default(file.buffer)
+                  .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                  .jpeg({ quality: 85, progressive: true }).toBuffer();
+                fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimized);
+                newImageUrls.push(`/uploads/${filename}`);
+              }
+            }
+          }
+        } catch (uploadErr: any) {
+          // Fallback to local
+          const fs = await import('fs');
+          const path = await import('path');
+          const sharp = await import('sharp');
+          newImageUrls = [];
+          for (const file of files) {
+            const uploadDir = path.join(process.cwd(), 'uploads', 'products');
+            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+            const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+            const optimized = await sharp.default(file.buffer || Buffer.alloc(0))
+              .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+              .jpeg({ quality: 85, progressive: true }).toBuffer();
+            fs.writeFileSync(path.join(uploadDir, filename), optimized);
+            newImageUrls.push(`/uploads/${filename}`);
+          }
+        }
+
+        // Append new images to existing array
+        const currentImages = (product.images as string[]) || [];
+        await storage.updateProductImages(productId, [...currentImages, ...newImageUrls]);
+
+        const updated = await storage.getProduct(productId);
+        res.json(updated);
+      } catch (error) {
+        console.error('Error uploading product images:', error);
+        res.status(500).json({ message: 'Failed to upload images' });
+      }
+    });
   });
 
   app.delete('/api/products/:id', isAuthenticated, async (req: any, res) => {

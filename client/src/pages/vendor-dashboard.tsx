@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle } from "lucide-react";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images } from "lucide-react";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -31,6 +31,10 @@ export default function VendorDashboard() {
   const [profileForm, setProfileForm] = useState({ businessName: '', description: '' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+  const [editCurrentImages, setEditCurrentImages] = useState<string[]>([]);
+  const [editRemovedImages, setEditRemovedImages] = useState<string[]>([]);
+  const [editNewFiles, setEditNewFiles] = useState<File[]>([]);
+  const [editNewPreviews, setEditNewPreviews] = useState<string[]>([]);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [addPreviewUrl, setAddPreviewUrl] = useState('');
   const [addImageMode, setAddImageMode] = useState<'upload' | 'url'>('upload');
@@ -216,19 +220,57 @@ export default function VendorDashboard() {
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Record<string, string | number> }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
       const res = await apiRequest("PATCH", `/api/products/${id}`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (updatedProduct) => {
+      // If there are new image files to upload, do that next
+      if (editNewFiles.length > 0) {
+        const formData = new FormData();
+        editNewFiles.forEach(f => formData.append('images', f));
+        await apiRequest("POST", `/api/products/${updatedProduct.id}/images`, formData);
+      }
       toast({ title: "Product updated", description: "Changes saved successfully." });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
-      setEditingProduct(null);
+      closeEditDialog();
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update product.", variant: "destructive" });
     },
   });
+
+  const closeEditDialog = () => {
+    setEditingProduct(null);
+    setEditCurrentImages([]);
+    setEditRemovedImages([]);
+    setEditNewFiles([]);
+    setEditNewPreviews([]);
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setEditNewFiles(prev => [...prev, ...files]);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setEditNewPreviews(prev => [...prev, ev.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeEditNewFile = (index: number) => {
+    setEditNewFiles(prev => prev.filter((_, i) => i !== index));
+    setEditNewPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeEditCurrentImage = (url: string) => {
+    setEditCurrentImages(prev => prev.filter(u => u !== url));
+    setEditRemovedImages(prev => [...prev, url]);
+  };
 
   const addProductMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -677,6 +719,14 @@ export default function VendorDashboard() {
                                   stock: String(product.stock),
                                   imageUrl: product.imageUrl || '',
                                 });
+                                const imgs: string[] = [];
+                                if (product.imageUrl) imgs.push(product.imageUrl);
+                                const extra = Array.isArray((product as any).images) ? (product as any).images as string[] : [];
+                                extra.forEach((u: string) => { if (u && !imgs.includes(u)) imgs.push(u); });
+                                setEditCurrentImages(imgs);
+                                setEditRemovedImages([]);
+                                setEditNewFiles([]);
+                                setEditNewPreviews([]);
                               }}
                             >
                               <Pencil className="w-3 h-3" /> Edit
@@ -1187,66 +1237,142 @@ export default function VendorDashboard() {
       </Sheet>
 
       {/* Edit Product Dialog */}
-      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && closeEditDialog()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-4 h-4" /> Edit Product
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
+          <div className="space-y-5 pt-2">
+
+            {/* Name */}
             <div>
-              <Label htmlFor="edit-name">Product Name</Label>
+              <Label htmlFor="edit-name" className="font-medium">Product Name</Label>
               <Input
                 id="edit-name"
                 value={editForm.name}
                 onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                className="input-nigerian"
+                className="input-nigerian mt-1"
                 required
               />
             </div>
+
+            {/* Description */}
             <div>
-              <Label htmlFor="edit-description">Description</Label>
+              <Label htmlFor="edit-description" className="font-medium">Description</Label>
               <Textarea
                 id="edit-description"
                 value={editForm.description}
                 onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                className="input-nigerian"
+                className="input-nigerian mt-1"
                 rows={3}
               />
             </div>
+
+            {/* Price + Stock */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-price">Price (₦)</Label>
+                <Label htmlFor="edit-price" className="font-medium">Price (₦)</Label>
                 <Input
                   id="edit-price"
                   type="number"
                   value={editForm.price}
                   onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
-                  className="input-nigerian"
+                  className="input-nigerian mt-1"
                 />
               </div>
               <div>
-                <Label htmlFor="edit-stock">Stock Quantity</Label>
+                <Label htmlFor="edit-stock" className="font-medium">Stock Quantity</Label>
                 <Input
                   id="edit-stock"
                   type="number"
                   value={editForm.stock}
                   onChange={e => setEditForm(f => ({ ...f, stock: e.target.value }))}
-                  className="input-nigerian"
+                  className="input-nigerian mt-1"
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="edit-imageUrl">Image URL (optional)</Label>
-              <Input
-                id="edit-imageUrl"
-                type="url"
-                placeholder="https://example.com/image.jpg"
-                value={editForm.imageUrl}
-                onChange={e => setEditForm(f => ({ ...f, imageUrl: e.target.value }))}
-                className="input-nigerian"
+
+            {/* Photos section */}
+            <div className="space-y-3">
+              <Label className="font-medium flex items-center gap-2">
+                <Images className="w-4 h-4" /> Product Photos
+              </Label>
+
+              {/* Existing images grid */}
+              {editCurrentImages.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">Current photos — click × to remove</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {editCurrentImages.map((url, i) => (
+                      <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                        <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = ''; }} />
+                        <button
+                          type="button"
+                          onClick={() => removeEditCurrentImage(url)}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                          title="Remove photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* New files to upload preview */}
+              {editNewPreviews.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">New photos to add (not saved yet)</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {editNewPreviews.map((src, i) => (
+                      <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-dashed border-nigerian-green bg-green-50">
+                        <img src={src} alt={`New ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeEditNewFile(i)}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                          title="Remove"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <div className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">New</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload area */}
+              <label
+                htmlFor="edit-images-upload"
+                className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-nigerian-green hover:bg-green-50 transition-colors"
+              >
+                <Upload className="w-5 h-5 text-gray-400 mb-1" />
+                <span className="text-sm text-gray-500 font-medium">Click to add more photos</span>
+                <span className="text-xs text-gray-400">JPG, PNG, WEBP — up to 15 MB each</span>
+              </label>
+              <input
+                id="edit-images-upload"
+                type="file"
+                multiple
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleEditFileChange}
               />
+
+              {editRemovedImages.length > 0 && (
+                <p className="text-xs text-orange-600 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {editRemovedImages.length} photo{editRemovedImages.length > 1 ? 's' : ''} will be removed when you save
+                </p>
+              )}
             </div>
-            <div className="flex gap-2 pt-2">
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2 border-t">
               <Button
                 className="btn-nigerian flex-1"
                 disabled={!editForm.name.trim() || updateProductMutation.isPending}
@@ -1259,15 +1385,16 @@ export default function VendorDashboard() {
                       description: editForm.description,
                       price: editForm.price,
                       stock: parseInt(editForm.stock) || 0,
-                      imageUrl: editForm.imageUrl,
+                      imageUrl: editForm.imageUrl || '',
+                      removeImages: editRemovedImages,
                     },
                   });
                 }}
               >
                 <Save className="w-4 h-4 mr-1" />
-                {updateProductMutation.isPending ? "Saving…" : "Save Changes"}
+                {updateProductMutation.isPending ? "Saving…" : `Save Changes${editNewFiles.length > 0 ? ` + Upload ${editNewFiles.length} photo${editNewFiles.length > 1 ? 's' : ''}` : ''}`}
               </Button>
-              <Button variant="outline" onClick={() => setEditingProduct(null)} disabled={updateProductMutation.isPending}>
+              <Button variant="outline" onClick={closeEditDialog} disabled={updateProductMutation.isPending}>
                 Cancel
               </Button>
             </div>
