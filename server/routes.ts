@@ -3728,6 +3728,52 @@ Return ONLY valid JSON:
 
   // ══ Discover Page Monetization Routes ════════════════════════════════════
 
+  // Admin: list all discover inquiries
+  app.get('/api/discover/inquiries', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { discoverInquiries } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { desc } = await import('drizzle-orm');
+      const inquiries = await db.select().from(discoverInquiries).orderBy(desc(discoverInquiries.createdAt));
+      res.json(inquiries);
+    } catch (err) {
+      console.error('[discover/inquiries GET]', err);
+      res.status(500).json({ message: 'Failed to fetch inquiries' });
+    }
+  });
+
+  // Admin: update inquiry status
+  app.patch('/api/discover/inquiries/:id/status', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { discoverInquiries } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { eq } = await import('drizzle-orm');
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!['pending', 'reviewed', 'approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+      await db.update(discoverInquiries).set({ status }).where(eq(discoverInquiries.id, id));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: 'Failed to update inquiry status' });
+    }
+  });
+
+  // Admin: list all premium subscriptions
+  app.get('/api/discover/premium', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { discoverPremium } = await import('@shared/schema');
+      const { db } = await import('./db');
+      const { desc } = await import('drizzle-orm');
+      const subs = await db.select().from(discoverPremium).orderBy(desc(discoverPremium.createdAt));
+      res.json(subs);
+    } catch (err) {
+      console.error('[discover/premium GET]', err);
+      res.status(500).json({ message: 'Failed to fetch premium subscriptions' });
+    }
+  });
+
   // Save any inquiry (guide registration, business claim, deal listing, destination feature)
   app.post('/api/discover/inquiries', async (req, res) => {
     try {
@@ -3765,15 +3811,15 @@ Return ONLY valid JSON:
       }).returning();
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/discover?booking_ref=${reference}`;
-      const txn = await paystack.initializeTransaction({
-        email: guestEmail,
-        amount: parseInt(totalAmountNgn) * 100,
-        currency: 'NGN',
+      const txn = await paystack.initializeTransaction(
+        guestEmail,
+        parseInt(totalAmountNgn),
         reference,
-        callback_url: callbackUrl,
-        metadata: { bookingId: booking.id, dealTitle, guestName },
-      });
-      res.json({ success: true, bookingId: booking.id, authorizationUrl: txn.authorization_url, reference });
+        { bookingId: booking.id, dealTitle, guestName },
+        callbackUrl,
+        'NGN'
+      );
+      res.json({ success: true, bookingId: booking.id, authorizationUrl: txn.data.authorization_url, reference });
     } catch (err) {
       console.error('[discover/bookings/initialize]', err);
       res.status(500).json({ message: 'Failed to initialize booking payment' });
@@ -3801,15 +3847,15 @@ Return ONLY valid JSON:
       }).returning();
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/discover?premium_ref=${reference}`;
-      const txn = await paystack.initializeTransaction({
+      const txn = await paystack.initializeTransaction(
         email,
-        amount: 250000, // ₦2,500 in kobo
-        currency: 'NGN',
+        2500, // ₦2,500 face value (function converts to kobo)
         reference,
-        callback_url: callbackUrl,
-        metadata: { subscriptionId: sub.id, plan: 'Explorer Premium Monthly' },
-      });
-      res.json({ success: true, subscriptionId: sub.id, authorizationUrl: txn.authorization_url, reference });
+        { subscriptionId: sub.id, plan: 'Explorer Premium Monthly' },
+        callbackUrl,
+        'NGN'
+      );
+      res.json({ success: true, subscriptionId: sub.id, authorizationUrl: txn.data.authorization_url, reference });
     } catch (err) {
       console.error('[discover/premium/initialize]', err);
       res.status(500).json({ message: 'Failed to initialize premium payment' });

@@ -75,6 +75,16 @@ export default function AdminDashboard() {
     retry: false,
     refetchInterval: 60000,
   });
+  const { data: discoverInquiries = [], refetch: refetchInquiries } = useQuery<any[]>({
+    queryKey: ['/api/discover/inquiries'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+  const { data: discoverPremium = [] } = useQuery<any[]>({
+    queryKey: ['/api/discover/premium'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
 
   // ── Real-time order change detection ────────────────────────────────────
   useEffect(() => {
@@ -167,6 +177,17 @@ export default function AdminDashboard() {
       else await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
     },
     onSuccess: () => { toast({ title: 'Role updated.' }); queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] }); },
+  });
+
+  const updateInquiryStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await apiRequest('PATCH', `/api/discover/inquiries/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      toast({ title: 'Inquiry updated.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/discover/inquiries'] });
+    },
+    onError: () => toast({ title: 'Failed to update inquiry.', variant: 'destructive' }),
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -331,6 +352,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="featured">Featured Products</TabsTrigger>
             <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
 
@@ -1006,7 +1028,156 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* ═══ SYSTEM OVERVIEW TAB ════════════════════════════════════════ */}
+          {/* ═══ DISCOVER TAB ════════════════════════════════════════════════ */}
+          <TabsContent value="discover">
+            <div className="space-y-6">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total Inquiries', value: discoverInquiries.length, color: 'text-blue-600' },
+                  { label: 'Pending Review', value: discoverInquiries.filter((i: any) => i.status === 'pending').length, color: 'text-yellow-600' },
+                  { label: 'Approved', value: discoverInquiries.filter((i: any) => i.status === 'approved').length, color: 'text-green-600' },
+                  { label: 'Premium Subscriptions', value: discoverPremium.filter((p: any) => p.paymentStatus === 'active').length, color: 'text-violet-600' },
+                ].map(({ label, value, color }) => (
+                  <Card key={label}>
+                    <CardContent className="pt-4 pb-3">
+                      <p className="text-xs text-gray-500 mb-1">{label}</p>
+                      <p className={`text-2xl font-black ${color}`}>{value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Inquiries table */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-emerald-600" />
+                      Discover Inquiries
+                    </CardTitle>
+                    <Button size="sm" variant="outline" onClick={() => refetchInquiries()}>
+                      <RefreshCw className="w-3 h-3 mr-1" />Refresh
+                    </Button>
+                  </div>
+                  <CardDescription>Guide registrations, business claims, deal listings and destination features</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {discoverInquiries.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8 text-sm">No inquiries yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(discoverInquiries as any[]).map((inq: any) => (
+                        <div key={inq.id} className="border rounded-xl p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <Badge variant="outline" className="text-xs capitalize border-emerald-300 text-emerald-700">
+                                  {inq.type?.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge className={
+                                  inq.status === 'approved' ? 'bg-green-100 text-green-800 border-0' :
+                                  inq.status === 'rejected' ? 'bg-red-100 text-red-800 border-0' :
+                                  inq.status === 'reviewed' ? 'bg-blue-100 text-blue-800 border-0' :
+                                  'bg-yellow-100 text-yellow-800 border-0'
+                                }>
+                                  {inq.status}
+                                </Badge>
+                                <span className="text-xs text-gray-400">#{inq.id} · {inq.createdAt ? new Date(inq.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                              </div>
+                              <p className="font-semibold text-sm">{inq.name}</p>
+                              <p className="text-xs text-gray-500">{inq.email}{inq.phone ? ` · ${inq.phone}` : ''}</p>
+                              {inq.details && typeof inq.details === 'object' && (
+                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                  {Object.entries(inq.details).filter(([k]) => !['name','email','phone'].includes(k)).map(([k, v]) => (
+                                    v ? <p key={k} className="text-xs text-gray-600"><span className="font-medium capitalize">{k.replace(/([A-Z])/g, ' $1')}: </span>{String(v)}</p> : null
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-1.5 shrink-0">
+                              {inq.status === 'pending' && (
+                                <>
+                                  <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'approved' })}>
+                                    <CheckCircle className="w-3 h-3 mr-1" />Approve
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs border-blue-300 text-blue-600"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'reviewed' })}>
+                                    <Eye className="w-3 h-3 mr-1" />Reviewed
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs border-red-300 text-red-600"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'rejected' })}>
+                                    <XCircle className="w-3 h-3 mr-1" />Reject
+                                  </Button>
+                                </>
+                              )}
+                              {inq.status !== 'pending' && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs"
+                                  disabled={updateInquiryStatusMutation.isPending}
+                                  onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'pending' })}>
+                                  Reset
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Premium subscriptions */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-violet-600" />
+                    Explorer Premium Subscriptions
+                  </CardTitle>
+                  <CardDescription>Users who have initiated or completed the Premium subscription</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {discoverPremium.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8 text-sm">No premium subscriptions yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Email</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Status</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Reference</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Start</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">End</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(discoverPremium as any[]).map((sub: any) => (
+                            <tr key={sub.id} className="border-b last:border-0 hover:bg-gray-50">
+                              <td className="py-2 text-xs">{sub.guestEmail || '—'}</td>
+                              <td className="py-2">
+                                <Badge className={sub.paymentStatus === 'active' ? 'bg-violet-100 text-violet-800 border-0' : 'bg-yellow-100 text-yellow-800 border-0'}>
+                                  {sub.paymentStatus}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-xs font-mono text-gray-500 truncate max-w-[120px]">{sub.paymentReference || '—'}</td>
+                              <td className="py-2 text-xs">{sub.subscriptionStart ? new Date(sub.subscriptionStart).toLocaleDateString('en-GB') : '—'}</td>
+                              <td className="py-2 text-xs">{sub.subscriptionEnd ? new Date(sub.subscriptionEnd).toLocaleDateString('en-GB') : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Platform Health */}
