@@ -115,6 +115,7 @@ export interface IStorage {
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;
   updateProductImages(id: number, images: string[], name?: string, description?: string): Promise<void>;
+  updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string }): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]>;
   
@@ -458,6 +459,17 @@ export class DatabaseStorage implements IStorage {
     if (name) updates.name = name;
     if (description) updates.description = description;
     await db.update(products).set(updates).where(eq(products.id, id));
+  }
+
+  async updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string }): Promise<Product> {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.price !== undefined) updates.price = data.price;
+    if (data.stock !== undefined) updates.stock = data.stock;
+    if (data.imageUrl !== undefined) updates.imageUrl = data.imageUrl;
+    const [updated] = await db.update(products).set(updates).where(eq(products.id, id)).returning();
+    return updated;
   }
 
   async deleteProduct(id: number): Promise<void> {

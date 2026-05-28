@@ -564,24 +564,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
               imageUrls = await Promise.all(uploadPromises);
               console.log('Successfully uploaded images to cloud storage');
             } else {
-              // Cloud storage disabled — save from memory buffer to disk
-              const fsMod = await import('fs');
-              const pathMod = await import('path');
-              const sharpMod = await import('sharp');
-              const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
-              if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
-
+              // Cloud storage disabled — localUpload (diskStorage) already saved files to disk.
+              // Just generate the serving URLs from the filenames multer assigned.
               for (const file of files) {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-                const filename = `product-${uniqueSuffix}.jpg`;
-                const filepath = pathMod.join(uploadDir, filename);
-                const optimizedBuffer = await sharpMod.default(file.buffer)
-                  .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-                  .jpeg({ quality: 85, progressive: true })
-                  .toBuffer();
-                fsMod.writeFileSync(filepath, optimizedBuffer);
-                imageUrls.push(`/uploads/${filename}`);
+                if (file.filename) {
+                  // diskStorage: file already saved at uploads/products/<filename>
+                  imageUrls.push(`/uploads/${file.filename}`);
+                } else if (file.buffer) {
+                  // memoryStorage fallback (safety net)
+                  const fsMod = await import('fs');
+                  const pathMod = await import('path');
+                  const sharpMod = await import('sharp');
+                  const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
+                  if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
+                  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+                  const filename = `product-${uniqueSuffix}.jpg`;
+                  const optimizedBuffer = await sharpMod.default(file.buffer)
+                    .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+                    .jpeg({ quality: 85, progressive: true })
+                    .toBuffer();
+                  fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimizedBuffer);
+                  imageUrls.push(`/uploads/${filename}`);
+                }
               }
+              console.log(`Saved ${imageUrls.length} image(s) locally via diskStorage`);
             }
           } catch (error: any) {
             console.error('Cloud storage failed, falling back to local storage:', error);
@@ -704,6 +710,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(product);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch product' });
+    }
+  });
+
+  // Vendor: update their own product (name, description, price, stock, imageUrl)
+  app.patch('/api/products/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const userId = (req.user as any)?.id;
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || product.vendorId !== vendor.id) {
+        return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
+      }
+      const { name, description, price, stock, imageUrl } = req.body;
+      const updates: Record<string, unknown> = {};
+      if (name !== undefined && name.trim()) updates.name = name.trim();
+      if (description !== undefined) updates.description = description.trim();
+      if (price !== undefined) updates.price = price;
+      if (stock !== undefined) updates.stock = parseInt(stock);
+      if (imageUrl !== undefined) updates.imageUrl = imageUrl.trim() || null;
+      const updated = await storage.updateProduct(productId, updates as any);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      res.status(500).json({ message: 'Failed to update product' });
     }
   });
 

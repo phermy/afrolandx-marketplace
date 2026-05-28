@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon } from "lucide-react";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -27,6 +28,8 @@ export default function VendorDashboard() {
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ businessName: '', description: '' });
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -208,6 +211,21 @@ export default function VendorDashboard() {
     },
   });
 
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, string | number> }) => {
+      const res = await apiRequest("PATCH", `/api/products/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Product updated", description: "Changes saved successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
+      setEditingProduct(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update product.", variant: "destructive" });
+    },
+  });
+
   const addProductMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       await apiRequest("POST", "/api/products", formData);
@@ -379,9 +397,17 @@ export default function VendorDashboard() {
                 Thank you for your vendor application! Our admin team is reviewing your submission. 
                 You'll receive an email notification once your application is approved.
               </p>
-              <Badge variant="secondary" className="badge-pending">
+              <Badge variant="secondary" className="badge-pending mb-6 block w-fit mx-auto">
                 Status: Pending Approval
               </Badge>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] })}
+              >
+                <RefreshCw className="w-4 h-4" />
+                Check Approval Status
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -556,42 +582,75 @@ export default function VendorDashboard() {
                     <p className="text-gray-500 text-lg">No products yet. Add your first product!</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {products.map((product) => (
-                      <div key={product.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900">{product.name}</h3>
-                          <p className="text-gray-600 text-sm">{product.description}</p>
-                          <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-nigerian-green font-semibold">₦{parseFloat(product.price).toLocaleString()}</span>
-                            <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
-                            <Badge 
-                              className={
+                  <div className="space-y-3">
+                    {products.map((product) => {
+                      const imgSrc = product.imageUrl || (Array.isArray((product as any).images) && (product as any).images[0]) || null;
+                      return (
+                        <div key={product.id} className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors">
+                          {/* Thumbnail */}
+                          <div className="w-16 h-16 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                            {imgSrc ? (
+                              <img src={imgSrc} alt={product.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                <ImageIcon className="w-6 h-6" />
+                              </div>
+                            )}
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
+                            <p className="text-gray-500 text-xs truncate">{product.description}</p>
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
+                              <span className="text-nigerian-green font-bold text-sm">₦{parseFloat(product.price).toLocaleString()}</span>
+                              <span className="text-gray-500 text-xs">Stock: {product.stock}</span>
+                              <Badge className={
                                 product.status === 'approved' ? 'badge-approved' :
                                 product.status === 'pending' ? 'badge-pending' :
                                 'badge-rejected'
-                              }
+                              }>
+                                {product.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          {/* Actions */}
+                          <div className="flex gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-blue-100"
+                              title="Edit product"
+                              onClick={() => {
+                                setEditingProduct(product);
+                                setEditForm({
+                                  name: product.name,
+                                  description: product.description || '',
+                                  price: product.price,
+                                  stock: String(product.stock),
+                                  imageUrl: product.imageUrl || '',
+                                });
+                              }}
                             >
-                              {product.status}
-                            </Badge>
+                              <Pencil className="w-4 h-4 text-blue-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-100"
+                              title="Delete product"
+                              onClick={() => {
+                                if (confirm(`Delete "${product.name}"? This cannot be undone.`)) {
+                                  deleteProductMutation.mutate(product.id);
+                                }
+                              }}
+                              disabled={deleteProductMutation.isPending}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-100 ml-2 shrink-0"
-                          onClick={() => {
-                            if (confirm(`Delete "${product.name}"? This cannot be undone.`)) {
-                              deleteProductMutation.mutate(product.id);
-                            }
-                          }}
-                          disabled={deleteProductMutation.isPending}
-                          title="Delete product"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -928,7 +987,7 @@ export default function VendorDashboard() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <Label htmlFor="price">Price ($)</Label>
+                      <Label htmlFor="price">Price (₦)</Label>
                       <Input
                         id="price"
                         name="price"
@@ -1078,6 +1137,95 @@ export default function VendorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="edit-name">Product Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="input-nigerian"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                className="input-nigerian"
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-price">Price (₦)</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  value={editForm.price}
+                  onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
+                  className="input-nigerian"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-stock">Stock Quantity</Label>
+                <Input
+                  id="edit-stock"
+                  type="number"
+                  value={editForm.stock}
+                  onChange={e => setEditForm(f => ({ ...f, stock: e.target.value }))}
+                  className="input-nigerian"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-imageUrl">Image URL (optional)</Label>
+              <Input
+                id="edit-imageUrl"
+                type="url"
+                placeholder="https://example.com/image.jpg"
+                value={editForm.imageUrl}
+                onChange={e => setEditForm(f => ({ ...f, imageUrl: e.target.value }))}
+                className="input-nigerian"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button
+                className="btn-nigerian flex-1"
+                disabled={!editForm.name.trim() || updateProductMutation.isPending}
+                onClick={() => {
+                  if (!editingProduct) return;
+                  updateProductMutation.mutate({
+                    id: editingProduct.id,
+                    data: {
+                      name: editForm.name,
+                      description: editForm.description,
+                      price: editForm.price,
+                      stock: parseInt(editForm.stock) || 0,
+                      imageUrl: editForm.imageUrl,
+                    },
+                  });
+                }}
+              >
+                <Save className="w-4 h-4 mr-1" />
+                {updateProductMutation.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={() => setEditingProduct(null)} disabled={updateProductMutation.isPending}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
