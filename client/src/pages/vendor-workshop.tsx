@@ -28,6 +28,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import Navbar from "@/components/navbar";
 
 const productionStages = [
   "fabric_cutting",
@@ -159,9 +160,12 @@ export default function VendorWorkshopPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">Vendor Access Required</h1>
-        <p className="text-muted-foreground">Sign in as a vendor to access the workshop dashboard.</p>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="container mx-auto py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Vendor Access Required</h1>
+          <p className="text-muted-foreground">Sign in as a vendor to access the workshop dashboard.</p>
+        </div>
       </div>
     );
   }
@@ -177,6 +181,8 @@ export default function VendorWorkshopPage() {
   };
 
   return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-6">
@@ -604,6 +610,7 @@ export default function VendorWorkshopPage() {
           </TabsContent>
         </Tabs>
       </div>
+    </div>
     </div>
   );
 }

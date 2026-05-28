@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Package, Truck, CheckCircle, Clock, Bell } from "lucide-react";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save } from "lucide-react";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -25,6 +25,8 @@ export default function VendorDashboard() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ businessName: '', description: '' });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -52,9 +54,9 @@ export default function VendorDashboard() {
     queryKey: ["/api/categories"],
   });
 
-  // Fetch vendor's products
+  // Fetch vendor's own products (all statuses)
   const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products", { vendorId: vendor?.id }],
+    queryKey: ["/api/vendors/me/products"],
     enabled: !!vendor?.id,
   });
 
@@ -174,6 +176,38 @@ export default function VendorDashboard() {
   });
 
   // Add product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      await apiRequest("DELETE", `/api/products/${productId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Product deleted", description: "The product has been removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        setTimeout(() => { window.location.href = "/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to delete product.", variant: "destructive" });
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { businessName: string; description: string }) => {
+      const res = await apiRequest("PATCH", "/api/vendors/me", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile updated", description: "Your vendor profile has been saved." });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] });
+      setIsEditingProfile(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
+    },
+  });
+
   const addProductMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       await apiRequest("POST", "/api/products", formData);
@@ -183,7 +217,7 @@ export default function VendorDashboard() {
         title: "Success",
         description: "Product submitted for approval!",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
       
       // Reset form and category selection
       setSelectedCategory('');
@@ -383,44 +417,7 @@ export default function VendorDashboard() {
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Vendor Notifications */}
-        {Array.isArray(vendorNotifications) && vendorNotifications.length > 0 && (
-          <div className="mb-6 space-y-3">
-            {vendorNotifications.map((notification) => (
-              <Card key={notification.id} className="border-nigerian-green bg-green-50">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Bell className="w-4 h-4 text-nigerian-green" />
-                        <h4 className="font-semibold text-nigerian-green">{notification.title}</h4>
-                        {!notification.isRead && (
-                          <Badge className="bg-nigerian-green text-white text-xs">New</Badge>
-                        )}
-                      </div>
-                      <p className="text-gray-700 mb-2">{notification.message}</p>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {notification.createdAt ? new Date(String(notification.createdAt)).toLocaleString() : 'Unknown time'}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => dismissNotificationMutation.mutate(notification.id)}
-                      className="h-8 w-8 p-0 hover:bg-red-100"
-                      disabled={dismissNotificationMutation.isPending}
-                    >
-                      <X className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Header */}
+          {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 font-nigerian">
             Welcome back, {vendor?.businessName}!
@@ -526,12 +523,12 @@ export default function VendorDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="p-2 bg-coral rounded-lg">
-                  <span className="text-white font-bold text-lg">$</span>
+                  <span className="text-white font-bold text-lg">₦</span>
                 </div>
                 <div className="ml-4">
                   <p className="text-gray-600 text-sm">Total Value</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    ${products.reduce((sum, p) => sum + parseFloat(p.price), 0).toLocaleString()}
+                    ₦{products.reduce((sum, p) => sum + parseFloat(p.price), 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -566,7 +563,7 @@ export default function VendorDashboard() {
                           <h3 className="font-semibold text-gray-900">{product.name}</h3>
                           <p className="text-gray-600 text-sm">{product.description}</p>
                           <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-nigerian-green font-semibold">${parseFloat(product.price).toLocaleString()}</span>
+                            <span className="text-nigerian-green font-semibold">₦{parseFloat(product.price).toLocaleString()}</span>
                             <span className="text-gray-500 text-sm">Stock: {product.stock}</span>
                             <Badge 
                               className={
@@ -579,6 +576,20 @@ export default function VendorDashboard() {
                             </Badge>
                           </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-red-100 ml-2 shrink-0"
+                          onClick={() => {
+                            if (confirm(`Delete "${product.name}"? This cannot be undone.`)) {
+                              deleteProductMutation.mutate(product.id);
+                            }
+                          }}
+                          disabled={deleteProductMutation.isPending}
+                          title="Delete product"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -621,7 +632,7 @@ export default function VendorDashboard() {
                               {order.orderStatus}
                             </Badge>
                             <p className="text-nigerian-green font-bold text-lg mt-2">
-                              ${order.vendorTotal?.toLocaleString()}
+                              ₦{order.vendorTotal?.toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -636,7 +647,7 @@ export default function VendorDashboard() {
                                   <span className="text-gray-600 ml-2">x{item.quantity}</span>
                                 </div>
                                 <span className="font-semibold">
-                                  ${(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
+                                  ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
                                 </span>
                               </div>
                             ))}
@@ -981,25 +992,87 @@ export default function VendorDashboard() {
           <TabsContent value="profile">
             <Card>
               <CardHeader>
-                <CardTitle>Vendor Profile</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Vendor Profile</CardTitle>
+                  {!isEditingProfile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProfileForm({
+                          businessName: vendor?.businessName || '',
+                          description: vendor?.description || '',
+                        });
+                        setIsEditingProfile(true);
+                      }}
+                    >
+                      <Pencil className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Business Name</Label>
-                    <Input value={vendor?.businessName || ""} disabled className="input-nigerian" />
+                {isEditingProfile ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="editBusinessName">Business Name</Label>
+                      <Input
+                        id="editBusinessName"
+                        value={profileForm.businessName}
+                        onChange={(e) => setProfileForm(f => ({ ...f, businessName: e.target.value }))}
+                        className="input-nigerian"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editDescription">Description</Label>
+                      <Textarea
+                        id="editDescription"
+                        value={profileForm.description}
+                        onChange={(e) => setProfileForm(f => ({ ...f, description: e.target.value }))}
+                        className="input-nigerian"
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => updateProfileMutation.mutate(profileForm)}
+                        disabled={updateProfileMutation.isPending || !profileForm.businessName.trim()}
+                        className="btn-nigerian"
+                      >
+                        <Save className="w-4 h-4 mr-1" />
+                        {updateProfileMutation.isPending ? "Saving…" : "Save Changes"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditingProfile(false)}
+                        disabled={updateProfileMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea value={vendor?.description || ""} disabled className="input-nigerian" rows={4} />
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Business Name</Label>
+                      <Input value={vendor?.businessName || ""} disabled className="input-nigerian" />
+                    </div>
+                    <div>
+                      <Label>Description</Label>
+                      <Textarea value={vendor?.description || ""} disabled className="input-nigerian" rows={4} />
+                    </div>
+                    <div>
+                      <Label>Status</Label>
+                      <div className="mt-1">
+                        <Badge className={vendor?.status === 'approved' ? 'badge-approved' : 'badge-pending'}>
+                          {vendor?.status}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Status</Label>
-                    <Badge className={vendor?.status === 'approved' ? 'badge-approved' : 'badge-pending'}>
-                      {vendor?.status}
-                    </Badge>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

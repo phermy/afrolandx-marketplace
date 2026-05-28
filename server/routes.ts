@@ -486,6 +486,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/vendors/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      const { businessName, description } = req.body;
+      if (!businessName || !businessName.trim()) {
+        return res.status(400).json({ message: 'Business name is required' });
+      }
+      await storage.updateVendorProfile(vendor.id, {
+        businessName: businessName.trim(),
+        description: description?.trim() || '',
+      });
+      const updated = await storage.getVendorByUserId(userId);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating vendor profile:', error);
+      res.status(500).json({ message: 'Failed to update vendor profile' });
+    }
+  });
+
+  app.get('/api/vendors/me/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      const vendorProducts = await storage.getProducts({ vendorId: vendor.id });
+      res.json(vendorProducts);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch vendor products' });
+    }
+  });
+
   app.patch('/api/vendors/:id/status', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const vendorId = parseInt(req.params.id);
@@ -671,6 +704,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(product);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch product' });
+    }
+  });
+
+  app.delete('/api/products/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const userId = (req.user as any)?.id;
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || product.vendorId !== vendor.id) {
+        return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
+      }
+      await storage.deleteProduct(productId);
+      res.json({ message: 'Product deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      res.status(500).json({ message: 'Failed to delete product' });
     }
   });
 
@@ -1188,6 +1239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.body;
       const userId = (req.user as any)?.id;
 
+      const vendorAllowedStatuses = ['processing', 'shipped', 'delivered'];
+      if (!status || !vendorAllowedStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Allowed values: ${vendorAllowedStatuses.join(', ')}` });
+      }
+
       // Verify vendor owns products in this order
       const order = await storage.getOrder(orderId);
       if (!order) {
@@ -1665,7 +1721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       await storage.createNotification({
                         userId: vendor.userId,
                         title: 'Payment Confirmed',
-                        message: `Payment confirmed for order #${orderId}. Worth $${parseFloat(order.totalAmount).toLocaleString()}.`,
+                        message: `Payment confirmed for order #${orderId}. Worth ₦${parseFloat(order.totalAmount).toLocaleString()}.`,
                         type: 'order'
                       });
                       notifiedVendors.add(product.vendorId);

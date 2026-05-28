@@ -100,6 +100,7 @@ export interface IStorage {
   getVendor(id: number): Promise<Vendor | undefined>;
   getVendorByUserId(userId: string): Promise<Vendor | undefined>;
   updateVendorStatus(id: number, status: string): Promise<void>;
+  updateVendorProfile(id: number, data: { businessName: string; description: string }): Promise<void>;
   getAllVendors(): Promise<Vendor[]>;
   
   // Category operations
@@ -114,6 +115,7 @@ export interface IStorage {
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;
   updateProductImages(id: number, images: string[], name?: string, description?: string): Promise<void>;
+  deleteProduct(id: number): Promise<void>;
   getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]>;
   
   // Cart operations
@@ -347,6 +349,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(vendors.id, id));
   }
 
+  async updateVendorProfile(id: number, data: { businessName: string; description: string }): Promise<void> {
+    await db
+      .update(vendors)
+      .set({ businessName: data.businessName, description: data.description, updatedAt: new Date() })
+      .where(eq(vendors.id, id));
+  }
+
   async getAllVendors(): Promise<Vendor[]> {
     return await db.select().from(vendors).orderBy(desc(vendors.createdAt));
   }
@@ -449,6 +458,10 @@ export class DatabaseStorage implements IStorage {
     if (name) updates.name = name;
     if (description) updates.description = description;
     await db.update(products).set(updates).where(eq(products.id, id));
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
   }
 
   async getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]> {
