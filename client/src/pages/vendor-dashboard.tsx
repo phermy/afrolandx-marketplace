@@ -254,23 +254,29 @@ export default function VendorDashboard() {
         }
       }, 100);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 500);
+        setTimeout(() => { window.location.href = "/login"; }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: "Failed to add product. Please try again.",
-        variant: "destructive",
-      });
+      // Parse the real server error message
+      const msg = error?.message || '';
+      let description = "Something went wrong. Please try again.";
+      if (msg.includes('403') || msg.includes('Approved vendor')) {
+        description = "Your vendor account needs to be approved by an admin before you can add products.";
+      } else if (msg.includes('400') || msg.includes('Missing required')) {
+        description = "Please fill in all required fields: name, description, price, stock, and category.";
+      } else if (msg.includes('Validation')) {
+        description = "Some fields have invalid values. Check price and stock are valid numbers.";
+      } else if (msg.length > 0) {
+        description = msg.replace(/^\d+:\s*/, '');
+      }
+      toast({ title: "Could not add product", description, variant: "destructive" });
     },
   });
 
@@ -287,16 +293,27 @@ export default function VendorDashboard() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    // Resolve category: if "others" string somehow slipped through, find the real DB id
+    // Resolve category
     let catId = selectedCategory;
     if (catId === 'others') {
       const othersCat = categories.find((c: any) => c.name.toLowerCase() === 'others');
       catId = othersCat ? String(othersCat.id) : '';
     }
-    if (catId) formData.set('categoryId', catId);
 
-    // If the selected category is "Others" and a custom name was given, prepend it to the description
+    // Client-side validation
+    if (!catId) {
+      toast({ title: "Select a category", description: "Please choose a product category before submitting.", variant: "destructive" });
+      return;
+    }
     const isOthersCategory = categories.find((c: any) => c.id === parseInt(catId))?.name?.toLowerCase() === 'others';
+    if (isOthersCategory && !customCategoryName.trim()) {
+      toast({ title: "Describe your product type", description: "Please describe what type of product this is.", variant: "destructive" });
+      return;
+    }
+
+    formData.set('categoryId', catId);
+
+    // Prepend custom type to description for "Others" category
     if (isOthersCategory && customCategoryName.trim()) {
       const existingDesc = (formData.get('description') as string) || '';
       formData.set('description', `[Product type: ${customCategoryName.trim()}]\n\n${existingDesc}`);

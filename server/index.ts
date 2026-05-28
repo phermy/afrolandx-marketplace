@@ -76,20 +76,31 @@ app.use((req, res, next) => {
     }
   }
 
-  // Ensure "Others" category always exists so the frontend filter works
+  // Ensure all default categories exist on every boot
   try {
-    const existingCategories = await storage.getCategories();
-    const hasOthers = existingCategories.some((c: any) => c.slug === 'others');
-    if (!hasOthers) {
-      await storage.createCategory({
-        name: 'Others',
-        slug: 'others',
-        description: 'Other African fashion products not listed in standard categories',
-      });
-      log('Created "Others" category');
+    const defaultCategories = [
+      { name: 'Traditional Wear',  slug: 'traditional-wear',  description: 'Authentic African traditional clothing' },
+      { name: 'Aso Oke',           slug: 'aso-oke',           description: 'Handwoven traditional fabrics' },
+      { name: 'Beads & Jewelry',   slug: 'beads-jewelry',     description: 'Traditional African beads and jewelry' },
+      { name: 'Accessories',       slug: 'accessories',       description: 'Fashion accessories and items' },
+      { name: 'Ankara & Kente',    slug: 'ankara-kente',      description: 'Printed and woven African fabrics' },
+      { name: 'Footwear',          slug: 'footwear',          description: 'African leather sandals and shoes' },
+      { name: 'Home & Crafts',     slug: 'home-crafts',       description: 'Handmade baskets, carvings, and art' },
+      { name: 'Beauty & Wellness', slug: 'beauty-wellness',   description: 'African natural beauty products' },
+      { name: 'Others',            slug: 'others',            description: 'Other African fashion products' },
+    ];
+    const existing = await storage.getCategories();
+    const existingSlugs = new Set(existing.map((c: any) => c.slug));
+    let created = 0;
+    for (const cat of defaultCategories) {
+      if (!existingSlugs.has(cat.slug)) {
+        await storage.createCategory(cat);
+        created++;
+      }
     }
+    if (created > 0) log(`Seeded ${created} default categor${created === 1 ? 'y' : 'ies'}`);
   } catch (e) {
-    log('Could not seed Others category: ' + e);
+    log('Could not seed categories: ' + e);
   }
 
   const server = await registerRoutes(app);
