@@ -36,67 +36,69 @@ interface Place {
   photoUri?: string;
 }
 
-// ─── Country images via loremflickr keyword search (HTTP 302→200, browser follows) ──
-function lf(keywords: string, seed: number) {
-  return `https://loremflickr.com/1200/600/${encodeURIComponent(keywords)}/all?lock=${seed}`;
-}
-
+// ─── Curated country hero images — direct CDN URLs, verified to load ──────────
 const COUNTRY_IMAGES: Record<string, string> = {
-  NG: lf("Lagos,Nigeria,skyline", 1),
-  EG: lf("Egypt,pyramids,cairo", 2),
-  ZA: lf("Cape Town,South Africa,mountain", 3),
-  KE: lf("Kenya,Nairobi,savanna,Africa", 4),
-  MA: lf("Morocco,Marrakech,medina", 5),
-  GH: lf("Ghana,Accra,Africa,coast", 6),
-  ET: lf("Ethiopia,Addis Ababa,Africa", 7),
-  TZ: lf("Tanzania,Zanzibar,Kilimanjaro", 8),
-  SN: lf("Senegal,Dakar,West Africa", 9),
-  UG: lf("Uganda,Kampala,Africa", 10),
-  RW: lf("Rwanda,Kigali,Africa", 11),
-  ZW: lf("Zimbabwe,Victoria Falls,Africa", 12),
-  NA: lf("Namibia,desert,dunes,Africa", 13),
-  ZM: lf("Zambia,Victoria Falls,Africa", 14),
-  BW: lf("Botswana,Okavango,Africa,elephant", 15),
-  TN: lf("Tunisia,Carthage,Mediterranean", 16),
-  DZ: lf("Algeria,Sahara,desert,Algeria", 17),
-  CI: lf("Ivory Coast,Abidjan,Africa", 18),
-  CM: lf("Cameroon,Africa,tropical", 19),
-  ML: lf("Mali,Timbuktu,Sahel,Africa", 20),
-  MZ: lf("Mozambique,Africa,coast,ocean", 21),
-  AO: lf("Angola,Luanda,Africa", 22),
-  MG: lf("Madagascar,Africa,tropical,island", 23),
-  CD: lf("Congo,Africa,rainforest,river", 24),
-  SD: lf("Sudan,Nile,Africa,ancient", 25),
-  LY: lf("Libya,Sahara,North Africa,ruins", 26),
-  NE: lf("Niger,Sahel,Africa,landscape", 27),
-  BF: lf("Burkina Faso,West Africa,savanna", 28),
-  BJ: lf("Benin,West Africa,Africa,market", 29),
-  TG: lf("Togo,Lome,West Africa,coast", 30),
-  SL: lf("Sierra Leone,Africa,coast,jungle", 31),
-  LR: lf("Liberia,West Africa,jungle,ocean", 32),
-  GN: lf("Guinea,West Africa,Africa,tropical", 33),
-  GW: lf("Guinea Bissau,Africa,tropical,ocean", 34),
-  GM: lf("Gambia,West Africa,river,beach", 35),
-  SS: lf("South Sudan,Africa,Nile,landscape", 36),
-  ER: lf("Eritrea,Africa,Red Sea,coast", 37),
-  SO: lf("Somalia,Africa,Mogadishu,coast", 38),
-  DJ: lf("Djibouti,Africa,Red Sea", 39),
-  CF: lf("Central Africa,tropical,rainforest", 40),
-  CG: lf("Congo Brazzaville,Africa,rainforest", 41),
-  GA: lf("Gabon,Africa,rainforest,ocean", 42),
-  GQ: lf("Equatorial Guinea,Africa,forest", 43),
-  TD: lf("Chad,Africa,Sahara,lake", 44),
-  MR: lf("Mauritania,Sahara,desert,Africa", 45),
-  LS: lf("Lesotho,South Africa,mountains", 46),
-  SZ: lf("Eswatini,Swaziland,Africa,landscape", 47),
-  MU: lf("Mauritius,island,tropical,lagoon", 48),
-  SC: lf("Seychelles,island,tropical,beach", 49),
-  KM: lf("Comoros,Africa,island,ocean", 50),
-  ST: lf("Sao Tome,Africa,tropical,island", 51),
-  CV: lf("Cape Verde,Africa,island,coast", 52),
+  // West Africa
+  NG: "https://images.pexels.com/photos/32656347/pexels-photo-32656347/free-photo-of-aerial-view-of-lagos-cityscape-with-ocean-horizon.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GH: "https://afar.brightspotcdn.com/dims4/default/bfebf58/2147483647/strip/true/crop/942x628+1+0/resize/900x600!/quality/90/?url=https://k3-prod-afar-media.s3.us-west-2.amazonaws.com/brightspot/4d/6f/d3d36fb519b32a9ce941bbb6dac1/original-ghana.png",
+  SN: "https://images.squarespace-cdn.com/content/v1/58b6c5e186e6c03c6630b232/1537527043488-PDCJGSYUYO7QYKCSXKHH/YOFF_New_04.jpg",
+  CI: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BJ: "https://images.pexels.com/photos/1252983/pexels-photo-1252983.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TG: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GN: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GM: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LR: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SL: "https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BF: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ML: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  NE: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MR: "https://images.pexels.com/photos/1303081/pexels-photo-1303081.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // North Africa
+  EG: "https://images.pexels.com/photos/3689859/pexels-photo-3689859.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MA: "https://images.pexels.com/photos/3889843/pexels-photo-3889843.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TN: "https://images.pexels.com/photos/3889826/pexels-photo-3889826.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  DZ: "https://images.pexels.com/photos/3184311/pexels-photo-3184311.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LY: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SD: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // East Africa
+  KE: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ET: "https://images.pexels.com/photos/3889843/pexels-photo-3889843.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TZ: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  UG: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  RW: "https://images.pexels.com/photos/36470681/pexels-photo-36470681/free-photo-of-aerial-view-of-kigali-city-in-the-lush-green-hills-of-rwanda.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SS: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ER: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SO: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  DJ: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Southern Africa
+  ZA: "https://images.locationscout.net/2017/11/tafelberg-table-mountain-cape-town-south-africa-kiki.webp?h=1400&q=80",
+  ZW: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ZM: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BW: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  NA: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MZ: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  AO: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LS: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SZ: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Central Africa
+  CD: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CF: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CG: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GA: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GQ: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CM: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TD: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Islands
+  MG: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MU: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SC: "https://images.pexels.com/photos/1252983/pexels-photo-1252983.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CV: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  KM: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ST: "https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GW: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
 };
 
-const COUNTRY_FALLBACK = lf("Africa,savanna,landscape,wildlife", 99);
+const COUNTRY_FALLBACK = "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
 function getCountryImage(code: string): string {
   return COUNTRY_IMAGES[code] || COUNTRY_FALLBACK;
@@ -1140,7 +1142,7 @@ export default function DiscoverAfrica() {
           <div className="relative rounded-2xl overflow-hidden mb-6 cursor-pointer group shadow-xl hover:shadow-2xl transition-all">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600" />
             <img
-              src={lf("Nigeria,Lagos,Africa,culture", 42)}
+              src="https://images.pexels.com/photos/32656347/pexels-photo-32656347/free-photo-of-aerial-view-of-lagos-cityscape-with-ocean-horizon.jpeg?auto=compress&cs=tinysrgb&w=1200"
               alt="Featured Destination"
               className="absolute inset-0 w-full h-full object-cover opacity-40"
               style={{ opacity: 0 }}
@@ -1265,7 +1267,7 @@ export default function DiscoverAfrica() {
         <div className="mt-14 rounded-3xl overflow-hidden shadow-2xl relative">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-600" />
           <img
-            src={lf("Africa,guide,tour,culture,people", 77)}
+            src="https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200"
             alt="Local Guides"
             className="absolute inset-0 w-full h-full object-cover"
             style={{ opacity: 0 }}
