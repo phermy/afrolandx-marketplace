@@ -13,7 +13,6 @@ import { Link } from "wouter";
 import { Loader2, Mail, Lock, User, CheckCircle, ShieldCheck, AlertCircle, Store } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SiGoogle, SiFacebook, SiTiktok } from "react-icons/si";
 
 const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -377,38 +376,7 @@ export default function RegisterPage() {
               </Button>
             </form>
           </Form>
-          {/* Social sign-up */}
-          <div className="mt-6">
-            <div className="relative mb-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-gray-400 font-medium">Or sign up with</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <a href="/api/auth/google" className="block">
-                <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 hover:bg-gray-50">
-                  <SiGoogle className="h-4 w-4 text-[#4285F4]" />
-                  <span className="font-medium">Continue with Google</span>
-                </Button>
-              </a>
-              <a href="/api/auth/facebook" className="block">
-                <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 hover:bg-blue-50">
-                  <SiFacebook className="h-4 w-4 text-[#1877F2]" />
-                  <span className="font-medium">Continue with Facebook</span>
-                </Button>
-              </a>
-              <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 opacity-50 cursor-not-allowed" disabled>
-                <SiTiktok className="h-4 w-4 text-black" />
-                <span className="font-medium">Continue with TikTok</span>
-                <span className="ml-auto text-xs text-gray-400">Coming soon</span>
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-5 text-center text-sm">
+          <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Already have an account? </span>
             <Link href="/login" className="text-green-700 hover:underline font-medium" data-testid="link-login">
               Sign in

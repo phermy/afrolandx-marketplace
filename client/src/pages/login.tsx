@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,6 @@ import { Link } from "wouter";
 import { Loader2, Mail, Lock, KeyRound, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { SiGoogle, SiFacebook, SiTiktok } from "react-icons/si";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -27,51 +26,10 @@ const otpEmailSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 type OtpEmailForm = z.infer<typeof otpEmailSchema>;
 
-function SocialLoginButtons() {
-  return (
-    <div className="space-y-3">
-      <a href="/api/auth/google" className="block">
-        <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 hover:bg-gray-50">
-          <SiGoogle className="h-4 w-4 text-[#4285F4]" />
-          <span className="font-medium">Continue with Google</span>
-        </Button>
-      </a>
-      <a href="/api/auth/facebook" className="block">
-        <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 hover:bg-blue-50">
-          <SiFacebook className="h-4 w-4 text-[#1877F2]" />
-          <span className="font-medium">Continue with Facebook</span>
-        </Button>
-      </a>
-      <Button type="button" variant="outline" className="w-full flex items-center gap-3 h-11 border-gray-300 opacity-50 cursor-not-allowed" disabled>
-        <SiTiktok className="h-4 w-4 text-black" />
-        <span className="font-medium">Continue with TikTok</span>
-        <span className="ml-auto text-xs text-gray-400">Coming soon</span>
-      </Button>
-    </div>
-  );
-}
-
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-
-  // Handle OAuth error redirects (e.g. ?error=google_not_configured)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get("error");
-    if (err) {
-      const messages: Record<string, string> = {
-        google_failed: "Google sign-in failed. Please try again.",
-        google_not_configured: "Google sign-in is not yet configured.",
-        facebook_failed: "Facebook sign-in failed. Please try again.",
-        facebook_not_configured: "Facebook sign-in is not yet configured.",
-      };
-      toast({ title: "Sign-in error", description: messages[err] || "An error occurred.", variant: "destructive" });
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // OTP flow state
   const [otpStep, setOtpStep] = useState<"email" | "code">("email");
@@ -308,20 +266,7 @@ export default function LoginPage() {
             </TabsContent>
           </Tabs>
 
-          {/* Social login */}
-          <div className="mt-6">
-            <div className="relative mb-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-3 text-gray-400 font-medium">Or continue with</span>
-              </div>
-            </div>
-            <SocialLoginButtons />
-          </div>
-
-          <div className="mt-5 text-center text-sm">
+          <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Don't have an account? </span>
             <Link href="/register" className="text-green-700 hover:underline font-medium" data-testid="link-register">
               Create one

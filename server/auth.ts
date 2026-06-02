@@ -1,7 +1,5 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { Strategy as FacebookStrategy } from "passport-facebook";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
@@ -81,89 +79,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // ── Google OAuth ─────────────────────────────────────────────────────────
-  const appUrl = process.env.APP_URL || 'https://afrolandx.com';
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    passport.use(new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: `${appUrl}/api/auth/google/callback`,
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const email = profile.emails?.[0]?.value || '';
-          const user = await storage.upsertUser({
-            id: `google_${profile.id}`,
-            email,
-            firstName: profile.name?.givenName || profile.displayName?.split(' ')[0] || '',
-            lastName: profile.name?.familyName || profile.displayName?.split(' ').slice(1).join(' ') || '',
-            profileImageUrl: profile.photos?.[0]?.value,
-            emailVerified: true,
-          });
-          done(null, user);
-        } catch (err) { done(err as Error); }
-      }
-    ));
-
-    app.get('/api/auth/google',
-      passport.authenticate('google', { scope: ['profile', 'email'] })
-    );
-    app.get('/api/auth/google/callback',
-      passport.authenticate('google', { failureRedirect: '/login?error=google_failed' }),
-      async (req: any, res) => {
-        try { await storage.updateActiveSession(req.user.id, req.sessionID); } catch {}
-        res.redirect('/');
-      }
-    );
-  } else {
-    app.get('/api/auth/google', (_req, res) => {
-      res.redirect('/login?error=google_not_configured');
-    });
-  }
-
-  // ── Facebook OAuth ────────────────────────────────────────────────────────
-  if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-    passport.use(new FacebookStrategy(
-      {
-        clientID: process.env.FACEBOOK_APP_ID,
-        clientSecret: process.env.FACEBOOK_APP_SECRET,
-        callbackURL: `${appUrl}/api/auth/facebook/callback`,
-        profileFields: ['id', 'emails', 'name', 'picture'],
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const email = profile.emails?.[0]?.value || '';
-          const user = await storage.upsertUser({
-            id: `fb_${profile.id}`,
-            email,
-            firstName: profile.name?.givenName || '',
-            lastName: profile.name?.familyName || '',
-            profileImageUrl: profile.photos?.[0]?.value,
-            emailVerified: !!email,
-          });
-          done(null, user);
-        } catch (err) { done(err as Error); }
-      }
-    ));
-
-    app.get('/api/auth/facebook',
-      passport.authenticate('facebook', { scope: ['email'] })
-    );
-    app.get('/api/auth/facebook/callback',
-      passport.authenticate('facebook', { failureRedirect: '/login?error=facebook_failed' }),
-      async (req: any, res) => {
-        try { await storage.updateActiveSession(req.user.id, req.sessionID); } catch {}
-        res.redirect('/');
-      }
-    );
-  } else {
-    app.get('/api/auth/facebook', (_req, res) => {
-      res.redirect('/login?error=facebook_not_configured');
-    });
-  }
-
-  // ── Helper: logs a user in AND records their session as the only active one,
+  // Helper: logs a user in AND records their session as the only active one,
   // kicking out any previous session automatically.
   async function finalizeLogin(req: any, res: any, user: any, onSuccess: () => void) {
     req.login(user, async (err: any) => {
