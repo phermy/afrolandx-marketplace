@@ -138,6 +138,44 @@ const STATES_BY_COUNTRY: Record<string, string[]> = {
   Qatar: ['Ad Dawhah','Al Khor','Al Rayyan','Al Wakrah','Ash Shamal','Az Za\'ayin','Umm Salal'],
 };
 
+// All country names used in the dropdown, so we can match against geo detection
+const DROPDOWN_COUNTRIES = [
+  'Nigeria','Ghana','Kenya','South Africa','Egypt','Senegal','Ivory Coast',
+  'Tanzania','Ethiopia','Uganda','Rwanda','Cameroon',
+  'United States','United Kingdom','Canada','Australia','New Zealand',
+  'Germany','France','Netherlands','Sweden','Norway','Denmark','Ireland',
+  'Spain','Italy','Portugal','Belgium','Switzerland','Austria',
+  'United Arab Emirates','Saudi Arabia','Qatar',
+  'Brazil','Jamaica','Trinidad and Tobago','Barbados',
+  'India','China','Japan','Singapore',
+];
+
+// Map ipapi.co country_name variants → our dropdown value
+const COUNTRY_NAME_MAP: Record<string, string> = {
+  'United States of America': 'United States',
+  'USA': 'United States',
+  'UK': 'United Kingdom',
+  'Great Britain': 'United Kingdom',
+  "Côte d'Ivoire": 'Ivory Coast',
+  'Cote d\'Ivoire': 'Ivory Coast',
+  'South Korea': 'South Korea',
+  'UAE': 'United Arab Emirates',
+};
+
+function detectCountryFromGeo(): string {
+  try {
+    const raw = localStorage.getItem('afrolandx_geo_v2');
+    if (!raw) return 'Nigeria';
+    const { data } = JSON.parse(raw);
+    const name: string = data?.country_name || '';
+    if (!name) return 'Nigeria';
+    const mapped = COUNTRY_NAME_MAP[name] || name;
+    return DROPDOWN_COUNTRIES.includes(mapped) ? mapped : 'Nigeria';
+  } catch {
+    return 'Nigeria';
+  }
+}
+
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -153,11 +191,32 @@ export default function Checkout() {
     city: '',
     state: '',
     postalCode: '',
-    country: 'Nigeria',
+    country: detectCountryFromGeo(),
   });
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [paymentMethod] = useState('paystack'); // Only Paystack for now
+  const [countryTouched, setCountryTouched] = useState(false);
+
+  // If geo cache was empty on mount, fetch it now and update country
+  useEffect(() => {
+    if (countryTouched) return;
+    const raw = localStorage.getItem('afrolandx_geo_v2');
+    if (raw) return; // already have cache, detectCountryFromGeo() handled it
+    fetch('/api/geo', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.local || data.error) return;
+        // Cache it for useCurrency too
+        try { localStorage.setItem('afrolandx_geo_v2', JSON.stringify({ data, ts: Date.now() })); } catch {}
+        const name: string = data.country_name || '';
+        const mapped = COUNTRY_NAME_MAP[name] || name;
+        const country = DROPDOWN_COUNTRIES.includes(mapped) ? mapped : null;
+        if (country) setShippingAddress(prev => ({ ...prev, country, state: '' }));
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Show error/cancelled message if Paystack redirected back with an error
   useEffect(() => {
@@ -494,7 +553,7 @@ export default function Checkout() {
                     <Label htmlFor="country">Country</Label>
                     <Select
                       value={shippingAddress.country}
-                      onValueChange={(value) => setShippingAddress(prev => ({ ...prev, country: value, state: '' }))}
+                      onValueChange={(value) => { setCountryTouched(true); setShippingAddress(prev => ({ ...prev, country: value, state: '' })); }}
                     >
                       <SelectTrigger className="input-nigerian">
                         <SelectValue />
