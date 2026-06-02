@@ -20,6 +20,124 @@ import type { ShippingQuote, ShippingAddress } from '@/types';
 // Currencies Paystack can natively charge in
 const PAYSTACK_SUPPORTED = new Set(['NGN', 'GHS', 'ZAR', 'KES', 'USD', 'GBP', 'EUR', 'EGP', 'XOF']);
 
+// States / provinces per country
+const STATES_BY_COUNTRY: Record<string, string[]> = {
+  Nigeria: [
+    'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
+    'Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT – Abuja','Gombe',
+    'Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos',
+    'Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
+    'Taraba','Yobe','Zamfara',
+  ],
+  Ghana: [
+    'Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra',
+    'North East','Northern','Oti','Savannah','Upper East','Upper West',
+    'Volta','Western','Western North',
+  ],
+  Kenya: [
+    'Baringo','Bomet','Bungoma','Busia','Elgeyo-Marakwet','Embu','Garissa',
+    'Homa Bay','Isiolo','Kajiado','Kakamega','Kericho','Kiambu','Kilifi',
+    'Kirinyaga','Kisii','Kisumu','Kitui','Kwale','Laikipia','Lamu','Machakos',
+    'Makueni','Mandera','Marsabit','Meru','Migori','Mombasa','Muranga',
+    'Nairobi','Nakuru','Nandi','Narok','Nyamira','Nyandarua','Nyeri',
+    'Samburu','Siaya','Taita-Taveta','Tana River','Tharaka-Nithi',
+    'Trans Nzoia','Turkana','Uasin Gishu','Vihiga','Wajir','West Pokot',
+  ],
+  'South Africa': [
+    'Eastern Cape','Free State','Gauteng','KwaZulu-Natal','Limpopo',
+    'Mpumalanga','North West','Northern Cape','Western Cape',
+  ],
+  Egypt: [
+    'Alexandria','Aswan','Asyut','Beheira','Beni Suef','Cairo','Dakahlia',
+    'Damietta','Faiyum','Gharbia','Giza','Ismailia','Kafr el-Sheikh',
+    'Luxor','Matruh','Minya','Monufia','New Valley','North Sinai',
+    'Port Said','Qalyubia','Qena','Red Sea','Sharqia','Sohag','South Sinai',
+    'Suez',
+  ],
+  Senegal: [
+    'Dakar','Diourbel','Fatick','Kaffrine','Kaolack','Kédougou','Kolda',
+    'Louga','Matam','Saint-Louis','Sédhiou','Tambacounda','Thiès','Ziguinchor',
+  ],
+  'Ivory Coast': [
+    'Abidjan','Bas-Sassandra','Comoé','Denguélé','Gôh-Djiboua','Lacs','Lagunes',
+    'Montagnes','Sassandra-Marahoué','Savanes','Vallée du Bandama',
+    'Woroba','Yamoussoukro','Zanzan',
+  ],
+  Tanzania: [
+    'Arusha','Dar es Salaam','Dodoma','Geita','Iringa','Kagera','Katavi',
+    'Kigoma','Kilimanjaro','Lindi','Manyara','Mara','Mbeya','Morogoro',
+    'Mtwara','Mwanza','Njombe','Pemba North','Pemba South','Pwani','Rukwa',
+    'Ruvuma','Shinyanga','Simiyu','Singida','Songwe','Tabora','Tanga',
+    'Zanzibar North','Zanzibar South','Zanzibar West',
+  ],
+  Ethiopia: [
+    'Addis Ababa','Afar','Amhara','Benishangul-Gumuz','Dire Dawa','Gambela',
+    'Harari','Oromia','Sidama','Somali','South Ethiopia','Southwest Ethiopia',
+    'Tigray',
+  ],
+  Uganda: [
+    'Central','Eastern','Northern','Western',
+  ],
+  Rwanda: [
+    'Eastern','Kigali','Northern','Southern','Western',
+  ],
+  Cameroon: [
+    'Adamawa','Centre','East','Far North','Littoral','North',
+    'North West','South','South West','West',
+  ],
+  'United States': [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado',
+    'Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho',
+    'Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana',
+    'Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
+    'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey',
+    'New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma',
+    'Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+    'Tennessee','Texas','Utah','Vermont','Virginia','Washington',
+    'West Virginia','Wisconsin','Wyoming','District of Columbia',
+  ],
+  Canada: [
+    'Alberta','British Columbia','Manitoba','New Brunswick',
+    'Newfoundland and Labrador','Northwest Territories','Nova Scotia',
+    'Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon',
+  ],
+  'United Kingdom': [
+    'England','Scotland','Wales','Northern Ireland',
+  ],
+  Australia: [
+    'Australian Capital Territory','New South Wales','Northern Territory',
+    'Queensland','South Australia','Tasmania','Victoria','Western Australia',
+  ],
+  'New Zealand': [
+    'Auckland','Bay of Plenty','Canterbury','Gisborne','Hawke\'s Bay',
+    'Manawatu-Whanganui','Marlborough','Nelson','Northland','Otago',
+    'Southland','Taranaki','Tasman','Waikato','Wellington','West Coast',
+  ],
+  India: [
+    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa',
+    'Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala',
+    'Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+    'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura',
+    'Uttar Pradesh','Uttarakhand','West Bengal',
+    'Delhi','Jammu & Kashmir','Ladakh',
+  ],
+  Brazil: [
+    'Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal',
+    'Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul',
+    'Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí',
+    'Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia',
+    'Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins',
+  ],
+  'United Arab Emirates': [
+    'Abu Dhabi','Ajman','Dubai','Fujairah','Ras Al Khaimah','Sharjah','Umm Al Quwain',
+  ],
+  'Saudi Arabia': [
+    'Al Bahah','Al Jawf','Al Madinah','Al Qassim','Asir','Eastern Province',
+    'Hail','Jizan','Makkah','Najran','Riyadh','Tabuk',
+  ],
+  Qatar: ['Ad Dawhah','Al Khor','Al Rayyan','Al Wakrah','Ash Shamal','Az Za\'ayin','Umm Salal'],
+};
+
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -329,14 +447,36 @@ export default function Checkout() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={shippingAddress.state}
-                        onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
-                        required
-                        className="input-nigerian"
-                      />
+                      <Label htmlFor="state">
+                        {shippingAddress.country === 'Canada' ? 'Province / Territory'
+                          : shippingAddress.country === 'United Kingdom' ? 'Country / Region'
+                          : shippingAddress.country === 'Australia' ? 'State / Territory'
+                          : 'State / Region'}
+                      </Label>
+                      {STATES_BY_COUNTRY[shippingAddress.country] ? (
+                        <Select
+                          value={shippingAddress.state}
+                          onValueChange={(value) => setShippingAddress(prev => ({ ...prev, state: value }))}
+                          required
+                        >
+                          <SelectTrigger className="input-nigerian">
+                            <SelectValue placeholder="Select…" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {STATES_BY_COUNTRY[shippingAddress.country].map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="state"
+                          value={shippingAddress.state}
+                          onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
+                          placeholder="State / Region"
+                          className="input-nigerian"
+                        />
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="postalCode">Postal Code</Label>
@@ -354,7 +494,7 @@ export default function Checkout() {
                     <Label htmlFor="country">Country</Label>
                     <Select
                       value={shippingAddress.country}
-                      onValueChange={(value) => setShippingAddress(prev => ({ ...prev, country: value }))}
+                      onValueChange={(value) => setShippingAddress(prev => ({ ...prev, country: value, state: '' }))}
                     >
                       <SelectTrigger className="input-nigerian">
                         <SelectValue />
