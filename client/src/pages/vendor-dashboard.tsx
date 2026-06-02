@@ -36,7 +36,9 @@ export default function VendorDashboard() {
   const [editNewFiles, setEditNewFiles] = useState<File[]>([]);
   const [editNewPreviews, setEditNewPreviews] = useState<string[]>([]);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-  const [addPreviewUrl, setAddPreviewUrl] = useState('');
+  const [addForm, setAddForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+  const [addFiles, setAddFiles] = useState<File[]>([]);
+  const [addPreviews, setAddPreviews] = useState<string[]>([]);
   const [addImageMode, setAddImageMode] = useState<'upload' | 'url'>('upload');
 
   // Redirect if not authenticated
@@ -272,52 +274,52 @@ export default function VendorDashboard() {
     setEditRemovedImages(prev => [...prev, url]);
   };
 
+  const resetAddForm = () => {
+    setAddForm({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+    setAddFiles([]);
+    setAddPreviews([]);
+    setSelectedCategory('');
+    setCustomCategoryName('');
+    setAddImageMode('upload');
+  };
+
+  const handleAddFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setAddFiles(prev => [...prev, ...files]);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => setAddPreviews(prev => [...prev, ev.target?.result as string]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const removeAddFile = (i: number) => {
+    setAddFiles(prev => prev.filter((_, idx) => idx !== i));
+    setAddPreviews(prev => prev.filter((_, idx) => idx !== i));
+  };
+
   const addProductMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       await apiRequest("POST", "/api/products", formData);
     },
     onSuccess: () => {
-      toast({
-        title: "Product submitted!",
-        description: "It will appear in your list once an admin approves it.",
-      });
+      toast({ title: "Product submitted!", description: "It will appear in your list once an admin approves it." });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
-      setSelectedCategory('');
-      setCustomCategoryName('');
-      setAddPreviewUrl('');
-      setAddImageMode('upload');
+      resetAddForm();
       setIsAddSheetOpen(false);
-      setTimeout(() => {
-        const productForm = document.querySelector('form[data-form="add-product"]') as HTMLFormElement;
-        if (productForm) {
-          productForm.reset();
-          const fileInputs = productForm.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
-          fileInputs.forEach(input => { input.value = ''; });
-        }
-      }, 100);
     },
     onError: (error: any) => {
       if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
+        toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
         setTimeout(() => { window.location.href = "/login"; }, 500);
         return;
       }
-      // Parse the real server error message
-      const msg = error?.message || '';
-      let description = "Something went wrong. Please try again.";
-      if (msg.includes('403') || msg.includes('Approved vendor')) {
-        description = "Your vendor account needs to be approved by an admin before you can add products.";
-      } else if (msg.includes('400') || msg.includes('Missing required')) {
-        description = "Please fill in all required fields: name, description, price, stock, and category.";
-      } else if (msg.includes('Validation')) {
-        description = "Some fields have invalid values. Check price and stock are valid numbers.";
-      } else if (msg.length > 0) {
-        description = msg.replace(/^\d+:\s*/, '');
-      }
+      const msg = (error?.message || '').replace(/^\d+:\s*/, '');
+      let description = msg || "Something went wrong. Please try again.";
+      if (msg.includes('403') || msg.includes('vendor')) description = "Your vendor account must be approved before adding products.";
+      else if (msg.includes('400') || msg.includes('Missing')) description = "Please fill in all required fields (name, description, price, stock, category).";
       toast({ title: "Could not add product", description, variant: "destructive" });
     },
   });
@@ -331,9 +333,8 @@ export default function VendorDashboard() {
     });
   };
 
-  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
 
     // Resolve category
     let catId = selectedCategory;
@@ -343,25 +344,46 @@ export default function VendorDashboard() {
     }
 
     // Client-side validation
+    if (!addForm.name.trim()) {
+      toast({ title: "Product name required", description: "Please enter a product name.", variant: "destructive" });
+      return;
+    }
     if (!catId) {
-      toast({ title: "Select a category", description: "Please choose a product category before submitting.", variant: "destructive" });
+      toast({ title: "Category required", description: "Please choose a product category.", variant: "destructive" });
+      return;
+    }
+    if (!addForm.description.trim()) {
+      toast({ title: "Description required", description: "Please describe your product.", variant: "destructive" });
+      return;
+    }
+    if (!addForm.price || parseFloat(addForm.price) <= 0) {
+      toast({ title: "Valid price required", description: "Please enter a price greater than 0.", variant: "destructive" });
+      return;
+    }
+    if (!addForm.stock || parseInt(addForm.stock) < 0) {
+      toast({ title: "Stock quantity required", description: "Please enter a stock quantity (0 or more).", variant: "destructive" });
       return;
     }
     const isOthersCategory = categories.find((c: any) => c.id === parseInt(catId))?.name?.toLowerCase() === 'others';
     if (isOthersCategory && !customCategoryName.trim()) {
-      toast({ title: "Describe your product type", description: "Please describe what type of product this is.", variant: "destructive" });
+      toast({ title: "Product type required", description: "Please describe what type of product this is.", variant: "destructive" });
       return;
     }
 
-    formData.set('categoryId', catId);
-
-    // Prepend custom type to description for "Others" category
-    if (isOthersCategory && customCategoryName.trim()) {
-      const existingDesc = (formData.get('description') as string) || '';
-      formData.set('description', `[Product type: ${customCategoryName.trim()}]\n\n${existingDesc}`);
+    const fd = new FormData();
+    fd.set('name', addForm.name.trim());
+    fd.set('categoryId', catId);
+    fd.set('description', isOthersCategory && customCategoryName.trim()
+      ? `[Product type: ${customCategoryName.trim()}]\n\n${addForm.description.trim()}`
+      : addForm.description.trim());
+    fd.set('price', addForm.price);
+    fd.set('stock', addForm.stock);
+    if (addImageMode === 'url' && addForm.imageUrl.trim()) {
+      fd.set('imageUrl', addForm.imageUrl.trim());
     }
+    addFiles.forEach(f => fd.append('images', f));
 
-    addProductMutation.mutate(formData);
+    addProductMutation.mutate(fd);
   };
 
   if (isLoading || vendorLoading) {
@@ -1099,94 +1121,110 @@ export default function VendorDashboard() {
       </div>
 
       {/* Add Product Sheet */}
-      <Sheet open={isAddSheetOpen} onOpenChange={setIsAddSheetOpen}>
+      <Sheet open={isAddSheetOpen} onOpenChange={(open) => { if (!open) resetAddForm(); setIsAddSheetOpen(open); }}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle className="text-xl">Add New Product</SheetTitle>
+          <SheetHeader className="mb-5">
+            <SheetTitle className="text-xl flex items-center gap-2">
+              <Plus className="w-5 h-5 text-nigerian-green" /> Add New Product
+            </SheetTitle>
             <SheetDescription>
-              Fill in the details below. Your product will be reviewed by our team before going live — usually within 24 hours.
+              Fill in the details below. Your product goes live after admin approval — usually within 24 hours.
             </SheetDescription>
           </SheetHeader>
 
-          <form onSubmit={handleAddProduct} className="space-y-5" data-form="add-product">
+          <form onSubmit={handleAddProduct} className="space-y-5">
+
             {/* Product Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="font-medium">Product Name <span className="text-red-500">*</span></Label>
-              <Input id="name" name="name" placeholder="e.g., Premium Ankara Dress" required className="input-nigerian" />
+              <Label className="font-semibold">Product Name <span className="text-red-500">*</span></Label>
+              <Input
+                placeholder="e.g. Premium Ankara Dress"
+                value={addForm.name}
+                onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                className="input-nigerian"
+              />
             </div>
 
             {/* Category */}
             <div className="space-y-1.5">
-              <Label htmlFor="categoryId" className="font-medium">Category <span className="text-red-500">*</span></Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
+              <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="input-nigerian">
                   <SelectValue placeholder="What type of product is this?" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                   ))}
-                  {!categories.some((c) => c.name.toLowerCase() === 'others') && (
+                  {!categories.some(c => c.name.toLowerCase() === 'others') && (
                     <SelectItem value="others">Others</SelectItem>
                   )}
                 </SelectContent>
               </Select>
-              {(() => {
-                const selectedCat = categories.find((c: any) => c.id === parseInt(selectedCategory) || (selectedCategory === 'others' && c.name.toLowerCase() === 'others'));
-                return selectedCat?.name?.toLowerCase() === 'others';
-              })() && (
-                <div className="mt-2">
-                  <Input
-                    id="customCategoryName"
-                    placeholder="Describe your product type, e.g. Beaded Crown, Raffia Bag…"
-                    value={customCategoryName}
-                    onChange={(e) => setCustomCategoryName(e.target.value)}
-                    className="input-nigerian"
-                    required
-                  />
-                </div>
+              {categories.find(c => c.id === parseInt(selectedCategory))?.name?.toLowerCase() === 'others' && (
+                <Input
+                  placeholder="Describe your product type, e.g. Beaded Crown, Raffia Bag…"
+                  value={customCategoryName}
+                  onChange={e => setCustomCategoryName(e.target.value)}
+                  className="input-nigerian mt-1.5"
+                />
               )}
             </div>
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label htmlFor="description" className="font-medium">Description <span className="text-red-500">*</span></Label>
-              <Textarea id="description" name="description" placeholder="Tell buyers what makes this product special — fabric, craftsmanship, size, occasion…" rows={4} required className="input-nigerian" />
+              <Label className="font-semibold">Description <span className="text-red-500">*</span></Label>
+              <Textarea
+                placeholder="Tell buyers what makes this product special — fabric, craftsmanship, sizing, occasion…"
+                rows={4}
+                value={addForm.description}
+                onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))}
+                className="input-nigerian"
+              />
             </div>
 
             {/* Price & Stock */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="price" className="font-medium">Price (₦) <span className="text-red-500">*</span></Label>
-                <Input id="price" name="price" type="number" min="0" placeholder="e.g. 45000" required className="input-nigerian" />
+                <Label className="font-semibold">Price (₦) <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 45000"
+                  value={addForm.price}
+                  onChange={e => setAddForm(f => ({ ...f, price: e.target.value }))}
+                  className="input-nigerian"
+                />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="stock" className="font-medium">Stock Qty <span className="text-red-500">*</span></Label>
-                <Input id="stock" name="stock" type="number" min="0" placeholder="e.g. 10" required className="input-nigerian" />
+                <Label className="font-semibold">Stock Qty <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 10"
+                  value={addForm.stock}
+                  onChange={e => setAddForm(f => ({ ...f, stock: e.target.value }))}
+                  className="input-nigerian"
+                />
               </div>
             </div>
 
-            {/* Weight */}
-            <div className="space-y-1.5">
-              <Label htmlFor="weight" className="font-medium">Weight (kg) <span className="text-gray-400 font-normal">— optional, helps with shipping</span></Label>
-              <Input id="weight" name="weight" type="number" step="0.1" min="0" placeholder="e.g. 0.5" className="input-nigerian" />
-            </div>
-
-            {/* Image section */}
+            {/* Photos */}
             <div className="space-y-2">
-              <Label className="font-medium">Product Image</Label>
-              {/* Toggle */}
+              <Label className="font-semibold flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" /> Product Photos <span className="text-gray-400 font-normal text-xs">(optional but recommended)</span>
+              </Label>
+
+              {/* Toggle upload / URL */}
               <div className="flex rounded-lg border border-gray-200 p-1 gap-1 bg-gray-50">
-                <button
-                  type="button"
-                  onClick={() => { setAddImageMode('upload'); setAddPreviewUrl(''); }}
+                <button type="button"
+                  onClick={() => { setAddImageMode('upload'); setAddForm(f => ({ ...f, imageUrl: '' })); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-colors ${addImageMode === 'upload' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                 >
-                  <Upload className="w-4 h-4" /> Upload file
+                  <Upload className="w-4 h-4" /> Upload Photo
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAddImageMode('url')}
+                <button type="button"
+                  onClick={() => { setAddImageMode('url'); setAddFiles([]); setAddPreviews([]); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-sm font-medium transition-colors ${addImageMode === 'url' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   <LinkIcon className="w-4 h-4" /> Paste URL
@@ -1194,50 +1232,78 @@ export default function VendorDashboard() {
               </div>
 
               {addImageMode === 'upload' ? (
-                <div>
-                  <label htmlFor="images" className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-nigerian-green hover:bg-green-50 transition-colors">
-                    <ImageIcon className="w-7 h-7 text-gray-400 mb-1" />
-                    <span className="text-sm text-gray-500">Click to upload photos</span>
+                <div className="space-y-2">
+                  {/* Preview thumbnails */}
+                  {addPreviews.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {addPreviews.map((src, i) => (
+                        <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-nigerian-green bg-green-50">
+                          <img src={src} alt={`Photo ${i+1}`} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removeAddFile(i)}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                            <X className="w-3 h-3" />
+                          </button>
+                          <div className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">✓</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload zone */}
+                  <label
+                    htmlFor="add-product-images"
+                    className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-nigerian-green hover:bg-green-50 transition-colors"
+                  >
+                    <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                    <span className="text-sm font-medium text-gray-600">
+                      {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected — click to add more` : 'Click here to choose photos'}
+                    </span>
                     <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — up to 15 MB each</span>
                   </label>
-                  <Input id="images" name="images" type="file" multiple accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif" className="hidden" />
+                  <input
+                    id="add-product-images"
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/avif"
+                    className="hidden"
+                    onChange={handleAddFileChange}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Input
-                    name="imageUrl"
                     type="url"
                     placeholder="https://example.com/photo.jpg"
                     className="input-nigerian"
-                    value={addPreviewUrl}
-                    onChange={(e) => setAddPreviewUrl(e.target.value)}
+                    value={addForm.imageUrl}
+                    onChange={e => setAddForm(f => ({ ...f, imageUrl: e.target.value }))}
                   />
-                  {addPreviewUrl && (
+                  {addForm.imageUrl && (
                     <div className="w-full h-36 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-                      <img
-                        src={addPreviewUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
+                      <img src={addForm.imageUrl} alt="Preview" className="w-full h-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Notice */}
-            <div className="flex gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-              <Clock className="w-4 h-4 mt-0.5 shrink-0 text-yellow-600" />
-              <span>Products are reviewed by an admin before appearing in the shop. This usually takes less than 24 hours.</span>
+            {/* Review notice */}
+            <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+              <span>Products are reviewed by an admin before going live in the shop — usually within 24 hours.</span>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <Button type="submit" className="btn-nigerian flex-1" disabled={addProductMutation.isPending}>
-                {addProductMutation.isPending ? "Submitting…" : "Submit Product"}
+            {/* Submit */}
+            <div className="flex gap-3 pt-1 pb-4">
+              <Button type="submit" className="btn-nigerian flex-1 h-11 text-base" disabled={addProductMutation.isPending}>
+                {addProductMutation.isPending
+                  ? <><span className="animate-spin mr-2">⏳</span> Submitting…</>
+                  : <><Plus className="w-4 h-4 mr-1" /> Submit Product</>}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setIsAddSheetOpen(false)} disabled={addProductMutation.isPending}>
+              <Button type="button" variant="outline" className="h-11"
+                onClick={() => { resetAddForm(); setIsAddSheetOpen(false); }}
+                disabled={addProductMutation.isPending}>
                 Cancel
               </Button>
             </div>
