@@ -94,6 +94,7 @@ export interface IStorage {
   updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   verifyUserEmail(userId: string): Promise<void>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  updateActiveSession(userId: string, sessionId: string | null): Promise<void>;
   
   // Vendor operations
   createVendor(vendor: InsertVendor): Promise<Vendor>;
@@ -322,6 +323,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
     await db.update(users).set({ password: hashedPassword, passwordResetOtp: null, passwordResetOtpExpiry: null, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updateActiveSession(userId: string, sessionId: string | null): Promise<void> {
+    await db.update(users).set({ activeSessionId: sessionId, updatedAt: new Date() }).where(eq(users.id, userId));
   }
 
   // Vendor operations

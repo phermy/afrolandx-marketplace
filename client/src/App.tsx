@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { CartProvider } from "@/contexts/CartContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
@@ -33,6 +34,29 @@ import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import SessionTimeout from "@/components/session-timeout";
 import { useEffect } from "react";
+
+function SessionKickoutGuard() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    const handle = () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Signed out",
+        description: "You were signed in on another device, so this session has ended.",
+        variant: "destructive",
+        duration: 6000,
+      });
+      setLocation("/login");
+    };
+    window.addEventListener("session-superseded", handle);
+    return () => window.removeEventListener("session-superseded", handle);
+  }, []);
+
+  return null;
+}
 
 function AuthRedirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
@@ -115,6 +139,7 @@ function App() {
           <ShoppingCart />
           <Chatbot />
           <SessionTimeout />
+          <SessionKickoutGuard />
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>

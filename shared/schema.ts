@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   passwordResetOtpExpiry: timestamp("password_reset_otp_expiry"),
   loginOtp: varchar("login_otp"),
   loginOtpExpiry: timestamp("login_otp_expiry"),
+  activeSessionId: varchar("active_session_id"), // enforces single active session
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

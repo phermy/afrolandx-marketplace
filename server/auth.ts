@@ -79,6 +79,20 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Helper: logs a user in AND records their session as the only active one,
+  // kicking out any previous session automatically.
+  async function finalizeLogin(req: any, res: any, user: any, onSuccess: () => void) {
+    req.login(user, async (err: any) => {
+      if (err) return res.status(500).json({ message: "Login failed" });
+      try {
+        await storage.updateActiveSession(user.id, req.sessionID);
+      } catch (e) {
+        console.error("Failed to store active session:", e);
+      }
+      onSuccess();
+    });
+  }
+
   // Register endpoint
   app.get("/api/check-email", async (req, res) => {
     try {
@@ -169,20 +183,19 @@ export async function setupAuth(app: Express) {
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Login failed" });
-        }
+      finalizeLogin(req, res, user, () => {
         return res.json({ user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
       });
     })(req, res, next);
   });
 
   // Logout endpoint
-  app.post("/api/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Logout failed" });
+  app.post("/api/logout", async (req, res) => {
+    const userId = (req.user as any)?.id;
+    req.logout(async (err) => {
+      if (err) return res.status(500).json({ message: "Logout failed" });
+      if (userId) {
+        try { await storage.updateActiveSession(userId, null); } catch {}
       }
       res.json({ message: "Logged out successfully" });
     });
@@ -264,10 +277,7 @@ export async function setupAuth(app: Express) {
         await storage.verifyUserEmail(user.id);
       }
 
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Login failed" });
-        }
+      finalizeLogin(req, res, user, () => {
         return res.json({
           user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles }
         });
@@ -305,10 +315,7 @@ export async function setupAuth(app: Express) {
 
       await storage.verifyUserEmail(user.id);
 
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Verification succeeded but login failed. Please sign in." });
-        }
+      finalizeLogin(req, res, user, () => {
         return res.json({ message: "Email verified successfully", user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
       });
     } catch (error) {
@@ -412,8 +419,15 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
+  if (!req.isAuthenticated() || !req.user) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
-  return res.status(401).json({ message: "Unauthorized" });
+  const user = req.user as any;
+  if (user.activeSessionId && user.activeSessionId !== req.sessionID) {
+    req.logout((err) => {
+      if (!err) req.session?.destroy?.(() => {});
+    });
+    return res.status(401).json({ message: "SESSION_SUPERSEDED" });
+  }
+  return next();
 };

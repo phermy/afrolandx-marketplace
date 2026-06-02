@@ -1,0 +1,1 @@
+- [Single-session enforcement](single-session.md) — how one-active-session-per-user is implemented (activeSessionId column + isAuthenticated middleware + frontend kickout guard).
