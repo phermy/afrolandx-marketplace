@@ -331,16 +331,28 @@ function DropCard({
         </div>
       )}
       <div className="md:flex">
-        {drop.teaserImageUrl && (
-          <div className="md:w-80 aspect-video md:aspect-auto shrink-0">
+        <div className="md:w-72 shrink-0 relative overflow-hidden bg-gradient-to-br from-amber-800 via-orange-700 to-yellow-600" style={{ minHeight: '180px' }}>
+          {drop.teaserImageUrl ? (
             <img
               src={drop.teaserImageUrl}
               alt={drop.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover absolute inset-0"
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
-          </div>
-        )}
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-white">
+              <div className="text-4xl mb-2 opacity-80">✦</div>
+              <p className="text-xs font-semibold uppercase tracking-widest opacity-70 text-center">Designer Collab</p>
+            </div>
+          )}
+          {/* Decorative kente-inspired overlay */}
+          {!drop.teaserImageUrl && (
+            <div className="absolute inset-0 opacity-10" style={{
+              backgroundImage: 'repeating-linear-gradient(45deg, #fff 0, #fff 2px, transparent 0, transparent 50%)',
+              backgroundSize: '12px 12px',
+            }} />
+          )}
+        </div>
         <div className="flex-1 flex flex-col">
           <CardHeader>
             <div className="flex items-start justify-between gap-2">
