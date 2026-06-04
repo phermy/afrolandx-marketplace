@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
 import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "lucide-react";
 import type { Product } from "@/types";
-import LocalPrice from "@/components/LocalPrice";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
 import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.png';
@@ -336,9 +335,8 @@ export default function Landing() {
                     <div className="flex items-center justify-between mb-2 md:mb-4">
                       <div className="flex flex-col">
                         <span className="text-sm sm:text-base md:text-xl font-bold text-nigerian-green">
-                          ${product.price.toLocaleString()}
+                          ₦{parseFloat(product.price).toLocaleString()}
                         </span>
-                        <LocalPrice usdAmount={product.price} />
                       </div>
                       <span className="hidden sm:block text-xs text-gray-500">
                         {product.stock} left

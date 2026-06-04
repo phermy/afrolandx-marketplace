@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'wouter';
-import LocalPrice from '@/components/LocalPrice';
 
 export default function ShoppingCart() {
   const { 
@@ -28,9 +27,7 @@ export default function ShoppingCart() {
     return null;
   }
 
-  const formatPrice = (price: string) => {
-    return `$${parseFloat(price).toLocaleString()}`;
-  };
+  const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
 
   const handleQuantityChange = (cartItemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -196,7 +193,6 @@ export default function ShoppingCart() {
                   <span>Total</span>
                   <div className="text-right">
                     <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
-                    <LocalPrice usdAmount={cartTotal} className="block" size="md" />
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">

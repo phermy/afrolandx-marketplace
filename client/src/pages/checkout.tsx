@@ -5,7 +5,6 @@ import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
-import { useCurrency } from '@/hooks/useCurrency';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,8 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { ShippingQuote, ShippingAddress } from '@/types';
 
-// Currencies Paystack can natively charge in
-const PAYSTACK_SUPPORTED = new Set(['NGN', 'GHS', 'ZAR', 'KES', 'USD', 'GBP', 'EUR', 'EGP', 'XOF']);
 
 // States / provinces per country
 const STATES_BY_COUNTRY: Record<string, string[]> = {
@@ -181,7 +178,6 @@ export default function Checkout() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { currencyInfo, formatLocal } = useCurrency();
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -279,17 +275,11 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Fetch shipping quotes — pass buyer's local currency so the API returns localPrice
+  // Fetch shipping quotes (all prices in NGN)
   const { data: shippingQuotes = [], isLoading: isLoadingShipping } = useQuery<ShippingQuote[]>({
-    queryKey: ['/api/shipping/quote', currencyInfo?.code, currencyInfo?.rate],
+    queryKey: ['/api/shipping/quote'],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (currencyInfo) {
-        params.set('currency', currencyInfo.code);
-        params.set('rate', String(currencyInfo.rate));
-        params.set('symbol', currencyInfo.symbol);
-      }
-      const res = await fetch(`/api/shipping/quote?${params.toString()}`, { credentials: 'include' });
+      const res = await fetch('/api/shipping/quote', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch shipping quotes');
       return res.json();
     },
@@ -383,41 +373,27 @@ export default function Checkout() {
       return;
     }
 
-    const usdTotal = cartTotal + selectedQuote.price;
-    const currency = currencyInfo?.code || 'USD';
-    const localTotal = currencyInfo ? usdTotal * currencyInfo.rate : null;
+    // All prices are in NGN — add directly, no conversion needed
+    const ngnTotal = cartTotal + selectedQuote.price;
 
     const orderData = {
-      totalAmount: usdTotal.toString(),
+      totalAmount: ngnTotal.toString(),
       shippingAmount: selectedQuote.price.toString(),
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
       paymentMethod,
-      currency,
-      localAmount: localTotal !== null ? localTotal.toFixed(2) : undefined,
+      currency: 'NGN',
     };
 
     createOrderMutation.mutate(orderData);
   };
 
-  // Format price in local currency (primary) with USD fallback
-  const formatPrice = (usdAmount: number) => {
-    if (currencyInfo) {
-      const local = usdAmount * currencyInfo.rate;
-      const formatted = local >= 1000
-        ? local.toLocaleString(undefined, { maximumFractionDigits: 0 })
-        : local.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      return `${currencyInfo.symbol}${formatted}`;
-    }
-    return `$${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  // Show USD as small secondary label
-  const formatUsdSub = (usdAmount: number) => `≈ $${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // All prices are in NGN
+  const formatPrice = (ngnAmount: number) =>
+    `₦${ngnAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const selectedShippingQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
-  const isNativeCurrency = currencyInfo && PAYSTACK_SUPPORTED.has(currencyInfo.code);
 
   if (isLoading) {
     return (
@@ -630,19 +606,7 @@ export default function Checkout() {
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
                                 </div>
                                 <div className="text-right">
-                                  {quote.localPrice && quote.localSymbol ? (
-                                    <>
-                                      <span className="font-bold text-nigerian-green">
-                                        {quote.localSymbol}{quote.localPrice.toLocaleString()}
-                                      </span>
-                                      <span className="block text-xs text-gray-400">≈ ${quote.price.toFixed(2)}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
-                                      {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(quote.price)}</span>}
-                                    </>
-                                  )}
+                                  <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
                                 </div>
                               </div>
                             </Label>
@@ -704,7 +668,6 @@ export default function Checkout() {
                         </div>
                         <div className="text-right">
                           <span className="font-semibold text-sm">{formatPrice(parseFloat(item.product.price) * item.quantity)}</span>
-                          {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(parseFloat(item.product.price) * item.quantity)}</span>}
                         </div>
                       </div>
                     ))}
@@ -713,43 +676,22 @@ export default function Checkout() {
                   <Separator />
 
                   {/* Currency indicator */}
-                  {currencyInfo && (
-                    <div className={`text-xs px-3 py-2 rounded-md flex items-center gap-2 ${isNativeCurrency ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                      <span>{isNativeCurrency ? '✓' : 'ℹ'}</span>
-                      <span>
-                        {isNativeCurrency
-                          ? `Charging in ${currencyInfo.code} (${currencyInfo.country})`
-                          : `${currencyInfo.code} not supported by Paystack — charging in USD`}
-                      </span>
-                    </div>
-                  )}
+                  <div className="text-xs px-3 py-2 rounded-md flex items-center gap-2 bg-green-50 text-green-700 border border-green-200">
+                    <span>✓</span>
+                    <span>All prices in Nigerian Naira (₦) — charged via Paystack</span>
+                  </div>
 
                   {/* Pricing Breakdown */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <div className="text-right">
-                        <span className="font-medium">{formatPrice(cartTotal)}</span>
-                        {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(cartTotal)}</span>}
-                      </div>
+                      <span className="font-medium">{formatPrice(cartTotal)}</span>
                     </div>
                     
                     {selectedShippingQuote && (
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
-                        <div className="text-right">
-                          {selectedShippingQuote.localPrice && selectedShippingQuote.localSymbol ? (
-                            <>
-                              <span className="font-medium">{selectedShippingQuote.localSymbol}{selectedShippingQuote.localPrice.toLocaleString()}</span>
-                              <span className="block text-xs text-gray-400">≈ ${selectedShippingQuote.price.toFixed(2)}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
-                              {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(selectedShippingQuote.price)}</span>}
-                            </>
-                          )}
-                        </div>
+                        <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
                       </div>
                     )}
                     
@@ -757,10 +699,7 @@ export default function Checkout() {
                     
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <div className="text-right">
-                        <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
-                        {currencyInfo && <span className="block text-xs text-gray-400 font-normal">{formatUsdSub(totalAmount)}</span>}
-                      </div>
+                      <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
                     </div>
                   </div>
 

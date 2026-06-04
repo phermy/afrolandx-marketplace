@@ -1030,9 +1030,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Base rates in USD
       const BASE_QUOTES = [
-        { carrier: 'UPS',   service: 'UPS Standard',  price: 25, duration: '5-7 business days' },
-        { carrier: 'FedEx', service: 'FedEx Express',  price: 40, duration: '3-5 business days' },
-        { carrier: 'DHL',   service: 'DHL Express',    price: 60, duration: '1-2 business days' },
+        { carrier: 'UPS',   service: 'UPS Standard',  price: 15000, duration: '5-7 business days' },
+        { carrier: 'FedEx', service: 'FedEx Express',  price: 25000, duration: '3-5 business days' },
+        { carrier: 'DHL',   service: 'DHL Express',    price: 40000, duration: '1-2 business days' },
       ];
 
       // Optional local currency conversion: ?currency=NGN&rate=1800&symbol=₦
@@ -1095,16 +1095,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate payment reference
       const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
-      // Determine charge currency & amount
-      // If buyer's currency is Paystack-supported, charge in it. Otherwise fall back to USD.
-      const { PaystackService } = await import('./paystack');
-      const requestedCurrency = (currency || 'USD').toUpperCase();
-      const chargeCurrency = PaystackService.SUPPORTED_CURRENCIES.has(requestedCurrency) ? requestedCurrency : 'USD';
-      const chargeAmount = chargeCurrency !== 'USD' && localAmount
-        ? parseFloat(localAmount)
-        : parseFloat(totalAmount);
-      
-      // Create order with pending payment (always store USD total for accounting)
+      // All prices stored in NGN — always charge in Naira
+      const chargeCurrency = 'NGN';
+      const chargeAmount = parseFloat(totalAmount);
+
+      // Create order with pending payment (total stored in NGN)
       const orderData = {
         userId,
         totalAmount,
@@ -1133,49 +1128,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/callback`;
 
-      const buildMetadata = (finalCurrency: string) => ({
+      const metadata = {
         orderId: order.id,
         userId,
         shippingMethod,
-        chargeCurrency: finalCurrency,
-        usdEquivalent: totalAmount,
         custom_fields: [
-          { display_name: 'Order ID',  variable_name: 'order_id',        value: order.id.toString() },
-          { display_name: 'Currency',  variable_name: 'charge_currency',  value: finalCurrency },
+          { display_name: 'Order ID', variable_name: 'order_id', value: order.id.toString() },
         ],
-      });
+      };
 
-      let paymentData: any;
-      try {
-        paymentData = await paystack.initializeTransaction(
-          user.email, chargeAmount, reference,
-          buildMetadata(chargeCurrency), callbackUrl, chargeCurrency
-        );
-      } catch (firstErr: any) {
-        // Paystack merchant account doesn't support the requested currency.
-        // Retry with NGN (most likely the merchant's home currency).
-        if (firstErr?.message?.toLowerCase().includes('currency not supported')) {
-          console.log(`[paystack] ${chargeCurrency} rejected by merchant — retrying with NGN`);
-          let ngnRate = 1800; // safe fallback
-          try {
-            const ratesRes = await fetch('https://open.er-api.com/v6/latest/USD', {
-              signal: AbortSignal.timeout(5000),
-            });
-            if (ratesRes.ok) {
-              const ratesData = await ratesRes.json() as any;
-              ngnRate = ratesData.rates?.NGN || ngnRate;
-            }
-          } catch { /* use fallback rate */ }
-
-          const ngnAmount = parseFloat(totalAmount) * ngnRate;
-          paymentData = await paystack.initializeTransaction(
-            user.email, ngnAmount, reference,
-            buildMetadata('NGN'), callbackUrl, 'NGN'
-          );
-        } else {
-          throw firstErr;
-        }
-      }
+      const paymentData = await paystack.initializeTransaction(
+        user.email, chargeAmount, reference,
+        metadata, callbackUrl, chargeCurrency
+      );
 
       res.json({
         order,
@@ -1256,7 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createNotification({
               userId: vendor.userId,
               title: 'New Order Received!',
-              message: `You have a new order (#${order.id}) worth ₦${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
+              message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
               type: 'order'
             });
             notifiedVendors.add(product.vendorId);
@@ -1355,6 +1320,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Award loyalty points (1 point per $1 USD spent)
+        const orderTotal = parseFloat(order.totalAmount) || 0;
+        const pointsToAward = Math.floor(orderTotal);
+        if (pointsToAward > 0) {
+          try {
+            await storage.addLoyaltyPoints(
+              order.userId,
+              pointsToAward,
+              'purchase',
+              `Points for Order #${order.id}`,
+              order.id,
+              'order'
+            );
+          } catch (loyaltyErr) {
+            console.error('Failed to award loyalty points:', loyaltyErr);
+          }
+        }
+
         // Notify all admins
         const adminUsers = await storage.getAdminUsers();
         for (const admin of adminUsers) {
@@ -1367,8 +1350,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Redirect to My Orders page after successful payment
-      res.redirect(`/my-orders?payment=success&orderId=${orderId}&reference=${paymentReference}`);
+      // Redirect to order success page after payment
+      res.redirect(`/order-success?order_id=${orderId}&reference=${paymentReference}`);
     } catch (error) {
       console.error('Error processing payment callback:', error);
       res.redirect('/checkout?error=processing_failed');

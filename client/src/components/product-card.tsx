@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
 
 /** Returns the best URL to display for a product image */
@@ -31,6 +31,7 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart, isAddingToCart, openCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -47,7 +48,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     }, 1500);
   };
 
-  const formatPrice = (price: string) => `$${parseFloat(price).toLocaleString()}`;
+  const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
 
   const getStatusBadge = () => {
     if (product.status === 'approved') return null;
@@ -125,7 +126,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             {product.name}
           </h3>
 
-          <p className="text-gray-500 text-xs mb-1.5 line-clamp-2 hidden sm:block">
+          <p className="text-gray-500 text-xs mb-1.5 line-clamp-2 hidden sm:block min-h-[2.5rem]">
             {product.description}
           </p>
 
@@ -134,9 +135,6 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div className="flex flex-col min-w-0">
               <span className="text-sm sm:text-lg font-bold text-nigerian-green leading-none">
                 {formatPrice(product.price)}
-              </span>
-              <span className="mt-0.5 text-[10px] sm:text-xs">
-                <LocalPrice usdAmount={parseFloat(product.price)} />
               </span>
             </div>
             <div className="flex items-center text-yellow-500 flex-shrink-0 mt-0.5">
@@ -191,11 +189,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               variant="outline"
               size="sm"
               className="w-full text-xs sm:text-sm border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
-              onClick={() =>
-                alert(
-                  `Product Details:\n\nName: ${product.name}\nDescription: ${product.description}\nPrice: $${parseFloat(product.price).toLocaleString()}\nStock: ${product.stock}\nWeight: ${product.weight ? parseFloat(product.weight) + 'kg' : 'Not specified'}\nStatus: ${product.status}`
-                )
-              }
+              onClick={() => setLocation(`/products/${product.id}`)}
             >
               View Details
             </Button>

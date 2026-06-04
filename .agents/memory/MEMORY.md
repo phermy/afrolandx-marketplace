@@ -1,1 +1,1 @@
-- [Single-session enforcement](single-session.md) — how one-active-session-per-user is implemented (activeSessionId column + isAuthenticated middleware + frontend kickout guard).
+- [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
