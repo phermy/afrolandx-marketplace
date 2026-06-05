@@ -48,7 +48,7 @@ export default function Products() {
   });
 
   const { data: allProducts = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max],
+    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max, genderTab],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('status', 'approved');
@@ -56,14 +56,15 @@ export default function Products() {
       if (selectedCategory) params.append('categoryId', selectedCategory.toString());
       if (priceRange.min) params.append('minPrice', priceRange.min);
       if (priceRange.max) params.append('maxPrice', priceRange.max);
+      if (genderTab !== 'all') params.append('gender', genderTab);
       const response = await fetch(`/api/products?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
   });
 
-  // Apply gender tab filter first, then sort
-  const genderFiltered = allProducts.filter(p => matchesGender(p, genderTab));
+  // Products already filtered by gender on the server; no client-side filtering needed
+  const genderFiltered = allProducts;
 
   const sortedProducts = [...genderFiltered].sort((a, b) => {
     switch (sortBy) {

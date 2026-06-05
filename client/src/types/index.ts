@@ -42,6 +42,7 @@ export interface Product {
   images: string[];
   status: 'pending' | 'approved' | 'rejected';
   featured: boolean;
+  gender?: string | null;
   createdAt: string;
   updatedAt: string;
 }

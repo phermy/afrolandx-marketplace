@@ -111,12 +111,12 @@ export interface IStorage {
   // Product operations
   createProduct(product: InsertProduct): Promise<Product>;
   getProduct(id: number): Promise<Product | undefined>;
-  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; }): Promise<Product[]>;
+  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; gender?: string; }): Promise<Product[]>;
   updateProductStatus(id: number, status: string): Promise<void>;
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;
   updateProductImages(id: number, images: string[], name?: string, description?: string): Promise<void>;
-  updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string }): Promise<Product>;
+  updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string; gender?: string | null }): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]>;
   
@@ -401,6 +401,7 @@ export class DatabaseStorage implements IStorage {
     search?: string;
     minPrice?: number;
     maxPrice?: number;
+    gender?: string;
   }): Promise<Product[]> {
     const conditions = [];
     
@@ -429,6 +430,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.maxPrice !== undefined) {
       conditions.push(lte(products.price, filters.maxPrice.toString()));
+    }
+    if (filters?.gender) {
+      conditions.push(eq(products.gender, filters.gender));
     }
     
     const query = db.select().from(products);

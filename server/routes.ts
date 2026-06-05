@@ -647,6 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
           images: imageUrls,
           vendorId: req.vendor.id,
+          gender: req.body.gender && req.body.gender.trim() ? req.body.gender.trim() : null,
         };
 
         const validatedData = insertProductSchema.parse(productData);
@@ -673,7 +674,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         featured, 
         search, 
         minPrice, 
-        maxPrice 
+        maxPrice,
+        gender
       } = req.query;
       
       const filters: any = { status };
@@ -683,6 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) filters.search = search as string;
       if (minPrice) filters.minPrice = parseFloat(minPrice as string);
       if (maxPrice) filters.maxPrice = parseFloat(maxPrice as string);
+      if (gender && gender !== 'all') filters.gender = gender as string;
 
       const products = await storage.getProducts(filters);
       res.json(products);
@@ -727,13 +730,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vendor || product.vendorId !== vendor.id) {
         return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
       }
-      const { name, description, price, stock, imageUrl, removeImages } = req.body;
+      const { name, description, price, stock, imageUrl, removeImages, gender } = req.body;
       const updates: Record<string, unknown> = {};
       if (name !== undefined && name.trim()) updates.name = name.trim();
       if (description !== undefined) updates.description = description.trim();
       if (price !== undefined) updates.price = price;
       if (stock !== undefined) updates.stock = parseInt(stock);
       if (imageUrl !== undefined) updates.imageUrl = imageUrl.trim() || null;
+      if (gender !== undefined) updates.gender = gender && gender.trim() ? gender.trim() : null;
       const updated = await storage.updateProduct(productId, updates as any);
 
       // Handle image removal — filter URLs the vendor wants gone

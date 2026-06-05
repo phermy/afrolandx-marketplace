@@ -36,6 +36,8 @@ export default function VendorDashboard() {
   const [editNewFiles, setEditNewFiles] = useState<File[]>([]);
   const [editNewPreviews, setEditNewPreviews] = useState<string[]>([]);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [selectedGender, setSelectedGender] = useState<string>('');
+  const [editGender, setEditGender] = useState<string>('');
   const [addForm, setAddForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
   const [addFiles, setAddFiles] = useState<File[]>([]);
   const [addPreviews, setAddPreviews] = useState<string[]>([]);
@@ -244,6 +246,7 @@ export default function VendorDashboard() {
 
   const closeEditDialog = () => {
     setEditingProduct(null);
+    setEditGender('');
     setEditCurrentImages([]);
     setEditRemovedImages([]);
     setEditNewFiles([]);
@@ -279,6 +282,7 @@ export default function VendorDashboard() {
     setAddFiles([]);
     setAddPreviews([]);
     setSelectedCategory('');
+    setSelectedGender('');
     setCustomCategoryName('');
     setAddImageMode('upload');
   };
@@ -378,6 +382,7 @@ export default function VendorDashboard() {
       : addForm.description.trim());
     fd.set('price', addForm.price);
     fd.set('stock', addForm.stock);
+    if (selectedGender) fd.set('gender', selectedGender);
     if (addImageMode === 'url' && addForm.imageUrl.trim()) {
       fd.set('imageUrl', addForm.imageUrl.trim());
     }
@@ -750,6 +755,7 @@ export default function VendorDashboard() {
                                   stock: String(product.stock),
                                   imageUrl: product.imageUrl || '',
                                 });
+                                setEditGender(product.gender || '');
                                 const imgs: string[] = [];
                                 if (product.imageUrl) imgs.push(product.imageUrl);
                                 const extra = Array.isArray((product as any).images) ? (product as any).images as string[] : [];
@@ -1171,6 +1177,32 @@ export default function VendorDashboard() {
               )}
             </div>
 
+            {/* Gender / Audience */}
+            <div className="space-y-1.5">
+              <Label className="font-semibold">Who is this for?</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { value: '',       label: 'All / Unisex' },
+                  { value: 'women',  label: '👩 Women' },
+                  { value: 'men',    label: '👨 Men' },
+                  { value: 'kids',   label: '🧒 Kids' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedGender(opt.value)}
+                    className={`py-2 px-1 rounded-lg border text-xs font-medium transition-all ${
+                      selectedGender === opt.value
+                        ? 'bg-nigerian-green text-white border-nigerian-green'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-nigerian-green'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Description */}
             <div className="space-y-1.5">
               <Label className="font-semibold">Description <span className="text-red-500">*</span></Label>
@@ -1333,6 +1365,32 @@ export default function VendorDashboard() {
               />
             </div>
 
+            {/* Gender / Audience */}
+            <div>
+              <Label className="font-medium">Who is this for?</Label>
+              <div className="grid grid-cols-4 gap-2 mt-1">
+                {[
+                  { value: '',       label: 'All / Unisex' },
+                  { value: 'women',  label: '👩 Women' },
+                  { value: 'men',    label: '👨 Men' },
+                  { value: 'kids',   label: '🧒 Kids' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setEditGender(opt.value)}
+                    className={`py-2 px-1 rounded-lg border text-xs font-medium transition-all ${
+                      editGender === opt.value
+                        ? 'bg-nigerian-green text-white border-nigerian-green'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-nigerian-green'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Description */}
             <div>
               <Label htmlFor="edit-description" className="font-medium">Description</Label>
@@ -1461,6 +1519,7 @@ export default function VendorDashboard() {
                       price: editForm.price,
                       stock: parseInt(editForm.stock) || 0,
                       imageUrl: editForm.imageUrl || '',
+                      gender: editGender || null,
                       removeImages: editRemovedImages,
                     },
                   });

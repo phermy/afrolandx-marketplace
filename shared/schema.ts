@@ -80,6 +80,7 @@ export const products = pgTable("products", {
   images: jsonb("images").default([]), // array of image URLs for gallery
   status: varchar("status").default("pending"), // pending, approved, rejected
   featured: boolean("featured").default(false),
+  gender: varchar("gender"), // women, men, kids, or null = unisex/all
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
