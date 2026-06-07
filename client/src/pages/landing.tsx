@@ -295,15 +295,11 @@ export default function Landing() {
                     : product.imageUrl) || '';
                 return (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
-                  {/* Padding-bottom trick: universally supported 1:1 aspect ratio */}
-                  <div
-                    className="relative w-full overflow-hidden rounded-t-lg bg-gray-100"
-                    style={{ height: 0, paddingBottom: '100%' }}
-                  >
+                  <div className="relative w-full aspect-square overflow-hidden rounded-t-lg bg-white">
                     <img
                       src={rawSrc || 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&h=400&q=75'}
                       alt={product.name}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       loading="eager"
                       decoding="async"
                       onError={(e) => {
