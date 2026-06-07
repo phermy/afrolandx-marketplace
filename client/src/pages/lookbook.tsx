@@ -403,7 +403,7 @@ export default function LookbookPage() {
                                 <img
                                   src={item.imageUrl}
                                   alt={item.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform duration-300"
                                   onError={(e) => {
                                     e.currentTarget.onerror = null;
                                     e.currentTarget.src = "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=200&h=200&q=60";

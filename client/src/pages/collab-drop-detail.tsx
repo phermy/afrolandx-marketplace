@@ -214,7 +214,7 @@ export default function CollabDropDetailPage() {
                         <img
                           src={img}
                           alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?auto=format&fit=crop&w=400&h=400&q=60"; }}
                         />
                       ) : (

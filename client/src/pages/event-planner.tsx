@@ -382,7 +382,7 @@ export default function EventPlannerPage() {
                             <img
                               src={product.imageUrl}
                               alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
