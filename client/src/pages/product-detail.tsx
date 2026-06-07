@@ -7,6 +7,7 @@ import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
 
 const FALLBACK_URL =
@@ -164,10 +165,11 @@ export default function ProductDetail() {
             {/* Price */}
             <Card className="mb-4">
               <CardContent className="p-4">
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl font-bold text-nigerian-green">
                     ₦{parseFloat(product.price).toLocaleString()}
                   </span>
+                  <LocalPrice ngnAmount={parseFloat(product.price)} size="md" />
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
                   {isOutOfStock

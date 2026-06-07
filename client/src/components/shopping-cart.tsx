@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'wouter';
+import LocalPrice from '@/components/LocalPrice';
 
 export default function ShoppingCart() {
   const { 
@@ -126,6 +127,7 @@ export default function ShoppingCart() {
                       <p className="text-lg font-bold text-nigerian-green mt-1">
                         {formatPrice(item.product.price)}
                       </p>
+                      <LocalPrice ngnAmount={parseFloat(item.product.price)} />
                     </div>
 
                     {/* Quantity Controls */}
@@ -193,6 +195,7 @@ export default function ShoppingCart() {
                   <span>Total</span>
                   <div className="text-right">
                     <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
+                    <div><LocalPrice ngnAmount={cartTotal} size="md" /></div>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
