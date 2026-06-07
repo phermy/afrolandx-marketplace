@@ -390,19 +390,25 @@ export default function MegaMenu() {
 
   return (
     <div
-      className="relative bg-gray-50 border-b border-gray-200 hidden md:block"
+      className="relative bg-gray-50 border-b border-gray-200"
       onMouseLeave={scheduleClose}
     >
       {/* ── Tab row ─────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
         <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
           {TABS.map(tab => (
             <button
               key={tab}
               onMouseEnter={() => openTab(tab)}
-              onClick={() => setActiveTab(activeTab === tab ? null : tab)}
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  handleLinkClick(MENU[tab].featured[0].href);
+                } else {
+                  setActiveTab(activeTab === tab ? null : tab);
+                }
+              }}
               className={`
-                flex items-center gap-1 px-4 py-3 text-sm font-medium whitespace-nowrap
+                flex items-center gap-1 px-3 md:px-4 py-3 text-xs md:text-sm font-medium whitespace-nowrap
                 border-b-2 transition-colors duration-150
                 ${activeTab === tab
                   ? 'border-nigerian-green text-nigerian-green bg-white'
@@ -412,13 +418,13 @@ export default function MegaMenu() {
             >
               {tab}
               <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${activeTab === tab ? 'rotate-180' : ''}`}
+                className={`hidden md:inline-block w-3.5 h-3.5 transition-transform duration-200 ${activeTab === tab ? 'rotate-180' : ''}`}
               />
             </button>
           ))}
 
-          {/* Quick links on the right */}
-          <div className="ml-auto flex items-center gap-0 pl-4 border-l border-gray-200">
+          {/* Quick links on the right — desktop only */}
+          <div className="ml-auto hidden md:flex items-center gap-0 pl-4 border-l border-gray-200">
             <button
               onClick={() => handleLinkClick('/products')}
               className="px-3 py-3 text-sm font-medium text-gray-600 hover:text-nigerian-green whitespace-nowrap transition-colors"
@@ -435,10 +441,10 @@ export default function MegaMenu() {
         </div>
       </div>
 
-      {/* ── Dropdown panel ──────────────────────────────────────────── */}
+      {/* ── Dropdown panel — desktop only ───────────────────────────── */}
       {section && activeTab && (
         <div
-          className="absolute top-full left-0 w-full bg-white shadow-2xl border-t border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+          className="hidden md:block absolute top-full left-0 w-full bg-white shadow-2xl border-t border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
