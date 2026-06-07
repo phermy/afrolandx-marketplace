@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getCountryFlag } from '@shared/africanFashion';
+import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
 
 const resolveImageUrl = (imagePath: string): string => {
@@ -147,6 +148,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <span className="text-sm sm:text-lg font-bold text-nigerian-green leading-none">
                 {formatPrice(product.price)}
               </span>
+              <LocalPrice ngnAmount={parseFloat(product.price)} className="mt-0.5" />
             </div>
             <div className="flex items-center text-yellow-500 flex-shrink-0 mt-0.5">
               <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20">
