@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
+import MegaMenu from '@/components/mega-menu';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
@@ -220,6 +221,9 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* Mega Menu - desktop category bar */}
+      <MegaMenu />
 
       {/* Mobile Menu - Full Screen Overlay */}
       {isMobileMenuOpen && (
