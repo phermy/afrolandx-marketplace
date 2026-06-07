@@ -5,19 +5,13 @@ import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getCountryFlag } from '@shared/africanFashion';
 import type { Product } from '@/types';
 
-/** Returns the best URL to display for a product image */
 const resolveImageUrl = (imagePath: string): string => {
   if (!imagePath) return '';
-  // Already an absolute URL (S3, Unsplash, etc.)
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  // Local upload — strip any stale query params and return clean path
-  if (imagePath.startsWith('/uploads/')) {
-    return imagePath.split('?')[0];
-  }
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+  if (imagePath.startsWith('/uploads/')) return imagePath.split('?')[0];
   return imagePath;
 };
 
@@ -73,15 +67,13 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const displaySrc = imgError || !rawSrc ? FALLBACK_URL : rawSrc;
 
+  const flag = product.originCountry ? getCountryFlag(product.originCountry) : null;
+
   return (
     <Card className="group cursor-pointer card-hover overflow-hidden flex flex-col">
       <CardContent className="p-0 flex flex-col flex-1">
 
-        {/* ── Image container ─────────────────────────────────────────
-            Uses the padding-bottom trick: height = 0, paddingBottom = 100%
-            gives a perfect 1:1 aspect ratio that works in ALL browsers,
-            including Safari iOS < 15 which doesn't fully support aspect-ratio.
-        ─────────────────────────────────────────────────────────── */}
+        {/* ── Image container ─────────────────────────────────────────── */}
         <div
           className="relative w-full overflow-hidden bg-gray-100"
           style={{ height: 0, paddingBottom: '100%' }}
@@ -90,27 +82,31 @@ export default function ProductCard({ product }: ProductCardProps) {
             src={displaySrc}
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            /* eager so images load immediately — avoids lazy-load timing
-               issues inside iframes and mobile embedded browsers */
             loading="eager"
             decoding="async"
             onError={() => setImgError(true)}
           />
 
-          {/* Subtle bottom gradient for badge legibility */}
           <div className="absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
 
-          {/* Status badge */}
           {getStatusBadge()}
 
-          {/* Featured badge */}
           {product.featured && (
             <Badge className="absolute top-2 right-2 z-10 bg-nigerian-gold text-white text-[10px] sm:text-xs px-1.5 py-0.5">
               ⭐ Featured
             </Badge>
           )}
 
-          {/* Out-of-stock overlay */}
+          {/* Country origin badge — top left when no status badge */}
+          {!product.status || product.status === 'approved' ? (
+            product.originCountry && flag && (
+              <span className="absolute top-2 left-2 z-10 bg-black/60 text-white text-[10px] sm:text-xs px-2 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-sm">
+                <span>{flag}</span>
+                <span className="hidden sm:inline">{product.originCountry}</span>
+              </span>
+            )
+          ) : null}
+
           {isOutOfStock && (
             <div className="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
               <Badge variant="destructive" className="text-sm font-semibold">
@@ -122,6 +118,14 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* ── Product details ──────────────────────────────────────── */}
         <div className="p-2.5 sm:p-4 flex flex-col flex-1">
+
+          {/* Traditional name chip */}
+          {product.traditionalName && (
+            <span className="inline-block mb-1 text-[10px] font-semibold text-nigerian-green bg-nigerian-green/10 px-2 py-0.5 rounded-full w-fit">
+              {product.traditionalName}
+            </span>
+          )}
+
           <h3 className="font-semibold text-xs sm:text-sm md:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-nigerian-green transition-colors leading-tight">
             {product.name}
           </h3>
@@ -129,6 +133,13 @@ export default function ProductCard({ product }: ProductCardProps) {
           <p className="text-gray-500 text-xs mb-1.5 line-clamp-2 hidden sm:block min-h-[2.5rem]">
             {product.description}
           </p>
+
+          {/* Country row (mobile-visible full version) */}
+          {product.originCountry && (
+            <p className="text-[10px] text-gray-400 mb-1 sm:hidden">
+              {flag} {product.originCountry}
+            </p>
+          )}
 
           {/* Price row */}
           <div className="flex items-start justify-between mb-1.5 sm:mb-2 gap-1">
@@ -153,7 +164,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </p>
 
-          {/* Buttons — always at bottom */}
+          {/* Buttons */}
           <div className="mt-auto space-y-1.5">
             <Button
               onClick={handleAddToCart}

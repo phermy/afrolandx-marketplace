@@ -43,6 +43,8 @@ export interface Product {
   status: 'pending' | 'approved' | 'rejected';
   featured: boolean;
   gender?: string | null;
+  originCountry?: string | null;
+  traditionalName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

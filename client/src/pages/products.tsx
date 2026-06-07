@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { AFRICAN_COUNTRIES, getCountryFlag } from '@shared/africanFashion';
 import type { Product, Category } from '@/types';
 
 type GenderTab = 'all' | 'women' | 'men' | 'kids';
@@ -33,6 +34,7 @@ export default function Products() {
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [sortBy, setSortBy] = useState('newest');
   const [genderTab, setGenderTab] = useState<GenderTab>('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function Products() {
   });
 
   const { data: allProducts = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max, genderTab],
+    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max, genderTab, selectedCountry],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('status', 'approved');
@@ -57,6 +59,7 @@ export default function Products() {
       if (priceRange.min) params.append('minPrice', priceRange.min);
       if (priceRange.max) params.append('maxPrice', priceRange.max);
       if (genderTab !== 'all') params.append('gender', genderTab);
+      if (selectedCountry) params.append('originCountry', selectedCountry);
       const response = await fetch(`/api/products?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
@@ -81,9 +84,10 @@ export default function Products() {
     setPriceRange({ min: '', max: '' });
     setSortBy('newest');
     setGenderTab('all');
+    setSelectedCountry('');
   };
 
-  const hasActiveFilters = searchQuery || selectedCategory || priceRange.min || priceRange.max || genderTab !== 'all';
+  const hasActiveFilters = searchQuery || selectedCategory || priceRange.min || priceRange.max || genderTab !== 'all' || selectedCountry;
 
   const GENDER_TABS: { value: GenderTab; label: string }[] = [
     { value: 'all',   label: 'All' },
@@ -227,6 +231,37 @@ export default function Products() {
 
                 <Separator />
 
+                {/* Country of Origin */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Country of Origin 🌍
+                  </label>
+                  <select
+                    value={selectedCountry}
+                    onChange={e => setSelectedCountry(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                  >
+                    <option value="">All African countries</option>
+                    {["West","East","North","Central","Southern"].map(region => (
+                      <optgroup key={region} label={`${region} Africa`}>
+                        {AFRICAN_COUNTRIES.filter(c => c.region === region).map(c => (
+                          <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {selectedCountry && (
+                    <button
+                      onClick={() => setSelectedCountry('')}
+                      className="mt-1.5 text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+                    >
+                      × Clear country filter
+                    </button>
+                  )}
+                </div>
+
+                <Separator />
+
                 {/* Quick Filter Badges */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -307,6 +342,12 @@ export default function Products() {
                     <Badge variant="secondary" className="flex items-center gap-1">
                       Search: {searchQuery}
                       <button onClick={() => setSearchQuery('')} className="ml-1 hover:text-red-500">×</button>
+                    </Badge>
+                  )}
+                  {selectedCountry && (
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      {getCountryFlag(selectedCountry)} {selectedCountry}
+                      <button onClick={() => setSelectedCountry('')} className="ml-1 hover:text-red-500">×</button>
                     </Badge>
                   )}
                   {selectedCategory && (

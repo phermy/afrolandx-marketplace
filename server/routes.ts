@@ -648,6 +648,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           images: imageUrls,
           vendorId: req.vendor.id,
           gender: req.body.gender && req.body.gender.trim() ? req.body.gender.trim() : null,
+          originCountry: req.body.originCountry && req.body.originCountry.trim() ? req.body.originCountry.trim() : null,
+          traditionalName: req.body.traditionalName && req.body.traditionalName.trim() ? req.body.traditionalName.trim() : null,
         };
 
         const validatedData = insertProductSchema.parse(productData);
@@ -675,7 +677,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search, 
         minPrice, 
         maxPrice,
-        gender
+        gender,
+        originCountry
       } = req.query;
       
       const filters: any = { status };
@@ -686,6 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (minPrice) filters.minPrice = parseFloat(minPrice as string);
       if (maxPrice) filters.maxPrice = parseFloat(maxPrice as string);
       if (gender && gender !== 'all') filters.gender = gender as string;
+      if (originCountry && originCountry !== 'all') filters.originCountry = originCountry as string;
 
       const products = await storage.getProducts(filters);
       res.json(products);
@@ -730,7 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vendor || product.vendorId !== vendor.id) {
         return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
       }
-      const { name, description, price, stock, imageUrl, removeImages, gender } = req.body;
+      const { name, description, price, stock, imageUrl, removeImages, gender, originCountry, traditionalName } = req.body;
       const updates: Record<string, unknown> = {};
       if (name !== undefined && name.trim()) updates.name = name.trim();
       if (description !== undefined) updates.description = description.trim();
@@ -738,6 +742,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stock !== undefined) updates.stock = parseInt(stock);
       if (imageUrl !== undefined) updates.imageUrl = imageUrl.trim() || null;
       if (gender !== undefined) updates.gender = gender && gender.trim() ? gender.trim() : null;
+      if (originCountry !== undefined) updates.originCountry = originCountry && originCountry.trim() ? originCountry.trim() : null;
+      if (traditionalName !== undefined) updates.traditionalName = traditionalName && traditionalName.trim() ? traditionalName.trim() : null;
       const updated = await storage.updateProduct(productId, updates as any);
 
       // Handle image removal — filter URLs the vendor wants gone

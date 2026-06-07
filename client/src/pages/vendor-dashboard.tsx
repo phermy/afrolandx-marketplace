@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images } from "lucide-react";
+import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -38,6 +39,10 @@ export default function VendorDashboard() {
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
   const [selectedGender, setSelectedGender] = useState<string>('');
   const [editGender, setEditGender] = useState<string>('');
+  const [selectedOriginCountry, setSelectedOriginCountry] = useState<string>('');
+  const [selectedTraditionalName, setSelectedTraditionalName] = useState<string>('');
+  const [editOriginCountry, setEditOriginCountry] = useState<string>('');
+  const [editTraditionalName, setEditTraditionalName] = useState<string>('');
   const [addForm, setAddForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
   const [addFiles, setAddFiles] = useState<File[]>([]);
   const [addPreviews, setAddPreviews] = useState<string[]>([]);
@@ -383,6 +388,8 @@ export default function VendorDashboard() {
     fd.set('price', addForm.price);
     fd.set('stock', addForm.stock);
     if (selectedGender) fd.set('gender', selectedGender);
+    if (selectedOriginCountry) fd.set('originCountry', selectedOriginCountry);
+    if (selectedTraditionalName) fd.set('traditionalName', selectedTraditionalName);
     if (addImageMode === 'url' && addForm.imageUrl.trim()) {
       fd.set('imageUrl', addForm.imageUrl.trim());
     }
@@ -756,6 +763,8 @@ export default function VendorDashboard() {
                                   imageUrl: product.imageUrl || '',
                                 });
                                 setEditGender(product.gender || '');
+                                setEditOriginCountry((product as any).originCountry || '');
+                                setEditTraditionalName((product as any).traditionalName || '');
                                 const imgs: string[] = [];
                                 if (product.imageUrl) imgs.push(product.imageUrl);
                                 const extra = Array.isArray((product as any).images) ? (product as any).images as string[] : [];
@@ -1203,6 +1212,49 @@ export default function VendorDashboard() {
               </div>
             </div>
 
+            {/* Cultural Origin */}
+            <div className="space-y-1.5">
+              <Label className="font-semibold">Country of Origin <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <p className="text-xs text-gray-400">Which African country is this fashion from?</p>
+              <select
+                value={selectedOriginCountry}
+                onChange={e => {
+                  setSelectedOriginCountry(e.target.value);
+                  setSelectedTraditionalName('');
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+              >
+                <option value="">🌍 Select a country…</option>
+                {AFRICAN_COUNTRIES.map(c => (
+                  <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
+                ))}
+              </select>
+              {selectedOriginCountry && getFashionItemsByCountry(selectedOriginCountry).length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-600">Traditional garment name</Label>
+                  <select
+                    value={selectedTraditionalName}
+                    onChange={e => setSelectedTraditionalName(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                  >
+                    <option value="">Select garment name…</option>
+                    {getFashionItemsByCountry(selectedOriginCountry).map(item => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                    <option value="__custom">Other (type below)</option>
+                  </select>
+                  {selectedTraditionalName === '__custom' && (
+                    <input
+                      type="text"
+                      placeholder="Type the traditional name…"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                      onChange={e => setSelectedTraditionalName(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Description */}
             <div className="space-y-1.5">
               <Label className="font-semibold">Description <span className="text-red-500">*</span></Label>
@@ -1391,6 +1443,49 @@ export default function VendorDashboard() {
               </div>
             </div>
 
+            {/* Cultural Origin */}
+            <div>
+              <Label className="font-medium">Country of Origin <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <p className="text-xs text-gray-400 mb-1">Which African country is this fashion from?</p>
+              <select
+                value={editOriginCountry}
+                onChange={e => {
+                  setEditOriginCountry(e.target.value);
+                  setEditTraditionalName('');
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green mb-2"
+              >
+                <option value="">🌍 Select a country…</option>
+                {AFRICAN_COUNTRIES.map(c => (
+                  <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
+                ))}
+              </select>
+              {editOriginCountry && getFashionItemsByCountry(editOriginCountry).length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium text-gray-600">Traditional garment name</Label>
+                  <select
+                    value={editTraditionalName}
+                    onChange={e => setEditTraditionalName(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                  >
+                    <option value="">Select garment name…</option>
+                    {getFashionItemsByCountry(editOriginCountry).map(item => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                    <option value="__custom">Other (type below)</option>
+                  </select>
+                  {editTraditionalName === '__custom' && (
+                    <input
+                      type="text"
+                      placeholder="Type the traditional name…"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-nigerian-green mt-1"
+                      onChange={e => setEditTraditionalName(e.target.value)}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Description */}
             <div>
               <Label htmlFor="edit-description" className="font-medium">Description</Label>
@@ -1520,6 +1615,8 @@ export default function VendorDashboard() {
                       stock: parseInt(editForm.stock) || 0,
                       imageUrl: editForm.imageUrl || '',
                       gender: editGender || null,
+                      originCountry: editOriginCountry || null,
+                      traditionalName: editTraditionalName || null,
                       removeImages: editRemovedImages,
                     },
                   });

@@ -81,6 +81,8 @@ export const products = pgTable("products", {
   status: varchar("status").default("pending"), // pending, approved, rejected
   featured: boolean("featured").default(false),
   gender: varchar("gender"), // women, men, kids, or null = unisex/all
+  originCountry: varchar("origin_country"), // which African country this fashion is from
+  traditionalName: varchar("traditional_name"), // local name of the garment (e.g. Kente, Agbada, Habesha Kemis)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
