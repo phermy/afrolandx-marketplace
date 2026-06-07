@@ -101,12 +101,11 @@ export default function ProductDetail() {
 
           {/* ── Image panel ── */}
           <div className="space-y-3">
-            <div className="relative w-full overflow-hidden rounded-xl bg-gray-100 shadow-md"
-              style={{ height: 0, paddingBottom: '100%' }}>
+            <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-white shadow-md">
               <img
                 src={displaySrc}
                 alt={product.name}
-                className="absolute inset-0 w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 onError={() => setImgError(true)}
               />
               {isOutOfStock && (

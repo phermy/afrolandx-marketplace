@@ -75,14 +75,11 @@ export default function ProductCard({ product }: ProductCardProps) {
       <CardContent className="p-0 flex flex-col flex-1">
 
         {/* ── Image container ─────────────────────────────────────────── */}
-        <div
-          className="relative w-full overflow-hidden bg-white"
-          style={{ height: 0, paddingBottom: '100%' }}
-        >
+        <div className="relative w-full aspect-square overflow-hidden bg-white">
           <img
             src={displaySrc}
             alt={product.name}
-            className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
             loading="eager"
             decoding="async"
             onError={() => setImgError(true)}
