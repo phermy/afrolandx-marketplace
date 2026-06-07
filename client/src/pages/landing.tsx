@@ -132,10 +132,10 @@ export default function Landing() {
 
             {/* Right actions */}
             <div className="flex items-center space-x-2">
-              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden sm:flex border-green-700 text-green-700 hover:bg-green-50">
+              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden md:flex border-green-700 text-green-700 hover:bg-green-50">
                 Sign In
               </Button>
-              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4 hidden md:flex">
                 Sign Up
               </Button>
               {/* Mobile Hamburger */}
@@ -176,7 +176,10 @@ export default function Landing() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>
               </a>
-              <div className="pt-4 border-t border-gray-200 mt-4">
+              <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
+                <Button onClick={() => { setIsMobileMenuOpen(false); handleLogin(); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
+                  Sign In
+                </Button>
                 <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
                   Sign Up — Create Account
                 </Button>
