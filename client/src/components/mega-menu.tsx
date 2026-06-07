@@ -363,20 +363,30 @@ const TABS = ['Women', 'Men', 'Kids', 'Accessories', 'Fabrics', 'Occasions', 'By
 
 export default function MegaMenu() {
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  // true only on real pointer devices (mouse/trackpad) — never on touch screens
+  // Wide screen = tablet/desktop (≥768 px) — this gates dropdown rendering
+  const [isWideScreen, setIsWideScreen] = useState(false);
+  // Hover device = real mouse/trackpad — this gates onMouseEnter opening
   const [isHoverDevice, setIsHoverDevice] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    const mq = window.matchMedia('(hover: hover) and (pointer: fine)');
-    setIsHoverDevice(mq.matches);
-    const handler = (e: MediaQueryListEvent) => {
-      setIsHoverDevice(e.matches);
-      if (!e.matches) setActiveTab(null); // close dropdown if device changes
+    const mqWide = window.matchMedia('(min-width: 768px)');
+    const mqHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+    const update = () => {
+      setIsWideScreen(mqWide.matches);
+      setIsHoverDevice(mqHover.matches);
+      if (!mqWide.matches) setActiveTab(null);
     };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    update();
+
+    mqWide.addEventListener('change', update);
+    mqHover.addEventListener('change', update);
+    return () => {
+      mqWide.removeEventListener('change', update);
+      mqHover.removeEventListener('change', update);
+    };
   }, []);
 
   const cancelClose = useCallback(() => {
@@ -413,54 +423,51 @@ export default function MegaMenu() {
               key={tab}
               onMouseEnter={isHoverDevice ? () => openTab(tab) : undefined}
               onClick={() => {
-                if (isHoverDevice) {
-                  // Desktop: toggle dropdown
+                if (isWideScreen) {
+                  // Tablet/desktop: toggle dropdown open/close
+                  cancelClose();
                   setActiveTab(prev => prev === tab ? null : tab);
                 } else {
-                  // Mobile/touch: navigate directly — no dropdown
+                  // Mobile: navigate directly, no dropdown
                   handleLinkClick(MENU[tab].featured[0].href);
                 }
               }}
               className={`
                 flex items-center gap-1 px-3 md:px-4 py-3 text-xs md:text-sm font-medium whitespace-nowrap
                 border-b-2 transition-colors duration-150 select-none
-                ${activeTab === tab && isHoverDevice
+                ${activeTab === tab
                   ? 'border-nigerian-green text-nigerian-green bg-white'
                   : 'border-transparent text-gray-600 hover:text-nigerian-green hover:border-nigerian-green/40'
                 }
               `}
             >
               {tab}
-              {isHoverDevice && (
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${activeTab === tab ? 'rotate-180' : ''}`}
-                />
-              )}
+              <ChevronDown
+                className={`hidden md:inline-block w-3.5 h-3.5 transition-transform duration-200 ${activeTab === tab ? 'rotate-180' : ''}`}
+              />
             </button>
           ))}
 
-          {/* Quick links on the right — hover devices (desktop) only */}
-          {isHoverDevice && (
-            <div className="ml-auto flex items-center gap-0 pl-4 border-l border-gray-200 flex-shrink-0">
-              <button
-                onClick={() => handleLinkClick('/products')}
-                className="px-3 py-3 text-sm font-medium text-gray-600 hover:text-nigerian-green whitespace-nowrap transition-colors"
-              >
-                New In
-              </button>
-              <button
-                onClick={() => handleLinkClick('/collab-drops')}
-                className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-600 whitespace-nowrap transition-colors"
-              >
-                ⭐ Collab Drops
-              </button>
-            </div>
-          )}
+          {/* Quick links — desktop only */}
+          <div className="ml-auto hidden md:flex items-center gap-0 pl-4 border-l border-gray-200 flex-shrink-0">
+            <button
+              onClick={() => handleLinkClick('/products')}
+              className="px-3 py-3 text-sm font-medium text-gray-600 hover:text-nigerian-green whitespace-nowrap transition-colors"
+            >
+              New In
+            </button>
+            <button
+              onClick={() => handleLinkClick('/collab-drops')}
+              className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-600 whitespace-nowrap transition-colors"
+            >
+              ⭐ Collab Drops
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── Dropdown panel — hover/desktop devices only ──────────────── */}
-      {isHoverDevice && section && activeTab && (
+      {/* ── Dropdown panel — tablet/desktop (≥768 px) only ───────────── */}
+      {isWideScreen && section && activeTab && (
         <div
           className="absolute top-full left-0 w-full bg-white shadow-2xl border-t border-gray-100 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
           onMouseEnter={cancelClose}
