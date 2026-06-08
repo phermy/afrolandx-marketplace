@@ -77,7 +77,7 @@ import {
   type InsertDropRsvp,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, lt } from "drizzle-orm";
+import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -506,19 +506,23 @@ export class DatabaseStorage implements IStorage {
 
   // Cart operations
   async addToCart(cartItem: InsertCartItem): Promise<CartItem> {
-    // Check if item already exists in cart
+    // Match on product + size: same product with different size = separate cart item
+    const conditions = [
+      eq(cartItems.userId, cartItem.userId),
+      eq(cartItems.productId, cartItem.productId),
+    ];
+    if (cartItem.selectedSize) {
+      conditions.push(eq(cartItems.selectedSize, cartItem.selectedSize));
+    } else {
+      conditions.push(isNull(cartItems.selectedSize));
+    }
+
     const [existingItem] = await db
       .select()
       .from(cartItems)
-      .where(
-        and(
-          eq(cartItems.userId, cartItem.userId),
-          eq(cartItems.productId, cartItem.productId)
-        )
-      );
+      .where(and(...conditions));
 
     if (existingItem) {
-      // Update quantity
       const [updatedItem] = await db
         .update(cartItems)
         .set({ 
@@ -529,7 +533,6 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updatedItem;
     } else {
-      // Create new cart item
       const [newItem] = await db
         .insert(cartItems)
         .values(cartItem)

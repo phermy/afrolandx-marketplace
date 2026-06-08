@@ -123,6 +123,11 @@ export default function ShoppingCart() {
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-gray-900 truncate">{item.product.name}</h4>
+                      {item.selectedSize && (
+                        <span className="inline-block text-xs font-medium bg-nigerian-green/10 text-nigerian-green border border-nigerian-green/20 rounded px-1.5 py-0.5 mb-1">
+                          Size: {item.selectedSize}
+                        </span>
+                      )}
                       <p className="text-sm text-gray-600 truncate">{item.product.description}</p>
                       <p className="text-lg font-bold text-nigerian-green mt-1">
                         {formatPrice(item.product.price)}

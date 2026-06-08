@@ -78,6 +78,7 @@ export const products = pgTable("products", {
   weight: decimal("weight", { precision: 5, scale: 2 }), // in kg
   imageUrl: text("image_url"), // single image URL for display
   images: jsonb("images").default([]), // array of image URLs for gallery
+  sizes: jsonb("sizes").default([]), // string[] — available sizes e.g. ["S","M","L","XL"]
   status: varchar("status").default("pending"), // pending, approved, rejected
   featured: boolean("featured").default(false),
   gender: varchar("gender"), // women, men, kids, or null = unisex/all
@@ -93,6 +94,7 @@ export const cartItems = pgTable("cart_items", {
   userId: varchar("user_id").notNull().references(() => users.id),
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull().default(1),
+  selectedSize: varchar("selected_size"), // null = no size required (accessories, fabric etc.)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -120,6 +122,7 @@ export const orderItems = pgTable("order_items", {
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
   priceAtTime: decimal("price_at_time", { precision: 10, scale: 2 }).notNull(),
+  selectedSize: varchar("selected_size"), // size chosen by customer at time of order
   createdAt: timestamp("created_at").defaultNow(),
 });
 

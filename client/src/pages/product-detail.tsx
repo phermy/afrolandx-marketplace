@@ -19,8 +19,10 @@ export default function ProductDetail() {
   const { addToCart, isAddingToCart, openCart } = useCart();
   const { isAuthenticated } = useAuth();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [sizeError, setSizeError] = useState(false);
 
   const productId = params?.id ? parseInt(params.id) : null;
 
@@ -40,7 +42,15 @@ export default function ProductDetail() {
       return;
     }
     if (!product) return;
-    addToCart(product.id, 1);
+
+    // Require size selection if product has sizes defined
+    const hasSizes = product.sizes && product.sizes.length > 0;
+    if (hasSizes && !selectedSize) {
+      setSizeError(true);
+      return;
+    }
+
+    addToCart(product.id, 1, selectedSize ?? undefined);
     setIsAddedToCart(true);
     setTimeout(() => {
       openCart();
@@ -81,6 +91,7 @@ export default function ProductDetail() {
 
   const isOutOfStock = product.stock <= 0;
   const isAvailable = product.status === 'approved' && !isOutOfStock;
+  const hasSizes = product.sizes && product.sizes.length > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -182,6 +193,49 @@ export default function ProductDetail() {
               </CardContent>
             </Card>
 
+            {/* ── Size Selector ── */}
+            {hasSizes && (
+              <div className="mb-5">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">
+                    Select Size
+                    <span className="text-red-500 ml-1">*</span>
+                  </h3>
+                  {selectedSize && (
+                    <span className="text-sm text-nigerian-green font-medium">
+                      Selected: <strong>{selectedSize}</strong>
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes!.map(size => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => { setSelectedSize(size); setSizeError(false); }}
+                      className={`
+                        min-w-[3rem] px-3 py-2 rounded-lg border-2 text-sm font-semibold transition-all duration-150
+                        ${selectedSize === size
+                          ? 'border-nigerian-green bg-nigerian-green text-white shadow-sm'
+                          : 'border-gray-200 text-gray-700 hover:border-nigerian-green hover:text-nigerian-green bg-white'
+                        }
+                      `}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+                {sizeError && (
+                  <p className="mt-2 text-sm text-red-500 font-medium">
+                    Please select a size before adding to cart.
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-gray-400">
+                  Sizes follow international standards. Check the vendor's description for measurements.
+                </p>
+              </div>
+            )}
+
             {/* Description */}
             {product.description && (
               <div className="mb-6">
@@ -216,6 +270,8 @@ export default function ProductDetail() {
                   isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'
                 ) : !isAuthenticated ? (
                   'Login to Buy'
+                ) : hasSizes && !selectedSize ? (
+                  'Select a Size First'
                 ) : (
                   'Add to Cart'
                 )}

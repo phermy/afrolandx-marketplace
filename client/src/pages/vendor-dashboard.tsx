@@ -47,6 +47,8 @@ export default function VendorDashboard() {
   const [addFiles, setAddFiles] = useState<File[]>([]);
   const [addPreviews, setAddPreviews] = useState<string[]>([]);
   const [addImageMode, setAddImageMode] = useState<'upload' | 'url'>('upload');
+  const [selectedSizeSystem, setSelectedSizeSystem] = useState<string>('');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -290,6 +292,8 @@ export default function VendorDashboard() {
     setSelectedGender('');
     setCustomCategoryName('');
     setAddImageMode('upload');
+    setSelectedSizeSystem('');
+    setSelectedSizes([]);
   };
 
   const handleAddFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,6 +394,7 @@ export default function VendorDashboard() {
     if (selectedGender) fd.set('gender', selectedGender);
     if (selectedOriginCountry) fd.set('originCountry', selectedOriginCountry);
     if (selectedTraditionalName) fd.set('traditionalName', selectedTraditionalName);
+    fd.set('sizes', JSON.stringify(selectedSizes));
     if (addImageMode === 'url' && addForm.imageUrl.trim()) {
       fd.set('imageUrl', addForm.imageUrl.trim());
     }
@@ -1253,6 +1258,77 @@ export default function VendorDashboard() {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Size Options */}
+            <div className="space-y-2">
+              <Label className="font-semibold">Available Sizes <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <p className="text-xs text-gray-400">Pick a sizing system then toggle the sizes your product comes in.</p>
+              <select
+                value={selectedSizeSystem}
+                onChange={e => { setSelectedSizeSystem(e.target.value); setSelectedSizes([]); }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+              >
+                <option value="">— No sizes (one size fits all) —</option>
+                <option value="International">International (XS – XXXL)</option>
+                <option value="UK Numeric">UK Numeric (6 – 24)</option>
+                <option value="US Numeric">US Numeric (0 – 18)</option>
+                <option value="EU Numeric">EU Numeric (32 – 52)</option>
+                <option value="Kids by Age">Kids by Age</option>
+                <option value="Shoes EU">Shoes — EU (35 – 47)</option>
+                <option value="Shoes UK">Shoes — UK (2 – 13)</option>
+                <option value="One Size">One Size</option>
+              </select>
+              {selectedSizeSystem && selectedSizeSystem !== '' && (() => {
+                const sizeMap: Record<string, string[]> = {
+                  'International': ['XS','S','M','L','XL','XXL','XXXL'],
+                  'UK Numeric': ['6','8','10','12','14','16','18','20','22','24'],
+                  'US Numeric': ['0','2','4','6','8','10','12','14','16','18'],
+                  'EU Numeric': ['32','34','36','38','40','42','44','46','48','50','52'],
+                  'Kids by Age': ['0-3M','3-6M','6-12M','1Y','2Y','3Y','4Y','5Y','6Y','7Y','8Y','10Y','12Y','14Y'],
+                  'Shoes EU': ['35','36','37','38','39','40','41','42','43','44','45','46','47'],
+                  'Shoes UK': ['2','3','4','5','6','7','8','9','10','11','12','13'],
+                  'One Size': ['One Size'],
+                };
+                const options = sizeMap[selectedSizeSystem] || [];
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-500 font-medium">Toggle the sizes you offer:</p>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSizes(selectedSizes.length === options.length ? [] : options)}
+                        className="text-xs text-nigerian-green underline underline-offset-2"
+                      >
+                        {selectedSizes.length === options.length ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {options.map(size => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setSelectedSizes(prev =>
+                            prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                          )}
+                          className={`min-w-[2.8rem] px-2.5 py-1.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                            selectedSizes.includes(size)
+                              ? 'border-nigerian-green bg-nigerian-green text-white'
+                              : 'border-gray-200 text-gray-600 hover:border-nigerian-green hover:text-nigerian-green bg-white'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedSizes.length > 0 && (
+                      <p className="text-xs text-green-600 font-medium">
+                        ✓ {selectedSizes.length} size{selectedSizes.length !== 1 ? 's' : ''} selected
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Description */}

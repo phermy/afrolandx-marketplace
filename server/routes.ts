@@ -637,6 +637,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Parse sizes — sent as JSON string from FormData
+        let sizes: string[] = [];
+        if (req.body.sizes) {
+          try { sizes = JSON.parse(req.body.sizes); } catch { sizes = []; }
+        }
+
         const productData = {
           name: req.body.name.trim(),
           description: req.body.description.trim(),
@@ -646,6 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
           imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
           images: imageUrls,
+          sizes,
           vendorId: req.vendor.id,
           gender: req.body.gender && req.body.gender.trim() ? req.body.gender.trim() : null,
           originCountry: req.body.originCountry && req.body.originCountry.trim() ? req.body.originCountry.trim() : null,
@@ -1131,6 +1138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           productId: item.productId,
           quantity: item.quantity,
           priceAtTime: item.product.price,
+          selectedSize: item.selectedSize ?? null,
         });
       }
 

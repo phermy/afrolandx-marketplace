@@ -40,6 +40,7 @@ export interface Product {
   weight?: string;
   imageUrl?: string;
   images: string[];
+  sizes?: string[]; // available sizes e.g. ["XS","S","M","L","XL"]
   status: 'pending' | 'approved' | 'rejected';
   featured: boolean;
   gender?: string | null;
@@ -59,6 +60,7 @@ export interface CartItem {
   userId: string;
   productId: number;
   quantity: number;
+  selectedSize?: string | null;
   createdAt: string;
   updatedAt: string;
   product: Product;
