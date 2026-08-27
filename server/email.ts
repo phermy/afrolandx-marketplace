@@ -1,11 +1,14 @@
-import sgMail from "@sendgrid/mail";
-
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@afrolandx.com";
 const APP_NAME = "Afrolandx";
+let managedSendGrid: import("@replit/connectors-sdk").ReplitConnectors | null = null;
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
+async function getManagedSendGrid() {
+  if (!managedSendGrid) {
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    managedSendGrid = new ReplitConnectors();
+  }
+  return managedSendGrid;
 }
 
 export function generateOtp(): string {
@@ -19,24 +22,49 @@ export function otpExpiryTime(): Date {
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  if (!SENDGRID_API_KEY) {
-    console.log("\n========================================");
-    console.log(`[${APP_NAME} Email] TO: ${to}`);
-    console.log(`[${APP_NAME} Email] SUBJECT: ${subject}`);
-    const otpMatch = html.match(/\d{6}/);
-    if (otpMatch) {
-      console.log(`[${APP_NAME} Email] OTP CODE: ${otpMatch[0]}`);
+  try {
+    const connectors = await getManagedSendGrid();
+    const response = await connectors.proxy("sendgrid", "/v3/mail/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: FROM_EMAIL, name: APP_NAME },
+        subject,
+        content: [{ type: "text/html", value: html }],
+      }),
+    });
+
+    if (response.ok) return;
+
+    const providerMessage = await response.text().catch(() => "");
+    throw new Error(`SendGrid connector returned ${response.status}${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`);
+  } catch (connectorError) {
+    // Keep the legacy key as a local-development fallback when the managed
+    // connector proxy is unavailable.
+    if (SENDGRID_API_KEY) {
+      const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: FROM_EMAIL, name: APP_NAME },
+          subject,
+          content: [{ type: "text/html", value: html }],
+        }),
+      });
+
+      if (response.ok) return;
+      const providerMessage = await response.text().catch(() => "");
+      throw new Error(`SendGrid delivery failed (${response.status})${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`);
     }
-    console.log("========================================\n");
-    return;
+
+    throw connectorError;
   }
 
-  await sgMail.send({
-    to,
-    from: { email: FROM_EMAIL, name: APP_NAME },
-    subject,
-    html,
-  });
 }
 
 export async function sendVerificationEmail(email: string, firstName: string, otp: string): Promise<void> {

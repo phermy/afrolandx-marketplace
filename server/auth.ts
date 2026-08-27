@@ -370,9 +370,15 @@ export async function setupAuth(app: Express) {
       const otp = generateOtp();
       const expiry = otpExpiryTime();
       await storage.updatePasswordResetOtp(user.id, otp, expiry);
-      sendPasswordResetEmail(email, user.firstName || "there", otp).catch(err =>
-        console.error("Failed to send password reset email:", err)
-      );
+      try {
+        await sendPasswordResetEmail(email, user.firstName || "there", otp);
+      } catch (error) {
+        await storage.updatePasswordResetOtp(user.id, null, null);
+        console.error("Failed to send password reset email:", error);
+        return res.status(503).json({
+          message: "We couldn't send the reset email right now. Please try again shortly.",
+        });
+      }
 
       return res.json({ message: "If that email is registered, you'll receive a reset code shortly." });
     } catch (error) {
