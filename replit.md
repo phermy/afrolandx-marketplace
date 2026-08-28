@@ -253,14 +253,12 @@ Preferred communication style: Simple, everyday language.
 - Fallback to local storage when cloud storage unavailable
 
 **Email Service:**
-- SendGrid integration for transactional emails
-- Order confirmation notifications
-- Vendor approval notifications
+- Transactional email delivery is not currently configured
+- Order confirmation and account email notifications remain disabled until a provider is connected
 
 **Key Integrations:**
 - Paystack chosen as primary payment gateway for Nigerian market focus
 - S3-compatible storage for scalable image hosting with local fallback
-- SendGrid for reliable email delivery with template support
 - Sharp for server-side image optimization to reduce bandwidth
 
 **Configuration:**
