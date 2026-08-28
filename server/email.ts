@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@afrolandx.com";
 const APP_NAME = "Afrolandx";
@@ -12,7 +14,7 @@ async function getManagedSendGrid() {
 }
 
 export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1_000_000).toString();
 }
 
 export function otpExpiryTime(): Date {

@@ -243,18 +243,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const canonicalEmail = email.trim().toLowerCase();
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${canonicalEmail}`);
     return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const normalizedUserData = {
+      ...userData,
+      ...(userData.email ? { email: userData.email.trim().toLowerCase() } : {}),
+    };
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(normalizedUserData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...normalizedUserData,
           updatedAt: new Date(),
         },
       })

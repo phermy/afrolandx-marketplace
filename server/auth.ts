@@ -4,35 +4,74 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
-import { storage } from "./storage";
 import crypto from "crypto";
+import { storage } from "./storage";
 import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
 import { pool } from "./db";
 
-export function getSession() {
-  if (!process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET environment variable is required");
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const OTP_RE = /^\d{6}$/;
+const REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const MAX_OTP_REQUESTS = 5;
+const MAX_OTP_ATTEMPTS = 8;
+const requestLimits = new Map<string, number[]>();
+const attemptLimits = new Map<string, number[]>();
+
+class OtpRateLimitError extends Error {}
+
+function canonicalEmail(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  return EMAIL_RE.test(email) && email.length <= 254 ? email : null;
+}
+
+function otpDigest(otp: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET environment variable is required");
+  return crypto.createHmac("sha256", secret).update(otp).digest("hex");
+}
+
+function secureOtpMatches(digest: string | null, otp: unknown): boolean {
+  if (!digest || typeof otp !== "string" || !OTP_RE.test(otp)) return false;
+  const actual = Buffer.from(otpDigest(otp), "hex");
+  const expected = Buffer.from(digest, "hex");
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function permitted(limit: Map<string, number[]>, key: string, max: number): boolean {
+  const now = Date.now();
+  const recent = (limit.get(key) || []).filter(time => now - time < REQUEST_WINDOW_MS);
+  if (recent.length >= max) {
+    limit.set(key, recent);
+    return false;
   }
-  
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  recent.push(now);
+  limit.set(key, recent);
+  return true;
+}
+
+function clientIp(req: any): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  return typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.ip || "unknown";
+}
+
+export function sanitizeUser(user: any) {
+  return {
+    id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName,
+    roles: user.roles, profileImageUrl: user.profileImageUrl, emailVerified: user.emailVerified,
+    createdAt: user.createdAt, updatedAt: user.updatedAt,
+  };
+}
+
+export function getSession() {
+  if (!process.env.SESSION_SECRET) throw new Error("SESSION_SECRET environment variable is required");
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    pool,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
-  
   return session({
     secret: process.env.SESSION_SECRET,
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: sessionTtl,
-    },
+    store: new pgStore({ pool, createTableIfMissing: true, ttl: sessionTtl, tableName: "sessions" }),
+    resave: false, saveUninitialized: false,
+    cookie: { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: sessionTtl },
   });
 }
 
@@ -42,397 +81,254 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  passport.use(
-    new LocalStrategy(
-      { usernameField: "email" },
-      async (email, password, done) => {
-        try {
-          const user = await storage.getUserByEmail(email);
-          if (!user) {
-            return done(null, false, { message: "Invalid email or password" });
-          }
-          if (!user.password) {
-            return done(null, false, { message: "Please set a password for your account" });
-          }
-          const isValid = await bcrypt.compare(password, user.password);
-          if (!isValid) {
-            return done(null, false, { message: "Invalid email or password" });
-          }
-          return done(null, user);
-        } catch (error) {
-          return done(error);
-        }
-      }
-    )
-  );
-
-  passport.serializeUser((user: any, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: string, done) => {
+  passport.use(new LocalStrategy({ usernameField: "email" }, async (rawEmail, password, done) => {
     try {
-      const user = await storage.getUser(id);
-      done(null, user);
-    } catch (error) {
-      done(error);
-    }
+      const email = canonicalEmail(rawEmail);
+      if (!email || typeof password !== "string" || password.length < 8) return done(null, false, { message: "Invalid email or password" });
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.password || !await bcrypt.compare(password, user.password)) return done(null, false, { message: "Invalid email or password" });
+      if (!user.emailVerified) {
+        return done(
+          null,
+          false,
+          { message: "Please verify your email before signing in", hint: "EMAIL_UNVERIFIED" } as any,
+        );
+      }
+      return done(null, user);
+    } catch (error) { return done(error); }
+  }));
+  passport.serializeUser((user: any, done) => done(null, user.id));
+  passport.deserializeUser(async (id: string, done) => {
+    try { done(null, await storage.getUser(id)); } catch (error) { done(error); }
   });
 
-  // Helper: logs a user in AND records their session as the only active one,
-  // kicking out any previous session automatically.
   async function finalizeLogin(req: any, res: any, user: any, onSuccess: () => void) {
-    req.login(user, async (err: any) => {
-      if (err) return res.status(500).json({ message: "Login failed" });
-      try {
-        await storage.updateActiveSession(user.id, req.sessionID);
-      } catch (e) {
-        console.error("Failed to store active session:", e);
-      }
-      onSuccess();
+    req.session.regenerate((regenerateError: any) => {
+      if (regenerateError) return res.status(500).json({ message: "Login failed" });
+      req.login(user, async (loginError: any) => {
+        if (loginError) return res.status(500).json({ message: "Login failed" });
+        try {
+          await storage.updateActiveSession(user.id, req.sessionID);
+        } catch {
+          return req.logout(() => {
+            req.session.destroy(() => res.status(500).json({ message: "Login failed" }));
+          });
+        }
+        onSuccess();
+      });
     });
   }
 
-  // Register endpoint
-  app.get("/api/check-email", async (req, res) => {
+  async function issueOtp(req: any, user: any, type: "email" | "login" | "reset") {
+    const email = user.email;
+    if (!email) throw new Error("User has no email address");
+    if (
+      !permitted(requestLimits, `${type}:ip:${clientIp(req)}`, MAX_OTP_REQUESTS) ||
+      !permitted(requestLimits, `${type}:email:${email}`, MAX_OTP_REQUESTS)
+    ) {
+      throw new OtpRateLimitError("Too many code requests");
+    }
+    const otp = generateOtp();
+    const save = type === "email" ? storage.updateEmailOtp : type === "login" ? storage.updateLoginOtp : storage.updatePasswordResetOtp;
+    await save(user.id, otpDigest(otp), otpExpiryTime());
     try {
-      const email = (req.query.email as string || "").toLowerCase().trim();
-      if (!email) return res.status(400).json({ message: "Email is required" });
+      if (type === "email") await sendVerificationEmail(email, user.firstName || "there", otp);
+      else if (type === "login") await sendLoginOtpEmail(email, user.firstName || "there", otp);
+      else await sendPasswordResetEmail(email, user.firstName || "there", otp);
+    } catch (error) {
+      await save(user.id, null, null);
+      throw error;
+    }
+  }
 
+  app.get("/api/check-email", async (req, res) => {
+    const email = canonicalEmail(req.query.email);
+    if (!email) return res.status(400).json({ message: "A valid email is required" });
+    try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.json({ exists: false });
-
-      const roles: string[] = (user.roles as string[]) || ["customer"];
-      const isVendor = roles.includes("vendor");
-      const isAdmin = roles.includes("admin");
-
-      return res.json({
-        exists: true,
-        accountType: isAdmin ? "admin" : isVendor ? "vendor" : "customer",
-        roles,
-        emailVerified: user.emailVerified,
-      });
-    } catch (error) {
-      return res.status(500).json({ message: "Check failed" });
-    }
+      const roles = (user.roles as string[]) || ["customer"];
+      return res.json({ exists: true, accountType: roles.includes("admin") ? "admin" : roles.includes("vendor") ? "vendor" : "customer", roles, emailVerified: user.emailVerified });
+    } catch { return res.status(500).json({ message: "Check failed" }); }
   });
 
   app.post("/api/register", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    const { password, firstName, lastName } = req.body;
+    if (!email || typeof password !== "string" || password.length < 8) return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
     try {
-      const { email, password, firstName, lastName } = req.body;
-
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        const roles: string[] = (existingUser.roles as string[]) || ["customer"];
-        const isVendor = roles.includes("vendor");
-        return res.status(409).json({ 
-          message: isVendor
-            ? "This email is already registered as a vendor account."
-            : "This email is already registered as a customer account.",
-          roles,
-          hint: "sign_in"
-        });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const userId = crypto.randomUUID();
-
-      await storage.upsertUser({
-        id: userId,
-        email,
-        password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
-      });
-
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        return res.status(500).json({ message: "User creation failed" });
-      }
-
-      // Send verification email (non-blocking)
-      const otp = generateOtp();
-      const expiry = otpExpiryTime();
-      await storage.updateEmailOtp(userId, otp, expiry);
-      sendVerificationEmail(email, firstName || "there", otp).catch(err =>
-        console.error("Failed to send verification email:", err)
-      );
-
-      return res.json({ 
-        message: "Account created. Please verify your email.",
-        email: user.email,
-        emailVerificationSent: true
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      return res.status(500).json({ message: "Registration failed" });
-    }
+      const existing = await storage.getUserByEmail(email);
+      if (existing) return res.status(409).json({ message: ((existing.roles as string[]) || []).includes("vendor") ? "This email is already registered as a vendor account." : "This email is already registered as a customer account.", roles: existing.roles, hint: "sign_in" });
+      const id = crypto.randomUUID();
+      await storage.upsertUser({ id, email, password: await bcrypt.hash(password, 10), firstName: firstName || null, lastName: lastName || null });
+      const user = await storage.getUser(id);
+      if (!user) return res.status(500).json({ message: "User creation failed" });
+       try {
+         await issueOtp(req, user, "email");
+       } catch (error) {
+         const rateLimited = error instanceof OtpRateLimitError;
+         return res.status(201).json({
+           message: rateLimited
+             ? "Account created. Please wait before requesting a verification code."
+             : "Account created, but we couldn't send the verification email. Please use resend when email service is available.",
+           email,
+           emailVerificationSent: false,
+           ...(rateLimited ? { hint: "RATE_LIMITED" } : {}),
+         });
+       }
+      return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
+     } catch (error: any) {
+       if (error?.code === "23505") {
+         return res.status(409).json({ message: "An account already exists for this email.", hint: "sign_in" });
+       }
+       console.error("Registration error:", error);
+       return res.status(500).json({ message: "Registration failed" });
+     }
   });
 
-  // Login endpoint
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) {
-        return res.status(500).json({ message: "Authentication error" });
-      }
-      if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      }
-      finalizeLogin(req, res, user, () => {
-        return res.json({ user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
-      });
-    })(req, res, next);
-  });
+  app.post("/api/login", (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
+    if (err) return res.status(500).json({ message: "Authentication error" });
+    if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials", ...(info?.hint ? { hint: info.hint } : {}) });
+    finalizeLogin(req, res, user, () => res.json({ user: sanitizeUser(user) }));
+  })(req, res, next));
 
-  // Logout endpoint
-  app.post("/api/logout", async (req, res) => {
+  app.post("/api/logout", (req, res) => {
     const userId = (req.user as any)?.id;
+    const sessionId = req.sessionID;
     req.logout(async (err) => {
       if (err) return res.status(500).json({ message: "Logout failed" });
-      if (userId) {
-        try { await storage.updateActiveSession(userId, null); } catch {}
+      try {
+        // A superseded session must not invalidate the newer session on logout.
+        const user = userId ? await storage.getUser(userId) : undefined;
+        if (user?.activeSessionId === sessionId) await storage.updateActiveSession(userId, null);
       }
-      res.json({ message: "Logged out successfully" });
+      finally { req.session?.destroy(() => res.clearCookie("connect.sid").json({ message: "Logged out successfully" })); }
     });
   });
 
-  // Get current user endpoint
-  app.get("/api/auth/user", (req, res) => {
-    if (req.isAuthenticated() && req.user) {
-      const user = req.user as any;
-      return res.json({ 
-        id: user.id, 
-        email: user.email, 
-        firstName: user.firstName, 
-        lastName: user.lastName, 
-        roles: user.roles,
-        profileImageUrl: user.profileImageUrl,
-        emailVerified: user.emailVerified,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      });
-    }
-    return res.status(401).json({ message: "Not authenticated" });
-  });
+  app.get("/api/auth/user", isAuthenticated, (req, res) => res.json(sanitizeUser(req.user)));
 
-  // Send login OTP to email (passwordless sign-in)
   app.post("/api/send-login-otp", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    if (!email) return res.status(400).json({ message: "A valid email is required" });
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ message: "No account found with that email. Please create one first." });
-      }
-
-      const otp = generateOtp();
-      const expiry = otpExpiryTime();
-      await storage.updateLoginOtp(user.id, otp, expiry);
-
-      sendLoginOtpEmail(email, user.firstName || "there", otp).catch(err =>
-        console.error("Failed to send login OTP email:", err)
-      );
-
+      if (!user) return res.status(404).json({ message: "No account found with that email. Please create one first." });
+      await issueOtp(req, user, "login");
       return res.json({ message: "Sign-in code sent to your email" });
     } catch (error) {
-      console.error("Send login OTP error:", error);
-      return res.status(500).json({ message: "Failed to send sign-in code" });
+      if (error instanceof OtpRateLimitError) {
+        return res.status(429).json({ message: "Too many code requests. Please try again later.", hint: "RATE_LIMITED" });
+      }
+      return res.status(503).json({ message: "Failed to send sign-in code" });
     }
   });
 
-  // Login with OTP (passwordless)
+  async function verifyOtp(req: any, user: any, otp: unknown, kind: "email" | "login" | "reset") {
+    const digest = kind === "email" ? user.emailOtp : kind === "login" ? user.loginOtp : user.passwordResetOtp;
+    const expiry = kind === "email" ? user.emailOtpExpiry : kind === "login" ? user.loginOtpExpiry : user.passwordResetOtpExpiry;
+    const clear = kind === "email" ? storage.updateEmailOtp : kind === "login" ? storage.updateLoginOtp : storage.updatePasswordResetOtp;
+    if (
+      !permitted(attemptLimits, `${kind}:ip:${clientIp(req)}`, MAX_OTP_ATTEMPTS) ||
+      !permitted(attemptLimits, `${kind}:email:${user.email}`, MAX_OTP_ATTEMPTS)
+    ) return "limited";
+    if (!expiry || new Date() > expiry) { await clear(user.id, null, null); return "expired"; }
+    if (!secureOtpMatches(digest, otp)) return "invalid";
+    await clear(user.id, null, null);
+    return "valid";
+  }
+
   app.post("/api/login-with-otp", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    if (!email || !OTP_RE.test(req.body.otp || "")) return res.status(400).json({ message: "Email and a six-digit code are required" });
     try {
-      const { email, otp } = req.body;
-      if (!email || !otp) {
-        return res.status(400).json({ message: "Email and code are required" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(400).json({ message: "Invalid or expired sign-in code" });
-      }
-
-      if (!user.loginOtp || user.loginOtp !== otp) {
-        return res.status(400).json({ message: "Invalid sign-in code" });
-      }
-
-      if (!user.loginOtpExpiry || new Date() > user.loginOtpExpiry) {
-        return res.status(400).json({ message: "Sign-in code has expired. Please request a new one." });
-      }
-
-      // Clear the OTP after use
-      await storage.updateLoginOtp(user.id, null, null);
-
-      // Also mark email as verified if not already
-      if (!user.emailVerified) {
-        await storage.verifyUserEmail(user.id);
-      }
-
-      finalizeLogin(req, res, user, () => {
-        return res.json({
-          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles }
-        });
-      });
-    } catch (error) {
-      console.error("Login with OTP error:", error);
-      return res.status(500).json({ message: "Sign-in failed" });
-    }
+      if (!user) return res.status(400).json({ message: "Invalid or expired sign-in code" });
+      const result = await verifyOtp(req, user, req.body.otp, "login");
+      if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Sign-in code has expired. Please request a new one." : "Invalid sign-in code", ...(result === "limited" ? { hint: "RATE_LIMITED" } : {}) });
+      if (!user.emailVerified) await storage.verifyUserEmail(user.id);
+      finalizeLogin(req, res, user, () => res.json({ user: sanitizeUser({ ...user, emailVerified: true }) }));
+    } catch { return res.status(500).json({ message: "Sign-in failed" }); }
   });
 
-  // Verify email with OTP
   app.post("/api/verify-email", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    if (!email || !OTP_RE.test(req.body.otp || "")) return res.status(400).json({ message: "Email and a six-digit code are required" });
     try {
-      const { email, otp } = req.body;
-      if (!email || !otp) {
-        return res.status(400).json({ message: "Email and OTP are required" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ message: "Account not found" });
-      }
-
-      if (user.emailVerified) {
-        return res.json({ message: "Email already verified" });
-      }
-
-      if (!user.emailOtp || user.emailOtp !== otp) {
-        return res.status(400).json({ message: "Invalid verification code" });
-      }
-
-      if (!user.emailOtpExpiry || new Date() > user.emailOtpExpiry) {
-        return res.status(400).json({ message: "Verification code has expired. Please request a new one." });
-      }
-
+      if (!user) return res.status(404).json({ message: "Account not found" });
+      if (user.emailVerified) return res.json({ message: "Email already verified" });
+      const result = await verifyOtp(req, user, req.body.otp, "email");
+      if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Verification code has expired. Please request a new one." : "Invalid verification code" });
       await storage.verifyUserEmail(user.id);
-
-      finalizeLogin(req, res, user, () => {
-        return res.json({ message: "Email verified successfully", user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, roles: user.roles } });
-      });
-    } catch (error) {
-      console.error("Email verification error:", error);
-      return res.status(500).json({ message: "Verification failed" });
-    }
+      finalizeLogin(req, res, user, () => res.json({ message: "Email verified successfully", user: sanitizeUser({ ...user, emailVerified: true }) }));
+    } catch { return res.status(500).json({ message: "Verification failed" }); }
   });
 
-  // Resend email verification OTP
   app.post("/api/resend-verification", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    if (!email) return res.status(400).json({ message: "A valid email is required" });
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ message: "Account not found" });
-      }
-
-      if (user.emailVerified) {
-        return res.json({ message: "Email is already verified" });
-      }
-
-      const otp = generateOtp();
-      const expiry = otpExpiryTime();
-      await storage.updateEmailOtp(user.id, otp, expiry);
-      await sendVerificationEmail(email, user.firstName || "there", otp);
-
+      if (!user) return res.status(404).json({ message: "Account not found" });
+      if (user.emailVerified) return res.json({ message: "Email is already verified" });
+      await issueOtp(req, user, "email");
       return res.json({ message: "Verification code sent to your email" });
     } catch (error) {
-      console.error("Resend verification error:", error);
-      return res.status(500).json({ message: "Failed to resend verification code" });
+      if (error instanceof OtpRateLimitError) {
+        return res.status(429).json({ message: "Too many code requests. Please try again later.", hint: "RATE_LIMITED" });
+      }
+      return res.status(503).json({ message: "Failed to resend verification code" });
     }
   });
 
-  // Forgot password — sends OTP to email
   app.post("/api/forgot-password", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    if (!email) return res.status(400).json({ message: "A valid email is required" });
+    const genericResponse = { message: "If that email is registered, you'll receive a reset code shortly." };
+
+    // Apply the same public response and IP limit before lookup to prevent account enumeration.
+    if (!permitted(requestLimits, `reset:public-ip:${clientIp(req)}`, MAX_OTP_REQUESTS)) {
+      return res.json(genericResponse);
+    }
+
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      // Always respond success to avoid leaking registered emails
-      if (!user) {
-        return res.json({ message: "If that email is registered, you'll receive a reset code shortly." });
+      if (user) {
+        try {
+          await issueOtp(req, user, "reset");
+        } catch (error) {
+          console.error("Password reset code delivery failed:", error);
+        }
       }
-
-      const otp = generateOtp();
-      const expiry = otpExpiryTime();
-      await storage.updatePasswordResetOtp(user.id, otp, expiry);
-      try {
-        await sendPasswordResetEmail(email, user.firstName || "there", otp);
-      } catch (error) {
-        await storage.updatePasswordResetOtp(user.id, null, null);
-        console.error("Failed to send password reset email:", error);
-        return res.status(503).json({
-          message: "We couldn't send the reset email right now. Please try again shortly.",
-        });
-      }
-
-      return res.json({ message: "If that email is registered, you'll receive a reset code shortly." });
+      return res.json(genericResponse);
     } catch (error) {
-      console.error("Forgot password error:", error);
-      return res.status(500).json({ message: "Failed to process request" });
+      console.error("Password reset request failed:", error);
+      return res.json(genericResponse);
     }
   });
 
-  // Reset password with OTP
   app.post("/api/reset-password", async (req, res) => {
+    const email = canonicalEmail(req.body.email);
+    const { otp, newPassword } = req.body;
+    if (!email || !OTP_RE.test(otp || "") || typeof newPassword !== "string" || newPassword.length < 8) return res.status(400).json({ message: "A valid email, six-digit code, and password of at least 8 characters are required" });
     try {
-      const { email, otp, newPassword } = req.body;
-
-      if (!email || !otp || !newPassword) {
-        return res.status(400).json({ message: "Email, code, and new password are required" });
-      }
-
-      if (newPassword.length < 8) {
-        return res.status(400).json({ message: "Password must be at least 8 characters" });
-      }
-
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(400).json({ message: "Invalid or expired reset code" });
-      }
-
-      if (!user.passwordResetOtp || user.passwordResetOtp !== otp) {
-        return res.status(400).json({ message: "Invalid reset code" });
-      }
-
-      if (!user.passwordResetOtpExpiry || new Date() > user.passwordResetOtpExpiry) {
-        return res.status(400).json({ message: "Reset code has expired. Please request a new one." });
-      }
-
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await storage.updateUserPassword(user.id, hashedPassword);
-
+      if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
+      const result = await verifyOtp(req, user, otp, "reset");
+      if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Reset code has expired. Please request a new one." : "Invalid reset code" });
+      await storage.updateUserPassword(user.id, await bcrypt.hash(newPassword, 10));
+      await storage.updateActiveSession(user.id, null);
       return res.json({ message: "Password reset successfully. You can now sign in." });
-    } catch (error) {
-      console.error("Reset password error:", error);
-      return res.status(500).json({ message: "Failed to reset password" });
-    }
+    } catch { return res.status(500).json({ message: "Failed to reset password" }); }
   });
 }
 
 export const isAuthenticated: RequestHandler = (req, res, next) => {
-  if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
+  if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
   const user = req.user as any;
-  if (user.activeSessionId && user.activeSessionId !== req.sessionID) {
-    req.logout((err) => {
-      if (!err) req.session?.destroy?.(() => {});
-    });
+  if (user.activeSessionId !== req.sessionID) {
+    req.logout(() => req.session?.destroy(() => {}));
     return res.status(401).json({ message: "SESSION_SUPERSEDED" });
   }
   return next();

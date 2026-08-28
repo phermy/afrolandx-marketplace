@@ -54,14 +54,14 @@ function SessionKickoutGuard() {
     };
     window.addEventListener("session-superseded", handle);
     return () => window.removeEventListener("session-superseded", handle);
-  }, []);
+  }, [setLocation, toast]);
 
   return null;
 }
 
 function AuthRedirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
-  useEffect(() => { setLocation(to); }, []);
+  useEffect(() => { setLocation(to); }, [setLocation, to]);
   return null;
 }
 

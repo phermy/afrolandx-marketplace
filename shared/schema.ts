@@ -5,12 +5,13 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
   integer,
   decimal,
   boolean,
   serial,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -26,25 +27,31 @@ export const sessions = pgTable(
 );
 
 // User storage table
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  password: varchar("password"), // hashed password for email/password auth
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  roles: jsonb("roles").default(["customer"]), // array of roles: customer, vendor, admin
-  emailVerified: boolean("email_verified").default(false),
-  emailOtp: varchar("email_otp"),
-  emailOtpExpiry: timestamp("email_otp_expiry"),
-  passwordResetOtp: varchar("password_reset_otp"),
-  passwordResetOtpExpiry: timestamp("password_reset_otp_expiry"),
-  loginOtp: varchar("login_otp"),
-  loginOtpExpiry: timestamp("login_otp_expiry"),
-  activeSessionId: varchar("active_session_id"), // enforces single active session
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: varchar("id").primaryKey().notNull(),
+    email: varchar("email"),
+    password: varchar("password"), // hashed password for email/password auth
+    firstName: varchar("first_name"),
+    lastName: varchar("last_name"),
+    profileImageUrl: varchar("profile_image_url"),
+    roles: jsonb("roles").default(["customer"]), // array of roles: customer, vendor, admin
+    emailVerified: boolean("email_verified").default(false),
+    emailOtp: varchar("email_otp"), // keyed digest; never store the code itself
+    emailOtpExpiry: timestamp("email_otp_expiry"),
+    passwordResetOtp: varchar("password_reset_otp"), // keyed digest
+    passwordResetOtpExpiry: timestamp("password_reset_otp_expiry"),
+    loginOtp: varchar("login_otp"), // keyed digest
+    loginOtpExpiry: timestamp("login_otp_expiry"),
+    activeSessionId: varchar("active_session_id"), // enforces single active session
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("users_email_lower_unique").on(sql`lower(${table.email})`),
+  ],
+);
 
 // Vendors table
 export const vendors = pgTable("vendors", {
@@ -574,6 +581,9 @@ export const dropRsvpsRelations = relations(dropRsvps, ({ one }) => ({
 export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
+}).extend({
+  email: z.string().trim().toLowerCase().email().max(254).optional(),
+  password: z.string().min(8).optional(),
 });
 
 export const insertVendorSchema = createInsertSchema(vendors).omit({

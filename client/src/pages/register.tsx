@@ -17,13 +17,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Please enter a valid email"),
+  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+async function responseMessage(response: Response, fallback: string) {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text);
+    if (typeof body?.message === "string") return body.message;
+    if (typeof body?.error === "string") return body.error;
+  } catch {
+    // Non-JSON failures should still leave the form usable.
+  }
+  return fallback;
+}
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -44,6 +57,7 @@ export default function RegisterPage() {
   const [isResending, setIsResending] = useState(false);
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ state: "idle" });
   const checkTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailCheckRequest = useRef(0);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -57,32 +71,45 @@ export default function RegisterPage() {
   });
 
   async function checkEmail(email: string) {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const normalizedEmail = normalizeEmail(email);
+    const request = ++emailCheckRequest.current;
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setEmailStatus({ state: "idle" });
       return;
     }
     setEmailStatus({ state: "checking" });
     try {
-      const res = await fetch(`/api/check-email?email=${encodeURIComponent(email)}`);
-      const data = await res.json();
+      const res = await fetch(`/api/check-email?email=${encodeURIComponent(normalizedEmail)}`);
+      if (!res.ok) throw new Error("Email check failed");
+      const data = await res.json().catch(() => {
+        throw new Error("Email check returned an invalid response");
+      });
+      if (request !== emailCheckRequest.current) return;
       if (data.exists) {
         setEmailStatus({ state: "taken", accountType: data.accountType, emailVerified: data.emailVerified });
       } else {
         setEmailStatus({ state: "available" });
       }
     } catch {
-      setEmailStatus({ state: "idle" });
+      if (request === emailCheckRequest.current) setEmailStatus({ state: "idle" });
     }
   }
 
   function handleEmailChange(email: string) {
+    emailCheckRequest.current++;
     setEmailStatus({ state: "idle" });
     if (checkTimeout.current) clearTimeout(checkTimeout.current);
     checkTimeout.current = setTimeout(() => checkEmail(email), 600);
   }
 
   async function onSubmit(data: RegisterForm) {
-    if (emailStatus.state === "taken") return;
+    const email = normalizeEmail(data.email);
+    if (checkTimeout.current) clearTimeout(checkTimeout.current);
+    emailCheckRequest.current++;
+    if (emailStatus.state === "taken") {
+      form.setError("email", { message: "An account already exists for this email." });
+      return;
+    }
     setIsLoading(true);
     try {
       const response = await fetch("/api/register", {
@@ -91,26 +118,40 @@ export default function RegisterPage() {
         body: JSON.stringify({
           firstName: data.firstName,
           lastName: data.lastName,
-          email: data.email,
+          email,
           password: data.password,
         }),
         credentials: "include",
       });
 
-      const result = await response.json();
-
       if (response.status === 409) {
-        setEmailStatus({ state: "taken", accountType: result.roles?.includes("vendor") ? "vendor" : "customer", emailVerified: false });
+        const text = await response.text();
+        let result: { roles?: unknown; emailVerified?: unknown } = {};
+        try { result = JSON.parse(text); } catch { /* use safe duplicate defaults */ }
+        setEmailStatus({
+          state: "taken",
+          accountType: Array.isArray(result.roles) && result.roles.includes("vendor") ? "vendor" : "customer",
+          emailVerified: result.emailVerified === true,
+        });
+        form.setError("email", { message: "An account already exists for this email." });
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(result.message || "Registration failed");
-      }
+      if (!response.ok) throw new Error(await responseMessage(response, "Registration failed"));
 
-      setRegisteredEmail(data.email);
+      const responseText = await response.text();
+      let result: { email?: string; emailVerificationSent?: boolean; message?: string } = {};
+      try { result = JSON.parse(responseText); } catch { /* success response may be empty */ }
+
+      setRegisteredEmail(result.email || email);
       setStep("verify");
-      toast({ title: "Account created!", description: "Check your email for a verification code." });
+      toast({
+        title: "Account created!",
+        description: result.emailVerificationSent === false
+          ? result.message || "The verification email could not be sent. Please try resend shortly."
+          : "Check your email for a verification code.",
+        variant: result.emailVerificationSent === false ? "destructive" : "default",
+      });
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -131,8 +172,7 @@ export default function RegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: registeredEmail, otp }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!res.ok) throw new Error(await responseMessage(res, "Invalid or expired verification code"));
       setStep("done");
     } catch (error: any) {
       toast({ title: "Invalid code", description: error.message || "Please try again", variant: "destructive" });
@@ -149,8 +189,7 @@ export default function RegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: registeredEmail }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!res.ok) throw new Error(await responseMessage(res, "Could not resend the verification code"));
       toast({ title: "Code resent!", description: "A new code has been sent to your email." });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -248,7 +287,7 @@ export default function RegisterPage() {
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input {...field} placeholder="First" className="pl-10" data-testid="input-first-name" />
+                          <Input {...field} autoComplete="given-name" placeholder="First" className="pl-10" data-testid="input-first-name" />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -262,7 +301,7 @@ export default function RegisterPage() {
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Last" data-testid="input-last-name" />
+                          <Input {...field} autoComplete="family-name" placeholder="Last" data-testid="input-last-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -282,6 +321,8 @@ export default function RegisterPage() {
                         <Input
                           {...field}
                           type="email"
+                           autoComplete="email"
+                           inputMode="email"
                           placeholder="you@example.com"
                           className={`pl-10 pr-10 ${isTaken ? "border-red-400 focus-visible:ring-red-400" : emailStatus.state === "available" ? "border-green-400 focus-visible:ring-green-400" : ""}`}
                           data-testid="input-email"
@@ -339,7 +380,7 @@ export default function RegisterPage() {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input {...field} type="password" placeholder="At least 8 characters" className="pl-10" data-testid="input-password" />
+                        <Input {...field} type="password" autoComplete="new-password" placeholder="At least 8 characters" className="pl-10" data-testid="input-password" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -355,7 +396,7 @@ export default function RegisterPage() {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input {...field} type="password" placeholder="Confirm your password" className="pl-10" data-testid="input-confirm-password" />
+                        <Input {...field} type="password" autoComplete="new-password" placeholder="Confirm your password" className="pl-10" data-testid="input-confirm-password" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -365,7 +406,7 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full bg-green-700 hover:bg-green-800"
-                disabled={isLoading || isTaken || emailStatus.state === "checking"}
+                disabled={isLoading || isTaken}
                 data-testid="button-register"
               >
                 {isLoading ? (

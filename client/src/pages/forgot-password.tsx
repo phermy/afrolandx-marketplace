@@ -12,7 +12,7 @@ import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const emailSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().trim().toLowerCase().email("Please enter a valid email address"),
 });
 
 const resetSchema = z.object({
@@ -26,6 +26,19 @@ const resetSchema = z.object({
 
 type EmailForm = z.infer<typeof emailSchema>;
 type ResetForm = z.infer<typeof resetSchema>;
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+async function responseMessage(response: Response, fallback: string) {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text);
+    if (typeof body?.message === "string") return body.message;
+    if (typeof body?.error === "string") return body.error;
+  } catch {
+    // Error pages are not always JSON.
+  }
+  return fallback;
+}
 
 export default function ForgotPasswordPage() {
   const [, setLocation] = useLocation();
@@ -45,18 +58,21 @@ export default function ForgotPasswordPage() {
   });
 
   async function onEmailSubmit(data: EmailForm) {
+    const normalizedEmail = normalizeEmail(data.email);
     setIsLoading(true);
     try {
       const res = await fetch("/api/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
-      setEmail(data.email);
+      if (!res.ok) throw new Error(await responseMessage(res, "Failed to send reset code"));
+      setEmail(normalizedEmail);
       setStep("otp");
-      toast({ title: "Code sent!", description: "Check your email for the 6-digit reset code." });
+      toast({
+        title: "Request received",
+        description: "If that email is registered, a 6-digit reset code will arrive shortly.",
+      });
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to send reset code", variant: "destructive" });
     } finally {
@@ -72,8 +88,7 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp: data.otp, newPassword: data.newPassword }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!res.ok) throw new Error(await responseMessage(res, "Failed to reset password"));
       setStep("done");
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to reset password", variant: "destructive" });
@@ -85,14 +100,18 @@ export default function ForgotPasswordPage() {
   async function resendCode() {
     setIsLoading(true);
     try {
-      await fetch("/api/forgot-password", {
+      const res = await fetch("/api/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      toast({ title: "Code resent!", description: "A new code has been sent to your email." });
-    } catch {
-      toast({ title: "Error", description: "Failed to resend code", variant: "destructive" });
+      if (!res.ok) throw new Error(await responseMessage(res, "Failed to resend reset code"));
+      toast({
+        title: "Request received",
+        description: "If that email is registered, a new code will arrive shortly.",
+      });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to resend code", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +166,7 @@ export default function ForgotPasswordPage() {
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input {...field} type="email" placeholder="you@example.com" className="pl-10" />
+                          <Input {...field} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className="pl-10" />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -169,7 +188,7 @@ export default function ForgotPasswordPage() {
                     <FormItem className="flex flex-col items-center">
                       <FormLabel>Verification Code</FormLabel>
                       <FormControl>
-                        <InputOTP maxLength={6} value={field.value} onChange={field.onChange}>
+                        <InputOTP maxLength={6} value={field.value} onChange={field.onChange} autoComplete="one-time-code">
                           <InputOTPGroup>
                             <InputOTPSlot index={0} />
                             <InputOTPSlot index={1} />
@@ -191,7 +210,7 @@ export default function ForgotPasswordPage() {
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
                       <FormControl>
-                        <Input {...field} type="password" placeholder="At least 8 characters" />
+                        <Input {...field} type="password" autoComplete="new-password" placeholder="At least 8 characters" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,7 +223,7 @@ export default function ForgotPasswordPage() {
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
                       <FormControl>
-                        <Input {...field} type="password" placeholder="Confirm your password" />
+                        <Input {...field} type="password" autoComplete="new-password" placeholder="Confirm your password" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

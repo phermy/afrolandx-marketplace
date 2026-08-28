@@ -11,13 +11,27 @@ import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from "lucide-re
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import logoImage from "@assets/Group 1000002646_1749631956471.png";
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+async function responseMessage(response: Response, fallback: string) {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text);
+    if (typeof body?.message === "string") return body.message;
+    if (typeof body?.error === "string") return body.error;
+  } catch {
+    // A proxy or server error may be HTML rather than JSON.
+  }
+  return fallback;
+}
+
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
+  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
 
 const otpEmailSchema = z.object({
-  email: z.string().email("Please enter a valid email"),
+  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -47,17 +61,30 @@ export default function LoginPage() {
   });
 
   async function onPasswordSubmit(data: LoginForm) {
+    const email = normalizeEmail(data.email);
     setIsLoading(true);
     try {
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, email }),
         credentials: "include",
       });
-      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.message || "Invalid email or password");
+        const message = await responseMessage(response, "Invalid email or password");
+        const isUnverified = /not\s+verified|unverified|verify\s+(your\s+)?email/i.test(message);
+        if (isUnverified) {
+          setOtpEmail(email);
+          otpEmailForm.setValue("email", email, { shouldValidate: true });
+          setMode("otp");
+          setOtpStep("email");
+          toast({
+            title: "Verify your email to continue",
+            description: "Request an email sign-in code to verify your account and sign in.",
+          });
+          return;
+        }
+        throw new Error(message);
       }
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -75,17 +102,17 @@ export default function LoginPage() {
   }
 
   async function onSendOtp(data: OtpEmailForm) {
+    const email = normalizeEmail(data.email);
     setIsSendingOtp(true);
     try {
       const response = await fetch("/api/send-login-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email }),
+        body: JSON.stringify({ email }),
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Failed to send sign-in code");
+      if (!response.ok) throw new Error(await responseMessage(response, "Failed to send sign-in code"));
 
-      setOtpEmail(data.email);
+      setOtpEmail(email);
       setOtpStep("code");
       toast({ title: "Code sent", description: "Check your email for the 6-digit sign-in code." });
     } catch (error: any) {
@@ -109,8 +136,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email: otpEmail, otp }),
         credentials: "include",
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Invalid or expired sign-in code");
+      if (!response.ok) throw new Error(await responseMessage(response, "Invalid or expired sign-in code"));
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome!", description: "You have been signed in successfully." });
@@ -134,8 +160,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: otpEmail }),
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Failed to resend code");
+      if (!response.ok) throw new Error(await responseMessage(response, "Failed to resend code"));
 
       setOtp("");
       toast({ title: "Code resent", description: "A new sign-in code has been sent." });
@@ -202,6 +227,7 @@ export default function LoginPage() {
                                 {...field}
                                 type="email"
                                 autoComplete="email"
+                                 inputMode="email"
                                 placeholder="you@example.com"
                                 className="h-11 rounded-md border-gray-200 pl-10 pr-3 shadow-none focus:border-[#087f4f] focus:ring-[#087f4f]"
                                 data-testid="input-email"
@@ -254,7 +280,7 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={isLoading}
+      disabled={isLoading}
                       data-testid="button-login"
                     >
                       {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Log in"}
@@ -304,6 +330,7 @@ export default function LoginPage() {
                                   {...field}
                                   type="email"
                                   autoComplete="email"
+                                 inputMode="email"
                                   placeholder="you@example.com"
                                   className="h-11 rounded-md border-gray-200 pl-10 shadow-none focus:border-[#087f4f] focus:ring-[#087f4f]"
                                 />
@@ -328,7 +355,7 @@ export default function LoginPage() {
                       We sent a code to <strong className="break-all">{otpEmail}</strong>.
                     </p>
                     <div className="flex justify-center">
-                      <InputOTP maxLength={6} value={otp} onChange={setOtp} aria-label="6-digit sign-in code">
+                      <InputOTP maxLength={6} value={otp} onChange={setOtp} aria-label="6-digit sign-in code" autoComplete="one-time-code">
                         <InputOTPGroup>
                           <InputOTPSlot index={0} />
                           <InputOTPSlot index={1} />
@@ -343,7 +370,7 @@ export default function LoginPage() {
                       type="button"
                       onClick={onVerifyOtp}
                       className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={otp.length !== 6 || isVerifyingOtp}
+                      disabled={otp.length !== 6 || isVerifyingOtp || isSendingOtp}
                     >
                       {isVerifyingOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify and log in"}
                     </button>

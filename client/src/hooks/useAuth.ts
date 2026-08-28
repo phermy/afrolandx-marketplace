@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { User } from "@/types";
 
 export function useAuth() {
-  const { data: user, isLoading, error } = useQuery<User>({
+  const { data: user, isLoading, error } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     retry: false,
     refetchInterval: 60 * 1000, // poll every 60s to detect being kicked out
@@ -26,7 +26,12 @@ export function useAuth() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return response.json();
+      const text = await response.text();
+      try {
+        return JSON.parse(text) as User;
+      } catch {
+        throw new Error("Received an invalid authentication response");
+      }
     }
   });
 
