@@ -87,6 +87,13 @@ export async function setupAuth(app: Express) {
       if (!email || typeof password !== "string" || password.length < 8) return done(null, false, { message: "Invalid email or password" });
       const user = await storage.getUserByEmail(email);
       if (!user || !user.password || !await bcrypt.compare(password, user.password)) return done(null, false, { message: "Invalid email or password" });
+      if (!user.emailVerified) {
+        return done(
+          null,
+          false,
+          { message: "Please verify your email before signing in", hint: "EMAIL_UNVERIFIED" } as any,
+        );
+      }
       return done(null, user);
     } catch (error) { return done(error); }
   }));
@@ -123,10 +130,15 @@ export async function setupAuth(app: Express) {
     }
     const otp = generateOtp();
     const save = type === "email" ? storage.updateEmailOtp : type === "login" ? storage.updateLoginOtp : storage.updatePasswordResetOtp;
-    if (type === "email") await sendVerificationEmail(email, user.firstName || "there", otp);
-    else if (type === "login") await sendLoginOtpEmail(email, user.firstName || "there", otp);
-    else await sendPasswordResetEmail(email, user.firstName || "there", otp);
     await save(user.id, otpDigest(otp), otpExpiryTime());
+    try {
+      if (type === "email") await sendVerificationEmail(email, user.firstName || "there", otp);
+      else if (type === "login") await sendLoginOtpEmail(email, user.firstName || "there", otp);
+      else await sendPasswordResetEmail(email, user.firstName || "there", otp);
+    } catch (error) {
+      await save(user.id, null, null);
+      throw error;
+    }
   }
 
   app.get("/api/check-email", async (req, res) => {
@@ -151,12 +163,20 @@ export async function setupAuth(app: Express) {
       await storage.upsertUser({ id, email, password: await bcrypt.hash(password, 10), firstName: firstName || null, lastName: lastName || null });
       const user = await storage.getUser(id);
       if (!user) return res.status(500).json({ message: "User creation failed" });
-      return finalizeLogin(req, res, user, () => res.status(201).json({
-        message: "Account created successfully.",
-        email,
-        emailVerificationSent: false,
-        user: sanitizeUser(user),
-      }));
+      try {
+        await issueOtp(req, user, "email");
+      } catch (error) {
+        const rateLimited = error instanceof OtpRateLimitError;
+        return res.status(201).json({
+          message: rateLimited
+            ? "Account created. Please wait before requesting a verification code."
+            : "Account created, but we couldn't send the verification email. Please use resend when email service is available.",
+          email,
+          emailVerificationSent: false,
+          ...(rateLimited ? { hint: "RATE_LIMITED" } : {}),
+        });
+      }
+      return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
      } catch (error: any) {
        if (error?.code === "23505") {
          return res.status(409).json({ message: "An account already exists for this email.", hint: "sign_in" });

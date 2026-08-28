@@ -1,1 +1,2 @@
 - [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
+- [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users

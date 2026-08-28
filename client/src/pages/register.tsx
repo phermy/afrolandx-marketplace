@@ -10,7 +10,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
-import { Loader2, Mail, Lock, User, CheckCircle, AlertCircle, Store } from "lucide-react";
+import { Loader2, Mail, Lock, User, CheckCircle, ShieldCheck, AlertCircle, Store } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const registerSchema = z.object({
@@ -49,6 +50,11 @@ export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<"register" | "verify" | "done">("register");
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ state: "idle" });
   const checkTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailCheckRequest = useRef(0);
@@ -134,14 +140,18 @@ export default function RegisterPage() {
       if (!response.ok) throw new Error(await responseMessage(response, "Registration failed"));
 
       const responseText = await response.text();
-      let result: { message?: string } = {};
-      try { result = JSON.parse(responseText); } catch { /* use the default success message */ }
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      let result: { email?: string; emailVerificationSent?: boolean; message?: string } = {};
+      try { result = JSON.parse(responseText); } catch { /* success response may be empty */ }
+
+      setRegisteredEmail(result.email || email);
+      setStep("verify");
       toast({
         title: "Account created!",
-        description: result.message || "You are now signed in.",
+        description: result.emailVerificationSent === false
+          ? result.message || "The verification email could not be sent. Please try resend shortly."
+          : "Check your email for a verification code.",
+        variant: result.emailVerificationSent === false ? "destructive" : "default",
       });
-      setLocation("/");
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -151,6 +161,108 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleVerify() {
+    if (otp.length !== 6) return;
+    setIsVerifying(true);
+    try {
+      const res = await fetch("/api/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: registeredEmail, otp }),
+      });
+      if (!res.ok) throw new Error(await responseMessage(res, "Invalid or expired verification code"));
+      setStep("done");
+    } catch (error: any) {
+      toast({ title: "Invalid code", description: error.message || "Please try again", variant: "destructive" });
+    } finally {
+      setIsVerifying(false);
+    }
+  }
+
+  async function handleResend() {
+    setIsResending(true);
+    try {
+      const res = await fetch("/api/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: registeredEmail }),
+      });
+      if (!res.ok) throw new Error(await responseMessage(res, "Could not resend the verification code"));
+      toast({ title: "Code resent!", description: "A new code has been sent to your email." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsResending(false);
+    }
+  }
+
+  if (step === "done") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="pt-10 pb-8 space-y-4">
+            <CheckCircle className="h-20 w-20 text-green-600 mx-auto" />
+            <h2 className="text-2xl font-bold text-green-800">Email Verified!</h2>
+            <p className="text-gray-600">Your account is fully set up and ready to go.</p>
+            <Button className="w-full bg-green-700 hover:bg-green-800" onClick={async () => {
+              await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              setLocation("/");
+            }}>
+              Start Shopping
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (step === "verify") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-3">
+              <ShieldCheck className="h-14 w-14 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-green-800">Verify Your Email</CardTitle>
+            <CardDescription>
+              We sent a 6-digit code to <strong>{registeredEmail}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex justify-center">
+              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <Button
+              className="w-full bg-green-700 hover:bg-green-800"
+              onClick={handleVerify}
+              disabled={otp.length !== 6 || isVerifying}
+            >
+              {isVerifying ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify Email"}
+            </Button>
+            <div className="text-center text-sm text-gray-500">
+              <p>
+                Didn't receive it?{" "}
+                <button onClick={handleResend} disabled={isResending} className="text-green-700 hover:underline font-medium">
+                  {isResending ? "Sending..." : "Resend code"}
+                </button>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const isTaken = emailStatus.state === "taken";
@@ -243,6 +355,9 @@ export default function RegisterPage() {
                                   : "Customer account already exists"}
                               </p>
                               <p className="text-xs mt-0.5">
+                                {emailStatus.emailVerified === false
+                                  ? "This account hasn't been verified yet. "
+                                  : ""}
                                 <Link href="/login" className="text-green-700 font-semibold hover:underline">Sign in</Link>
                                 {" "}or{" "}
                                 <Link href="/forgot-password" className="text-green-700 font-semibold hover:underline">reset your password</Link>.
