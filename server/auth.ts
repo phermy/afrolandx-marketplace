@@ -130,27 +130,16 @@ export async function setupAuth(app: Express) {
     }
     const otp = generateOtp();
     const save = type === "email" ? storage.updateEmailOtp : type === "login" ? storage.updateLoginOtp : storage.updatePasswordResetOtp;
-    await save(user.id, otpDigest(otp), otpExpiryTime());
     try {
       if (type === "email") await sendVerificationEmail(email, user.firstName || "there", otp);
       else if (type === "login") await sendLoginOtpEmail(email, user.firstName || "there", otp);
       else await sendPasswordResetEmail(email, user.firstName || "there", otp);
+      await save(user.id, otpDigest(otp), otpExpiryTime());
     } catch (error) {
       await save(user.id, null, null);
       throw error;
     }
   }
-
-  app.get("/api/check-email", async (req, res) => {
-    const email = canonicalEmail(req.query.email);
-    if (!email) return res.status(400).json({ message: "A valid email is required" });
-    try {
-      const user = await storage.getUserByEmail(email);
-      if (!user) return res.json({ exists: false });
-      const roles = (user.roles as string[]) || ["customer"];
-      return res.json({ exists: true, accountType: roles.includes("admin") ? "admin" : roles.includes("vendor") ? "vendor" : "customer", roles, emailVerified: user.emailVerified });
-    } catch { return res.status(500).json({ message: "Check failed" }); }
-  });
 
   app.post("/api/register", async (req, res) => {
     const email = canonicalEmail(req.body.email);
@@ -158,7 +147,7 @@ export async function setupAuth(app: Express) {
     if (!email || typeof password !== "string" || password.length < 8) return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
     try {
       const existing = await storage.getUserByEmail(email);
-      if (existing) return res.status(409).json({ message: ((existing.roles as string[]) || []).includes("vendor") ? "This email is already registered as a vendor account." : "This email is already registered as a customer account.", roles: existing.roles, hint: "sign_in" });
+      if (existing) return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
       const id = crypto.randomUUID();
       await storage.upsertUser({ id, email, password: await bcrypt.hash(password, 10), firstName: firstName || null, lastName: lastName || null });
       const user = await storage.getUser(id);

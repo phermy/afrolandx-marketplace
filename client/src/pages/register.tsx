@@ -1,430 +1,213 @@
-import { useState, useRef } from "react";
-import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
-import { Loader2, Mail, Lock, User, CheckCircle, ShieldCheck, AlertCircle, Store } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { AuthShell, authInputClass } from "@/components/auth-shell";
 
-const registerSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 async function responseMessage(response: Response, fallback: string) {
   const text = await response.text();
   try {
     const body = JSON.parse(text);
-    if (typeof body?.message === "string") return body.message;
-    if (typeof body?.error === "string") return body.error;
+    return typeof body?.message === "string" ? body.message : fallback;
   } catch {
-    // Non-JSON failures should still leave the form usable.
+    return fallback;
   }
-  return fallback;
 }
 
-type RegisterForm = z.infer<typeof registerSchema>;
-
-type EmailStatus =
-  | { state: "idle" }
-  | { state: "checking" }
-  | { state: "available" }
-  | { state: "taken"; accountType: "customer" | "vendor" | "admin"; emailVerified: boolean };
+type FormState = { name: string; email: string; password: string; confirmPassword: string };
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<"register" | "verify" | "done">("register");
+  const [form, setForm] = useState<FormState>({ name: "", email: "", password: "", confirmPassword: "" });
+  const [step, setStep] = useState<"form" | "verify">("form");
   const [registeredEmail, setRegisteredEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [emailStatus, setEmailStatus] = useState<EmailStatus>({ state: "idle" });
-  const checkTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const emailCheckRequest = useRef(0);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [deliveryMessage, setDeliveryMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
-  });
-
-  async function checkEmail(email: string) {
-    const normalizedEmail = normalizeEmail(email);
-    const request = ++emailCheckRequest.current;
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setEmailStatus({ state: "idle" });
-      return;
-    }
-    setEmailStatus({ state: "checking" });
-    try {
-      const res = await fetch(`/api/check-email?email=${encodeURIComponent(normalizedEmail)}`);
-      if (!res.ok) throw new Error("Email check failed");
-      const data = await res.json().catch(() => {
-        throw new Error("Email check returned an invalid response");
-      });
-      if (request !== emailCheckRequest.current) return;
-      if (data.exists) {
-        setEmailStatus({ state: "taken", accountType: data.accountType, emailVerified: data.emailVerified });
-      } else {
-        setEmailStatus({ state: "available" });
-      }
-    } catch {
-      if (request === emailCheckRequest.current) setEmailStatus({ state: "idle" });
-    }
+  function updateField(field: keyof FormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
   }
 
-  function handleEmailChange(email: string) {
-    emailCheckRequest.current++;
-    setEmailStatus({ state: "idle" });
-    if (checkTimeout.current) clearTimeout(checkTimeout.current);
-    checkTimeout.current = setTimeout(() => checkEmail(email), 600);
-  }
-
-  async function onSubmit(data: RegisterForm) {
-    const email = normalizeEmail(data.email);
-    if (checkTimeout.current) clearTimeout(checkTimeout.current);
-    emailCheckRequest.current++;
-    if (emailStatus.state === "taken") {
-      form.setError("email", { message: "An account already exists for this email." });
+  async function createAccount(event: React.FormEvent) {
+    event.preventDefault();
+    const name = form.name.trim();
+    const email = normalizeEmail(form.email);
+    if (!name || !email || !form.password || !form.confirmPassword) {
+      setError("Complete all fields to create your account.");
       return;
     }
+    if (form.password.length < 8) {
+      setError("Your password must be at least 8 characters.");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Your passwords do not match.");
+      return;
+    }
+    setError("");
     setIsLoading(true);
     try {
+      const names = name.split(/\s+/);
       const response = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName: data.firstName,
-          lastName: data.lastName,
+          firstName: names[0],
+          lastName: names.slice(1).join(" "),
           email,
-          password: data.password,
+          password: form.password,
         }),
         credentials: "include",
       });
-
-      if (response.status === 409) {
-        const text = await response.text();
-        let result: { roles?: unknown; emailVerified?: unknown } = {};
-        try { result = JSON.parse(text); } catch { /* use safe duplicate defaults */ }
-        setEmailStatus({
-          state: "taken",
-          accountType: Array.isArray(result.roles) && result.roles.includes("vendor") ? "vendor" : "customer",
-          emailVerified: result.emailVerified === true,
-        });
-        form.setError("email", { message: "An account already exists for this email." });
-        return;
-      }
-
-      if (!response.ok) throw new Error(await responseMessage(response, "Registration failed"));
-
-      const responseText = await response.text();
-      let result: { email?: string; emailVerificationSent?: boolean; message?: string } = {};
-      try { result = JSON.parse(responseText); } catch { /* success response may be empty */ }
-
+      if (!response.ok) throw new Error(await responseMessage(response, "We couldn't create your account."));
+      const result = await response.json().catch(() => ({}));
       setRegisteredEmail(result.email || email);
+      setDeliveryMessage(result.emailVerificationSent === false ? result.message || "We couldn't send the verification email yet." : "");
+      setCode("");
       setStep("verify");
       toast({
-        title: "Account created!",
-        description: result.emailVerificationSent === false
-          ? result.message || "The verification email could not be sent. Please try resend shortly."
-          : "Check your email for a verification code.",
+        title: "Account created",
+        description: result.emailVerificationSent === false ? "Your account is saved. Try sending the code again." : "Check your email for your verification code.",
         variant: result.emailVerificationSent === false ? "destructive" : "default",
       });
-    } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Could not create account",
-        variant: "destructive",
-      });
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't create your account. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function handleVerify() {
-    if (otp.length !== 6) return;
-    setIsVerifying(true);
+  async function verifyEmail(event: React.FormEvent) {
+    event.preventDefault();
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/verify-email", {
+      const response = await fetch("/api/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: registeredEmail, otp }),
+        body: JSON.stringify({ email: registeredEmail, otp: code }),
+        credentials: "include",
       });
-      if (!res.ok) throw new Error(await responseMessage(res, "Invalid or expired verification code"));
-      setStep("done");
-    } catch (error: any) {
-      toast({ title: "Invalid code", description: error.message || "Please try again", variant: "destructive" });
+      if (!response.ok) throw new Error(await responseMessage(response, "That code is invalid or expired."));
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Email verified", description: "Your account is ready." });
+      window.location.href = "/";
+    } catch (submitError: any) {
+      setError(submitError.message || "That code is invalid or expired.");
     } finally {
-      setIsVerifying(false);
+      setIsLoading(false);
     }
   }
 
-  async function handleResend() {
-    setIsResending(true);
+  async function resendCode(event?: React.MouseEvent) {
+    event?.preventDefault();
+    setError("");
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/resend-verification", {
+      const response = await fetch("/api/resend-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: registeredEmail }),
       });
-      if (!res.ok) throw new Error(await responseMessage(res, "Could not resend the verification code"));
-      toast({ title: "Code resent!", description: "A new code has been sent to your email." });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (!response.ok) throw new Error(await responseMessage(response, "We couldn't send a new code."));
+      setDeliveryMessage("");
+      toast({ title: "Code sent", description: "Check your email for the new verification code." });
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't send a new code. Please try again.");
     } finally {
-      setIsResending(false);
+      setIsLoading(false);
     }
-  }
-
-  if (step === "done") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-10 pb-8 space-y-4">
-            <CheckCircle className="h-20 w-20 text-green-600 mx-auto" />
-            <h2 className="text-2xl font-bold text-green-800">Email Verified!</h2>
-            <p className="text-gray-600">Your account is fully set up and ready to go.</p>
-            <Button className="w-full bg-green-700 hover:bg-green-800" onClick={async () => {
-              await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-              setLocation("/");
-            }}>
-              Start Shopping
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
   }
 
   if (step === "verify") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-3">
-              <ShieldCheck className="h-14 w-14 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-green-800">Verify Your Email</CardTitle>
-            <CardDescription>
-              We sent a 6-digit code to <strong>{registeredEmail}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex justify-center">
-              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-            <Button
-              className="w-full bg-green-700 hover:bg-green-800"
-              onClick={handleVerify}
-              disabled={otp.length !== 6 || isVerifying}
-            >
-              {isVerifying ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify Email"}
-            </Button>
-            <div className="text-center text-sm text-gray-500">
-              <p>
-                Didn't receive it?{" "}
-                <button onClick={handleResend} disabled={isResending} className="text-green-700 hover:underline font-medium">
-                  {isResending ? "Sending..." : "Resend code"}
-                </button>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell title="Check your email" description={`We sent a 6-digit verification code to ${registeredEmail}.`} headerLink={{ href: "/login", label: "Log in" }}>
+        <button type="button" onClick={() => { setStep("form"); setError(""); }} className="mb-5 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 focus:outline-none focus:underline">
+          <ArrowLeft className="h-4 w-4" /> Use a different email
+        </button>
+        <div className="mb-6 flex items-start gap-3 rounded-md bg-green-50 px-3 py-3 text-sm leading-5 text-green-800">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
+          <span>Verification keeps your account secure. The code expires in 15 minutes.</span>
+        </div>
+        {deliveryMessage && <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800" role="alert">{deliveryMessage}</div>}
+        {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+        <form onSubmit={verifyEmail} className="space-y-5">
+          <div className="flex justify-center py-2">
+            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit verification code" autoComplete="one-time-code" autoFocus>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
+                /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify email"}
+          </button>
+          <p className="text-center text-sm text-gray-500">
+            Didn’t get the code?{" "}
+            <button type="button" onClick={() => resendCode()} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">
+              Resend code
+            </button>
+          </p>
+        </form>
+      </AuthShell>
     );
   }
 
-  const isTaken = emailStatus.state === "taken";
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
-      <Card className="w-full max-w-md" data-testid="register-card">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-green-800">Join Afrolandx</CardTitle>
-          <CardDescription>Create your account to start shopping</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input {...field} autoComplete="given-name" placeholder="First" className="pl-10" data-testid="input-first-name" />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                          <Input {...field} autoComplete="family-name" placeholder="Last" data-testid="input-last-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          {...field}
-                          type="email"
-                           autoComplete="email"
-                           inputMode="email"
-                          placeholder="you@example.com"
-                          className={`pl-10 pr-10 ${isTaken ? "border-red-400 focus-visible:ring-red-400" : emailStatus.state === "available" ? "border-green-400 focus-visible:ring-green-400" : ""}`}
-                          data-testid="input-email"
-                          onChange={(e) => { field.onChange(e); handleEmailChange(e.target.value); }}
-                        />
-                        <div className="absolute right-3 top-3">
-                          {emailStatus.state === "checking" && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
-                          {emailStatus.state === "available" && <CheckCircle className="h-4 w-4 text-green-500" />}
-                          {isTaken && <AlertCircle className="h-4 w-4 text-red-500" />}
-                        </div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-
-                    {isTaken && (
-                      <Alert className="mt-2 border-red-200 bg-red-50 py-2">
-                        <AlertDescription className="text-red-800 text-sm">
-                          <div className="flex items-start gap-2">
-                            {emailStatus.accountType === "vendor" ? (
-                              <Store className="h-4 w-4 mt-0.5 shrink-0 text-red-600" />
-                            ) : (
-                              <User className="h-4 w-4 mt-0.5 shrink-0 text-red-600" />
-                            )}
-                            <div>
-                              <p className="font-semibold">
-                                {emailStatus.accountType === "vendor"
-                                  ? "Vendor account already exists"
-                                  : emailStatus.accountType === "admin"
-                                  ? "Admin account already exists"
-                                  : "Customer account already exists"}
-                              </p>
-                              <p className="text-xs mt-0.5">
-                                {emailStatus.emailVerified === false
-                                  ? "This account hasn't been verified yet. "
-                                  : ""}
-                                <Link href="/login" className="text-green-700 font-semibold hover:underline">Sign in</Link>
-                                {" "}or{" "}
-                                <Link href="/forgot-password" className="text-green-700 font-semibold hover:underline">reset your password</Link>.
-                              </p>
-                            </div>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input {...field} type="password" autoComplete="new-password" placeholder="At least 8 characters" className="pl-10" data-testid="input-password" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input {...field} type="password" autoComplete="new-password" placeholder="Confirm your password" className="pl-10" data-testid="input-confirm-password" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full bg-green-700 hover:bg-green-800"
-                disabled={isLoading || isTaken}
-                data-testid="button-register"
-              >
-                {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</>
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-            </form>
-          </Form>
-          <div className="mt-6 text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <Link href="/login" className="text-green-700 hover:underline font-medium" data-testid="link-login">
-              Sign in
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthShell title="Create your Afrolandx account" description="One account for shopping, orders, and your profile." headerLink={{ href: "/login", label: "Log in" }} footer={
+      <p className="text-center text-sm text-gray-600">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-[#087f4f] hover:underline">Log in</Link>
+      </p>
+    }>
+      {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+      <form onSubmit={createAccount} className="space-y-5">
+        <label className="block text-sm font-medium text-gray-700">
+          Full name
+          <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={authInputClass} autoFocus data-testid="input-name" />
+        </label>
+        <label className="block text-sm font-medium text-gray-700">
+          Email address
+          <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} data-testid="input-email" />
+        </label>
+        <label className="block text-sm font-medium text-gray-700">
+          Password
+          <span className="relative block">
+            <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${authInputClass} pr-11`} data-testid="input-password" />
+            <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </span>
+          <span className="mt-1.5 block text-xs font-normal text-gray-500">Use at least 8 characters.</span>
+        </label>
+        <label className="block text-sm font-medium text-gray-700">
+          Confirm password
+          <span className="relative block">
+            <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${authInputClass} pr-11`} data-testid="input-confirm-password" />
+            <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </span>
+        </label>
+        <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-register">
+          {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

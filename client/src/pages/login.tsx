@@ -1,404 +1,256 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import logoImage from "@assets/Group 1000002646_1749631956471.png";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
+import { AuthShell, authInputClass } from "@/components/auth-shell";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-async function responseMessage(response: Response, fallback: string) {
+async function readResponse(response: Response, fallback: string) {
   const text = await response.text();
-  try {
-    const body = JSON.parse(text);
-    if (typeof body?.message === "string") return body.message;
-    if (typeof body?.error === "string") return body.error;
-  } catch {
-    // A proxy or server error may be HTML rather than JSON.
-  }
-  return fallback;
+  let body: { message?: string; hint?: string } = {};
+  try { body = JSON.parse(text); } catch { /* use fallback */ }
+  return {
+    message: typeof body.message === "string" ? body.message : fallback,
+    hint: body.hint,
+  };
 }
 
-const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const otpEmailSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Please enter a valid email"),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-type OtpEmailForm = z.infer<typeof otpEmailSchema>;
-
 export default function LoginPage() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<"password" | "code">("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [codeEmail, setCodeEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeStep, setCodeStep] = useState<"request" | "verify">("request");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [otpStep, setOtpStep] = useState<"email" | "code">("email");
-  const [otpEmail, setOtpEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-
-  const form = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
-  });
-
-  const otpEmailForm = useForm<OtpEmailForm>({
-    resolver: zodResolver(otpEmailSchema),
-    defaultValues: { email: "" },
-  });
-
-  async function onPasswordSubmit(data: LoginForm) {
-    const email = normalizeEmail(data.email);
+  async function loginWithPassword(event: React.FormEvent) {
+    event.preventDefault();
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+    setError("");
     setIsLoading(true);
     try {
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, email }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
         credentials: "include",
       });
       if (!response.ok) {
-        const message = await responseMessage(response, "Invalid email or password");
-        const isUnverified = /not\s+verified|unverified|verify\s+(your\s+)?email/i.test(message);
-        if (isUnverified) {
-          setOtpEmail(email);
-          otpEmailForm.setValue("email", email, { shouldValidate: true });
-          setMode("otp");
-          setOtpStep("email");
-          toast({
-            title: "Verify your email to continue",
-            description: "Request an email sign-in code to verify your account and sign in.",
-          });
+        const result = await readResponse(response, "Email or password is incorrect.");
+        if (result.hint === "EMAIL_UNVERIFIED" || /not\s+verified|unverified|verify\s+(your\s+)?email/i.test(result.message)) {
+          setCodeEmail(normalizedEmail);
+          setCodeStep("request");
+          setCode("");
+          setMode("code");
+          setError("Your email is not verified yet. Use an email code to verify it and sign in.");
           return;
         }
-        throw new Error(message);
+        throw new Error(result.message);
       }
-
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Welcome back!", description: "You have been logged in successfully." });
-      setLocation("/");
-    } catch (error: any) {
-      toast({
-        title: "Unable to log in",
-        description: error.message || "Please check your email and password and try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Welcome back!", description: "You are now signed in." });
+      window.location.href = "/";
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't sign you in. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function onSendOtp(data: OtpEmailForm) {
-    const email = normalizeEmail(data.email);
-    setIsSendingOtp(true);
+  async function requestCode(event?: React.FormEvent) {
+    event?.preventDefault();
+    const normalizedEmail = normalizeEmail(codeEmail);
+    if (!normalizedEmail) {
+      setError("Enter the email address on your account.");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
     try {
       const response = await fetch("/api/send-login-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
-      if (!response.ok) throw new Error(await responseMessage(response, "Failed to send sign-in code"));
-
-      setOtpEmail(email);
-      setOtpStep("code");
-      toast({ title: "Code sent", description: "Check your email for the 6-digit sign-in code." });
-    } catch (error: any) {
-      toast({
-        title: "Could not send code",
-        description: error.message || "Please try again or use your password to log in.",
-        variant: "destructive",
-      });
+      if (!response.ok) throw new Error((await readResponse(response, "We couldn't send the sign-in code.")).message);
+      setCodeEmail(normalizedEmail);
+      setCodeStep("verify");
+      setCode("");
+      toast({ title: "Code sent", description: "Check your email for your 6-digit sign-in code." });
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't send the sign-in code. Please try again.");
     } finally {
-      setIsSendingOtp(false);
+      setIsLoading(false);
     }
   }
 
-  async function onVerifyOtp() {
-    if (otp.length !== 6) return;
-    setIsVerifyingOtp(true);
+  async function resendCode() {
+    await requestCode();
+  }
+
+  async function verifyCode(event: React.FormEvent) {
+    event.preventDefault();
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setError("");
+    setIsLoading(true);
     try {
       const response = await fetch("/api/login-with-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: otpEmail, otp }),
+        body: JSON.stringify({ email: normalizeEmail(codeEmail), otp: code }),
         credentials: "include",
       });
-      if (!response.ok) throw new Error(await responseMessage(response, "Invalid or expired sign-in code"));
-
+      if (!response.ok) throw new Error((await readResponse(response, "That code is invalid or expired.")).message);
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Welcome!", description: "You have been signed in successfully." });
-      setLocation("/");
-    } catch (error: any) {
-      toast({
-        title: "Invalid code",
-        description: error.message || "Please request a new code and try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Welcome!", description: "You are now signed in." });
+      window.location.href = "/";
+    } catch (submitError: any) {
+      setError(submitError.message || "That code is invalid or expired.");
     } finally {
-      setIsVerifyingOtp(false);
+      setIsLoading(false);
     }
   }
 
-  async function resendOtp() {
-    setIsSendingOtp(true);
-    try {
-      const response = await fetch("/api/send-login-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: otpEmail }),
-      });
-      if (!response.ok) throw new Error(await responseMessage(response, "Failed to resend code"));
-
-      setOtp("");
-      toast({ title: "Code resent", description: "A new sign-in code has been sent." });
-    } catch (error: any) {
-      toast({
-        title: "Could not resend code",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingOtp(false);
-    }
-  }
-
-  function showPasswordLogin() {
+  function switchToPassword() {
     setMode("password");
-    setOtpStep("email");
-    setOtp("");
+    setError("");
+    setCode("");
   }
 
-  function showOtpLogin() {
-    setMode("otp");
-    setOtpStep("email");
-    setOtp("");
+  function switchToCode() {
+    setMode("code");
+    setError("");
+    setCodeStep("request");
+    setCode("");
+    if (!codeEmail) setCodeEmail(email);
+  }
+
+  const footer = (
+    <p className="text-center text-sm text-gray-600">
+      Don’t have an account?{" "}
+      <Link href="/register" className="font-semibold text-[#087f4f] hover:underline">Create one</Link>
+    </p>
+  );
+
+  if (mode === "code") {
+    return (
+      <AuthShell
+        title={codeStep === "request" ? "Sign in with a code" : "Enter your sign-in code"}
+        description={codeStep === "request" ? "We’ll email you a one-time code. No password needed." : `We sent a 6-digit code to ${codeEmail}.`}
+        headerLink={{ href: "/register", label: "Create account" }}
+        footer={footer}
+      >
+        <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 focus:outline-none focus:underline">
+          <ArrowLeft className="h-4 w-4" /> Back to password login
+        </button>
+        {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+
+        {codeStep === "request" ? (
+          <form onSubmit={requestCode} className="space-y-5">
+            <label className="block text-sm font-medium text-gray-700">
+              Email address
+              <input
+                value={codeEmail}
+                onChange={(event) => setCodeEmail(event.target.value)}
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                placeholder="you@example.com"
+                className={authInputClass}
+                autoFocus
+              />
+            </label>
+            <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send sign-in code"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={verifyCode} className="space-y-5">
+            <div className="flex justify-center py-2">
+              <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit sign-in code" autoComplete="one-time-code" autoFocus>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
+                  /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : "Verify and sign in"}
+            </button>
+            <div className="flex items-center justify-between text-sm">
+              <button type="button" onClick={() => { setCodeStep("request"); setError(""); }} className="text-gray-500 hover:text-gray-900 hover:underline">Use another email</button>
+              <button type="button" onClick={resendCode} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">Resend code</button>
+            </div>
+          </form>
+        )}
+      </AuthShell>
+    );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fbfcfa] pattern-bg">
-      <header className="flex items-center justify-between px-6 py-6 sm:px-8 lg:px-12">
-        <Link href="/" className="inline-flex items-center gap-3" aria-label="Go to Afrolandx home">
-          <img src={logoImage} alt="" className="h-10 w-10 object-contain" />
-          <span className="text-2xl font-bold tracking-tight text-[#087f4f]">Afrolandx</span>
-        </Link>
-        <Link
-          href="/register"
-          className="rounded-md bg-[#087f4f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2"
-        >
-          Create account
-        </Link>
-      </header>
-
-      <main className="flex flex-1 items-center px-6 pb-16 pt-4 sm:px-8 lg:items-start lg:px-24 lg:pt-24">
-        <section className="w-full max-w-[360px]" aria-labelledby="login-title">
-          <div className="border border-gray-100 bg-white px-7 py-8 shadow-[0_10px_35px_rgba(20,40,30,0.06)] sm:px-8">
-            {mode === "password" ? (
-              <>
-                <h1 id="login-title" className="text-xl font-semibold tracking-tight text-gray-900">
-                  Log in to your account
-                </h1>
-                <p className="mt-2 text-sm text-gray-500">Welcome back to Afrolandx.</p>
-
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onPasswordSubmit)} className="mt-7 space-y-5">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700">Email address</FormLabel>
-                          <FormControl>
-                            <div className="relative mt-1.5">
-                              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                              <Input
-                                {...field}
-                                type="email"
-                                autoComplete="email"
-                                 inputMode="email"
-                                placeholder="you@example.com"
-                                className="h-11 rounded-md border-gray-200 pl-10 pr-3 shadow-none focus:border-[#087f4f] focus:ring-[#087f4f]"
-                                data-testid="input-email"
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700">Password</FormLabel>
-                          <div className="relative mt-1.5">
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type={showPassword ? "text" : "password"}
-                                autoComplete="current-password"
-                                placeholder="Your password"
-                                className="h-11 rounded-md border-gray-200 pl-10 pr-11 shadow-none focus:border-[#087f4f] focus:ring-[#087f4f]"
-                                data-testid="input-password"
-                              />
-                            </FormControl>
-                            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword((visible) => !visible)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]"
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex justify-end">
-                      <Link href="/forgot-password" className="text-sm text-[#315cff] hover:underline">
-                        Forgot password?
-                      </Link>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-      disabled={isLoading}
-                      data-testid="button-login"
-                    >
-                      {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Log in"}
-                    </button>
-                  </form>
-                </Form>
-
-                <button
-                  type="button"
-                  onClick={showOtpLogin}
-                  className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-[#087f4f] focus:outline-none focus:underline"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  Use an email sign-in code instead
-                </button>
-
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={showPasswordLogin}
-                  className="mb-6 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 focus:outline-none focus:underline"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to password login
-                </button>
-                <h1 id="login-title" className="text-xl font-semibold tracking-tight text-gray-900">
-                  Sign in with an email code
-                </h1>
-                <p className="mt-2 text-sm leading-6 text-gray-500">
-                  We’ll send a one-time 6-digit code to your email.
-                </p>
-
-                {otpStep === "email" ? (
-                  <Form {...otpEmailForm}>
-                    <form onSubmit={otpEmailForm.handleSubmit(onSendOtp)} className="mt-7 space-y-5">
-                      <FormField
-                        control={otpEmailForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-700">Email address</FormLabel>
-                            <FormControl>
-                              <div className="relative mt-1.5">
-                                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                <Input
-                                  {...field}
-                                  type="email"
-                                  autoComplete="email"
-                                 inputMode="email"
-                                  placeholder="you@example.com"
-                                  className="h-11 rounded-md border-gray-200 pl-10 shadow-none focus:border-[#087f4f] focus:ring-[#087f4f]"
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <button
-                        type="submit"
-                        className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isSendingOtp}
-                      >
-                        {isSendingOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send sign-in code"}
-                      </button>
-                    </form>
-                  </Form>
-                ) : (
-                  <div className="mt-7 space-y-5">
-                    <p className="text-sm leading-6 text-gray-600">
-                      We sent a code to <strong className="break-all">{otpEmail}</strong>.
-                    </p>
-                    <div className="flex justify-center">
-                      <InputOTP maxLength={6} value={otp} onChange={setOtp} aria-label="6-digit sign-in code" autoComplete="one-time-code">
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onVerifyOtp}
-                      className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={otp.length !== 6 || isVerifyingOtp || isSendingOtp}
-                    >
-                      {isVerifyingOtp ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify and log in"}
-                    </button>
-                    <p className="text-center text-sm text-gray-500">
-                      Didn’t receive it?{" "}
-                      <button type="button" onClick={resendOtp} disabled={isSendingOtp} className="font-medium text-[#315cff] hover:underline">
-                        {isSendingOtp ? "Sending..." : "Resend code"}
-                      </button>
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-            <p className="mt-7 border-t border-gray-100 pt-6 text-center text-sm text-gray-600">
-              Don’t have an account?{" "}
-              <Link href="/register" className="font-semibold text-[#087f4f] hover:underline" data-testid="link-register">
-                Create one
-              </Link>
-            </p>
-          </div>
-        </section>
-      </main>
-
-      <footer className="px-6 py-5 text-center text-xs text-gray-500 sm:px-8 lg:px-12 lg:text-left">
-        Secure access to Afrolandx marketplace
-      </footer>
-    </div>
+    <AuthShell
+      title="Log in to Afrolandx"
+      description="Welcome back. Enter your details to continue."
+      headerLink={{ href: "/register", label: "Create account" }}
+      footer={footer}
+    >
+      {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+      <form onSubmit={loginWithPassword} className="space-y-5">
+        <label className="block text-sm font-medium text-gray-700">
+          Email address
+          <input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="you@example.com"
+            className={authInputClass}
+            autoFocus
+            data-testid="input-email"
+          />
+        </label>
+        <label className="block text-sm font-medium text-gray-700">
+          Password
+          <span className="relative block">
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Your password"
+              className={`${authInputClass} pr-11`}
+              data-testid="input-password"
+            />
+            <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </span>
+        </label>
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-sm text-[#315cff] hover:underline">Forgot password?</Link>
+        </div>
+        <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">
+          {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Log in"}
+        </button>
+      </form>
+      <button type="button" onClick={switchToCode} className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-[#087f4f] focus:outline-none focus:underline">
+        <KeyRound className="h-4 w-4" /> Use an email sign-in code instead
+      </button>
+    </AuthShell>
   );
 }
