@@ -3,14 +3,10 @@ import crypto from "crypto";
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@afrolandx.com";
 const APP_NAME = "Afrolandx";
-let managedSendGrid: import("@replit/connectors-sdk").ReplitConnectors | null = null;
 
 async function getManagedSendGrid() {
-  if (!managedSendGrid) {
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    managedSendGrid = new ReplitConnectors();
-  }
-  return managedSendGrid;
+  const { ReplitConnectors } = await import("@replit/connectors-sdk");
+  return new ReplitConnectors();
 }
 
 export function generateOtp(): string {

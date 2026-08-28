@@ -288,14 +288,6 @@ export default function LoginPage() {
                   </form>
                 </Form>
 
-                <button
-                  type="button"
-                  onClick={showOtpLogin}
-                  className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-[#087f4f] focus:outline-none focus:underline"
-                >
-                  <KeyRound className="h-4 w-4" />
-                  Use an email sign-in code instead
-                </button>
               </>
             ) : (
               <>
