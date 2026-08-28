@@ -45,6 +45,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
     // Keep the legacy key as a local-development fallback when the managed
     // connector proxy is unavailable.
     if (SENDGRID_API_KEY) {
+      console.error("Managed SendGrid connector failed; trying legacy fallback:", connectorError);
       const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
