@@ -705,7 +705,7 @@ export class DatabaseStorage implements IStorage {
   async createMeasurement(measurementData: InsertMeasurement): Promise<Measurement> {
     const [measurement] = await db
       .insert(measurements)
-      .values(measurementData)
+      .values(measurementData as any)
       .returning();
     return measurement;
   }

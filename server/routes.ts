@@ -16,6 +16,14 @@ import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 
+declare global {
+  namespace Express {
+    interface User {
+      id?: string;
+    }
+  }
+}
+
 // Configure multer for memory storage (for cloud upload)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2468,7 +2476,7 @@ INSTRUCTIONS:
       const enhancedItems = await Promise.all(bundleItems.map(async (item: any) => {
         const product = await storage.getProduct(item.productId);
         if (!product) return null;
-        const imageUrl = (product.images && product.images[0]) || product.imageUrl || null;
+        const imageUrl = (Array.isArray(product.images) && product.images[0]) || product.imageUrl || null;
         return { ...item, name: product.name, price: product.price, imageUrl };
       }));
       
@@ -3276,7 +3284,7 @@ Return ONLY valid JSON:
         }
       }
       
-      const rsvp = await storage.createDropRsvp({ dropId, userId });
+      const rsvp = await storage.createDropRsvp({ dropId, userId, status: 'confirmed' });
       res.status(201).json(rsvp);
     } catch (error) {
       console.error('Error creating RSVP:', error);
@@ -3591,7 +3599,7 @@ Return ONLY valid JSON:
       let places: any[] = [];
 
       // Helper: Nominatim free-text search (used as primary for queries, fallback for categories)
-      async function nominatimSearch(q: string): Promise<any[]> {
+      const nominatimSearch = async (q: string): Promise<any[]> => {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=20&addressdetails=1&extratags=1`;
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 15000);
@@ -3615,7 +3623,7 @@ Return ONLY valid JSON:
             ? { openNow: null, weekdayDescriptions: [r.extratags.opening_hours] }
             : undefined,
         })).filter((p: any) => p.displayName.text);
-      }
+      };
 
       if (type && OSM_CATEGORY_TAGS[type as string]) {
         // Category search: Nominatim viewbox only — Overpass removed (too unreliable / rate-limited)
@@ -3713,8 +3721,10 @@ Return ONLY valid JSON:
           console.log(`[img-fix] Cleared bad imageUrl for product #${p.id} "${p.name}"`);
         }
         // 2. Replace images[] that use CDNs which block hotlinking
-        if (!p.images) continue;
-        const hasBlocked = p.images.some((u: string) => BLOCKED_IMAGE_DOMAINS.some(d => u.includes(d)));
+        if (!Array.isArray(p.images)) continue;
+        const hasBlocked = p.images.some((u): u is string =>
+          typeof u === 'string' && BLOCKED_IMAGE_DOMAINS.some(d => u.includes(d))
+        );
         if (!hasBlocked) continue;
         await storage.updateProductImages(p.id, [AGBADA_RELIABLE]);
         console.log(`[img-fix] Updated images for product #${p.id} "${p.name}" to reliable CDN`);
@@ -3992,8 +4002,8 @@ Return ONLY valid JSON:
       if (!reference) return res.status(400).json({ message: 'reference required' });
       const paystack = getPaystackService();
       const verification = await paystack.verifyTransaction(reference);
-      if (verification.status !== 'success') {
-        return res.status(400).json({ message: 'Payment not successful', status: verification.status });
+      if (verification.data.status !== 'success') {
+        return res.status(400).json({ message: 'Payment not successful', status: verification.data.status });
       }
       const { discoverBookings, discoverPremium } = await import('@shared/schema');
       const { db } = await import('./db');

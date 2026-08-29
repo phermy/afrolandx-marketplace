@@ -25,6 +25,36 @@ interface MeasurementFormProps {
 }
 
 type Unit = "cm" | "inches";
+type ScanStatus = "pending" | "processing" | "completed" | "failed";
+
+interface ScanMeasurements {
+  chest?: number;
+  waist?: number;
+  hips?: number;
+  height?: number;
+  shoulderWidth?: number;
+  sleeveLength?: number;
+  armLength?: number;
+  inseam?: number;
+  outseam?: number;
+  neck?: number;
+}
+
+interface ScanInitiateResponse {
+  sessionId: string;
+  status: ScanStatus;
+  demoMode: boolean;
+  scanUrl?: string;
+  message?: string;
+}
+
+interface ScanResultsResponse {
+  status: ScanStatus;
+  demoMode: boolean;
+  measurements?: ScanMeasurements;
+  model3dUrl?: string;
+  message?: string;
+}
 
 interface FieldConfig {
   name: string;
@@ -156,7 +186,8 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
     setShowScanPrompt(false);
     setScanStatus("initiating");
     try {
-      const response = await apiRequest("POST", "/api/body-scan/initiate", { gender: scanGender, height: scanHeight });
+      const apiResponse = await apiRequest("POST", "/api/body-scan/initiate", { gender: scanGender, height: scanHeight });
+      const response = await apiResponse.json() as ScanInitiateResponse;
       setScanSessionId(response.sessionId);
       setIsDemoMode(response.demoMode);
       setScanData(response);
@@ -176,7 +207,8 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
         return;
       }
       try {
-        const response = await apiRequest("GET", `/api/body-scan/results/${sessionId}`);
+        const apiResponse = await apiRequest("GET", `/api/body-scan/results/${sessionId}`);
+        const response = await apiResponse.json() as ScanResultsResponse;
         if (response.status === "completed" && response.measurements) {
           const m = response.measurements;
           (["chest","waist","hips","height","shoulderWidth","sleeveLength","armLength","inseam","outseam","neck"] as const)

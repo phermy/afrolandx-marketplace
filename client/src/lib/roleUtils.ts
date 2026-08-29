@@ -1,29 +1,29 @@
 import type { User } from '@/types';
 
 // Helper functions for role checking in multi-role system
-export const hasRole = (user: User | undefined, role: string): boolean => {
+export const hasRole = (user: User | null | undefined, role: string): boolean => {
   if (!user || !user.roles) return false;
   return Array.isArray(user.roles) && user.roles.includes(role);
 };
 
-export const hasAnyRole = (user: User | undefined, roles: string[]): boolean => {
+export const hasAnyRole = (user: User | null | undefined, roles: string[]): boolean => {
   if (!user || !user.roles) return false;
   return Array.isArray(user.roles) && roles.some(role => user.roles.includes(role));
 };
 
-export const isAdmin = (user: User | undefined): boolean => {
+export const isAdmin = (user: User | null | undefined): boolean => {
   return hasRole(user, 'admin');
 };
 
-export const isVendor = (user: User | undefined): boolean => {
+export const isVendor = (user: User | null | undefined): boolean => {
   return hasRole(user, 'vendor');
 };
 
-export const isCustomer = (user: User | undefined): boolean => {
+export const isCustomer = (user: User | null | undefined): boolean => {
   return hasRole(user, 'customer');
 };
 
-export const getUserRoleDisplay = (user: User | undefined): string => {
+export const getUserRoleDisplay = (user: User | null | undefined): string => {
   if (!user || !user.roles) return 'Customer';
   
   const roles = user.roles as string[];

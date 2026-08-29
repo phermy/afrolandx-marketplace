@@ -379,7 +379,7 @@ export default function MegaMenu() {
 
   // Close dropdown when clicking outside the entire menu bar
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setActiveTab(null);
       }

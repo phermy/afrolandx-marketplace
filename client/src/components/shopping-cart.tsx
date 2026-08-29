@@ -154,7 +154,7 @@ export default function ShoppingCart() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          disabled={isUpdatingQuantity || item.quantity >= item.product.quantity}
+                          disabled={isUpdatingQuantity || item.quantity >= item.product.stock}
                           className="w-8 h-8 p-0"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
