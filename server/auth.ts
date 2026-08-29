@@ -75,6 +75,60 @@ export function getSession() {
   });
 }
 
+type RegisterHandlerDependencies = {
+  storage: Pick<typeof storage, "getUserByEmail" | "upsertUser" | "getUser">;
+  issueOtp: (req: any, user: any) => Promise<void>;
+  hashPassword: (password: string) => Promise<string>;
+  createId: () => string;
+  isRateLimited: (error: unknown) => boolean;
+};
+
+export function createRegisterHandler(dependencies: RegisterHandlerDependencies) {
+  return async (req: any, res: any) => {
+    const email = canonicalEmail(req.body.email);
+    const { password, firstName, lastName } = req.body;
+    if (!email || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
+    }
+    try {
+      const existing = await dependencies.storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
+      }
+      const id = dependencies.createId();
+      await dependencies.storage.upsertUser({
+        id,
+        email,
+        password: await dependencies.hashPassword(password),
+        firstName: firstName || null,
+        lastName: lastName || null,
+      });
+      const user = await dependencies.storage.getUser(id);
+      if (!user) return res.status(500).json({ message: "User creation failed" });
+      try {
+        await dependencies.issueOtp(req, user);
+      } catch (error) {
+        const rateLimited = dependencies.isRateLimited(error);
+        return res.status(201).json({
+          message: rateLimited
+            ? "Account created. Please wait before requesting a verification code."
+            : "Account created, but we couldn't send the verification email. Please use resend when email service is available.",
+          email,
+          emailVerificationSent: false,
+          ...(rateLimited ? { hint: "RATE_LIMITED" } : {}),
+        });
+      }
+      return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "An account already exists for this email.", hint: "sign_in" });
+      }
+      console.error("Registration error:", error);
+      return res.status(500).json({ message: "Registration failed" });
+    }
+  };
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -141,39 +195,13 @@ export async function setupAuth(app: Express) {
     }
   }
 
-  app.post("/api/register", async (req, res) => {
-    const email = canonicalEmail(req.body.email);
-    const { password, firstName, lastName } = req.body;
-    if (!email || typeof password !== "string" || password.length < 8) return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
-    try {
-      const existing = await storage.getUserByEmail(email);
-      if (existing) return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
-      const id = crypto.randomUUID();
-      await storage.upsertUser({ id, email, password: await bcrypt.hash(password, 10), firstName: firstName || null, lastName: lastName || null });
-      const user = await storage.getUser(id);
-      if (!user) return res.status(500).json({ message: "User creation failed" });
-      try {
-        await issueOtp(req, user, "email");
-      } catch (error) {
-        const rateLimited = error instanceof OtpRateLimitError;
-        return res.status(201).json({
-          message: rateLimited
-            ? "Account created. Please wait before requesting a verification code."
-            : "Account created, but we couldn't send the verification email. Please use resend when email service is available.",
-          email,
-          emailVerificationSent: false,
-          ...(rateLimited ? { hint: "RATE_LIMITED" } : {}),
-        });
-      }
-      return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
-     } catch (error: any) {
-       if (error?.code === "23505") {
-         return res.status(409).json({ message: "An account already exists for this email.", hint: "sign_in" });
-       }
-       console.error("Registration error:", error);
-       return res.status(500).json({ message: "Registration failed" });
-     }
-  });
+  app.post("/api/register", createRegisterHandler({
+    storage,
+    issueOtp: (req, user) => issueOtp(req, user, "email"),
+    hashPassword: (password) => bcrypt.hash(password, 10),
+    createId: () => crypto.randomUUID(),
+    isRateLimited: (error) => error instanceof OtpRateLimitError,
+  }));
 
   app.post("/api/login", (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
     if (err) return res.status(500).json({ message: "Authentication error" });
