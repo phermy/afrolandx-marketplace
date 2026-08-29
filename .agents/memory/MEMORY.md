@@ -1,2 +1,3 @@
 - [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
 - [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
+- [Inbound mail routing](inbound-mail-routing.md) — outbound Resend delivery works, but afrolandx.com inboxes reject mail with SMTP relay-access errors
