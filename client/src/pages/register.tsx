@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
-import { AuthShell, authInputClass } from "@/components/auth-shell";
+import { AuthShell, authButtonClass, authInputClass } from "@/components/auth-shell";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -136,15 +136,15 @@ export default function RegisterPage() {
   if (step === "verify") {
     return (
       <AuthShell title="Check your email" description={`We sent a 6-digit verification code to ${registeredEmail}.`} headerLink={{ href: "/login", label: "Log in" }}>
-        <button type="button" onClick={() => { setStep("form"); setError(""); }} className="mb-5 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 focus:outline-none focus:underline">
+         <button type="button" onClick={() => { setStep("form"); setError(""); }} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
           <ArrowLeft className="h-4 w-4" /> Use a different email
         </button>
-        <div className="mb-6 flex items-start gap-3 rounded-md bg-green-50 px-3 py-3 text-sm leading-5 text-green-800">
+         <div className="mb-6 flex items-start gap-3 rounded-[3px] bg-[#f2f8f3] px-3 py-3 text-sm leading-5 text-[#315b3d]">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
           <span>Verification keeps your account secure. The code expires in 15 minutes.</span>
         </div>
-        {deliveryMessage && <div className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800" role="alert">{deliveryMessage}</div>}
-        {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+         {deliveryMessage && <div className="mb-5 rounded-[3px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800" role="alert">{deliveryMessage}</div>}
+         {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
         <form onSubmit={verifyEmail} className="space-y-5">
           <div className="flex justify-center py-2">
             <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit verification code" autoComplete="one-time-code" autoFocus>
@@ -154,12 +154,12 @@ export default function RegisterPage() {
               </InputOTPGroup>
             </InputOTP>
           </div>
-          <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+           <button type="submit" disabled={isLoading || code.length !== 6} className={authButtonClass}>
             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : "Verify email"}
           </button>
-          <p className="text-center text-sm text-gray-500">
+           <p className="text-center text-sm text-[#6d6d69]">
             Didn’t get the code?{" "}
-            <button type="button" onClick={() => resendCode()} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">
+             <button type="button" onClick={() => resendCode()} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">
               Resend code
             </button>
           </p>
@@ -169,42 +169,37 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell title="Create your Afrolandx account" description="One account for shopping, orders, and your profile." headerLink={{ href: "/login", label: "Log in" }} footer={
-      <p className="text-center text-sm text-gray-600">
-        Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-[#087f4f] hover:underline">Log in</Link>
-      </p>
-    }>
-      {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+    <AuthShell title="Create your account" description="Shop authentic African fashion, track orders, and more." headerLink={{ href: "/login", label: "Log in" }}>
+       {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
       <form onSubmit={createAccount} className="space-y-5">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Full name
           <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={authInputClass} autoFocus required data-testid="input-name" />
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Email address
           <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} required data-testid="input-email" />
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Password
           <span className="relative block">
             <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${authInputClass} pr-11`} minLength={8} required data-testid="input-password" />
-            <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
+             <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f5a000]" aria-label={showPassword ? "Hide password" : "Show password"}>
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </span>
-          <span className="mt-1.5 block text-xs font-normal text-gray-500">Use at least 8 characters.</span>
+           <span className="mt-1.5 block text-xs font-normal text-[#858581]">Use at least 8 characters.</span>
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Confirm password
           <span className="relative block">
             <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${authInputClass} pr-11`} minLength={8} required data-testid="input-confirm-password" />
-            <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+             <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f5a000]" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </span>
         </label>
-        <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-register">
+        <button type="submit" disabled={isLoading} className={authButtonClass} data-testid="button-register">
           {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
         </button>
       </form>

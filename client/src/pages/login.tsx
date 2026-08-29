@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
-import { AuthShell, authInputClass } from "@/components/auth-shell";
+import { AuthShell, authButtonClass, authInputClass } from "@/components/auth-shell";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -139,29 +139,21 @@ export default function LoginPage() {
     if (!codeEmail) setCodeEmail(email);
   }
 
-  const footer = (
-    <p className="text-center text-sm text-gray-600">
-      Don’t have an account?{" "}
-      <Link href="/register" className="font-semibold text-[#087f4f] hover:underline">Create one</Link>
-    </p>
-  );
-
   if (mode === "code") {
     return (
       <AuthShell
         title={codeStep === "request" ? "Sign in with a code" : "Enter your sign-in code"}
         description={codeStep === "request" ? "We’ll email you a one-time code. No password needed." : `We sent a 6-digit code to ${codeEmail}.`}
         headerLink={{ href: "/register", label: "Create account" }}
-        footer={footer}
       >
-        <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 focus:outline-none focus:underline">
+         <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
           <ArrowLeft className="h-4 w-4" /> Back to password login
         </button>
-        {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+         {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
 
         {codeStep === "request" ? (
           <form onSubmit={requestCode} className="space-y-5">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-[#3c3c39]">
               Email address
               <input
                 value={codeEmail}
@@ -175,7 +167,7 @@ export default function LoginPage() {
                 required
               />
             </label>
-            <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={isLoading} className={authButtonClass}>
               {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send sign-in code"}
             </button>
           </form>
@@ -193,8 +185,8 @@ export default function LoginPage() {
               {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : "Verify and sign in"}
             </button>
             <div className="flex items-center justify-between text-sm">
-              <button type="button" onClick={() => { setCodeStep("request"); setError(""); }} className="text-gray-500 hover:text-gray-900 hover:underline">Use another email</button>
-              <button type="button" onClick={resendCode} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">Resend code</button>
+               <button type="button" onClick={() => { setCodeStep("request"); setError(""); }} className="text-[#6d6d69] hover:text-[#20201f] hover:underline">Use another email</button>
+               <button type="button" onClick={resendCode} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">Resend code</button>
             </div>
           </form>
         )}
@@ -204,14 +196,13 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      title="Log in to Afrolandx"
-      description="Welcome back. Enter your details to continue."
+       title="Log in to your account"
+       description="Welcome back. Enter your details to continue."
       headerLink={{ href: "/register", label: "Create account" }}
-      footer={footer}
     >
-      {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+       {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
       <form onSubmit={loginWithPassword} className="space-y-5">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Email address
           <input
             value={email}
@@ -225,7 +216,7 @@ export default function LoginPage() {
             data-testid="input-email"
           />
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[#3c3c39]">
           Password
           <span className="relative block">
             <input
@@ -238,7 +229,7 @@ export default function LoginPage() {
                required
               data-testid="input-password"
             />
-            <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
+             <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#f5a000]" aria-label={showPassword ? "Hide password" : "Show password"}>
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </span>
@@ -246,11 +237,11 @@ export default function LoginPage() {
         <div className="flex justify-end">
           <Link href="/forgot-password" className="text-sm text-[#315cff] hover:underline">Forgot password?</Link>
         </div>
-        <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" data-testid="button-login">
+        <button type="submit" disabled={isLoading} className={authButtonClass} data-testid="button-login">
           {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...</> : "Log in"}
         </button>
       </form>
-      <button type="button" onClick={switchToCode} className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-gray-500 hover:text-[#087f4f] focus:outline-none focus:underline">
+      <button type="button" onClick={switchToCode} className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-[#6d6d69] hover:text-[#087f4f] focus:outline-none focus:underline">
         <KeyRound className="h-4 w-4" /> Use an email sign-in code instead
       </button>
     </AuthShell>
