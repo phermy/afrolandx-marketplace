@@ -131,7 +131,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={requestReset} className="space-y-5">
           <label className="block text-sm font-medium text-gray-700">
             Email address
-            <input value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} autoFocus />
+            <input value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} autoFocus required />
           </label>
           <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send reset code"}
@@ -140,7 +140,7 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={resetPassword} className="space-y-5">
           <div className="flex justify-center py-1">
-            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit password reset code" autoComplete="one-time-code" autoFocus>
+            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit password reset code" autoComplete="one-time-code" autoFocus required>
               <InputOTPGroup>
                 <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
                 /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
@@ -149,11 +149,11 @@ export default function ForgotPasswordPage() {
           </div>
           <label className="block text-sm font-medium text-gray-700">
             New password
-            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" className={authInputClass} />
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" className={authInputClass} minLength={8} required />
           </label>
           <label className="block text-sm font-medium text-gray-700">
             Confirm new password
-            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="Enter it again" className={authInputClass} />
+            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="Enter it again" className={authInputClass} minLength={8} required />
           </label>
           <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating password...</> : "Update password"}

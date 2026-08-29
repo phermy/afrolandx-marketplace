@@ -179,16 +179,16 @@ export default function RegisterPage() {
       <form onSubmit={createAccount} className="space-y-5">
         <label className="block text-sm font-medium text-gray-700">
           Full name
-          <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={authInputClass} autoFocus data-testid="input-name" />
+          <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={authInputClass} autoFocus required data-testid="input-name" />
         </label>
         <label className="block text-sm font-medium text-gray-700">
           Email address
-          <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} data-testid="input-email" />
+          <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} required data-testid="input-email" />
         </label>
         <label className="block text-sm font-medium text-gray-700">
           Password
           <span className="relative block">
-            <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${authInputClass} pr-11`} data-testid="input-password" />
+            <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${authInputClass} pr-11`} minLength={8} required data-testid="input-password" />
             <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -198,7 +198,7 @@ export default function RegisterPage() {
         <label className="block text-sm font-medium text-gray-700">
           Confirm password
           <span className="relative block">
-            <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${authInputClass} pr-11`} data-testid="input-confirm-password" />
+            <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${authInputClass} pr-11`} minLength={8} required data-testid="input-confirm-password" />
             <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>

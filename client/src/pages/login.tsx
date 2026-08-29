@@ -172,6 +172,7 @@ export default function LoginPage() {
                 placeholder="you@example.com"
                 className={authInputClass}
                 autoFocus
+                required
               />
             </label>
             <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
@@ -234,6 +235,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               placeholder="Your password"
               className={`${authInputClass} pr-11`}
+               required
               data-testid="input-password"
             />
             <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#087f4f]" aria-label={showPassword ? "Hide password" : "Show password"}>
