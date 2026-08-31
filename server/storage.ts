@@ -123,8 +123,8 @@ export interface IStorage {
   // Cart operations
   addToCart(cartItem: InsertCartItem): Promise<CartItem>;
   getCartItems(userId: string): Promise<(CartItem & { product: Product })[]>;
-  updateCartItemQuantity(id: number, quantity: number): Promise<void>;
-  removeFromCart(id: number): Promise<void>;
+  updateCartItemQuantity(id: number, userId: string, quantity: number): Promise<boolean>;
+  removeFromCart(id: number, userId: string): Promise<boolean>;
   clearCart(userId: string): Promise<void>;
   
   // Order operations
@@ -136,11 +136,13 @@ export interface IStorage {
   getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
+  markOrderPaid(id: number, reference: string): Promise<boolean>;
+  decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean>;
   
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
-  markNotificationAsRead(id: number): Promise<void>;
+  markNotificationAsRead(id: number, userId: string): Promise<boolean>;
   dismissNotification(id: number, userId: string): Promise<void>;
   cleanupExpiredNotifications(): Promise<void>;
   getAdminUsers(): Promise<User[]>;
@@ -182,6 +184,7 @@ export interface IStorage {
 
   // Production steps operations
   createProductionStep(step: InsertProductionStep): Promise<OrderProductionStep>;
+  getProductionStep(id: number): Promise<OrderProductionStep | undefined>;
   getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]>;
   updateProductionStep(id: number, completedAt: Date, notes?: string): Promise<void>;
   getVendorOrders(vendorId: number): Promise<Order[]>;
@@ -563,15 +566,20 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async updateCartItemQuantity(id: number, quantity: number): Promise<void> {
-    await db
+  async updateCartItemQuantity(id: number, userId: string, quantity: number): Promise<boolean> {
+    const result = await db
       .update(cartItems)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(cartItems.id, id));
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .returning({ id: cartItems.id });
+    return result.length > 0;
   }
 
-  async removeFromCart(id: number): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.id, id));
+  async removeFromCart(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(cartItems)
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .returning({ id: cartItems.id });
+    return result.length > 0;
   }
 
   async clearCart(userId: string): Promise<void> {
@@ -634,6 +642,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id));
   }
 
+  async markOrderPaid(id: number, reference: string): Promise<boolean> {
+    const result = await db.update(orders)
+      .set({ paymentStatus: 'paid', paymentReference: reference, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.paymentStatus, 'pending')))
+      .returning({ id: orders.id });
+    return result.length > 0;
+  }
+
+  async decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean> {
+    const result = await db.update(products)
+      .set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() })
+      .where(and(eq(products.id, id), gte(products.stock, quantity)))
+      .returning({ id: products.id });
+    return result.length > 0;
+  }
+
   async getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]> {
     return await db
       .select()
@@ -669,11 +693,13 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(notifications.createdAt));
   }
 
-  async markNotificationAsRead(id: number): Promise<void> {
-    await db
+  async markNotificationAsRead(id: number, userId: string): Promise<boolean> {
+    const result = await db
       .update(notifications)
       .set({ isRead: true })
-      .where(eq(notifications.id, id));
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+    return result.length > 0;
   }
 
   async dismissNotification(id: number, userId: string): Promise<void> {
@@ -947,6 +973,11 @@ export class DatabaseStorage implements IStorage {
   async createProductionStep(step: InsertProductionStep): Promise<OrderProductionStep> {
     const [newStep] = await db.insert(orderProductionSteps).values(step).returning();
     return newStep;
+  }
+
+  async getProductionStep(id: number): Promise<OrderProductionStep | undefined> {
+    const [step] = await db.select().from(orderProductionSteps).where(eq(orderProductionSteps.id, id));
+    return step;
   }
 
   async getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]> {

@@ -77,11 +77,17 @@ export class PaystackService {
       options.body = JSON.stringify(data);
     }
 
-    const response = await fetch(url, options);
-    const result = await response.json();
+    const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+    const responseText = await response.text();
+    let result: any;
+    try {
+      result = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      throw new Error(`Paystack returned an invalid response (${response.status})`);
+    }
     
     if (!response.ok) {
-      throw new Error(result.message || 'Paystack API error');
+      throw new Error(typeof result.message === 'string' ? result.message : 'Paystack API error');
     }
 
     return result;
@@ -98,9 +104,11 @@ export class PaystackService {
     reference: string,
     metadata?: any,
     callbackUrl?: string,
-    currency: string = 'USD'
+    currency: string = 'NGN'
   ): Promise<PaystackInitializeResponse> {
-    const chargeCurrency = PaystackService.SUPPORTED_CURRENCIES.has(currency) ? currency : 'USD';
+    const chargeCurrency = PaystackService.SUPPORTED_CURRENCIES.has(currency) ? currency : 'NGN';
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payment amount must be positive');
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
 
     const payload: any = {
       email,
@@ -118,6 +126,7 @@ export class PaystackService {
   }
 
   async verifyTransaction(reference: string): Promise<PaystackVerifyResponse> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
     return await this.makeRequest(`/transaction/verify/${reference}`);
   }
 }

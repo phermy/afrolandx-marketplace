@@ -123,7 +123,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-green-700">${parseFloat(order.totalAmount).toFixed(2)}</p>
+            <p className="text-xl font-bold text-green-700">₦{parseFloat(order.totalAmount).toLocaleString()}</p>
             {!isCancelled && (
               <p className="text-xs text-gray-400">Est. delivery: {getEstimatedDelivery(order.shippingMethod, order.createdAt)}</p>
             )}
@@ -190,7 +190,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                       <p className="text-xs text-gray-500">by {item.vendorName}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-green-700">${parseFloat(item.priceAtTime).toFixed(2)}</p>
+                      <p className="text-sm font-bold text-green-700">₦{parseFloat(item.priceAtTime).toLocaleString()}</p>
                       <p className="text-xs text-gray-400">×{item.quantity}</p>
                     </div>
                   </div>
@@ -248,7 +248,7 @@ export default function MyOrders() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const prevStatusRef = useRef<Record<number, string>>({});
 
-  const { data: orders = [], isLoading, isFetching, dataUpdatedAt } = useQuery<any[]>({
+  const { data: orders = [], isLoading, isFetching, isError, refetch, dataUpdatedAt } = useQuery<any[]>({
     queryKey: ['/api/orders/my-orders'],
     enabled: isAuthenticated,
     retry: false,
@@ -356,7 +356,16 @@ export default function MyOrders() {
         )}
 
         {/* Order list */}
-        {orders.length === 0 ? (
+        {isError ? (
+          <Card>
+            <CardContent className="text-center py-16">
+              <AlertCircle className="w-12 h-12 mx-auto text-red-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">We couldn’t load your orders</h3>
+              <p className="text-gray-500 mb-6 text-sm">Check your connection and try again.</p>
+              <Button onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" />Try Again</Button>
+            </CardContent>
+          </Card>
+        ) : orders.length === 0 ? (
           <Card>
             <CardContent className="text-center py-16">
               <ShoppingBag className="w-16 h-16 mx-auto text-gray-200 mb-4" />

@@ -20,7 +20,6 @@ export default function ProductDetail() {
   const { isAuthenticated } = useAuth();
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [sizeError, setSizeError] = useState(false);
 
@@ -51,11 +50,7 @@ export default function ProductDetail() {
     }
 
     addToCart(product.id, 1, selectedSize ?? undefined);
-    setIsAddedToCart(true);
-    setTimeout(() => {
-      openCart();
-      setIsAddedToCart(false);
-    }, 1500);
+    openCart();
   };
 
   if (isLoading) {
@@ -248,23 +243,16 @@ export default function ProductDetail() {
             <div className="space-y-3 mt-auto">
               <Button
                 onClick={handleAddToCart}
-                disabled={!isAvailable || isAddingToCart || isAddedToCart}
+                disabled={!isAvailable || isAddingToCart}
                 size="lg"
                 className={`w-full text-base transition-all duration-200 ${
-                  isAddedToCart ? 'bg-green-600 hover:bg-green-600' : 'btn-nigerian'
+                  'btn-nigerian'
                 }`}
               >
                 {isAddingToCart ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="spinner-nigerian w-4 h-4" />
                     Adding to Cart…
-                  </span>
-                ) : isAddedToCart ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Added to Cart!
                   </span>
                 ) : !isAvailable ? (
                   isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'

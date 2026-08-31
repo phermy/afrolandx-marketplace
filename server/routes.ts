@@ -6,7 +6,11 @@ import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getPaystackService, isPaystackInitialized } from "./paystack";
 import { getChatbotService } from "./chatbot";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
-import { insertVendorSchema, insertProductSchema, insertCartItemSchema, insertOrderSchema, insertMeasurementSchema, insertMessageSchema, orders, orderItems, products, vendors } from "@shared/schema";
+import {
+  insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
+  insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
+  insertProductStorySchema, insertFabricAssetSchema, orders, orderItems, products, vendors,
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -15,6 +19,47 @@ import crypto from "crypto";
 import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
+
+const SHIPPING_QUOTES = [
+  { carrier: 'UPS', service: 'UPS Standard', price: 15000, duration: '5-7 business days' },
+  { carrier: 'FedEx', service: 'FedEx Express', price: 25000, duration: '3-5 business days' },
+  { carrier: 'DHL', service: 'DHL Express', price: 40000, duration: '1-2 business days' },
+] as const;
+
+const shippingAddressSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  address1: z.string().trim().min(3).max(250),
+  address2: z.string().trim().max(250).optional().default(''),
+  city: z.string().trim().min(1).max(120),
+  state: z.string().trim().min(1).max(120),
+  postalCode: z.string().trim().min(1).max(30),
+  country: z.string().trim().min(2).max(100),
+});
+
+function safeImagePath(filename: string): string | null {
+  if (!filename || filename !== path.basename(filename) || !/^[A-Za-z0-9._-]+$/.test(filename)) return null;
+  const uploadRoot = path.resolve(process.cwd(), 'uploads', 'products');
+  const candidate = path.resolve(uploadRoot, filename);
+  return candidate.startsWith(`${uploadRoot}${path.sep}`) ? candidate : null;
+}
+
+function boundedInt(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;
+  return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
+}
+
+function paymentVerificationError(order: any, verification: any, reference: string): string | null {
+  const data = verification?.data;
+  if (!verification?.status || data?.status !== 'success') return 'Payment was not successful';
+  if (data.reference !== reference || order.paymentReference !== reference) return 'Payment reference mismatch';
+  if (data.currency !== 'NGN') return 'Payment currency mismatch';
+  const expectedKobo = Math.round(Number(order.totalAmount) * 100);
+  if (!Number.isSafeInteger(data.amount) || data.amount !== expectedKobo) return 'Payment amount mismatch';
+  const metadataOrderId = Number(data.metadata?.orderId);
+  if (!Number.isSafeInteger(metadataOrderId) || metadataOrderId !== order.id) return 'Payment metadata mismatch';
+  return null;
+}
 
 declare global {
   namespace Express {
@@ -76,17 +121,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Optimized image serving route
   app.get('/uploads/:filename', async (req, res) => {
     const filename = req.params.filename;
-    const filePath = path.join(process.cwd(), 'uploads', 'products', filename);
+    const filePath = safeImagePath(filename);
+    if (!filePath) return res.status(400).json({ message: 'Invalid image path' });
     
     if (fs.existsSync(filePath)) {
       try {
         const { imageProcessor } = await import('./imageProcessor');
         
         // Get optimization parameters from query
-        const width = req.query.w ? parseInt(req.query.w as string) : 800;
-        const height = req.query.h ? parseInt(req.query.h as string) : 800;
-        const quality = req.query.q ? parseInt(req.query.q as string) : 85;
-        const format = (req.query.f as string) || 'jpeg';
+        const width = boundedInt(req.query.w, 800, 16, 2400);
+        const height = boundedInt(req.query.h, 800, 16, 2400);
+        const quality = boundedInt(req.query.q, 85, 30, 95);
+        const format = ['jpeg', 'webp', 'png'].includes(String(req.query.f)) ? String(req.query.f) : 'jpeg';
         
         // Optimize and serve image
         const optimizedPath = await imageProcessor.optimizeImage(filePath, {
@@ -114,7 +160,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Advanced image optimization API endpoint
   app.get('/api/images/optimize/uploads/:filename', async (req, res) => {
     const filename = req.params.filename;
-    const filePath = path.join(process.cwd(), 'uploads', 'products', filename);
+    const filePath = safeImagePath(filename);
+    if (!filePath) return res.status(400).json({ message: 'Invalid image path' });
     
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: 'Image not found' });
@@ -124,10 +171,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { imageProcessor } = await import('./imageProcessor');
       
       // Parse optimization parameters
-      const width = req.query.w ? parseInt(req.query.w as string) : undefined;
-      const height = req.query.h ? parseInt(req.query.h as string) : undefined;
-      const quality = req.query.q ? parseInt(req.query.q as string) : 85;
-      const format = (req.query.f as string) || 'jpeg';
+      const width = req.query.w ? boundedInt(req.query.w, 800, 16, 2400) : undefined;
+      const height = req.query.h ? boundedInt(req.query.h, 800, 16, 2400) : undefined;
+      const quality = boundedInt(req.query.q, 85, 30, 95);
+      const format = ['jpeg', 'webp', 'png'].includes(String(req.query.f)) ? String(req.query.f) : 'jpeg';
       
       const optimizedPath = await imageProcessor.optimizeImage(filePath, {
         width,
@@ -171,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signal: AbortSignal.timeout(4000),
       });
 
-      if (!geoRes.ok) return res.json({ error: 'geo_unavailable' });
+      if (!geoRes.ok) return res.status(503).json({ error: 'geo_unavailable' });
       const data = await geoRes.json() as any;
 
       res.json({
@@ -181,7 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency_name: data.currency_name,
       });
     } catch {
-      res.json({ error: 'geo_unavailable' });
+      res.status(503).json({ error: 'geo_unavailable' });
     }
   });
 
@@ -192,11 +239,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rRes = await fetch('https://open.er-api.com/v6/latest/USD', {
         signal: AbortSignal.timeout(5000),
       });
-      if (!rRes.ok) return res.json({ error: 'rates_unavailable' });
+      if (!rRes.ok) return res.status(503).json({ error: 'rates_unavailable' });
       const data = await rRes.json() as any;
+      if (!data?.rates || typeof data.rates !== 'object') return res.status(502).json({ error: 'rates_unavailable' });
       res.json({ rates: data.rates });
     } catch {
-      res.json({ error: 'rates_unavailable' });
+      res.status(503).json({ error: 'rates_unavailable' });
     }
   });
 
@@ -256,6 +304,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error checking vendor status" });
     }
   };
+
+  async function completeVerifiedOrder(order: any, reference: string): Promise<boolean> {
+    const transitioned = await storage.markOrderPaid(order.id, reference);
+    if (!transitioned) return false;
+
+    await storage.updateOrderStatus(order.id, 'pending');
+    await storage.clearCart(order.userId);
+    const items = await storage.getOrderItemsWithProducts(order.id);
+
+    for (const item of items) {
+      const reduced = await storage.decrementProductStockIfAvailable(item.productId, item.quantity);
+      if (!reduced) {
+        console.error(`Stock could not be reserved for paid order ${order.id}, product ${item.productId}`);
+      }
+    }
+
+    const points = Math.floor(Number(order.totalAmount) / 1000);
+    if (points > 0) {
+      await storage.addLoyaltyPoints(
+        order.userId, points, 'purchase', `Points for Order #${order.id}`, order.id, 'order',
+      ).catch(error => console.error('Failed to award loyalty points:', error));
+    }
+
+    const notifiedVendors = new Set<number>();
+    for (const item of items) {
+      const product = await storage.getProduct(item.productId);
+      if (!product || notifiedVendors.has(product.vendorId)) continue;
+      const vendor = await storage.getVendor(product.vendorId);
+      if (!vendor) continue;
+      await storage.createNotification({
+        userId: vendor.userId,
+        title: 'New Order Received',
+        message: `Payment was confirmed for order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}.`,
+        type: 'order',
+        orderId: order.id,
+      }).catch(error => console.error('Failed to notify vendor:', error));
+      notifiedVendors.add(product.vendorId);
+    }
+
+    const admins = await storage.getAdminUsers();
+    for (const admin of admins) {
+      await storage.createNotification({
+        userId: admin.id,
+        title: 'New Order Placed',
+        message: `Order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}, has been paid.`,
+        type: 'order',
+        orderId: order.id,
+      }).catch(error => console.error('Failed to notify admin:', error));
+    }
+    return true;
+  }
 
   // Admin user management routes
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
@@ -406,12 +505,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorData = insertVendorSchema.parse({
         ...req.body,
         userId,
+        status: 'pending',
       });
 
-      // Add vendor role to user
-      await storage.addUserRole(userId, 'vendor');
-
       const vendor = await storage.createVendor(vendorData);
+      await storage.addUserRole(userId, 'vendor');
       res.json(vendor);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -522,7 +620,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const vendorId = parseInt(req.params.id);
       const { status } = req.body;
-
+      if (!Number.isSafeInteger(vendorId)) return res.status(400).json({ message: 'Invalid vendor ID' });
+      if (!['pending', 'approved', 'rejected', 'suspended'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid vendor status' });
+      }
+      if (!await storage.getVendor(vendorId)) return res.status(404).json({ message: 'Vendor not found' });
       await storage.updateVendorStatus(vendorId, status);
       res.json({ message: 'Vendor status updated' });
     } catch (error) {
@@ -541,7 +643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Validate required fields are present
-        if (!req.body.name || !req.body.description || !req.body.price || !req.body.stock || !req.body.categoryId) {
+        if (!req.body.name || !req.body.description || req.body.price === undefined || req.body.stock === undefined || !req.body.categoryId) {
           return res.status(400).json({ 
             message: 'Missing required fields', 
             required: ['name', 'description', 'price', 'stock', 'categoryId'] 
@@ -672,8 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/products', async (req, res) => {
     try {
-      const { 
-        status = 'approved', 
+      const {
         categoryId, 
         vendorId, 
         featured, 
@@ -684,7 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originCountry
       } = req.query;
       
-      const filters: any = { status };
+      const filters: any = { status: 'approved' };
       if (categoryId) filters.categoryId = parseInt(categoryId as string);
       if (vendorId) filters.vendorId = parseInt(vendorId as string);
       if (featured) filters.featured = featured === 'true';
@@ -704,7 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/products/with-details', async (req, res) => {
     try {
-      const products = await storage.getProductsWithVendor();
+      const products = (await storage.getProductsWithVendor()).filter(product => product.status === 'approved');
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch products with details' });
@@ -719,6 +820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!product) {
         return res.status(404).json({ message: 'Product not found' });
       }
+      if (product.status !== 'approved') return res.status(404).json({ message: 'Product not found' });
       
       res.json(product);
     } catch (error) {
@@ -747,6 +849,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (gender !== undefined) updates.gender = gender && gender.trim() ? gender.trim() : null;
       if (originCountry !== undefined) updates.originCountry = originCountry && originCountry.trim() ? originCountry.trim() : null;
       if (traditionalName !== undefined) updates.traditionalName = traditionalName && traditionalName.trim() ? traditionalName.trim() : null;
+      if (updates.price !== undefined && (!Number.isFinite(Number(updates.price)) || Number(updates.price) <= 0)) {
+        return res.status(400).json({ message: 'Price must be a positive number' });
+      }
+      if (updates.stock !== undefined && (!Number.isSafeInteger(updates.stock) || (updates.stock as number) < 0)) {
+        return res.status(400).json({ message: 'Stock must be a non-negative whole number' });
+      }
       const updated = await storage.updateProduct(productId, updates as any);
 
       // Handle image removal — filter URLs the vendor wants gone
@@ -871,7 +979,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const productId = parseInt(req.params.id);
       const { status } = req.body;
-
+      if (!Number.isSafeInteger(productId)) return res.status(400).json({ message: 'Invalid product ID' });
+      if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid product status' });
+      if (!await storage.getProduct(productId)) return res.status(404).json({ message: 'Product not found' });
       await storage.updateProductStatus(productId, status);
       res.json({ message: 'Product status updated' });
     } catch (error) {
@@ -983,6 +1093,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId,
       });
+      const quantity = cartItemData.quantity ?? 1;
+      const product = await storage.getProduct(cartItemData.productId);
+      if (!product || product.status !== 'approved') return res.status(404).json({ message: 'Product is not available' });
+      if (!Number.isSafeInteger(quantity) || quantity < 1) {
+        return res.status(400).json({ message: 'Quantity must be a positive whole number' });
+      }
+      const sizes = Array.isArray(product.sizes) ? product.sizes.filter((size): size is string => typeof size === 'string') : [];
+      if (sizes.length > 0 && (!cartItemData.selectedSize || !sizes.includes(cartItemData.selectedSize))) {
+        return res.status(400).json({ message: 'Please select a valid size' });
+      }
+      const existing = (await storage.getCartItems(userId))
+        .find(item => item.productId === cartItemData.productId && item.selectedSize === (cartItemData.selectedSize ?? null));
+      if ((existing?.quantity || 0) + quantity > product.stock) {
+        return res.status(409).json({ message: 'Requested quantity exceeds available stock' });
+      }
 
       const cartItem = await storage.addToCart(cartItemData);
       res.json(cartItem);
@@ -1006,22 +1131,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/cart/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/cart/:id', isAuthenticated, async (req: any, res) => {
     try {
       const cartItemId = parseInt(req.params.id);
       const { quantity } = req.body;
-
-      await storage.updateCartItemQuantity(cartItemId, quantity);
+      const userId = (req.user as any)?.id;
+      if (!Number.isSafeInteger(cartItemId) || !Number.isSafeInteger(quantity) || quantity < 1) {
+        return res.status(400).json({ message: 'A positive whole-number quantity is required' });
+      }
+      const item = (await storage.getCartItems(userId)).find(cartItem => cartItem.id === cartItemId);
+      if (!item) return res.status(404).json({ message: 'Cart item not found' });
+      if (item.product.status !== 'approved' || quantity > item.product.stock) {
+        return res.status(409).json({ message: 'Requested quantity is not available' });
+      }
+      if (!await storage.updateCartItemQuantity(cartItemId, userId, quantity)) {
+        return res.status(404).json({ message: 'Cart item not found' });
+      }
       res.json({ message: 'Cart item updated' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to update cart item' });
     }
   });
 
-  app.delete('/api/cart/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/cart/:id', isAuthenticated, async (req: any, res) => {
     try {
       const cartItemId = parseInt(req.params.id);
-      await storage.removeFromCart(cartItemId);
+      const userId = (req.user as any)?.id;
+      if (!Number.isSafeInteger(cartItemId)) return res.status(400).json({ message: 'Invalid cart item ID' });
+      if (!await storage.removeFromCart(cartItemId, userId)) return res.status(404).json({ message: 'Cart item not found' });
       res.json({ message: 'Item removed from cart' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to remove item from cart' });
@@ -1041,51 +1178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shipping quotes endpoint
   app.get('/api/shipping/quote', isAuthenticated, async (req: any, res) => {
     try {
-      // Base rates in USD
-      const BASE_QUOTES = [
-        { carrier: 'UPS',   service: 'UPS Standard',  price: 15000, duration: '5-7 business days' },
-        { carrier: 'FedEx', service: 'FedEx Express',  price: 25000, duration: '3-5 business days' },
-        { carrier: 'DHL',   service: 'DHL Express',    price: 40000, duration: '1-2 business days' },
-      ];
-
-      // Optional local currency conversion: ?currency=NGN&rate=1800&symbol=₦
-      const currency = req.query.currency as string | undefined;
-      const rate     = parseFloat(req.query.rate as string) || 0;
-      const symbol   = req.query.symbol as string | undefined;
-
-      const shippingQuotes = BASE_QUOTES.map(q => {
-        const quote: any = { ...q };
-        if (currency && rate > 0) {
-          quote.localPrice    = Math.round(q.price * rate);
-          quote.localCurrency = currency;
-          quote.localSymbol   = symbol || currency;
-        }
-        return quote;
-      });
-
-      res.json(shippingQuotes);
+      res.json(SHIPPING_QUOTES.map(quote => ({ ...quote, currency: 'NGN' })));
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch shipping quotes' });
-    }
-  });
-
-  // Initialize Paystack (when secret key is provided)
-  app.post('/api/paystack/initialize', isAuthenticated, async (req: any, res) => {
-    try {
-      const { secretKey } = req.body;
-      
-      if (!secretKey) {
-        return res.status(400).json({ message: 'Paystack secret key required' });
-      }
-
-      // Initialize Paystack service
-      const { initializePaystack } = await import('./paystack');
-      initializePaystack(secretKey);
-      
-      res.json({ message: 'Paystack initialized successfully' });
-    } catch (error) {
-      console.error('Error initializing Paystack:', error);
-      res.status(500).json({ message: 'Failed to initialize Paystack' });
     }
   });
 
@@ -1093,7 +1188,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
-      const { totalAmount, shippingAmount, shippingAddress, shippingMethod, currency, localAmount } = req.body;
+      const shippingAddress = shippingAddressSchema.parse(req.body.shippingAddress);
+      const shippingMethod = typeof req.body.shippingMethod === 'string' ? req.body.shippingMethod.toLowerCase() : '';
+      const shippingQuote = SHIPPING_QUOTES.find(quote => quote.carrier.toLowerCase() === shippingMethod);
+      if (!shippingQuote) return res.status(400).json({ message: 'Invalid shipping method' });
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured. Please contact administrator.' });
@@ -1105,18 +1203,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User email required for payment' });
       }
 
-      // Generate payment reference
-      const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const cartItems = await storage.getCartItems(userId);
+      if (cartItems.length === 0) return res.status(400).json({ message: 'Your cart is empty' });
+      let subtotal = 0;
+      for (const item of cartItems) {
+        const product = item.product;
+        if (!product || product.status !== 'approved') return res.status(409).json({ message: 'A cart item is no longer available' });
+        if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > product.stock) {
+          return res.status(409).json({ message: `${product.name} does not have enough stock` });
+        }
+        const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+        if (sizes.length > 0 && (!item.selectedSize || !sizes.includes(item.selectedSize))) {
+          return res.status(409).json({ message: `Select a valid size for ${product.name}` });
+        }
+        const price = Number(product.price);
+        if (!Number.isFinite(price) || price <= 0) return res.status(409).json({ message: 'A cart item has an invalid price' });
+        subtotal += price * item.quantity;
+      }
 
-      // All prices stored in NGN — always charge in Naira
-      const chargeCurrency = 'NGN';
-      const chargeAmount = parseFloat(totalAmount);
+      const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const totalAmount = subtotal + shippingQuote.price;
 
       // Create order with pending payment (total stored in NGN)
       const orderData = {
         userId,
-        totalAmount,
-        shippingAmount: shippingAmount || '0',
+        totalAmount: totalAmount.toFixed(2),
+        shippingAmount: shippingQuote.price.toFixed(2),
         shippingAddress,
         shippingMethod,
         paymentStatus: 'pending',
@@ -1126,8 +1238,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const order = await storage.createOrder(orderData);
 
-      // Create order items from cart
-      const cartItems = await storage.getCartItems(userId);
       for (const item of cartItems) {
         await storage.createOrderItem({
           orderId: order.id,
@@ -1152,8 +1262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const paymentData = await paystack.initializeTransaction(
-        user.email, chargeAmount, reference,
-        metadata, callbackUrl, chargeCurrency
+        user.email, totalAmount, reference,
+        metadata, callbackUrl, 'NGN'
       );
 
       res.json({
@@ -1163,6 +1273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error initializing payment:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'A complete, valid shipping address is required' });
       res.status(500).json({ message: 'Failed to initialize payment. Please try again.' });
     }
   });
@@ -1172,91 +1283,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { reference } = req.body;
       const userId = (req.user as any)?.id;
+      if (typeof reference !== 'string' || !/^[A-Za-z0-9._-]{3,100}$/.test(reference)) {
+        return res.status(400).json({ message: 'A valid payment reference is required' });
+      }
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured' });
       }
 
-      // Verify payment with Paystack
-      const paystack = getPaystackService();
-      const verificationResult = await paystack.verifyTransaction(reference);
-
-      if (!verificationResult.status || verificationResult.data.status !== 'success') {
-        return res.status(400).json({ message: 'Payment verification failed' });
-      }
-
-      // Find order by payment reference
-      const orders = await storage.getOrdersForUser(userId);
-      const order = orders.find(o => o.paymentReference === reference);
+      const userOrders = await storage.getOrdersForUser(userId);
+      const order = userOrders.find(o => o.paymentReference === reference);
 
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      // Update order status
-      await storage.updatePaymentStatus(order.id, 'completed', reference);
-      await storage.updateOrderStatus(order.id, 'confirmed');
-
-      // Clear user's cart
-      await storage.clearCart(userId);
-
-      // Get order items for stock reduction and notifications
-      const orderItems = await storage.getOrderItemsWithProducts(order.id);
-      
-      // Reduce stock for each purchased item
-      for (const item of orderItems) {
-        const product = await storage.getProduct(item.productId);
-        if (product && product.stock >= item.quantity) {
-          await storage.updateProductStock(item.productId, product.stock - item.quantity);
-        }
-      }
-      
-      // Award loyalty points for purchase (1 point per ₦1,000 spent)
-      const orderTotal = parseFloat(order.totalAmount) || 0;
-      const pointsToAward = Math.floor(orderTotal);
-      if (pointsToAward > 0) {
-        await storage.addLoyaltyPoints(
-          userId,
-          pointsToAward,
-          'purchase',
-          `Points for Order #${order.id}`,
-          order.id,
-          'order'
-        );
-      }
-
-      // Notify vendors and admins
-      const notifiedVendors = new Set<number>();
-      for (const item of orderItems) {
-        const product = await storage.getProduct(item.productId);
-        if (product && !notifiedVendors.has(product.vendorId)) {
-          const vendor = await storage.getVendor(product.vendorId);
-          if (vendor) {
-            await storage.createNotification({
-              userId: vendor.userId,
-              title: 'New Order Received!',
-              message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard.`,
-              type: 'order'
-            });
-            notifiedVendors.add(product.vendorId);
-          }
-        }
-      }
-
-      const adminUsers = await storage.getAdminUsers();
-      for (const admin of adminUsers) {
-        await storage.createNotification({
-          userId: admin.id,
-          title: 'New Order Placed',
-          message: `Order #${order.id} worth ₦${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
-          type: 'order'
-        });
-      }
+      const verificationResult = await getPaystackService().verifyTransaction(reference);
+      const mismatch = paymentVerificationError(order, verificationResult, reference);
+      if (mismatch) return res.status(400).json({ message: mismatch });
+      const newlyCompleted = await completeVerifiedOrder(order, reference);
 
       res.json({ 
         success: true, 
         orderId: order.id,
-        message: 'Payment verified and order confirmed' 
+        alreadyProcessed: !newlyCompleted,
+        message: 'Payment verified and order confirmed',
       });
     } catch (error) {
       console.error('Error verifying payment:', error);
@@ -1270,7 +1321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { reference, trxref } = req.query;
       const paymentReference = reference || trxref;
 
-      if (!paymentReference) {
+      if (typeof paymentReference !== 'string' || !/^[A-Za-z0-9._-]{3,100}$/.test(paymentReference)) {
         return res.redirect('/checkout?error=missing_reference');
       }
 
@@ -1282,90 +1333,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paystack = getPaystackService();
       const verificationResult = await paystack.verifyTransaction(paymentReference as string);
 
-      if (!verificationResult.status || verificationResult.data.status !== 'success') {
-        return res.redirect('/checkout?error=payment_failed');
-      }
-
-      // Get order ID from metadata
-      const orderId = verificationResult.data.metadata?.orderId || 
-                     verificationResult.data.metadata?.custom_fields?.find((field: any) => field.variable_name === 'order_id')?.value;
-
-      if (!orderId) {
+      const orderId = Number(verificationResult.data.metadata?.orderId);
+      if (!Number.isSafeInteger(orderId)) {
         return res.redirect('/checkout?error=order_not_found');
       }
-
-      // Update order status
-      await storage.updatePaymentStatus(parseInt(orderId), 'completed', paymentReference as string);
-      await storage.updateOrderStatus(parseInt(orderId), 'confirmed');
-
-      // Get user ID from order
-      const order = await storage.getOrder(parseInt(orderId));
-      if (order) {
-        // Clear user's cart
-        await storage.clearCart(order.userId);
-
-        // Get order items for stock reduction and notifications
-        const orderItems = await storage.getOrderItemsWithProducts(order.id);
-        
-        // Reduce stock for each purchased item
-        for (const item of orderItems) {
-          const product = await storage.getProduct(item.productId);
-          if (product && product.stock >= item.quantity) {
-            await storage.updateProductStock(item.productId, product.stock - item.quantity);
-          }
-        }
-        
-        // Create notifications for vendors and admins
-        const vendorNotifications = new Set<number>();
-        
-        for (const item of orderItems) {
-          const product = await storage.getProduct(item.productId);
-          if (product && !vendorNotifications.has(product.vendorId)) {
-            const vendor = await storage.getVendor(product.vendorId);
-            if (vendor) {
-              await storage.createNotification({
-                userId: vendor.userId,
-                title: 'New Order Received! 🎉',
-                message: `You have a new order (#${order.id}) worth $${parseFloat(order.totalAmount).toLocaleString()}. Check your vendor dashboard for details.`,
-                type: 'order'
-              });
-              vendorNotifications.add(product.vendorId);
-            }
-          }
-        }
-
-        // Award loyalty points (1 point per $1 USD spent)
-        const orderTotal = parseFloat(order.totalAmount) || 0;
-        const pointsToAward = Math.floor(orderTotal);
-        if (pointsToAward > 0) {
-          try {
-            await storage.addLoyaltyPoints(
-              order.userId,
-              pointsToAward,
-              'purchase',
-              `Points for Order #${order.id}`,
-              order.id,
-              'order'
-            );
-          } catch (loyaltyErr) {
-            console.error('Failed to award loyalty points:', loyaltyErr);
-          }
-        }
-
-        // Notify all admins
-        const adminUsers = await storage.getAdminUsers();
-        for (const admin of adminUsers) {
-          await storage.createNotification({
-            userId: admin.id,
-            title: 'New Order Placed! 📦',
-            message: `Order #${order.id} worth $${parseFloat(order.totalAmount).toLocaleString()} has been placed and payment confirmed.`,
-            type: 'order'
-          });
-        }
-      }
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.redirect('/checkout?error=order_not_found');
+      const mismatch = paymentVerificationError(order, verificationResult, paymentReference);
+      if (mismatch) return res.redirect('/checkout?error=payment_verification_failed');
+      await completeVerifiedOrder(order, paymentReference);
 
       // Redirect to order success page after payment
-      res.redirect(`/order-success?order_id=${orderId}&reference=${paymentReference}`);
+      res.redirect(`/order-success?order_id=${orderId}&reference=${encodeURIComponent(paymentReference)}`);
     } catch (error) {
       console.error('Error processing payment callback:', error);
       res.redirect('/checkout?error=processing_failed');
@@ -1393,8 +1372,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderItems = await storage.getOrderItemsWithProducts(orderId);
       const vendor = await storage.getVendorByUserId(userId);
       
-      if (!vendor) {
-        return res.status(403).json({ message: 'Access denied: Vendor account required' });
+      if (!vendor || vendor.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied: Approved vendor account required' });
+      }
+      if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Order payment has not been confirmed' });
+      const allowedNextStatus: Record<string, string> = { pending: 'processing', processing: 'shipped', shipped: 'delivered' };
+      if (allowedNextStatus[order.orderStatus || ''] !== status) {
+        return res.status(409).json({ message: `Order cannot move from ${order.orderStatus} to ${status}` });
       }
 
       let vendorOwnsItems = false;
@@ -1451,105 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Order routes
   app.post('/api/orders', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = (req.user as any)?.id;
-      const orderData = insertOrderSchema.parse({
-        ...req.body,
-        userId,
-      });
-
-      const order = await storage.createOrder(orderData);
-
-      // Create order items from cart and collect vendor information
-      const cartItems = await storage.getCartItems(userId);
-      const vendorProductMap: { [key: string]: any[] } = {};
-      
-      for (const item of cartItems) {
-        await storage.createOrderItem({
-          orderId: order.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          priceAtTime: item.product.price,
-        });
-
-        // Get vendor information for this product
-        const product = await storage.getProduct(item.productId);
-        if (product) {
-          const vendor = await storage.getVendor(product.vendorId);
-          if (vendor) {
-            const vendorId = vendor.userId;
-            if (!vendorProductMap[vendorId]) {
-              vendorProductMap[vendorId] = [];
-            }
-            vendorProductMap[vendorId].push({
-              product: item.product,
-              quantity: item.quantity,
-              totalPrice: parseFloat(item.product.price) * item.quantity
-            });
-          }
-        }
-      }
-
-      // Award loyalty points for purchase (1 point per ₦1,000 spent)
-      try {
-        const orderTotal = parseFloat(order.totalAmount) || 0;
-        const pointsToAward = Math.floor(orderTotal);
-        if (pointsToAward > 0) {
-          await storage.addLoyaltyPoints(userId, pointsToAward, 'purchase', `Points for Order #${order.id}`, order.id, 'order');
-        }
-      } catch (loyaltyError) {
-        console.error('Error awarding loyalty points:', loyaltyError);
-      }
-
-      // Notify each vendor about their products sold
-      for (const vendorId in vendorProductMap) {
-        const products = vendorProductMap[vendorId];
-        const totalVendorAmount = products.reduce((sum: number, p: any) => sum + p.totalPrice, 0);
-        const productNames = products.map((p: any) => p.product.name).join(', ');
-        
-        try {
-          await storage.createNotification({
-            userId: vendorId,
-            type: 'product_sold',
-            title: 'Products Sold!',
-            message: `Your products (${productNames}) have been purchased in order #${order.id}. Total value: ₦${totalVendorAmount.toLocaleString()}`,
-            orderId: order.id,
-            isRead: false
-          });
-        } catch (notificationError) {
-          console.error('Error creating vendor notification:', notificationError);
-        }
-      }
-
-      // Notify all admins about the new order
-      try {
-        const adminUsers = await storage.getAdminUsers();
-        for (const admin of adminUsers) {
-          await storage.createNotification({
-            userId: admin.id,
-            type: 'order_placed',
-            title: 'New Order Placed',
-            message: `A new order #${order.id} has been placed by a customer. Total amount: ₦${parseFloat(order.totalAmount).toLocaleString()}`,
-            orderId: order.id,
-            isRead: false
-          });
-        }
-      } catch (notificationError) {
-        console.error('Error creating admin notifications:', notificationError);
-      }
-
-      // Clear cart after order creation
-      await storage.clearCart(userId);
-
-      res.json(order);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: 'Validation error', errors: error.errors });
-      } else {
-        console.error('Error creating order:', error);
-        res.status(500).json({ message: 'Failed to create order' });
-      }
-    }
+    res.status(405).json({ message: 'Orders must be created through the secure payment flow' });
   });
 
   app.get('/api/orders/my-orders', isAuthenticated, async (req: any, res) => {
@@ -1590,8 +1476,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/orders/:id', isAuthenticated, async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
+      const userId = (req.user as any)?.id;
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
+      if (order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
       // Return with items
       const rawItems = await storage.getOrderItemsWithProducts(orderId);
       const items = await Promise.all(rawItems.map(async (item) => {
@@ -1647,6 +1535,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId,
       });
+      if (measurementData.productId) {
+        const product = await storage.getProduct(measurementData.productId);
+        if (!product || product.status !== 'approved') return res.status(400).json({ message: 'Invalid product' });
+        if (measurementData.vendorId && measurementData.vendorId !== product.vendorId) {
+          return res.status(400).json({ message: 'Vendor does not match product' });
+        }
+      }
+      if (measurementData.orderId) {
+        const order = await storage.getOrder(measurementData.orderId);
+        if (!order || order.userId !== userId) return res.status(400).json({ message: 'Invalid order' });
+        const items = await storage.getOrderItemsWithProducts(order.id);
+        if (measurementData.productId && !items.some(item => item.productId === measurementData.productId)) {
+          return res.status(400).json({ message: 'Product is not part of this order' });
+        }
+      }
 
       const measurement = await storage.createMeasurement(measurementData as any);
 
@@ -1810,58 +1713,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payment webhook (Paystack) — handles async payment confirmations
   app.post('/api/webhooks/paystack', async (req, res) => {
     try {
-      // Verify webhook signature
       const secret = process.env.PAYSTACK_SECRET_KEY;
-      if (secret) {
-        const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
-        if (hash !== req.headers['x-paystack-signature']) {
-          return res.status(401).json({ message: 'Invalid signature' });
-        }
+      const rawBody = (req as any).rawBody;
+      const signature = req.headers['x-paystack-signature'];
+      if (!secret || !Buffer.isBuffer(rawBody) || typeof signature !== 'string') {
+        return res.status(401).json({ message: 'Webhook authentication unavailable' });
+      }
+      const expected = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
+      const actualBuffer = Buffer.from(signature, 'utf8');
+      const expectedBuffer = Buffer.from(expected, 'utf8');
+      if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) {
+        return res.status(401).json({ message: 'Invalid signature' });
       }
 
       const { event, data } = req.body;
 
       if (event === 'charge.success') {
         const { reference } = data;
-
-        if (isPaystackInitialized()) {
-          const paystack = getPaystackService();
-          const verification = await paystack.verifyTransaction(reference);
-
-          if (verification?.data?.status === 'success') {
-            // Find order by payment reference
-            const orderId = verification.data.metadata?.orderId;
-            if (orderId) {
-              const order = await storage.getOrder(orderId);
-              if (order && order.paymentStatus !== 'completed') {
-                await storage.updatePaymentStatus(orderId, 'completed', reference);
-                await storage.updateOrderStatus(orderId, 'confirmed');
-                await storage.clearCart(order.userId);
-
-                const orderItems = await storage.getOrderItemsWithProducts(orderId);
-                const notifiedVendors = new Set<number>();
-                for (const item of orderItems) {
-                  const product = await storage.getProduct(item.productId);
-                  if (product && product.stock >= item.quantity) {
-                    await storage.updateProductStock(item.productId, product.stock - item.quantity);
-                  }
-                  if (product && !notifiedVendors.has(product.vendorId)) {
-                    const vendor = await storage.getVendor(product.vendorId);
-                    if (vendor) {
-                      await storage.createNotification({
-                        userId: vendor.userId,
-                        title: 'Payment Confirmed',
-                        message: `Payment confirmed for order #${orderId}. Worth ₦${parseFloat(order.totalAmount).toLocaleString()}.`,
-                        type: 'order'
-                      });
-                      notifiedVendors.add(product.vendorId);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+        if (typeof reference !== 'string' || !isPaystackInitialized()) return res.status(200).json({ message: 'Webhook ignored' });
+        const verification = await getPaystackService().verifyTransaction(reference);
+        const orderId = Number(verification.data?.metadata?.orderId);
+        const order = Number.isSafeInteger(orderId) ? await storage.getOrder(orderId) : undefined;
+        if (!order) return res.status(200).json({ message: 'Webhook ignored' });
+        const mismatch = paymentVerificationError(order, verification, reference);
+        if (mismatch) return res.status(200).json({ message: 'Webhook ignored' });
+        await completeVerifiedOrder(order, reference);
       }
 
       res.status(200).json({ message: 'Webhook received' });
@@ -2011,10 +1887,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
     try {
       const notificationId = parseInt(req.params.id);
-      await storage.markNotificationAsRead(notificationId);
+      const userId = (req.user as any)?.id;
+      if (!Number.isSafeInteger(notificationId)) return res.status(400).json({ message: 'Invalid notification ID' });
+      if (!await storage.markNotificationAsRead(notificationId, userId)) {
+        return res.status(404).json({ message: 'Notification not found' });
+      }
       res.json({ message: 'Notification marked as read' });
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -2109,7 +1989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createNotification({
             userId: admin.id,
             title: status === 'delivered' ? `✅ Order #${orderId} Delivered` : `❌ Order #${orderId} Cancelled`,
-            message: `Order #${orderId} worth $${parseFloat(order.totalAmount as string).toFixed(2)} has been marked as ${status}.`,
+            message: `Order #${orderId} worth ₦${parseFloat(order.totalAmount as string).toLocaleString()} has been marked as ${status}.`,
             type: 'order',
           });
         }
@@ -2592,7 +2472,7 @@ INSTRUCTIONS:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
       
       const alerts = await storage.getVendorMeasurementAlerts(vendor.id);
       res.json(alerts);
@@ -2608,7 +2488,7 @@ INSTRUCTIONS:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
       
       const id = parseInt(req.params.id);
       await storage.acknowledgeMeasurementAlert(id, vendor.id);
@@ -2629,7 +2509,7 @@ INSTRUCTIONS:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
       
       const vendorOrders = await storage.getVendorOrders(vendor.id);
       
@@ -2653,32 +2533,59 @@ INSTRUCTIONS:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
       
       const orderId = parseInt(req.params.orderId);
       const { stage, notes, orderItemId } = req.body;
-      
-      const step = await storage.createProductionStep({
+      if (!Number.isSafeInteger(orderId)) return res.status(400).json({ message: 'Invalid order ID' });
+      const order = await storage.getOrder(orderId);
+      if (!order || order.paymentStatus !== 'paid') return res.status(404).json({ message: 'Paid order not found' });
+      const items = await storage.getOrderItemsWithProducts(orderId);
+      const vendorItems = [];
+      for (const item of items) {
+        const product = await storage.getProduct(item.productId);
+        if (product?.vendorId === vendor.id) vendorItems.push(item);
+      }
+      if (vendorItems.length === 0) return res.status(403).json({ message: 'This order does not contain your products' });
+      if (orderItemId !== undefined && !vendorItems.some(item => item.id === Number(orderItemId))) {
+        return res.status(403).json({ message: 'Order item does not belong to this vendor' });
+      }
+
+      const stepData = insertProductionStepSchema.parse({
         orderId,
-        orderItemId,
+        orderItemId: orderItemId === undefined ? null : Number(orderItemId),
         stage,
-        notes,
+        notes: typeof notes === 'string' ? notes.trim().slice(0, 1000) : null,
         completedBy: userId,
       });
-      
+      const step = await storage.createProductionStep(stepData);
       res.status(201).json(step);
     } catch (error) {
       console.error('Error creating production step:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid production step', errors: error.errors });
       res.status(500).json({ message: 'Failed to create step' });
     }
   });
 
   app.patch('/api/vendor/workshop/steps/:id/complete', isAuthenticated, async (req, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
       const id = parseInt(req.params.id);
       const { notes } = req.body;
-      
-      await storage.updateProductionStep(id, new Date(), notes);
+      const step = await storage.getProductionStep(id);
+      if (!step) return res.status(404).json({ message: 'Production step not found' });
+      const items = await storage.getOrderItemsWithProducts(step.orderId);
+      const relevantItems = step.orderItemId ? items.filter(item => item.id === step.orderItemId) : items;
+      let ownsStep = false;
+      for (const item of relevantItems) {
+        const product = await storage.getProduct(item.productId);
+        if (product?.vendorId === vendor.id) ownsStep = true;
+      }
+      if (!ownsStep) return res.status(403).json({ message: 'Production step does not belong to this vendor' });
+      await storage.updateProductionStep(id, new Date(), typeof notes === 'string' ? notes.trim().slice(0, 1000) : undefined);
       res.json({ success: true });
     } catch (error) {
       console.error('Error completing step:', error);
@@ -2713,10 +2620,12 @@ INSTRUCTIONS:
       const vendor = await storage.getVendorByUserId(userId);
       if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
       
-      const resource = await storage.createVendorResource({ ...req.body, vendorId: vendor.id });
+      const resourceData = insertVendorResourceSchema.parse({ ...req.body, vendorId: vendor.id });
+      const resource = await storage.createVendorResource(resourceData);
       res.status(201).json(resource);
     } catch (error) {
       console.error('Error creating resource:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid resource data', errors: error.errors });
       res.status(500).json({ message: 'Failed to create resource' });
     }
   });
@@ -2899,14 +2808,15 @@ INSTRUCTIONS:
       if (!product) return res.status(404).json({ message: 'Product not found' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor || vendor.id !== product.vendorId) {
+      if (!vendor || vendor.status !== 'approved' || vendor.id !== product.vendorId) {
         return res.status(403).json({ message: 'Not authorized to add stories to this product' });
       }
-      
-      const story = await storage.createProductStory({ ...req.body, productId });
+      const storyData = insertProductStorySchema.parse({ ...req.body, productId });
+      const story = await storage.createProductStory(storyData);
       res.status(201).json(story);
     } catch (error) {
       console.error('Error creating product story:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid story data', errors: error.errors });
       res.status(500).json({ message: 'Failed to create story' });
     }
   });
@@ -3112,14 +3022,15 @@ INSTRUCTIONS:
       if (!product) return res.status(404).json({ message: 'Product not found' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor || vendor.id !== product.vendorId) {
+      if (!vendor || vendor.status !== 'approved' || vendor.id !== product.vendorId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      
-      const asset = await storage.createFabricAsset({ ...req.body, productId });
+      const assetData = insertFabricAssetSchema.parse({ ...req.body, productId });
+      const asset = await storage.createFabricAsset(assetData);
       res.status(201).json(asset);
     } catch (error) {
       console.error('Error creating fabric asset:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid fabric asset', errors: error.errors });
       res.status(500).json({ message: 'Failed to create fabric asset' });
     }
   });

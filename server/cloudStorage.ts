@@ -87,9 +87,11 @@ class CloudStorageService {
 
   async deleteImage(imageUrl: string): Promise<void> {
     try {
-      // Extract key from URL
       const url = new URL(imageUrl);
-      const key = url.pathname.substring(1); // Remove leading slash
+      const key = decodeURIComponent(url.pathname.substring(1));
+      if (!key || key.includes('..') || key.startsWith('/') || key.includes('\\')) {
+        throw new Error('Invalid cloud image key');
+      }
 
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
@@ -104,12 +106,16 @@ class CloudStorageService {
   }
 
   async generatePresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+    if (!/^[a-zA-Z0-9/_ .-]+$/.test(key) || key.includes('..')) {
+      throw new Error('Invalid cloud image key');
+    }
+    const boundedExpiry = Math.min(Math.max(Math.floor(expiresIn), 60), 3600);
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
     });
 
-    return await getSignedUrl(this.s3Client, command, { expiresIn });
+    return await getSignedUrl(this.s3Client, command, { expiresIn: boundedExpiry });
   }
 }
 

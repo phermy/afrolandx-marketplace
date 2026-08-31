@@ -42,6 +42,9 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 
 [userenv.production]
 
+[userenv.shared]
+FROM_EMAIL = "management@afrolandx.com"
+
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000

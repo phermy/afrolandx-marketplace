@@ -833,7 +833,7 @@ export default function VendorDashboard() {
                           </div>
                           <div className="text-right">
                             <Badge className={
-                              order.orderStatus === 'confirmed' ? 'badge-approved' :
+                              order.orderStatus === 'pending' ? 'badge-approved' :
                               order.orderStatus === 'pending' ? 'badge-pending' :
                               'badge-rejected'
                             }>
@@ -866,17 +866,17 @@ export default function VendorDashboard() {
                           <div className="flex justify-between items-start">
                             <div className="text-sm text-gray-600">
                               <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                              <p>Payment Status: <span className={order.paymentStatus === 'completed' ? 'text-green-600' : 'text-yellow-600'}>
+                              <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}>
                                 {order.paymentStatus}
                               </span></p>
                             </div>
                             
                             {/* Order Status Management */}
-                            {order.paymentStatus === 'completed' && (
+                            {order.paymentStatus === 'paid' && (
                               <div className="flex flex-col gap-2">
                                 <p className="text-sm font-medium text-gray-700 mb-2">Update Order Status:</p>
                                 <div className="flex gap-2 flex-wrap">
-                                  {order.orderStatus === 'confirmed' && (
+                                  {order.orderStatus === 'pending' && (
                                     <Button
                                       size="sm"
                                       onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'processing' })}

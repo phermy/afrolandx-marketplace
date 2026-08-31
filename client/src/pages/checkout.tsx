@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
@@ -175,9 +175,8 @@ function detectCountryFromGeo(): string {
 
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { cartItems, cartTotal, clearCart } = useCart();
+  const { cartItems, cartTotal } = useCart();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -191,7 +190,6 @@ export default function Checkout() {
   });
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
-  const [paymentMethod] = useState('paystack'); // Only Paystack for now
   const [countryTouched, setCountryTouched] = useState(false);
 
   // If geo cache was empty on mount, fetch it now and update country
@@ -276,7 +274,7 @@ export default function Checkout() {
   }, [user]);
 
   // Fetch shipping quotes (all prices in NGN)
-  const { data: shippingQuotes = [], isLoading: isLoadingShipping } = useQuery<ShippingQuote[]>({
+  const { data: shippingQuotes = [], isLoading: isLoadingShipping, isError: shippingError } = useQuery<ShippingQuote[]>({
     queryKey: ['/api/shipping/quote'],
     queryFn: async () => {
       const res = await fetch('/api/shipping/quote', { credentials: 'include' });
@@ -297,18 +295,8 @@ export default function Checkout() {
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      try {
-        const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
-        return response.json();
-      } catch (error: any) {
-        // Only fall back to direct order creation if Paystack is not configured (503)
-        // For all other errors (500 = payment failure), surface the error to the user
-        if (error?.message?.startsWith('503')) {
-          const response = await apiRequest('POST', '/api/orders', orderData);
-          return response.json();
-        }
-        throw error;
-      }
+      const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
+      return response.json();
     },
     onSuccess: (result) => {
       if (result.paymentUrl) {
@@ -318,15 +306,7 @@ export default function Checkout() {
         });
         localStorage.setItem('pending_payment_reference', result.reference);
         window.location.href = result.paymentUrl;
-      } else {
-        // Paystack not configured — direct order creation
-        toast({
-          title: 'Order Placed!',
-          description: `Order #${result.id} has been created. Our team will contact you to arrange payment.`,
-        });
-        clearCart();
-        setTimeout(() => { window.location.href = '/my-orders'; }, 1500);
-      }
+      } else throw new Error('Payment provider did not return a checkout URL');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -373,16 +353,9 @@ export default function Checkout() {
       return;
     }
 
-    // All prices are in NGN — add directly, no conversion needed
-    const ngnTotal = cartTotal + selectedQuote.price;
-
     const orderData = {
-      totalAmount: ngnTotal.toString(),
-      shippingAmount: selectedQuote.price.toString(),
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
-      paymentMethod,
-      currency: 'NGN',
     };
 
     createOrderMutation.mutate(orderData);
@@ -593,6 +566,12 @@ export default function Checkout() {
                       <div className="spinner-nigerian"></div>
                       <span className="ml-2">Loading shipping options...</span>
                     </div>
+                  ) : shippingError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      Shipping options are temporarily unavailable. Please refresh and try again.
+                    </div>
+                  ) : shippingQuotes.length === 0 ? (
+                    <div className="rounded-lg border p-4 text-sm text-gray-600">No shipping options are currently available.</div>
                   ) : (
                     <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
                       <div className="space-y-3">

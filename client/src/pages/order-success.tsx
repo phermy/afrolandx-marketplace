@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
@@ -8,23 +7,38 @@ import { Card, CardContent } from '@/components/ui/card';
 
 
 export default function OrderSuccess() {
-  const { user } = useAuth();
   const { clearCart } = useCart();
-  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get('order_id');
+  const reference = params.get('reference');
+  const { data: order, isLoading, isError } = useQuery<any>({
+    queryKey: ['/api/orders', orderId],
+    queryFn: async () => {
+      if (!orderId || !reference) throw new Error('Missing payment confirmation');
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Order confirmation unavailable');
+      const result = await response.json();
+      if (result.paymentStatus !== 'paid' || result.paymentReference !== reference) {
+        throw new Error('Payment is not confirmed');
+      }
+      return result;
+    },
+    enabled: Boolean(orderId && reference),
+    retry: 1,
+  });
 
   useEffect(() => {
-    // Clear cart after successful payment
-    clearCart();
+    if (order) clearCart();
+  }, [clearCart, order]);
 
-    // Get order details from URL params or localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('order_id');
-    const reference = urlParams.get('reference');
-    
-    if (orderId && reference) {
-      setOrderDetails({ orderId, reference });
-    }
-  }, [clearCart]);
+  if (isLoading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="min-h-[60vh] flex items-center justify-center"><div className="spinner-nigerian" /></div></div>;
+  if (isError || !order) return (
+    <div className="min-h-screen bg-gray-50"><Navbar /><div className="max-w-xl mx-auto px-4 py-20 text-center">
+      <h1 className="text-2xl font-bold mb-3">Payment confirmation unavailable</h1>
+      <p className="text-gray-600 mb-6">We could not confirm a paid order from this link. Check My Orders before trying payment again.</p>
+      <Button onClick={() => window.location.href = '/my-orders'}>View My Orders</Button>
+    </div></div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
@@ -61,12 +75,12 @@ export default function OrderSuccess() {
                   </p>
                 </div>
 
-                {orderDetails && (
+                {order && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-800 mb-2">Order Details</h3>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <p><span className="font-medium">Order ID:</span> #{orderDetails.orderId}</p>
-                      <p><span className="font-medium">Payment Reference:</span> {orderDetails.reference}</p>
+                      <p><span className="font-medium">Order ID:</span> #{order.id}</p>
+                      <p><span className="font-medium">Payment Reference:</span> {order.paymentReference}</p>
                     </div>
                   </div>
                 )}

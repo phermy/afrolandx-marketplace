@@ -31,23 +31,23 @@ import { useAuth } from "@/hooks/useAuth";
 import Navbar from "@/components/navbar";
 
 const productionStages = [
+  "received",
   "fabric_cutting",
   "sewing",
-  "embroidery",
   "finishing",
   "quality_check",
-  "packaging",
-  "ready_for_shipping",
+  "ready_to_ship",
+  "shipped",
 ];
 
 const stageLabels: Record<string, string> = {
+  received: "Order Received",
   fabric_cutting: "Fabric Cutting",
   sewing: "Sewing",
-  embroidery: "Embroidery/Beading",
   finishing: "Finishing Touches",
   quality_check: "Quality Check",
-  packaging: "Packaging",
-  ready_for_shipping: "Ready for Shipping",
+  ready_to_ship: "Ready to Ship",
+  shipped: "Shipped",
 };
 
 export default function VendorWorkshopPage() {

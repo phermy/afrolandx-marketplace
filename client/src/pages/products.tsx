@@ -49,7 +49,7 @@ export default function Products() {
     queryKey: ['/api/categories'],
   });
 
-  const { data: allProducts = [], isLoading } = useQuery<Product[]>({
+  const { data: allProducts = [], isLoading, isError, refetch } = useQuery<Product[]>({
     queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max, genderTab, selectedCountry],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -380,6 +380,12 @@ export default function Products() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            ) : isError ? (
+              <div className="text-center py-12">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">We couldn’t load the catalog</h3>
+                <p className="text-gray-600 mb-4">Check your connection and try again.</p>
+                <Button onClick={() => refetch()} className="btn-nigerian">Try Again</Button>
               </div>
             ) : sortedProducts.length === 0 ? (
               <div className="text-center py-12">
