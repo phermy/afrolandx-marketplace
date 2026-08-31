@@ -21,6 +21,3 @@ All product prices are stored in **NGN (Nigerian Naira)**. Never treat `product.
 2. User pays on Paystack → redirects to GET `/api/payment/callback`
 3. Callback verifies payment → updates order → clears cart → reduces stock → awards loyalty points → redirects to `/order-success?order_id=...&reference=...`
 4. POST `/api/orders/verify-payment` is an alternative manual verify route (not used in normal flow)
-
-## Loyalty points
-Awarded in GET `/api/payment/callback` (after fix): `Math.floor(parseFloat(order.totalAmount))` = 1 point per ₦1 spent.

@@ -19,12 +19,16 @@ import crypto from "crypto";
 import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
-
-const SHIPPING_QUOTES = [
-  { carrier: 'UPS', service: 'UPS Standard', price: 15000, duration: '5-7 business days' },
-  { carrier: 'FedEx', service: 'FedEx Express', price: 25000, duration: '3-5 business days' },
-  { carrier: 'DHL', service: 'DHL Express', price: 40000, duration: '1-2 business days' },
-] as const;
+import {
+  calculateCheckoutTotal,
+  CheckoutValidationError,
+  findOwnedCartItem,
+  getShippingQuote,
+  isValidPaystackWebhookSignature,
+  paymentVerificationError,
+  SHIPPING_QUOTES,
+} from "./order-security";
+import { createVerifiedOrderCompleter } from "./order-processing";
 
 const shippingAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
@@ -47,18 +51,6 @@ function safeImagePath(filename: string): string | null {
 function boundedInt(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;
   return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback;
-}
-
-function paymentVerificationError(order: any, verification: any, reference: string): string | null {
-  const data = verification?.data;
-  if (!verification?.status || data?.status !== 'success') return 'Payment was not successful';
-  if (data.reference !== reference || order.paymentReference !== reference) return 'Payment reference mismatch';
-  if (data.currency !== 'NGN') return 'Payment currency mismatch';
-  const expectedKobo = Math.round(Number(order.totalAmount) * 100);
-  if (!Number.isSafeInteger(data.amount) || data.amount !== expectedKobo) return 'Payment amount mismatch';
-  const metadataOrderId = Number(data.metadata?.orderId);
-  if (!Number.isSafeInteger(metadataOrderId) || metadataOrderId !== order.id) return 'Payment metadata mismatch';
-  return null;
 }
 
 declare global {
@@ -305,56 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  async function completeVerifiedOrder(order: any, reference: string): Promise<boolean> {
-    const transitioned = await storage.markOrderPaid(order.id, reference);
-    if (!transitioned) return false;
-
-    await storage.updateOrderStatus(order.id, 'pending');
-    await storage.clearCart(order.userId);
-    const items = await storage.getOrderItemsWithProducts(order.id);
-
-    for (const item of items) {
-      const reduced = await storage.decrementProductStockIfAvailable(item.productId, item.quantity);
-      if (!reduced) {
-        console.error(`Stock could not be reserved for paid order ${order.id}, product ${item.productId}`);
-      }
-    }
-
-    const points = Math.floor(Number(order.totalAmount) / 1000);
-    if (points > 0) {
-      await storage.addLoyaltyPoints(
-        order.userId, points, 'purchase', `Points for Order #${order.id}`, order.id, 'order',
-      ).catch(error => console.error('Failed to award loyalty points:', error));
-    }
-
-    const notifiedVendors = new Set<number>();
-    for (const item of items) {
-      const product = await storage.getProduct(item.productId);
-      if (!product || notifiedVendors.has(product.vendorId)) continue;
-      const vendor = await storage.getVendor(product.vendorId);
-      if (!vendor) continue;
-      await storage.createNotification({
-        userId: vendor.userId,
-        title: 'New Order Received',
-        message: `Payment was confirmed for order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}.`,
-        type: 'order',
-        orderId: order.id,
-      }).catch(error => console.error('Failed to notify vendor:', error));
-      notifiedVendors.add(product.vendorId);
-    }
-
-    const admins = await storage.getAdminUsers();
-    for (const admin of admins) {
-      await storage.createNotification({
-        userId: admin.id,
-        title: 'New Order Placed',
-        message: `Order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}, has been paid.`,
-        type: 'order',
-        orderId: order.id,
-      }).catch(error => console.error('Failed to notify admin:', error));
-    }
-    return true;
-  }
+  const completeVerifiedOrder = createVerifiedOrderCompleter(storage);
 
   // Admin user management routes
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
@@ -1139,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isSafeInteger(cartItemId) || !Number.isSafeInteger(quantity) || quantity < 1) {
         return res.status(400).json({ message: 'A positive whole-number quantity is required' });
       }
-      const item = (await storage.getCartItems(userId)).find(cartItem => cartItem.id === cartItemId);
+      const item = findOwnedCartItem(await storage.getCartItems(userId), userId, cartItemId);
       if (!item) return res.status(404).json({ message: 'Cart item not found' });
       if (item.product.status !== 'approved' || quantity > item.product.stock) {
         return res.status(409).json({ message: 'Requested quantity is not available' });
@@ -1190,7 +1133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       const shippingAddress = shippingAddressSchema.parse(req.body.shippingAddress);
       const shippingMethod = typeof req.body.shippingMethod === 'string' ? req.body.shippingMethod.toLowerCase() : '';
-      const shippingQuote = SHIPPING_QUOTES.find(quote => quote.carrier.toLowerCase() === shippingMethod);
+      const shippingQuote = getShippingQuote(shippingMethod);
       if (!shippingQuote) return res.status(400).json({ message: 'Invalid shipping method' });
 
       if (!isPaystackInitialized()) {
@@ -1205,24 +1148,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const cartItems = await storage.getCartItems(userId);
       if (cartItems.length === 0) return res.status(400).json({ message: 'Your cart is empty' });
-      let subtotal = 0;
-      for (const item of cartItems) {
-        const product = item.product;
-        if (!product || product.status !== 'approved') return res.status(409).json({ message: 'A cart item is no longer available' });
-        if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > product.stock) {
-          return res.status(409).json({ message: `${product.name} does not have enough stock` });
+      let checkoutTotal: ReturnType<typeof calculateCheckoutTotal>;
+      try {
+        checkoutTotal = calculateCheckoutTotal(cartItems, shippingMethod);
+      } catch (error) {
+        if (error instanceof CheckoutValidationError) {
+          return res.status(409).json({ message: error.message });
         }
-        const sizes = Array.isArray(product.sizes) ? product.sizes : [];
-        if (sizes.length > 0 && (!item.selectedSize || !sizes.includes(item.selectedSize))) {
-          return res.status(409).json({ message: `Select a valid size for ${product.name}` });
-        }
-        const price = Number(product.price);
-        if (!Number.isFinite(price) || price <= 0) return res.status(409).json({ message: 'A cart item has an invalid price' });
-        subtotal += price * item.quantity;
+        throw error;
       }
+      const { totalAmount } = checkoutTotal;
 
       const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-      const totalAmount = subtotal + shippingQuote.price;
 
       // Create order with pending payment (total stored in NGN)
       const orderData = {
@@ -1719,10 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!secret || !Buffer.isBuffer(rawBody) || typeof signature !== 'string') {
         return res.status(401).json({ message: 'Webhook authentication unavailable' });
       }
-      const expected = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
-      const actualBuffer = Buffer.from(signature, 'utf8');
-      const expectedBuffer = Buffer.from(expected, 'utf8');
-      if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) {
+      if (!isValidPaystackWebhookSignature(rawBody, signature, secret)) {
         return res.status(401).json({ message: 'Invalid signature' });
       }
 
