@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@afrolandx.com";
+const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
 const APP_NAME = "Afrolandx";
 
 export function generateOtp(): string {
