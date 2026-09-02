@@ -101,7 +101,7 @@ export interface IStorage {
   getVendor(id: number): Promise<Vendor | undefined>;
   getVendorByUserId(userId: string): Promise<Vendor | undefined>;
   updateVendorStatus(id: number, status: string): Promise<void>;
-  updateVendorProfile(id: number, data: { businessName: string; description: string }): Promise<void>;
+  updateVendorProfile(id: number, data: { contactName?: string; businessName?: string; phone?: string; cacNumber?: string; description?: string }): Promise<void>;
   getAllVendors(): Promise<Vendor[]>;
   
   // Category operations
@@ -366,10 +366,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(vendors.id, id));
   }
 
-  async updateVendorProfile(id: number, data: { businessName: string; description: string }): Promise<void> {
+  async updateVendorProfile(id: number, data: { contactName?: string; businessName?: string; phone?: string; cacNumber?: string; description?: string }): Promise<void> {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.contactName !== undefined) updates.contactName = data.contactName;
+    if (data.businessName !== undefined) updates.businessName = data.businessName;
+    if (data.phone !== undefined) updates.phone = data.phone;
+    if (data.cacNumber !== undefined) updates.cacNumber = data.cacNumber;
+    if (data.description !== undefined) updates.description = data.description;
     await db
       .update(vendors)
-      .set({ businessName: data.businessName, description: data.description, updatedAt: new Date() })
+      .set(updates)
       .where(eq(vendors.id, id));
   }
 

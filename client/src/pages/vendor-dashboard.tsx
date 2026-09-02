@@ -29,7 +29,7 @@ export default function VendorDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ businessName: '', description: '' });
+  const [profileForm, setProfileForm] = useState({ contactName: '', businessName: '', phone: '', cacNumber: '', description: '' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
   const [editCurrentImages, setEditCurrentImages] = useState<string[]>([]);
@@ -151,7 +151,7 @@ export default function VendorDashboard() {
 
   // Vendor registration mutation
   const registerVendorMutation = useMutation({
-    mutationFn: async (vendorData: { businessName: string; description: string }) => {
+    mutationFn: async (vendorData: { contactName: string; businessName: string; phone: string; cacNumber: string; description: string }) => {
       const res = await apiRequest("POST", "/api/vendors", vendorData);
       if (!res.ok) {
         const body = await res.json();
@@ -216,7 +216,7 @@ export default function VendorDashboard() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { businessName: string; description: string }) => {
+    mutationFn: async (data: { contactName: string; businessName: string; phone: string; cacNumber: string; description: string }) => {
       const res = await apiRequest("PATCH", "/api/vendors/me", data);
       return res.json();
     },
@@ -341,7 +341,10 @@ export default function VendorDashboard() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     registerVendorMutation.mutate({
+      contactName: formData.get("contactName") as string,
       businessName: formData.get("businessName") as string,
+      phone: formData.get("phone") as string,
+      cacNumber: formData.get("cacNumber") as string,
       description: formData.get("description") as string,
     });
   };
@@ -440,6 +443,17 @@ export default function VendorDashboard() {
 
               <form onSubmit={handleVendorRegistration} className="space-y-6">
                 <div>
+                  <Label htmlFor="contactName">Vendor Name</Label>
+                  <Input
+                    id="contactName"
+                    name="contactName"
+                    placeholder="Your full name"
+                    defaultValue={[user?.firstName, user?.lastName].filter(Boolean).join(' ')}
+                    required
+                    className="input-nigerian"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="businessName">Business Name</Label>
                   <Input
                     id="businessName"
@@ -448,6 +462,29 @@ export default function VendorDashboard() {
                     required
                     className="input-nigerian"
                   />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="+234 800 000 0000"
+                      required
+                      className="input-nigerian"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cacNumber">CAC Registration Number</Label>
+                    <Input
+                      id="cacNumber"
+                      name="cacNumber"
+                      placeholder="CAC registration number"
+                      required
+                      className="input-nigerian"
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="description">Business Description</Label>
@@ -1061,7 +1098,10 @@ export default function VendorDashboard() {
                       size="sm"
                       onClick={() => {
                         setProfileForm({
+                          contactName: vendor?.contactName || '',
                           businessName: vendor?.businessName || '',
+                          phone: vendor?.phone || '',
+                          cacNumber: vendor?.cacNumber || '',
                           description: vendor?.description || '',
                         });
                         setIsEditingProfile(true);
@@ -1076,12 +1116,45 @@ export default function VendorDashboard() {
               <CardContent>
                 {isEditingProfile ? (
                   <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="editContactName">Vendor Name</Label>
+                        <Input
+                          id="editContactName"
+                          value={profileForm.contactName}
+                          onChange={(e) => setProfileForm(f => ({ ...f, contactName: e.target.value }))}
+                          className="input-nigerian"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="editPhone">Phone Number</Label>
+                        <Input
+                          id="editPhone"
+                          type="tel"
+                          value={profileForm.phone}
+                          onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                          className="input-nigerian"
+                          required
+                        />
+                      </div>
+                    </div>
                     <div>
                       <Label htmlFor="editBusinessName">Business Name</Label>
                       <Input
                         id="editBusinessName"
                         value={profileForm.businessName}
                         onChange={(e) => setProfileForm(f => ({ ...f, businessName: e.target.value }))}
+                        className="input-nigerian"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editCacNumber">CAC Registration Number</Label>
+                      <Input
+                        id="editCacNumber"
+                        value={profileForm.cacNumber}
+                        onChange={(e) => setProfileForm(f => ({ ...f, cacNumber: e.target.value }))}
                         className="input-nigerian"
                         required
                       />
@@ -1117,12 +1190,26 @@ export default function VendorDashboard() {
                 ) : (
                   <div className="space-y-4">
                     <div>
+                      <Label>Vendor Name</Label>
+                      <Input value={vendor?.contactName || ""} disabled className="input-nigerian" />
+                    </div>
+                    <div>
                       <Label>Business Name</Label>
                       <Input value={vendor?.businessName || ""} disabled className="input-nigerian" />
                     </div>
                     <div>
                       <Label>Description</Label>
                       <Textarea value={vendor?.description || ""} disabled className="input-nigerian" rows={4} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Phone Number</Label>
+                        <Input value={vendor?.phone || ""} disabled className="input-nigerian" />
+                      </div>
+                      <div>
+                        <Label>CAC Registration Number</Label>
+                        <Input value={vendor?.cacNumber || ""} disabled className="input-nigerian" />
+                      </div>
                     </div>
                     <div>
                       <Label>Status</Label>

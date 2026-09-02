@@ -14,7 +14,10 @@ export interface User {
 export interface Vendor {
   id: number;
   userId: string;
+  contactName?: string;
   businessName: string;
+  phone?: string;
+  cacNumber?: string;
   description?: string;
   status: 'pending' | 'approved' | 'suspended';
   createdAt: string;

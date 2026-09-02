@@ -445,8 +445,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const vendorInput = z.object({
+        contactName: z.string().trim().min(2).max(120),
+        businessName: z.string().trim().min(2).max(160),
+        phone: z.string().trim().min(7).max(30),
+        cacNumber: z.string().trim().min(3).max(60),
+        description: z.string().trim().min(10).max(2000),
+      }).parse(req.body);
       const vendorData = insertVendorSchema.parse({
-        ...req.body,
+        ...vendorInput,
         userId,
         status: 'pending',
       });
@@ -482,18 +489,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
       if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-      const { businessName, description } = req.body;
-      if (!businessName || !businessName.trim()) {
-        return res.status(400).json({ message: 'Business name is required' });
-      }
-      await storage.updateVendorProfile(vendor.id, {
-        businessName: businessName.trim(),
-        description: description?.trim() || '',
-      });
+      const profile = z.object({
+        contactName: z.string().trim().min(2).max(120).optional(),
+        businessName: z.string().trim().min(2).max(160).optional(),
+        phone: z.string().trim().min(7).max(30).optional(),
+        cacNumber: z.string().trim().min(3).max(60).optional(),
+        description: z.string().trim().min(10).max(2000).optional(),
+      }).parse(req.body);
+      if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
+      await storage.updateVendorProfile(vendor.id, profile);
       const updated = await storage.getVendorByUserId(userId);
       res.json(updated);
     } catch (error) {
       console.error('Error updating vendor profile:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid vendor profile', errors: error.errors });
       res.status(500).json({ message: 'Failed to update vendor profile' });
     }
   });
@@ -779,7 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = await storage.getProduct(productId);
       if (!product) return res.status(404).json({ message: 'Product not found' });
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor || product.vendorId !== vendor.id) {
+      if (!vendor || vendor.status !== 'approved' || product.vendorId !== vendor.id) {
         return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
       }
       const { name, description, price, stock, imageUrl, removeImages, gender, originCountry, traditionalName } = req.body;
@@ -836,7 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const product = await storage.getProduct(productId);
         if (!product) return res.status(404).json({ message: 'Product not found' });
         const vendor = await storage.getVendorByUserId(userId);
-        if (!vendor || product.vendorId !== vendor.id) {
+        if (!vendor || vendor.status !== 'approved' || product.vendorId !== vendor.id) {
           return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
         }
 

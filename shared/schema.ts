@@ -57,7 +57,10 @@ export const users = pgTable(
 export const vendors = pgTable("vendors", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  contactName: varchar("contact_name"),
   businessName: text("business_name").notNull(),
+  phone: varchar("phone"),
+  cacNumber: varchar("cac_number"),
   description: text("description"),
   status: varchar("status").default("pending"), // pending, approved, suspended
   createdAt: timestamp("created_at").defaultNow(),

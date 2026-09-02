@@ -1,0 +1,67 @@
+AFROLANDX
+Vendor Onboarding, Shipping & Marketing Plan
+1. International-Capable Shipping Partners
+These operate the Nigeria → foreign buyer leg specifically (not just interstate delivery within Nigeria):
+Provider	Routes	Notes
+CargoNaija	Nigeria to UK, USA, Canada (air & sea)	Explicitly ships Ankara/textiles and dried food as export categories; positions itself as cheap cargo rates
+Terminal Africa	Nigeria to USA and other destinations	Already used by other Nigerian ecommerce brands (Arami, Afrihealth); markets itself as cheapest Nigeria-USA option
+Haulam	Nigeria to USA/UK	Has a "Value Export" tier built specifically for cost-effective shipping of local products
+African Import Export Solutions (formerly Shiptonaija)	Nigeria to worldwide, warehouses in Lagos/Abuja/Ibadan	Claims DHL/FedEx/UPS-level delivery at a fraction of the cost
+Hezelinks	Nigeria to UK (air freight)	Handles artwork and food items, but requires proper import licensing for food
+Actual per-kg rates were not published on any of these sites and would need a direct quote request before committing to one — flagging this rather than estimating a number that isn't confirmed.
+2. Vendor Acquisition — Route 1: Field Representatives
+Locations & Payment
+•	3 representatives, 1 each in Lagos, Aba, and Onitsha
+•	Payment: ₦115,000 per rep (revised up from the initial ₦100,000 figure)
+•	Target: up to 30 real, authentic, active vendors per rep — quality over volume (revised down from 100)
+Phase 1 — Vendor Sourcing & Data Collection
+•	Rep visits vendors in their location and confirms the products are good enough for the platform
+•	Collects: vendor name, business name, phone number, email, and confirmation the business is registered with CAC
+•	Submits collected data to Afrolandx to create the vendor account
+•	Afrolandx admin reviews and approves the account, then emails the vendor a one-time password
+•	Vendor logs in and changes the password on first login
+Phase 2 — Product Listing (two possible approaches, to be decided)
+•	Option A: Reps manually upload each vendor's products directly, then notify the vendor the listing is live so they can log in and edit
+•	Option B: Reps only take/collect product photos on-site. An AI feature auto-generates the product title and description from the photos; the vendor only has to input a price. This requires Afrolandx to actually have this AI feature built — not confirmed yet, needs to be checked with the dev team before this route is planned around
+Phase 2 was mentioned as a further ₦100,000 payment for handling roughly 100 vendors — this number should be reconciled with the revised 30-vendor cap from Phase 1 before finalizing, since the two figures don't currently match.
+3. Vendor Acquisition — Route 2: Targeted Adverts
+Second onboarding channel, running in parallel to the field reps. Facebook is the recommended primary platform given its reach in Nigeria; TikTok is a secondary option but depends on having strong visual content first. Proposed approach: commission micro-influencer videos, then run those videos as paid creative across Facebook and TikTok.
+Micro-Influencer Budget
+•	Proposed range: ₦1,000,000–1,500,000 to get 2 micro-influencers to create content about Afrolandx
+•	This is an estimate, not a confirmed cost — since Afrolandx is a new platform, there's no guarantee influencers at this budget level will take the offer, and the actual rate needed is unconfirmed until outreach happens
+Ad Costing — Per Location, Duration & Reach
+Based on published Nigeria Meta ads benchmarks (CPC ₦30–500, CPM ₦450–5,000, cost per lead ₦500–5,000+). These are directional estimates only — Afrolandx has no historical ad account data yet, so actual lead-to-onboarded-vendor conversion is unconfirmed until a real campaign runs.
+Tier	Budget per Location	Duration	Estimated Reach	Estimated Leads	Est. Vendors Onboarded
+Test	₦150,000–200,000	14 days	~100,000–130,000 impressions	60–120 leads	~10–25 (assumes ~20% lead-to-vendor conversion)
+Recommended	₦300,000–400,000	14–21 days	~200,000–260,000 impressions	120–250 leads	~25–50
+Aggressive (to approach 100)	₦500,000–700,000+	21–30 days	~330,000–460,000 impressions	200–450 leads	~40–90, still not guaranteed at 100
+Meta requires roughly 7-14 days minimum per campaign to exit its learning phase and optimize properly — shorter campaigns will underperform these estimates. 7.5% VAT applies on top of all ad spend.
+Reaching 100 onboarded vendors per location through ads alone, at a realistic budget, is not guaranteed — worth planning for ads to supplement the field reps rather than replace them.
+Platform Requirement for This Route
+Vendors coming in through ads have no rep walking them through onboarding, so the self-serve flow has to be smooth end-to-end: name, business name, business registration (CAC) number with verification, phone number, and any other required fields, completed without assistance.
+4. Shipping Flow & Shipping Verification Agents
+Flow: Vendor → Shipping Agent (verifies the product) → Logistics/freight company (e.g. CargoNaija) → Foreign buyer.
+Shipping Agents
+•	3 agents, one in each of the same locations as the vendor reps: Lagos, Aba, Onitsha
+•	Role is virtual-assistant style: receive the product from the vendor, verify it matches the listing, then hand off to the logistics company for onward shipping
+•	Proposed pay: ~₦100,000 — the pay period (monthly vs. per task) wasn't specified and should be confirmed before finalizing
+•	Logistics firms would be contacted to arrange pickup directly from these agents, rather than from individual vendors
+Platform Requirement for This Role
+This role doesn't currently have a system to work from and needs one built, similar in concept to how Jumia verifies products before they ship. Needed: a dashboard where the agent can see incoming products, confirm receipt/arrival, mark an item as verified and ready to ship, and log all of this against the order.
+5. Policies Required Before Vendor Onboarding
+Currently missing from the platform and needed before vendors are onboarded through any route:
+•	Seller's/Vendor Policy
+•	Return Policy
+•	Shipping Policy
+•	Refund Policy
+•	Dispute Resolution Policy
+•	Privacy Policy
+Vendors should be required to read and accept these as part of the onboarding flow, whether they're onboarded by a rep or self-serve through ads.
+6. Platform Build Requirements — Consolidated
+Pulling together everything referenced above that needs to exist or be confirmed before going to market. Flagged as build/confirm items rather than assumed to already be in place:
+•	Self-serve vendor onboarding form: name, business name, CAC number with verification, phone number, email
+•	Admin approval workflow with auto-generated OTP email and forced password change on first login
+•	AI feature to auto-generate product title/description from uploaded photos (for Phase 2, Option B) — needs confirmation from the dev team on whether this exists or needs to be built
+•	Shipping agent dashboard: view incoming products, confirm receipt, mark ready-to-ship, verification log tied to each order
+•	Published policy pages (seller, return, shipping, refund, dispute, privacy) with a mandatory acceptance step in onboarding
+Basic launch requirements should be built first, in phases, before scaling either the field rep or ad-based vendor acquisition routes.
