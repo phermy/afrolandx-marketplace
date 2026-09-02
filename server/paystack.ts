@@ -129,6 +129,28 @@ export class PaystackService {
     if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
     return await this.makeRequest(`/transaction/verify/${reference}`);
   }
+
+  async createRefund(reference: string, amount: number, merchantNote: string): Promise<any> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Refund amount must be positive');
+    return await this.makeRequest('/refund', 'POST', {
+      transaction: reference,
+      amount: Math.round(amount * 100),
+      currency: 'NGN',
+      merchant_note: merchantNote,
+    });
+  }
+
+  async findRefund(reference: string, amount: number): Promise<any | undefined> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
+    const result = await this.makeRequest(`/refund?transaction=${encodeURIComponent(reference)}`);
+    const refunds = Array.isArray(result?.data) ? result.data : [];
+    const expectedKobo = Math.round(amount * 100);
+    return refunds.find((refund: any) =>
+      Number(refund?.amount) === expectedKobo
+      && (!refund?.currency || refund.currency === 'NGN')
+    );
+  }
 }
 
 // Export singleton instance (will be initialized when secret key is provided)

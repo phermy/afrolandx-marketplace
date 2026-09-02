@@ -124,6 +124,26 @@ export function calculateCheckoutSubtotal(cartItems: CheckoutCartItem[]): number
   return subtotal;
 }
 
+const SHIPPING_ESTIMATE_MULTIPLIERS: Record<string, number> = {
+  ups: 1.15,
+  fedex: 1.12,
+  dhl: 1.1,
+  cargonaija: 0.92,
+  'terminal africa': 0.95,
+  haulam: 0.9,
+  'african import export solutions': 0.88,
+  hezelinks: 0.9,
+};
+
+export function calculateEstimatedShippingAmount(subtotal: number, shippingMethod: unknown): number {
+  const shippingQuote = getShippingQuote(shippingMethod);
+  if (!shippingQuote) throw new CheckoutValidationError('Invalid shipping method');
+  if (!Number.isFinite(subtotal) || subtotal <= 0) throw new CheckoutValidationError('Cart subtotal is invalid');
+  const multiplier = SHIPPING_ESTIMATE_MULTIPLIERS[shippingQuote.carrier.toLowerCase()] ?? 1;
+  const estimate = (7500 + subtotal * 0.06) * multiplier;
+  return Math.min(50000, Math.max(7500, Math.ceil(estimate / 500) * 500));
+}
+
 export function calculateCheckoutTotal(cartItems: CheckoutCartItem[], shippingMethod: unknown) {
   const shippingQuote = getShippingQuote(shippingMethod);
   if (!shippingQuote) throw new CheckoutValidationError('Invalid shipping method');

@@ -1,6 +1,5 @@
 type PaymentCompletionStorage = {
   markOrderPaid(id: number, reference: string): Promise<boolean>;
-  updateOrderStatus(id: number, status: string): Promise<void>;
   clearCart(userId: string): Promise<void>;
   getOrderItemsWithProducts(orderId: number): Promise<Array<{ productId: number; quantity: number }>>;
   decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean>;
@@ -22,8 +21,9 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
     const transitioned = await storage.markOrderPaid(order.id, reference);
     if (!transitioned) return false;
 
-    const awaitingShipping = order.shippingPaymentStatus === 'awaiting_quote';
-    await storage.updateOrderStatus(order.id, awaitingShipping ? 'awaiting_shipping_quote' : 'pending');
+    const awaitingShipping = order.orderStatus === 'awaiting_shipping_quote'
+      || order.shippingPaymentStatus === 'awaiting_quote'
+      || order.shippingPaymentStatus === 'pending';
     await storage.clearCart(order.userId);
     const items = await storage.getOrderItemsWithProducts(order.id);
 

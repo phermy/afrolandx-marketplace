@@ -101,6 +101,10 @@ export interface Order {
   shippingQuoteRequestId?: number | null;
   shippingPaymentStatus: 'included' | 'awaiting_quote' | 'pending' | 'paid' | 'rejected';
   shippingPaymentReference?: string | null;
+  shippingEstimatedAmount?: string | null;
+  shippingFinalAmount?: string | null;
+  shippingRefundAmount?: string | null;
+  shippingRefundStatus?: string | null;
   trackingNumber?: string;
   createdAt: string;
   updatedAt: string;
@@ -130,6 +134,7 @@ export interface ShippingQuote {
   carrier: string;
   service: string;
   price: number | null;
+  estimatedPrice?: number | null;
   duration: string;
   quoteRequired?: boolean;
   routes?: string;

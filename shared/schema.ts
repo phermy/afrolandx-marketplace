@@ -128,6 +128,10 @@ export const orders = pgTable("orders", {
   userId: varchar("user_id").notNull().references(() => users.id),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   shippingAmount: decimal("shipping_amount", { precision: 10, scale: 2 }).default("0"),
+  shippingEstimatedAmount: decimal("shipping_estimated_amount", { precision: 10, scale: 2 }),
+  shippingFinalAmount: decimal("shipping_final_amount", { precision: 10, scale: 2 }),
+  shippingRefundAmount: decimal("shipping_refund_amount", { precision: 10, scale: 2 }),
+  shippingRefundStatus: varchar("shipping_refund_status", { length: 32 }),
   paymentStatus: varchar("payment_status").default("pending"), // pending, paid, failed
   orderStatus: varchar("order_status").default("pending"), // pending, processing, shipped, delivered, cancelled
   shippingAddress: jsonb("shipping_address").notNull(),

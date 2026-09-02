@@ -3,8 +3,8 @@ name: Shipping quote payment lifecycle
 description: Policy for quote expiry, single use, and Paystack initialization failures.
 ---
 
-Every configured shipping carrier requires a quote. Buyers may pay the merchandise subtotal while that quote is pending, then pay the confirmed shipping balance separately before fulfillment. Quotes remain tied to the buyer's exact cart and destination. Expiry is the deadline to begin the relevant Paystack payment, not a deadline for a callback already in flight. The server-calculated NGN amounts remain authoritative.
+Every configured carrier requires a final quote, but testing checkout may charge merchandise plus a server-generated shipping estimate immediately. The order stays held until the final quote is reconciled: collect only a positive balance or queue an exact refund for an overestimate. Quotes remain tied to the buyer's exact cart and destination.
 
-**Why:** Buyers should not wait for manual carrier confirmation before securing their goods, but vendors must not begin fulfillment before shipping is paid. Redirects can be lost, duplicate payment attempts can invalidate valid charges, and cancellation can race with payment; signed webhooks and atomic state transitions prevent stranded payments.
+**Why:** Buyers need to test payment without waiting for manual carrier confirmation, while payment differences must never overcharge them or let fulfillment start early. Quote decisions, payment attempts, cancellation, and refund retries can race, so cross-row locking and durable reconciliation are required.
 
-**How to apply:** Do not add fixed-price carrier checkout paths. Merchandise and shipping payments must use exact server amounts, references, metadata, and both callback and signed-webhook completion. Reuse an active shipping checkout, serialize it against cancellation, and gate every fulfillment/production path on shipping being included or paid.
+**How to apply:** Keep estimates server-controlled and stored separately from final price, balance, and refund state. Use the shared quote-ID advisory lock for admin decisions and shipping-payment claims. Recover uncertain refunds by querying Paystack before retrying, and gate all fulfillment until reconciliation completes.

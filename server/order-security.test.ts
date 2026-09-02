@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   calculateCheckoutTotal,
   calculateCheckoutSubtotal,
+  calculateEstimatedShippingAmount,
   CheckoutValidationError,
   createCartFingerprint,
   findOwnedCartItem,
@@ -70,6 +71,16 @@ test("every shipping company requires a confirmed quote before payment", () => {
       new CheckoutValidationError(`${carrier} shipping requires a confirmed shipping quote before payment`),
     );
   }
+});
+
+test("testing checkout generates a server-controlled NGN shipping estimate for every carrier", () => {
+  const subtotal = calculateCheckoutSubtotal(cart);
+  for (const carrier of ["UPS", "FedEx", "DHL", "CargoNaija", "Terminal Africa", "Haulam", "African Import Export Solutions", "Hezelinks"]) {
+    const estimate = calculateEstimatedShippingAmount(subtotal, carrier);
+    assert.ok(estimate >= 7500 && estimate <= 50000);
+    assert.equal(estimate % 500, 0);
+  }
+  assert.throws(() => calculateEstimatedShippingAmount(subtotal, "Unknown"), new CheckoutValidationError("Invalid shipping method"));
 });
 
 test("confirmed quote cart fingerprints are stable and change with cart contents", () => {

@@ -154,12 +154,12 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
         {/* Timeline */}
         <OrderTimeline status={order.orderStatus} />
 
-        {order.paymentStatus === 'paid' && order.shippingPaymentStatus === 'awaiting_quote' && (
+        {order.paymentStatus === 'paid' && (order.shippingPaymentStatus === 'awaiting_quote' || order.orderStatus === 'awaiting_shipping_quote' && order.shippingPaymentStatus === 'included') && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-3">
             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-800 text-sm">Items paid — shipping quote in progress</p>
-              <p className="text-xs text-amber-700">Afrolandx is confirming the {order.shippingMethod?.toUpperCase()} rate. You will be notified when it is ready, and your order will stay safely on hold.</p>
+              <p className="font-medium text-amber-800 text-sm">Payment received — final shipping price in progress</p>
+              <p className="text-xs text-amber-700">Your estimated shipping deposit is included. Afrolandx is confirming the {order.shippingMethod?.toUpperCase()} rate; only any remaining difference will be collected.</p>
             </div>
           </div>
         )}
@@ -182,9 +182,15 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
           </div>
         )}
 
-        {order.shippingPaymentStatus === 'paid' && (
+        {order.shippingPaymentStatus === 'paid' && order.orderStatus !== 'awaiting_shipping_quote' && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
             Shipping payment confirmed. Your order is ready for fulfillment.
+          </div>
+        )}
+
+        {Number(order.shippingRefundAmount || 0) > 0 && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+            A ₦{Number(order.shippingRefundAmount).toLocaleString()} shipping adjustment refund is {order.shippingRefundStatus === 'processed' ? 'complete' : 'being processed'} to your original payment method.
           </div>
         )}
 

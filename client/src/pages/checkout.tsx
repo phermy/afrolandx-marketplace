@@ -434,17 +434,19 @@ export default function Checkout() {
           duration: request.estimatedDelivery || quote.duration,
           quoteRequestId: request.id,
         }
-      : request?.status === 'pending' && request.cartMatches !== false
-        ? { ...quote, quoteRequestId: request.id }
-        : quote;
+      : {
+          ...quote,
+          price: quote.estimatedPrice ?? null,
+          ...(request?.status === 'pending' && request.cartMatches !== false ? { quoteRequestId: request.id } : {}),
+          estimated: true,
+        };
   });
   const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
 
   useEffect(() => {
     if (!selectedShipping) return;
-    const selected = effectiveShippingQuotes.find(quote => quote.carrier === selectedShipping);
-    if (selected?.quoteRequired && !selected.quoteRequestId) setSelectedShipping('');
+    if (!effectiveShippingQuotes.some(quote => quote.carrier === selectedShipping)) setSelectedShipping('');
   }, [effectiveShippingQuotes, selectedShipping]);
 
   if (isLoading) {
@@ -658,13 +660,14 @@ export default function Checkout() {
                       aria-label="Choose a shipping option"
                     >
                       <p className="mb-4 text-sm text-gray-600">
-                        Choose the delivery service you want to use. Your selection and its confirmed price will be included in your payment.
+                        Choose a delivery service. A server-generated testing estimate is included now, and Afrolandx will confirm the final carrier price after the order is placed.
                       </p>
                       <div className="space-y-3">
                         {effectiveShippingQuotes.map((quote) => {
                           const request = requestForCarrier(quote.carrier);
-                          const canSelect = !quote.quoteRequired || !!quote.quoteRequestId;
+                          const canSelect = true;
                           const awaitingQuote = request?.status === 'pending' && !!quote.quoteRequestId;
+                          const estimated = (quote as any).estimated === true;
                           return (
                           <div
                             key={quote.carrier}
@@ -684,9 +687,12 @@ export default function Checkout() {
                                   {quote.notes && <p className="text-xs text-gray-500 mt-1">{quote.notes}</p>}
                                   {quote.quoteRequired && request?.status === 'pending' && (
                                      <div className="mt-2">
-                                       <Badge variant="outline" className="border-amber-300 text-amber-700">Quote pending</Badge>
-                                       <p className="mt-1 text-xs text-amber-700">You can select this carrier and pay for your items now. Shipping will be paid after Afrolandx confirms the rate.</p>
+                                       <Badge variant="outline" className="border-amber-300 text-amber-700">Final price pending</Badge>
+                                       <p className="mt-1 text-xs text-amber-700">The estimated shipping amount is included now. Only any difference will be collected after Afrolandx confirms the carrier price.</p>
                                      </div>
+                                  )}
+                                  {quote.quoteRequired && !request && (
+                                    <p className="mt-2 text-xs text-blue-700">The final carrier quote will be requested automatically when you place the order.</p>
                                   )}
                                   {quote.quoteRequired && request?.status === 'rejected' && (
                                     <p className="mt-2 text-xs text-red-700">{request.adminNotes || 'This route could not be confirmed.'}</p>
@@ -699,20 +705,8 @@ export default function Checkout() {
                                 </div>
                                 <div className="text-right">
                                   <span className={`font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
-                                    {awaitingQuote ? 'Pay shipping later' : quote.price === null ? 'Rate on request' : formatPrice(quote.price)}
+                                    {quote.price === null ? 'Estimate at payment' : `${estimated || awaitingQuote ? 'Est. ' : ''}${formatPrice(quote.price)}`}
                                   </span>
-                                  {quote.quoteRequired && !quote.quoteRequestId && request?.status !== 'pending' && (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="mt-2 block ml-auto"
-                                      disabled={requestQuoteMutation.isPending}
-                                      onClick={() => handleRequestQuote(quote.carrier)}
-                                    >
-                                      Request quote
-                                    </Button>
-                                  )}
                                 </div>
                               </div>
                             </Label>
@@ -721,7 +715,7 @@ export default function Checkout() {
                       </div>
                       {shippingQuotes.some(quote => quote.quoteRequired) && (
                         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                          Every shipping company confirms its current rate for your destination before payment. Request a quote, then select that carrier here once the quote is approved.
+                          Testing mode: checkout includes an estimated shipping deposit so buyers can pay immediately. Afrolandx confirms the final rate afterward and collects only any remaining balance.
                         </p>
                       )}
                       {!selectedShipping && (
@@ -808,7 +802,7 @@ export default function Checkout() {
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
                         <span className="font-medium">
-                          {selectedShippingQuote.price === null ? 'Pending — pay later' : formatPrice(selectedShippingQuote.price)}
+                          {selectedShippingQuote.price === null ? 'Calculated at payment' : `${(selectedShippingQuote as any).estimated ? 'Estimated ' : ''}${formatPrice(selectedShippingQuote.price)}`}
                         </span>
                       </div>
                     )}
@@ -842,7 +836,7 @@ export default function Checkout() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                         {selectedShippingQuote?.price === null
-                          ? `Pay for items ${formatPrice(cartTotal)}`
+                          ? 'Continue to calculated payment'
                           : `Pay ${formatPrice(totalAmount)}`}
                       </>
                     )}

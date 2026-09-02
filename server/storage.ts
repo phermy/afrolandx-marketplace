@@ -156,11 +156,20 @@ export interface IStorage {
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
   markOrderPaid(id: number, reference: string): Promise<boolean>;
   getOrderByShippingQuoteRequestId(quoteId: number): Promise<Order | undefined>;
-  updateOrderShippingQuote(quoteId: number, amount: string, status: string): Promise<Order | undefined>;
+  updateOrderShippingQuote(
+    quoteId: number,
+    amount: string,
+    status: string,
+    orderStatus?: string,
+    reconciliation?: { finalAmount?: string; refundAmount?: string; refundStatus?: string },
+  ): Promise<Order | undefined>;
   claimShippingPaymentReference(id: number, userId: string, reference: string): Promise<'claimed' | 'busy' | 'unavailable'>;
   saveShippingPaymentUrl(id: number, reference: string, url: string): Promise<boolean>;
   clearShippingPaymentAttempt(id: number, userId: string, reference: string): Promise<void>;
   markShippingPaid(id: number, reference: string): Promise<boolean>;
+  claimShippingRefund(id: number, finalAmount: string, refundAmount: string): Promise<boolean>;
+  completeShippingRefundClaim(id: number, status: string): Promise<void>;
+  releaseShippingRefundClaim(id: number): Promise<void>;
   decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean>;
   
   // Notification operations
@@ -177,6 +186,8 @@ export interface IStorage {
   getShippingQuoteRequestsForUser(userId: string): Promise<ShippingQuoteRequest[]>;
   getAllShippingQuoteRequests(): Promise<ShippingQuoteRequest[]>;
   updateShippingQuoteRequest(id: number, data: Partial<Pick<ShippingQuoteRequest, 'status' | 'quotedAmount' | 'currency' | 'estimatedDelivery' | 'adminNotes' | 'confirmedBy' | 'expiresAt'>>): Promise<ShippingQuoteRequest | undefined>;
+  claimShippingQuoteDecision(id: number, expectedStatus: string): Promise<boolean>;
+  releaseShippingQuoteDecision(id: number, originalStatus: string): Promise<void>;
   
   // Measurement operations
   createMeasurement(measurement: InsertMeasurement): Promise<Measurement>;
@@ -761,26 +772,52 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
-  async updateOrderShippingQuote(quoteId: number, amount: string, status: string): Promise<Order | undefined> {
+  async updateOrderShippingQuote(
+    quoteId: number,
+    amount: string,
+    status: string,
+    orderStatus?: string,
+    reconciliation?: { finalAmount?: string; refundAmount?: string; refundStatus?: string },
+  ): Promise<Order | undefined> {
+    const update: any = { shippingAmount: amount, shippingPaymentStatus: status, updatedAt: new Date() };
+    if (orderStatus) update.orderStatus = orderStatus;
+    if (reconciliation?.finalAmount !== undefined) update.shippingFinalAmount = reconciliation.finalAmount;
+    if (reconciliation?.refundAmount !== undefined) update.shippingRefundAmount = reconciliation.refundAmount;
+    if (reconciliation?.refundStatus !== undefined) update.shippingRefundStatus = reconciliation.refundStatus;
     const [order] = await db.update(orders)
-      .set({ shippingAmount: amount, shippingPaymentStatus: status, updatedAt: new Date() })
-      .where(eq(orders.shippingQuoteRequestId, quoteId))
+      .set(update)
+      .where(and(
+        eq(orders.shippingQuoteRequestId, quoteId),
+        sql`${orders.orderStatus} <> 'cancelled'`,
+      ))
       .returning();
     return order;
   }
 
   async claimShippingPaymentReference(id: number, userId: string, reference: string): Promise<'claimed' | 'busy' | 'unavailable'> {
-    const updated = await db.update(orders)
-      .set({ shippingPaymentReference: reference, shippingPaymentUrl: null, updatedAt: new Date() })
-      .where(and(
-        eq(orders.id, id),
-        eq(orders.userId, userId),
-        eq(orders.paymentStatus, 'paid'),
-        eq(orders.shippingPaymentStatus, 'pending'),
-        eq(orders.orderStatus, 'awaiting_shipping_quote'),
-        isNull(orders.shippingPaymentReference),
-      ))
-      .returning({ id: orders.id });
+    const updated = await db.transaction(async tx => {
+      const [current] = await tx.select({ quoteId: orders.shippingQuoteRequestId })
+        .from(orders)
+        .where(and(eq(orders.id, id), eq(orders.userId, userId)));
+      if (!current?.quoteId) return [];
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${current.quoteId})`);
+      return await tx.update(orders)
+        .set({ shippingPaymentReference: reference, shippingPaymentUrl: null, updatedAt: new Date() })
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.userId, userId),
+          eq(orders.paymentStatus, 'paid'),
+          eq(orders.shippingPaymentStatus, 'pending'),
+          eq(orders.orderStatus, 'awaiting_shipping_quote'),
+          isNull(orders.shippingPaymentReference),
+          sql`EXISTS (
+            SELECT 1 FROM ${shippingQuoteRequests}
+            WHERE ${shippingQuoteRequests.id} = ${orders.shippingQuoteRequestId}
+              AND ${shippingQuoteRequests.status} = 'quoted'
+          )`,
+        ))
+        .returning({ id: orders.id });
+    });
     if (updated.length > 0) return 'claimed';
     const current = await this.getOrder(id);
     if (current?.userId === userId && current.paymentStatus === 'paid' && current.shippingPaymentStatus === 'pending' && current.shippingPaymentReference) {
@@ -822,6 +859,40 @@ export class DatabaseStorage implements IStorage {
     return updated.length > 0;
   }
 
+  async claimShippingRefund(id: number, finalAmount: string, refundAmount: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({
+        shippingFinalAmount: finalAmount,
+        shippingRefundAmount: refundAmount,
+        shippingRefundStatus: 'processing',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.paymentStatus, 'paid'),
+        isNull(orders.shippingRefundStatus),
+      ))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async completeShippingRefundClaim(id: number, status: string): Promise<void> {
+    await db.update(orders)
+      .set({ shippingRefundStatus: status, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.shippingRefundStatus, 'processing')));
+  }
+
+  async releaseShippingRefundClaim(id: number): Promise<void> {
+    await db.update(orders)
+      .set({
+        shippingFinalAmount: null,
+        shippingRefundAmount: null,
+        shippingRefundStatus: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(orders.id, id), eq(orders.shippingRefundStatus, 'processing')));
+  }
+
   async getOrdersForUser(userId: string): Promise<Order[]> {
     return await db
       .select()
@@ -847,6 +918,7 @@ export class DatabaseStorage implements IStorage {
   async cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean> {
     const conditions = [
       eq(orders.id, id),
+      sql`${orders.paymentStatus} <> 'pending'`,
       or(sql`${orders.shippingPaymentStatus} <> 'pending'`, isNull(orders.shippingPaymentReference)),
     ];
     if (userId) conditions.push(eq(orders.userId, userId));
@@ -871,8 +943,17 @@ export class DatabaseStorage implements IStorage {
 
   async markOrderPaid(id: number, reference: string): Promise<boolean> {
     const result = await db.update(orders)
-      .set({ paymentStatus: 'paid', paymentReference: reference, updatedAt: new Date() })
-      .where(and(eq(orders.id, id), eq(orders.paymentStatus, 'pending')))
+      .set({
+        paymentStatus: 'paid',
+        paymentReference: reference,
+        orderStatus: sql`CASE WHEN ${orders.orderStatus} = 'awaiting_shipping_quote' THEN 'awaiting_shipping_quote' ELSE 'pending' END`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.paymentStatus, 'pending'),
+        sql`${orders.orderStatus} <> 'cancelled'`,
+      ))
       .returning({ id: orders.id });
     return result.length > 0;
   }
@@ -984,6 +1065,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(shippingQuoteRequests.id, id))
       .returning();
     return updated;
+  }
+
+  async claimShippingQuoteDecision(id: number, expectedStatus: string): Promise<boolean> {
+    const claimed = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${id})`);
+      return await tx.update(shippingQuoteRequests)
+        .set({ status: 'reconciling', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, id),
+          eq(shippingQuoteRequests.status, expectedStatus),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${orders}
+            WHERE ${orders.shippingQuoteRequestId} = ${id}
+              AND ${orders.shippingPaymentReference} IS NOT NULL
+          )`,
+        ))
+        .returning({ id: shippingQuoteRequests.id });
+    });
+    return claimed.length > 0;
+  }
+
+  async releaseShippingQuoteDecision(id: number, originalStatus: string): Promise<void> {
+    await db.update(shippingQuoteRequests)
+      .set({ status: originalStatus, updatedAt: new Date() })
+      .where(and(
+        eq(shippingQuoteRequests.id, id),
+        eq(shippingQuoteRequests.status, 'reconciling'),
+      ));
   }
 
   // Measurement operations
@@ -1265,6 +1374,7 @@ export class DatabaseStorage implements IStorage {
         sql`${orders.id} IN ${orderIds}`,
         eq(orders.paymentStatus, 'paid'),
         or(eq(orders.shippingPaymentStatus, 'included'), eq(orders.shippingPaymentStatus, 'paid')),
+        sql`${orders.orderStatus} <> 'awaiting_shipping_quote'`,
       ))
       .orderBy(desc(orders.createdAt));
   }
