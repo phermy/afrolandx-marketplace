@@ -479,6 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
       res.set('Cache-Control', 'no-store');
+      if (!vendor) return res.status(404).json({ message: 'Vendor profile not found' });
       res.json(vendor);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch vendor info' });
@@ -577,8 +578,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!['pending', 'approved', 'rejected', 'suspended'].includes(status)) {
         return res.status(400).json({ message: 'Invalid vendor status' });
       }
-      if (!await storage.getVendor(vendorId)) return res.status(404).json({ message: 'Vendor not found' });
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
       await storage.updateVendorStatus(vendorId, status);
+      if (status === 'approved') {
+        // Keep the authorization role in sync for legacy/manual vendor records.
+        await storage.addUserRole(vendor.userId, 'vendor');
+      }
       const updatedVendor = await storage.getVendor(vendorId);
       res.json({ message: 'Vendor status updated', vendor: updatedVendor });
     } catch (error) {

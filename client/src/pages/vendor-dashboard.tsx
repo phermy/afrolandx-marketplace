@@ -25,6 +25,7 @@ export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const hasVendorRole = isVendor(user);
   const [isRegistering, setIsRegistering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
@@ -433,11 +434,11 @@ export default function VendorDashboard() {
             </CardHeader>
             <CardContent>
               {/* Already-registered notice */}
-              {isVendor(user) && (
+              {hasVendorRole && !vendor && (
                 <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-center">
-                  <p className="text-amber-800 font-medium mb-1">You already have a vendor account.</p>
+                  <p className="text-amber-800 font-medium mb-1">Your vendor profile needs to be completed.</p>
                   <p className="text-amber-700 text-sm mb-3">
-                    Your account may still be under review. You can add products once you're approved.
+                    Your account has vendor access, but its vendor application details are missing. Complete this form to restore your vendor profile.
                   </p>
                   <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] })}>
                     Refresh status
@@ -504,15 +505,15 @@ export default function VendorDashboard() {
                 <Button
                   type="submit"
                   className="w-full btn-nigerian"
-                  disabled={registerVendorMutation.isPending || isVendor(user)}
+                   disabled={registerVendorMutation.isPending || !!vendor}
                 >
                   {registerVendorMutation.isPending
                     ? "Submitting…"
-                    : isVendor(user)
+                    : vendor
                     ? "Already Registered"
                     : "Register as Vendor"}
                 </Button>
-                {isVendor(user) && (
+                {vendor && (
                   <p className="text-center text-sm text-gray-500">
                     You're already a vendor — registration is not needed again.
                   </p>
