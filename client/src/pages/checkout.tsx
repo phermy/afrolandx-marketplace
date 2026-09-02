@@ -288,7 +288,8 @@ export default function Checkout() {
   // Auto-select the cheapest (first) shipping option when quotes load
   useEffect(() => {
     if (shippingQuotes.length > 0 && !selectedShipping) {
-      setSelectedShipping(shippingQuotes[0].carrier);
+      const firstPricedOption = shippingQuotes.find(quote => !quote.quoteRequired && quote.price !== null);
+      if (firstPricedOption) setSelectedShipping(firstPricedOption.carrier);
     }
   }, [shippingQuotes, selectedShipping]);
 
@@ -576,22 +577,31 @@ export default function Checkout() {
                     <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
                       <div className="space-y-3">
                         {shippingQuotes.map((quote) => (
-                          <div key={quote.carrier} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50">
-                            <RadioGroupItem value={quote.carrier} id={quote.carrier} />
-                            <Label htmlFor={quote.carrier} className="flex-1 cursor-pointer">
+                          <div key={quote.carrier} className={`flex items-center space-x-3 p-4 border rounded-lg ${quote.quoteRequired ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                            <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={quote.quoteRequired} />
+                            <Label htmlFor={quote.carrier} className={`flex-1 ${quote.quoteRequired ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="font-semibold">{quote.service}</p>
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
+                                  {quote.routes && <p className="text-xs text-gray-500 mt-1">{quote.routes}</p>}
+                                  {quote.notes && <p className="text-xs text-gray-500 mt-1">{quote.notes}</p>}
                                 </div>
                                 <div className="text-right">
-                                  <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
+                                  <span className={`font-bold ${quote.quoteRequired ? 'text-gray-600' : 'text-nigerian-green'}`}>
+                                    {quote.price === null ? 'Rate on request' : formatPrice(quote.price)}
+                                  </span>
                                 </div>
                               </div>
                             </Label>
                           </div>
                         ))}
                       </div>
+                      {shippingQuotes.some(quote => quote.quoteRequired) && (
+                        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                          International partner rates are not published yet. These routes require a direct quote before payment and cannot be selected for immediate checkout.
+                        </p>
+                      )}
                     </RadioGroup>
                   )}
                 </CardContent>
@@ -670,7 +680,9 @@ export default function Checkout() {
                     {selectedShippingQuote && (
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
-                        <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
+                        <span className="font-medium">
+                          {selectedShippingQuote.price === null ? 'Rate on request' : formatPrice(selectedShippingQuote.price)}
+                        </span>
                       </div>
                     )}
                     

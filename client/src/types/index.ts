@@ -97,7 +97,7 @@ export interface Order {
   orderStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
   paymentReference?: string;
-  shippingMethod?: 'ups' | 'fedex' | 'dhl';
+  shippingMethod?: string;
   trackingNumber?: string;
   createdAt: string;
   updatedAt: string;
@@ -124,10 +124,13 @@ export interface ShippingAddress {
 }
 
 export interface ShippingQuote {
-  carrier: 'UPS' | 'FedEx' | 'DHL';
+  carrier: string;
   service: string;
-  price: number;
+  price: number | null;
   duration: string;
+  quoteRequired?: boolean;
+  routes?: string;
+  notes?: string;
   localPrice?: number;
   localCurrency?: string;
   localSymbol?: string;

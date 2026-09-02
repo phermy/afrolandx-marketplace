@@ -1278,6 +1278,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shippingMethod = typeof req.body.shippingMethod === 'string' ? req.body.shippingMethod.toLowerCase() : '';
       const shippingQuote = getShippingQuote(shippingMethod);
       if (!shippingQuote) return res.status(400).json({ message: 'Invalid shipping method' });
+      if (shippingQuote.quoteRequired || shippingQuote.price === null) {
+        return res.status(400).json({ message: `${shippingQuote.carrier} shipping requires a confirmed shipping quote before payment` });
+      }
+      const shippingPrice = shippingQuote.price;
 
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured. Please contact administrator.' });
@@ -1308,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orderData = {
         userId,
         totalAmount: totalAmount.toFixed(2),
-        shippingAmount: shippingQuote.price.toFixed(2),
+        shippingAmount: shippingPrice.toFixed(2),
         shippingAddress,
         shippingMethod,
         paymentStatus: 'pending',
@@ -1924,29 +1928,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { destination, weight } = req.body;
 
-      // Mock shipping rates (in production, integrate with actual APIs)
-      const quotes = [
-        {
-          carrier: 'UPS',
-          service: 'UPS Worldwide Express',
-          price: 5000,
-          duration: '5-7 business days',
-        },
-        {
-          carrier: 'FedEx',
-          service: 'FedEx International Priority',
-          price: 6500,
-          duration: '3-5 business days',
-        },
-        {
-          carrier: 'DHL',
-          service: 'DHL Express Worldwide',
-          price: 8000,
-          duration: '2-4 business days',
-        },
-      ];
-
-      res.json(quotes);
+      // Partner rates are not published in the shipping plan, so quote-only
+      // providers are returned transparently instead of being given invented prices.
+      res.json(SHIPPING_QUOTES.map(quote => ({ ...quote, currency: 'NGN' })));
     } catch (error) {
       res.status(500).json({ message: 'Failed to get shipping quotes' });
     }

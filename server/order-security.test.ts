@@ -65,6 +65,13 @@ test("checkout rejects invalid shipping methods and unavailable products", () =>
   );
 });
 
+test("checkout does not charge an unconfirmed partner shipping rate", () => {
+  assert.throws(
+    () => calculateCheckoutTotal(cart, "CargoNaija"),
+    new CheckoutValidationError("CargoNaija shipping requires a confirmed shipping quote before payment"),
+  );
+});
+
 const order = {
   id: 42,
   userId: "buyer-1",

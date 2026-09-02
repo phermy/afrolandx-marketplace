@@ -249,6 +249,10 @@ export default function ShoppingCart() {
                       </span>
                       <span className="text-gray-600">2-4 days</span>
                     </div>
+                    <div className="pt-2 mt-2 border-t text-xs text-gray-600">
+                      <p className="font-semibold text-gray-800 mb-1">International partners — rate on request</p>
+                      <p>CargoNaija · Terminal Africa · Haulam · African Import Export Solutions · Hezelinks</p>
+                    </div>
                   </div>
                 </div>
               </div>

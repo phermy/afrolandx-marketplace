@@ -1,9 +1,54 @@
 import crypto from "crypto";
 
 export const SHIPPING_QUOTES = [
-  { carrier: 'UPS', service: 'UPS Standard', price: 15000, duration: '5-7 business days' },
-  { carrier: 'FedEx', service: 'FedEx Express', price: 25000, duration: '3-5 business days' },
-  { carrier: 'DHL', service: 'DHL Express', price: 40000, duration: '1-2 business days' },
+  { carrier: 'UPS', service: 'UPS Standard', price: 15000, duration: '5-7 business days', quoteRequired: false },
+  { carrier: 'FedEx', service: 'FedEx Express', price: 25000, duration: '3-5 business days', quoteRequired: false },
+  { carrier: 'DHL', service: 'DHL Express', price: 40000, duration: '1-2 business days', quoteRequired: false },
+  {
+    carrier: 'CargoNaija',
+    service: 'CargoNaija — Air & Sea Export',
+    price: null,
+    duration: 'Rate on request',
+    quoteRequired: true,
+    routes: 'Nigeria → UK, USA, Canada',
+    notes: 'Handles Ankara, textiles, and dried-food exports; air and sea cargo available.',
+  },
+  {
+    carrier: 'Terminal Africa',
+    service: 'Terminal Africa — International',
+    price: null,
+    duration: 'Rate on request',
+    quoteRequired: true,
+    routes: 'Nigeria → USA and other destinations',
+    notes: 'International shipping platform used by Nigerian ecommerce brands.',
+  },
+  {
+    carrier: 'Haulam',
+    service: 'Haulam — Value Export',
+    price: null,
+    duration: 'Rate on request',
+    quoteRequired: true,
+    routes: 'Nigeria → USA, UK',
+    notes: 'Value Export tier is designed for cost-effective shipping of local products.',
+  },
+  {
+    carrier: 'African Import Export Solutions',
+    service: 'African Import Export Solutions — Worldwide',
+    price: null,
+    duration: 'Rate on request',
+    quoteRequired: true,
+    routes: 'Nigeria → worldwide',
+    notes: 'Warehouses in Lagos, Abuja, and Ibadan; formerly Shiptonaija.',
+  },
+  {
+    carrier: 'Hezelinks',
+    service: 'Hezelinks — UK Air Freight',
+    price: null,
+    duration: 'Rate on request',
+    quoteRequired: true,
+    routes: 'Nigeria → UK',
+    notes: 'Handles artwork and food items; food shipments require proper import licensing.',
+  },
 ] as const;
 
 export type CheckoutCartItem = {
@@ -70,6 +115,9 @@ export function calculateCheckoutSubtotal(cartItems: CheckoutCartItem[]): number
 export function calculateCheckoutTotal(cartItems: CheckoutCartItem[], shippingMethod: unknown) {
   const shippingQuote = getShippingQuote(shippingMethod);
   if (!shippingQuote) throw new CheckoutValidationError('Invalid shipping method');
+  if (shippingQuote.quoteRequired) {
+    throw new CheckoutValidationError(`${shippingQuote.carrier} shipping requires a confirmed shipping quote before payment`);
+  }
 
   const subtotal = calculateCheckoutSubtotal(cartItems);
   return {
