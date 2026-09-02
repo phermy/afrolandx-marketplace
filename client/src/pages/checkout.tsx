@@ -316,6 +316,29 @@ export default function Checkout() {
     },
   });
 
+  const isShippingAddressComplete = () =>
+    Boolean(
+      shippingAddress.firstName.trim()
+      && shippingAddress.lastName.trim()
+      && shippingAddress.address1.trim().length >= 3
+      && shippingAddress.city.trim()
+      && shippingAddress.state.trim()
+      && shippingAddress.postalCode.trim()
+      && shippingAddress.country.trim(),
+    );
+
+  const handleRequestQuote = (carrier: string) => {
+    if (!isShippingAddressComplete()) {
+      toast({
+        title: 'Complete your shipping address',
+        description: 'Enter your name, address, city, state, postal code, and country before requesting a quote.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    requestQuoteMutation.mutate(carrier);
+  };
+
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -679,7 +702,7 @@ export default function Checkout() {
                                       variant="outline"
                                       className="mt-2 block ml-auto"
                                       disabled={requestQuoteMutation.isPending}
-                                      onClick={() => requestQuoteMutation.mutate(quote.carrier)}
+                                      onClick={() => handleRequestQuote(quote.carrier)}
                                     >
                                       Request quote
                                     </Button>
@@ -692,7 +715,7 @@ export default function Checkout() {
                       </div>
                       {shippingQuotes.some(quote => quote.quoteRequired) && (
                         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                          International partner rates are not published yet. These routes require a direct quote before payment and cannot be selected for immediate checkout.
+                          Every shipping company confirms its current rate for your destination before payment. Request a quote, then select that carrier here once the quote is approved.
                         </p>
                       )}
                       {!selectedShipping && (

@@ -1324,8 +1324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       const input = quoteRequestSchema.parse(req.body);
       const shippingOption = getShippingQuote(input.carrier);
-      if (!shippingOption || !shippingOption.quoteRequired) {
-        return res.status(400).json({ message: 'This carrier does not require a manual quote' });
+      if (!shippingOption) {
+        return res.status(404).json({ message: 'Shipping company not found' });
       }
 
       const cartItems = await storage.getCartItems(userId);

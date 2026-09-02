@@ -1,9 +1,9 @@
 import crypto from "crypto";
 
 export const SHIPPING_QUOTES = [
-  { carrier: 'UPS', service: 'UPS Standard', price: 15000, duration: '5-7 business days', quoteRequired: false },
-  { carrier: 'FedEx', service: 'FedEx Express', price: 25000, duration: '3-5 business days', quoteRequired: false },
-  { carrier: 'DHL', service: 'DHL Express', price: 40000, duration: '1-2 business days', quoteRequired: false },
+  { carrier: 'UPS', service: 'UPS Standard', price: null, duration: 'Rate on request', quoteRequired: true },
+  { carrier: 'FedEx', service: 'FedEx Express', price: null, duration: 'Rate on request', quoteRequired: true },
+  { carrier: 'DHL', service: 'DHL Express', price: null, duration: 'Rate on request', quoteRequired: true },
   {
     carrier: 'CargoNaija',
     service: 'CargoNaija — Air & Sea Export',
@@ -127,7 +127,7 @@ export function calculateCheckoutSubtotal(cartItems: CheckoutCartItem[]): number
 export function calculateCheckoutTotal(cartItems: CheckoutCartItem[], shippingMethod: unknown) {
   const shippingQuote = getShippingQuote(shippingMethod);
   if (!shippingQuote) throw new CheckoutValidationError('Invalid shipping method');
-  if (shippingQuote.quoteRequired) {
+  if (shippingQuote.quoteRequired || shippingQuote.price === null) {
     throw new CheckoutValidationError(`${shippingQuote.carrier} shipping requires a confirmed shipping quote before payment`);
   }
 

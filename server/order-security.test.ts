@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
   calculateCheckoutTotal,
+  calculateCheckoutSubtotal,
   CheckoutValidationError,
   createCartFingerprint,
   findOwnedCartItem,
@@ -32,23 +33,17 @@ test("cart item ownership never crosses users", () => {
   assert.equal(findOwnedCartItem(cart, "another-buyer", 7), undefined);
 });
 
-test("checkout computes the server-side NGN subtotal and shipping", () => {
-  const result = calculateCheckoutTotal(cart, "UPS");
-
-  assert.equal(result.subtotal, 121000);
-  assert.equal(result.shippingAmount, 15000);
-  assert.equal(result.totalAmount, 136000);
-  assert.equal(result.shippingMethod, "ups");
-  assert.equal(result.shippingQuote.price, 15000);
+test("checkout computes the server-side NGN subtotal", () => {
+  assert.equal(calculateCheckoutSubtotal(cart), 121000);
 });
 
 test("checkout rejects insufficient stock and invalid sizes", () => {
   assert.throws(
-    () => calculateCheckoutTotal([{ ...cart[0], quantity: 6 }], "UPS"),
+    () => calculateCheckoutSubtotal([{ ...cart[0], quantity: 6 }]),
     new CheckoutValidationError("Aso Oke Set does not have enough stock"),
   );
   assert.throws(
-    () => calculateCheckoutTotal([{ ...cart[0], selectedSize: "XXL" }], "UPS"),
+    () => calculateCheckoutSubtotal([{ ...cart[0], selectedSize: "XXL" }]),
     new CheckoutValidationError("Select a valid size for Aso Oke Set"),
   );
 });
@@ -59,19 +54,21 @@ test("checkout rejects invalid shipping methods and unavailable products", () =>
     new CheckoutValidationError("Invalid shipping method"),
   );
   assert.throws(
-    () => calculateCheckoutTotal([{
+    () => calculateCheckoutSubtotal([{
       ...cart[0],
       product: { ...cart[0].product, status: "pending" },
-    }], "UPS"),
+    }]),
     new CheckoutValidationError("A cart item is no longer available"),
   );
 });
 
-test("checkout does not charge an unconfirmed partner shipping rate", () => {
-  assert.throws(
-    () => calculateCheckoutTotal(cart, "CargoNaija"),
-    new CheckoutValidationError("CargoNaija shipping requires a confirmed shipping quote before payment"),
-  );
+test("every shipping company requires a confirmed quote before payment", () => {
+  for (const carrier of ["UPS", "FedEx", "DHL", "CargoNaija", "Terminal Africa", "Haulam", "African Import Export Solutions", "Hezelinks"]) {
+    assert.throws(
+      () => calculateCheckoutTotal(cart, carrier),
+      new CheckoutValidationError(`${carrier} shipping requires a confirmed shipping quote before payment`),
+    );
+  }
 });
 
 test("confirmed quote cart fingerprints are stable and change with cart contents", () => {
