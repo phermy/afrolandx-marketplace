@@ -316,14 +316,6 @@ export default function Checkout() {
     },
   });
 
-  // Auto-select the cheapest (first) shipping option when quotes load
-  useEffect(() => {
-    if (shippingQuotes.length > 0 && !selectedShipping) {
-      const firstPricedOption = shippingQuotes.find(quote => !quote.quoteRequired && quote.price !== null);
-      if (firstPricedOption) setSelectedShipping(firstPricedOption.carrier);
-    }
-  }, [shippingQuotes, selectedShipping]);
-
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -635,13 +627,27 @@ export default function Checkout() {
                   ) : shippingQuotes.length === 0 ? (
                     <div className="rounded-lg border p-4 text-sm text-gray-600">No shipping options are currently available.</div>
                   ) : (
-                    <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
+                    <RadioGroup
+                      value={selectedShipping}
+                      onValueChange={setSelectedShipping}
+                      aria-label="Choose a shipping option"
+                    >
+                      <p className="mb-4 text-sm text-gray-600">
+                        Choose the delivery service you want to use. Your selection and its confirmed price will be included in your payment.
+                      </p>
                       <div className="space-y-3">
                         {effectiveShippingQuotes.map((quote) => {
                           const request = requestForCarrier(quote.carrier);
                           const canSelect = !quote.quoteRequired || !!quote.quoteRequestId;
                           return (
-                          <div key={quote.carrier} className={`flex items-start space-x-3 p-4 border rounded-lg ${canSelect ? 'hover:bg-gray-50' : 'bg-gray-50'}`}>
+                          <div
+                            key={quote.carrier}
+                            className={`flex items-start space-x-3 p-4 border rounded-lg transition-colors ${
+                              selectedShipping === quote.carrier
+                                ? 'border-nigerian-green bg-green-50 ring-1 ring-nigerian-green'
+                                : canSelect ? 'hover:bg-gray-50' : 'bg-gray-50'
+                            }`}
+                          >
                             <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={!canSelect} className="mt-1" />
                             <Label htmlFor={quote.carrier} className={`flex-1 ${canSelect ? 'cursor-pointer' : 'cursor-default'}`}>
                               <div className="flex justify-between items-center">
@@ -687,6 +693,11 @@ export default function Checkout() {
                       {shippingQuotes.some(quote => quote.quoteRequired) && (
                         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                           International partner rates are not published yet. These routes require a direct quote before payment and cannot be selected for immediate checkout.
+                        </p>
+                      )}
+                      {!selectedShipping && (
+                        <p className="mt-4 text-sm font-medium text-amber-700">
+                          Select a shipping option to continue to payment.
                         </p>
                       )}
                     </RadioGroup>
@@ -775,9 +786,11 @@ export default function Checkout() {
                     
                     <Separator />
                     
-                    <div className="flex justify-between text-lg font-bold">
+                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
+                       <span className="text-nigerian-green">
+                         {selectedShippingQuote ? formatPrice(totalAmount) : 'Select shipping'}
+                       </span>
                     </div>
                   </div>
 
@@ -792,7 +805,9 @@ export default function Checkout() {
                         <div className="spinner-nigerian w-4 h-4 mr-2"></div>
                         Processing...
                       </div>
-                    ) : (
+                     ) : !selectedShipping ? (
+                       'Select shipping method'
+                     ) : (
                       <>
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

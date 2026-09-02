@@ -169,7 +169,7 @@ export const shippingQuoteRequests = pgTable("shipping_quote_requests", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   carrier: varchar("carrier", { length: 120 }).notNull(),
-  status: varchar("status", { length: 30 }).notNull().default("pending"), // pending, quoted, rejected, expired
+  status: varchar("status", { length: 30 }).notNull().default("pending"), // pending, quoted, reserved, used, rejected, expired
   shippingAddress: jsonb("shipping_address").notNull(),
   cartSnapshot: jsonb("cart_snapshot").notNull(),
   cartFingerprint: varchar("cart_fingerprint", { length: 64 }).notNull(),
