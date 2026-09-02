@@ -1964,6 +1964,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (order.orderStatus === 'awaiting_shipping_quote') {
         return res.status(409).json({ message: 'Afrolandx must confirm the final shipping price before fulfillment can begin' });
       }
+      if (['shipped', 'delivered'].includes(status)
+        && order.shippingEstimatedAmount
+        && !order.shippingFinalAmount) {
+        return res.status(409).json({ message: 'Afrolandx must confirm the final shipping price before dispatch' });
+      }
       const allowedNextStatus: Record<string, string> = { pending: 'processing', processing: 'shipped', shipped: 'delivered' };
       if (allowedNextStatus[order.orderStatus || ''] !== status) {
         return res.status(409).json({ message: `Order cannot move from ${order.orderStatus} to ${status}` });

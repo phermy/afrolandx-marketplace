@@ -780,7 +780,12 @@ export class DatabaseStorage implements IStorage {
     reconciliation?: { finalAmount?: string; refundAmount?: string; refundStatus?: string },
   ): Promise<Order | undefined> {
     const update: any = { shippingAmount: amount, shippingPaymentStatus: status, updatedAt: new Date() };
-    if (orderStatus) update.orderStatus = orderStatus;
+    if (orderStatus) {
+      update.orderStatus = sql`CASE
+        WHEN ${orders.orderStatus} IN ('pending', 'awaiting_shipping_quote') THEN ${orderStatus}
+        ELSE ${orders.orderStatus}
+      END`;
+    }
     if (reconciliation?.finalAmount !== undefined) update.shippingFinalAmount = reconciliation.finalAmount;
     if (reconciliation?.refundAmount !== undefined) update.shippingRefundAmount = reconciliation.refundAmount;
     if (reconciliation?.refundStatus !== undefined) update.shippingRefundStatus = reconciliation.refundStatus;
@@ -946,7 +951,7 @@ export class DatabaseStorage implements IStorage {
       .set({
         paymentStatus: 'paid',
         paymentReference: reference,
-        orderStatus: sql`CASE WHEN ${orders.orderStatus} = 'awaiting_shipping_quote' THEN 'awaiting_shipping_quote' ELSE 'pending' END`,
+        orderStatus: 'pending',
         updatedAt: new Date(),
       })
       .where(and(

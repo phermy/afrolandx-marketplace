@@ -21,9 +21,7 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
     const transitioned = await storage.markOrderPaid(order.id, reference);
     if (!transitioned) return false;
 
-    const awaitingShipping = order.orderStatus === 'awaiting_shipping_quote'
-      || order.shippingPaymentStatus === 'awaiting_quote'
-      || order.shippingPaymentStatus === 'pending';
+    const awaitingShipping = !!order.shippingEstimatedAmount && !order.shippingFinalAmount;
     await storage.clearCart(order.userId);
     const items = await storage.getOrderItemsWithProducts(order.id);
 
@@ -51,7 +49,7 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
         userId: vendor.userId,
         title: 'New Order Received',
         message: awaitingShipping
-          ? `Item payment was confirmed for order #${order.id}. Afrolandx is confirming shipping before fulfillment begins.`
+          ? `Payment was confirmed for order #${order.id}. You can begin preparing the items while Afrolandx confirms shipping before dispatch.`
           : `Payment was confirmed for order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}.`,
         type: 'order',
         orderId: order.id,
@@ -65,7 +63,7 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
         userId: admin.id,
         title: 'New Order Placed',
         message: awaitingShipping
-          ? `Order #${order.id} items are paid and the shipping quote is still pending.`
+          ? `Order #${order.id} is paid and can enter preparation while the final shipping price is confirmed.`
           : `Order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}, has been paid.`,
         type: 'order',
         orderId: order.id,

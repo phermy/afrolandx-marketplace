@@ -7,4 +7,4 @@ Every configured carrier requires a final quote, but testing checkout may charge
 
 **Why:** Buyers need to test payment without waiting for manual carrier confirmation, while payment differences must never overcharge them or let fulfillment start early. Quote decisions, payment attempts, cancellation, and refund retries can race, so cross-row locking and durable reconciliation are required.
 
-**How to apply:** Keep estimates server-controlled and stored separately from final price, balance, and refund state. Use the shared quote-ID advisory lock for admin decisions and shipping-payment claims. Recover uncertain refunds by querying Paystack before retrying, and gate all fulfillment until reconciliation completes.
+**How to apply:** Keep estimates server-controlled and stored separately from final price, balance, and refund state. A successful main payment moves the order to active preparation immediately; block dispatch, not preparation, until final shipping reconciliation. Use the shared quote-ID advisory lock for admin decisions and shipping-payment claims, and recover uncertain refunds by querying Paystack before retrying.
