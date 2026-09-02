@@ -82,14 +82,27 @@ export const products = pgTable("products", {
   vendorId: integer("vendor_id").notNull().references(() => vendors.id),
   categoryId: integer("category_id").notNull().references(() => categories.id),
   name: text("name").notNull(),
+  shortDescription: text("short_description"),
   description: text("description").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  sku: varchar("sku", { length: 100 }),
   stock: integer("stock").notNull().default(0), // renamed from quantity to stock
   weight: decimal("weight", { precision: 5, scale: 2 }), // in kg
+  dimensions: varchar("dimensions", { length: 120 }),
+  shippingClass: varchar("shipping_class", { length: 60 }),
+  processingTime: varchar("processing_time", { length: 120 }),
+  careInstructions: text("care_instructions"),
+  returnPolicy: text("return_policy"),
+  metaTitle: varchar("meta_title", { length: 180 }),
+  metaDescription: text("meta_description"),
+  requiresMeasurements: boolean("requires_measurements").default(false),
+  tags: jsonb("tags").default([]),
+  variants: jsonb("variants").default([]),
   imageUrl: text("image_url"), // single image URL for display
   images: jsonb("images").default([]), // array of image URLs for gallery
   sizes: jsonb("sizes").default([]), // string[] — available sizes e.g. ["S","M","L","XL"]
-  status: varchar("status").default("pending"), // pending, approved, rejected
+  status: varchar("status").default("pending"), // draft, pending, approved, rejected
   featured: boolean("featured").default(false),
   gender: varchar("gender"), // women, men, kids, or null = unisex/all
   originCountry: varchar("origin_country"), // which African country this fashion is from

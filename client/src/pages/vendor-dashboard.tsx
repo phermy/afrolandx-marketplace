@@ -21,6 +21,14 @@ import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
 
+type VariantDraft = {
+  size: string;
+  color: string;
+  pattern: string;
+  sku: string;
+  stock: string;
+};
+
 export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -44,12 +52,18 @@ export default function VendorDashboard() {
   const [selectedTraditionalName, setSelectedTraditionalName] = useState<string>('');
   const [editOriginCountry, setEditOriginCountry] = useState<string>('');
   const [editTraditionalName, setEditTraditionalName] = useState<string>('');
-  const [addForm, setAddForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+  const [addForm, setAddForm] = useState({
+    name: '', shortDescription: '', description: '', tags: '', sku: '', price: '',
+    compareAtPrice: '', stock: '', weight: '', dimensions: '', shippingClass: '',
+    processingTime: '', careInstructions: '', returnPolicy: '', metaTitle: '', metaDescription: '', imageUrl: '',
+    requiresMeasurements: false,
+  });
   const [addFiles, setAddFiles] = useState<File[]>([]);
   const [addPreviews, setAddPreviews] = useState<string[]>([]);
   const [addImageMode, setAddImageMode] = useState<'upload' | 'url'>('upload');
   const [selectedSizeSystem, setSelectedSizeSystem] = useState<string>('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [variantRows, setVariantRows] = useState<VariantDraft[]>([]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -220,6 +234,20 @@ export default function VendorDashboard() {
     },
   });
 
+  const submitForReviewMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest("POST", `/api/products/${productId}/submit`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Product submitted", description: "Your product is now waiting for admin approval." });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
+    },
+    onError: () => {
+      toast({ title: "Could not submit product", description: "Please review the product details and try again.", variant: "destructive" });
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { contactName: string; businessName: string; phone: string; cacNumber: string; description: string }) => {
       const res = await apiRequest("PATCH", "/api/vendors/me", data);
@@ -290,7 +318,12 @@ export default function VendorDashboard() {
   };
 
   const resetAddForm = () => {
-    setAddForm({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+    setAddForm({
+      name: '', shortDescription: '', description: '', tags: '', sku: '', price: '',
+      compareAtPrice: '', stock: '', weight: '', dimensions: '', shippingClass: '',
+      processingTime: '', careInstructions: '', returnPolicy: '', metaTitle: '', metaDescription: '', imageUrl: '',
+      requiresMeasurements: false,
+    });
     setAddFiles([]);
     setAddPreviews([]);
     setSelectedCategory('');
@@ -299,13 +332,19 @@ export default function VendorDashboard() {
     setAddImageMode('upload');
     setSelectedSizeSystem('');
     setSelectedSizes([]);
+    setVariantRows([]);
   };
 
   const handleAddFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    setAddFiles(prev => [...prev, ...files]);
-    files.forEach(file => {
+    const availableSlots = Math.max(0, 5 - addFiles.length);
+    const accepted = files.slice(0, availableSlots);
+    if (accepted.length < files.length) {
+      toast({ title: "Photo limit reached", description: "You can upload up to 5 product photos.", variant: "destructive" });
+    }
+    setAddFiles(prev => [...prev, ...accepted]);
+    accepted.forEach(file => {
       const reader = new FileReader();
       reader.onload = ev => setAddPreviews(prev => [...prev, ev.target?.result as string]);
       reader.readAsDataURL(file);
@@ -322,8 +361,12 @@ export default function VendorDashboard() {
     mutationFn: async (formData: FormData) => {
       await apiRequest("POST", "/api/products", formData);
     },
-    onSuccess: () => {
-      toast({ title: "Product submitted!", description: "It will appear in your list once an admin approves it." });
+    onSuccess: (_data, formData) => {
+      const wasDraft = formData.get('status') === 'draft';
+      toast({
+        title: wasDraft ? "Draft saved" : "Product submitted!",
+        description: wasDraft ? "You can continue editing it from your product list." : "It will appear in the shop once an admin approves it.",
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
       resetAddForm();
       setIsAddSheetOpen(false);
@@ -356,6 +399,8 @@ export default function VendorDashboard() {
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const submissionStatus = submitter?.value === 'draft' ? 'draft' : 'pending';
 
     // Resolve category
     let catId = selectedCategory;
@@ -373,8 +418,12 @@ export default function VendorDashboard() {
       toast({ title: "Category required", description: "Please choose a product category.", variant: "destructive" });
       return;
     }
+    if (!addForm.shortDescription.trim()) {
+      toast({ title: "Short description required", description: "Add a concise summary buyers can scan quickly.", variant: "destructive" });
+      return;
+    }
     if (!addForm.description.trim()) {
-      toast({ title: "Description required", description: "Please describe your product.", variant: "destructive" });
+      toast({ title: "Full description required", description: "Please describe your product in detail.", variant: "destructive" });
       return;
     }
     if (!addForm.price || parseFloat(addForm.price) <= 0) {
@@ -390,15 +439,44 @@ export default function VendorDashboard() {
       toast({ title: "Product type required", description: "Please describe what type of product this is.", variant: "destructive" });
       return;
     }
+    const tags = addForm.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    if (tags.length > 30) {
+      toast({ title: "Too many tags", description: "Use no more than 30 keywords.", variant: "destructive" });
+      return;
+    }
+    const variants = variantRows
+      .filter(row => row.size.trim() || row.color.trim() || row.pattern.trim() || row.sku.trim())
+      .map(row => ({
+        size: row.size.trim() || undefined,
+        color: row.color.trim() || undefined,
+        pattern: row.pattern.trim() || undefined,
+        sku: row.sku.trim() || undefined,
+        stock: Number(row.stock) || 0,
+      }));
 
     const fd = new FormData();
     fd.set('name', addForm.name.trim());
+    fd.set('shortDescription', addForm.shortDescription.trim());
     fd.set('categoryId', catId);
     fd.set('description', isOthersCategory && customCategoryName.trim()
       ? `[Product type: ${customCategoryName.trim()}]\n\n${addForm.description.trim()}`
       : addForm.description.trim());
     fd.set('price', addForm.price);
+    if (addForm.compareAtPrice.trim()) fd.set('compareAtPrice', addForm.compareAtPrice.trim());
+    if (addForm.sku.trim()) fd.set('sku', addForm.sku.trim());
     fd.set('stock', addForm.stock);
+    if (addForm.weight.trim()) fd.set('weight', addForm.weight.trim());
+    if (addForm.dimensions.trim()) fd.set('dimensions', addForm.dimensions.trim());
+    if (addForm.shippingClass) fd.set('shippingClass', addForm.shippingClass);
+    if (addForm.processingTime.trim()) fd.set('processingTime', addForm.processingTime.trim());
+    if (addForm.careInstructions.trim()) fd.set('careInstructions', addForm.careInstructions.trim());
+    if (addForm.returnPolicy.trim()) fd.set('returnPolicy', addForm.returnPolicy.trim());
+    if (addForm.metaTitle.trim()) fd.set('metaTitle', addForm.metaTitle.trim());
+    if (addForm.metaDescription.trim()) fd.set('metaDescription', addForm.metaDescription.trim());
+    fd.set('requiresMeasurements', String(addForm.requiresMeasurements));
+    fd.set('tags', JSON.stringify(tags));
+    fd.set('variants', JSON.stringify(variants));
+    fd.set('status', submissionStatus);
     if (selectedGender) fd.set('gender', selectedGender);
     if (selectedOriginCountry) fd.set('originCountry', selectedOriginCountry);
     if (selectedTraditionalName) fd.set('traditionalName', selectedTraditionalName);
@@ -756,8 +834,14 @@ export default function VendorDashboard() {
                   <div className="space-y-3">
                     {products.map((product) => {
                       const imgSrc = product.imageUrl || (Array.isArray((product as any).images) && (product as any).images[0]) || null;
-                      const statusColor = product.status === 'approved' ? 'text-green-700 bg-green-50 border-green-200' : product.status === 'pending' ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-700 bg-red-50 border-red-200';
-                      const statusLabel = product.status === 'approved' ? 'Live' : product.status === 'pending' ? 'Under Review' : 'Rejected';
+                      const statusColor = product.status === 'approved'
+                        ? 'text-green-700 bg-green-50 border-green-200'
+                        : product.status === 'pending'
+                        ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                        : product.status === 'draft'
+                        ? 'text-gray-700 bg-gray-50 border-gray-200'
+                        : 'text-red-700 bg-red-50 border-red-200';
+                      const statusLabel = product.status === 'approved' ? 'Live' : product.status === 'pending' ? 'Under Review' : product.status === 'draft' ? 'Draft' : 'Rejected';
                       return (
                         <div key={product.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:shadow-sm transition-all bg-white">
                           {/* Thumbnail */}
@@ -787,6 +871,11 @@ export default function VendorDashboard() {
                                 <Clock className="w-3 h-3" /> Waiting for admin approval — usually within 24 hrs
                               </p>
                             )}
+                            {product.status === 'draft' && (
+                              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <Pencil className="w-3 h-3" /> Draft — edit it before submitting for admin review
+                              </p>
+                            )}
                             {product.status === 'rejected' && (
                               <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" /> Rejected — edit and resubmit
@@ -795,6 +884,16 @@ export default function VendorDashboard() {
                           </div>
                           {/* Actions */}
                           <div className="flex flex-col gap-2 shrink-0">
+                            {(product.status === 'draft' || product.status === 'rejected') && (
+                              <Button
+                                size="sm"
+                                className="gap-1 text-xs h-8 btn-nigerian"
+                                onClick={() => submitForReviewMutation.mutate(product.id)}
+                                disabled={submitForReviewMutation.isPending}
+                              >
+                                <CheckCircle className="w-3 h-3" /> Submit
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -1257,6 +1356,18 @@ export default function VendorDashboard() {
               />
             </div>
 
+             {/* Short description */}
+             <div className="space-y-1.5">
+               <Label className="font-semibold">Short Description <span className="text-red-500">*</span></Label>
+               <Input
+                 placeholder="A quick summary buyers can scan"
+                 value={addForm.shortDescription}
+                 maxLength={240}
+                 onChange={e => setAddForm(f => ({ ...f, shortDescription: e.target.value }))}
+                 className="input-nigerian"
+               />
+             </div>
+
             {/* Category */}
             <div className="space-y-1.5">
               <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
@@ -1425,17 +1536,41 @@ export default function VendorDashboard() {
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label className="font-semibold">Description <span className="text-red-500">*</span></Label>
+               <Label className="font-semibold">Full Description <span className="text-red-500">*</span></Label>
+               <p className="text-xs text-gray-400">Include fabric, origin, fit, care, and the occasion it suits.</p>
               <Textarea
-                placeholder="Tell buyers what makes this product special — fabric, craftsmanship, sizing, occasion…"
-                rows={4}
+                 placeholder="Describe the fabric, craftsmanship, fit, origin, sizing, occasion, and care instructions…"
+                 rows={5}
                 value={addForm.description}
                 onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))}
                 className="input-nigerian"
               />
             </div>
 
-            {/* Price & Stock */}
+             {/* Tags and SKU */}
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className="space-y-1.5">
+                 <Label className="font-semibold">Tags / Keywords</Label>
+                 <Input
+                   placeholder="wax print, bridal, men's"
+                   value={addForm.tags}
+                   onChange={e => setAddForm(f => ({ ...f, tags: e.target.value }))}
+                   className="input-nigerian"
+                 />
+                 <p className="text-xs text-gray-400">Separate keywords with commas.</p>
+               </div>
+               <div className="space-y-1.5">
+                 <Label className="font-semibold">SKU / Item Code</Label>
+                 <Input
+                   placeholder="e.g. ADU-ANK-001"
+                   value={addForm.sku}
+                   onChange={e => setAddForm(f => ({ ...f, sku: e.target.value }))}
+                   className="input-nigerian"
+                 />
+               </div>
+             </div>
+
+             {/* Price, sale price, and stock */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="font-semibold">Price (₦) <span className="text-red-500">*</span></Label>
@@ -1448,18 +1583,187 @@ export default function VendorDashboard() {
                   className="input-nigerian"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="font-semibold">Stock Qty <span className="text-red-500">*</span></Label>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 10"
-                  value={addForm.stock}
-                  onChange={e => setAddForm(f => ({ ...f, stock: e.target.value }))}
-                  className="input-nigerian"
-                />
-              </div>
-            </div>
+               <div className="space-y-1.5">
+                 <Label className="font-semibold">Compare-at Price (₦)</Label>
+                 <Input
+                   type="number"
+                   min="0"
+                   placeholder="Optional original price"
+                   value={addForm.compareAtPrice}
+                   onChange={e => setAddForm(f => ({ ...f, compareAtPrice: e.target.value }))}
+                   className="input-nigerian"
+                 />
+               </div>
+             </div>
+             <div className="space-y-1.5">
+               <Label className="font-semibold">Total Stock Qty <span className="text-red-500">*</span></Label>
+               <Input
+                 type="number"
+                 min="0"
+                 placeholder="e.g. 10"
+                 value={addForm.stock}
+                 onChange={e => setAddForm(f => ({ ...f, stock: e.target.value }))}
+                 className="input-nigerian"
+               />
+             </div>
+
+             {/* Variant combinations */}
+             <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+               <div className="flex items-start justify-between gap-3">
+                 <div>
+                   <Label className="font-semibold">Variants</Label>
+                   <p className="text-xs text-gray-400 mt-1">Add size, color, or pattern combinations with their own SKU and stock.</p>
+                 </div>
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setVariantRows(rows => [...rows, { size: '', color: '', pattern: '', sku: '', stock: '' }])}
+                 >
+                   <Plus className="w-3 h-3 mr-1" /> Add variant
+                 </Button>
+               </div>
+               {variantRows.length > 0 && (
+                 <div className="space-y-3">
+                   {variantRows.map((variant, index) => (
+                     <div key={index} className="rounded-lg bg-gray-50 p-2.5 space-y-2">
+                       <div className="flex items-center justify-between">
+                         <span className="text-xs font-semibold text-gray-600">Variant {index + 1}</span>
+                         <button
+                           type="button"
+                           className="text-xs text-red-500 hover:text-red-700"
+                           onClick={() => setVariantRows(rows => rows.filter((_, i) => i !== index))}
+                         >
+                           Remove
+                         </button>
+                       </div>
+                       <div className="grid grid-cols-2 gap-2">
+                         {(['size', 'color', 'pattern', 'sku'] as const).map(field => (
+                           <Input
+                             key={field}
+                             placeholder={field[0].toUpperCase() + field.slice(1)}
+                             value={variant[field]}
+                             onChange={e => setVariantRows(rows => rows.map((row, i) => i === index ? { ...row, [field]: e.target.value } : row))}
+                             className="bg-white text-xs"
+                           />
+                         ))}
+                       </div>
+                       <Input
+                         type="number"
+                         min="0"
+                         placeholder="Variant stock"
+                         value={variant.stock}
+                         onChange={e => setVariantRows(rows => rows.map((row, i) => i === index ? { ...row, stock: e.target.value } : row))}
+                         className="bg-white text-xs"
+                       />
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+
+             {/* Tailoring, shipping, and fulfillment */}
+             <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+               <Label className="font-semibold">Tailoring & Fulfillment</Label>
+               <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                 <input
+                   type="checkbox"
+                   checked={addForm.requiresMeasurements}
+                   onChange={e => setAddForm(f => ({ ...f, requiresMeasurements: e.target.checked }))}
+                   className="mt-1 accent-green-700"
+                 />
+                 <span>
+                   <span className="font-medium">Requires customer measurements</span>
+                   <span className="block text-xs text-gray-400">Customers will be directed to submit measurements before fulfillment.</span>
+                 </span>
+               </label>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <div className="space-y-1.5">
+                   <Label className="text-sm">Processing / Lead Time</Label>
+                   <Input
+                     placeholder="e.g. 7–14 days made to order"
+                     value={addForm.processingTime}
+                     onChange={e => setAddForm(f => ({ ...f, processingTime: e.target.value }))}
+                     className="input-nigerian"
+                   />
+                 </div>
+                 <div className="space-y-1.5">
+                   <Label className="text-sm">Shipping Class</Label>
+                   <select
+                     value={addForm.shippingClass}
+                     onChange={e => setAddForm(f => ({ ...f, shippingClass: e.target.value }))}
+                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                   >
+                     <option value="">Choose shipping class</option>
+                     <option value="standard">Standard</option>
+                     <option value="fragile">Fragile / Handle with care</option>
+                     <option value="oversized">Oversized</option>
+                   </select>
+                 </div>
+               </div>
+               <div className="space-y-1.5">
+                 <Label className="text-sm">Weight (kg) and Dimensions</Label>
+                 <div className="grid grid-cols-2 gap-3">
+                   <Input
+                     type="number"
+                     min="0"
+                     step="0.01"
+                     placeholder="Weight in kg"
+                     value={addForm.weight}
+                     onChange={e => setAddForm(f => ({ ...f, weight: e.target.value }))}
+                     className="input-nigerian"
+                   />
+                   <Input
+                     placeholder="L × W × H cm"
+                     value={addForm.dimensions}
+                     onChange={e => setAddForm(f => ({ ...f, dimensions: e.target.value }))}
+                     className="input-nigerian"
+                   />
+                 </div>
+               </div>
+               <div className="space-y-1.5">
+                 <Label className="text-sm">Care Instructions</Label>
+                 <Textarea
+                   placeholder="e.g. Hand wash cold. Do not bleach. Hang dry."
+                   rows={2}
+                   value={addForm.careInstructions}
+                   onChange={e => setAddForm(f => ({ ...f, careInstructions: e.target.value }))}
+                   className="input-nigerian"
+                 />
+               </div>
+               <div className="space-y-1.5">
+                 <Label className="text-sm">Return Policy</Label>
+                 <Textarea
+                   placeholder="State your return or exchange terms."
+                   rows={2}
+                   value={addForm.returnPolicy}
+                   onChange={e => setAddForm(f => ({ ...f, returnPolicy: e.target.value }))}
+                   className="input-nigerian"
+                 />
+               </div>
+             </div>
+
+             {/* SEO */}
+             <div className="space-y-3 rounded-xl border border-gray-200 p-3">
+               <div>
+                 <Label className="font-semibold">Search Preview</Label>
+                 <p className="text-xs text-gray-400 mt-1">Optional title and description for search engines and shared links.</p>
+               </div>
+               <Input
+                 placeholder="SEO title (defaults to product name)"
+                 maxLength={180}
+                 value={addForm.metaTitle}
+                 onChange={e => setAddForm(f => ({ ...f, metaTitle: e.target.value }))}
+                 className="input-nigerian"
+               />
+               <Textarea
+                 placeholder="SEO description (defaults to short description)"
+                 rows={2}
+                 value={addForm.metaDescription}
+                 onChange={e => setAddForm(f => ({ ...f, metaDescription: e.target.value }))}
+                 className="input-nigerian"
+               />
+             </div>
 
             {/* Photos */}
             <div className="space-y-2">
@@ -1546,14 +1850,19 @@ export default function VendorDashboard() {
               <span>Products are reviewed by an admin before going live in the shop — usually within 24 hours.</span>
             </div>
 
-            {/* Submit */}
-            <div className="flex gap-3 pt-1 pb-4">
-              <Button type="submit" className="btn-nigerian flex-1 h-11 text-base" disabled={addProductMutation.isPending}>
+            {/* Save or submit */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <Button type="submit" name="submissionStatus" value="draft" variant="outline" className="h-11" disabled={addProductMutation.isPending}>
+                <Save className="w-4 h-4 mr-1" /> Save Draft
+              </Button>
+              <Button type="submit" name="submissionStatus" value="pending" className="btn-nigerian h-11 text-base" disabled={addProductMutation.isPending}>
                 {addProductMutation.isPending
                   ? <><span className="animate-spin mr-2">⏳</span> Submitting…</>
-                  : <><Plus className="w-4 h-4 mr-1" /> Submit Product</>}
+                  : <><Plus className="w-4 h-4 mr-1" /> Submit for Review</>}
               </Button>
-              <Button type="button" variant="outline" className="h-11"
+            </div>
+            <div className="pb-4">
+              <Button type="button" variant="ghost" className="w-full"
                 onClick={() => { resetAddForm(); setIsAddSheetOpen(false); }}
                 disabled={addProductMutation.isPending}>
                 Cancel

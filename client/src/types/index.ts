@@ -37,14 +37,33 @@ export interface Product {
   vendorId: number;
   categoryId: number;
   name: string;
+  shortDescription?: string | null;
   description: string;
   price: string;
+  compareAtPrice?: string | null;
+  sku?: string | null;
   stock: number;
   weight?: string;
+  dimensions?: string | null;
+  shippingClass?: string | null;
+  processingTime?: string | null;
+  careInstructions?: string | null;
+  returnPolicy?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  requiresMeasurements?: boolean | null;
+  tags?: string[];
+  variants?: Array<{
+    size?: string;
+    color?: string;
+    pattern?: string;
+    sku?: string;
+    stock: number;
+  }>;
   imageUrl?: string;
   images: string[];
   sizes?: string[]; // available sizes e.g. ["XS","S","M","L","XL"]
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
   featured: boolean;
   gender?: string | null;
   originCountry?: string | null;

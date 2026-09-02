@@ -603,10 +603,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Validate required fields are present
-        if (!req.body.name || !req.body.description || req.body.price === undefined || req.body.stock === undefined || !req.body.categoryId) {
+        if (!req.body.name || !req.body.shortDescription || !req.body.description || req.body.price === undefined || req.body.stock === undefined || !req.body.categoryId) {
           return res.status(400).json({ 
             message: 'Missing required fields', 
-            required: ['name', 'description', 'price', 'stock', 'categoryId'] 
+            required: ['name', 'shortDescription', 'description', 'price', 'stock', 'categoryId']
           });
         }
         
@@ -700,14 +700,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.sizes) {
           try { sizes = JSON.parse(req.body.sizes); } catch { sizes = []; }
         }
+        let tags: string[] = [];
+        if (req.body.tags) {
+          try { tags = z.array(z.string().trim().min(1).max(60)).max(30).parse(JSON.parse(req.body.tags)); } catch {
+            return res.status(400).json({ message: 'Tags must be a valid list of up to 30 keywords' });
+          }
+        }
+        let variants: Array<{ size?: string; color?: string; pattern?: string; sku?: string; stock: number }> = [];
+        if (req.body.variants) {
+          try {
+            variants = z.array(z.object({
+              size: z.string().trim().max(40).optional(),
+              color: z.string().trim().max(60).optional(),
+              pattern: z.string().trim().max(60).optional(),
+              sku: z.string().trim().max(100).optional(),
+              stock: z.coerce.number().int().min(0),
+            })).max(100).parse(JSON.parse(req.body.variants));
+          } catch {
+            return res.status(400).json({ message: 'Variants must be a valid list with non-negative stock values' });
+          }
+        }
 
         const productData = {
           name: req.body.name.trim(),
+          shortDescription: req.body.shortDescription.trim(),
           description: req.body.description.trim(),
           price: req.body.price,
+          compareAtPrice: req.body.compareAtPrice && req.body.compareAtPrice.trim() ? req.body.compareAtPrice.trim() : null,
+          sku: req.body.sku && req.body.sku.trim() ? req.body.sku.trim() : null,
           stock: parseInt(req.body.stock),
           categoryId: parseInt(req.body.categoryId),
           weight: req.body.weight && req.body.weight.trim() ? req.body.weight.trim() : undefined,
+          dimensions: req.body.dimensions && req.body.dimensions.trim() ? req.body.dimensions.trim() : null,
+          shippingClass: req.body.shippingClass && req.body.shippingClass.trim() ? req.body.shippingClass.trim() : null,
+          processingTime: req.body.processingTime && req.body.processingTime.trim() ? req.body.processingTime.trim() : null,
+          careInstructions: req.body.careInstructions && req.body.careInstructions.trim() ? req.body.careInstructions.trim() : null,
+          returnPolicy: req.body.returnPolicy && req.body.returnPolicy.trim() ? req.body.returnPolicy.trim() : null,
+          metaTitle: req.body.metaTitle && req.body.metaTitle.trim() ? req.body.metaTitle.trim() : null,
+          metaDescription: req.body.metaDescription && req.body.metaDescription.trim() ? req.body.metaDescription.trim() : null,
+          requiresMeasurements: req.body.requiresMeasurements === 'true',
+          tags,
+          variants,
           imageUrl: req.body.imageUrl && req.body.imageUrl.trim() ? req.body.imageUrl.trim() : undefined,
           images: imageUrls,
           sizes,
@@ -715,7 +748,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gender: req.body.gender && req.body.gender.trim() ? req.body.gender.trim() : null,
           originCountry: req.body.originCountry && req.body.originCountry.trim() ? req.body.originCountry.trim() : null,
           traditionalName: req.body.traditionalName && req.body.traditionalName.trim() ? req.body.traditionalName.trim() : null,
+          status: req.body.status === 'draft' ? 'draft' : 'pending',
         };
+
+        const numericPrice = Number(productData.price);
+        const numericCompareAtPrice = productData.compareAtPrice === null ? null : Number(productData.compareAtPrice);
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+          return res.status(400).json({ message: 'Price must be a positive number' });
+        }
+        if (numericCompareAtPrice !== null && (!Number.isFinite(numericCompareAtPrice) || numericCompareAtPrice <= numericPrice)) {
+          return res.status(400).json({ message: 'Compare-at price must be greater than the selling price' });
+        }
 
         const validatedData = insertProductSchema.parse(productData);
         const product = await storage.createProduct(validatedData);
@@ -799,13 +842,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!vendor || vendor.status !== 'approved' || product.vendorId !== vendor.id) {
         return res.status(403).json({ message: 'Access denied: This product does not belong to you' });
       }
-      const { name, description, price, stock, imageUrl, removeImages, gender, originCountry, traditionalName } = req.body;
+      const {
+        name, shortDescription, description, price, compareAtPrice, sku, stock, imageUrl,
+        dimensions, shippingClass, processingTime, careInstructions, returnPolicy, metaTitle, metaDescription,
+        requiresMeasurements, tags, variants, removeImages, gender, originCountry, traditionalName
+      } = req.body;
       const updates: Record<string, unknown> = {};
       if (name !== undefined && name.trim()) updates.name = name.trim();
+      if (shortDescription !== undefined) updates.shortDescription = shortDescription.trim() || null;
       if (description !== undefined) updates.description = description.trim();
       if (price !== undefined) updates.price = price;
+      if (compareAtPrice !== undefined) updates.compareAtPrice = compareAtPrice && compareAtPrice.trim() ? compareAtPrice.trim() : null;
+      if (sku !== undefined) updates.sku = sku && sku.trim() ? sku.trim() : null;
       if (stock !== undefined) updates.stock = parseInt(stock);
       if (imageUrl !== undefined) updates.imageUrl = imageUrl.trim() || null;
+      if (dimensions !== undefined) updates.dimensions = dimensions && dimensions.trim() ? dimensions.trim() : null;
+      if (shippingClass !== undefined) updates.shippingClass = shippingClass && shippingClass.trim() ? shippingClass.trim() : null;
+      if (processingTime !== undefined) updates.processingTime = processingTime && processingTime.trim() ? processingTime.trim() : null;
+      if (careInstructions !== undefined) updates.careInstructions = careInstructions && careInstructions.trim() ? careInstructions.trim() : null;
+      if (returnPolicy !== undefined) updates.returnPolicy = returnPolicy && returnPolicy.trim() ? returnPolicy.trim() : null;
+      if (metaTitle !== undefined) updates.metaTitle = metaTitle && metaTitle.trim() ? metaTitle.trim() : null;
+      if (metaDescription !== undefined) updates.metaDescription = metaDescription && metaDescription.trim() ? metaDescription.trim() : null;
+      if (requiresMeasurements !== undefined) updates.requiresMeasurements = requiresMeasurements === true || requiresMeasurements === 'true';
+      if (tags !== undefined) {
+        try {
+          updates.tags = z.array(z.string().trim().min(1).max(60)).max(30).parse(typeof tags === 'string' ? JSON.parse(tags) : tags);
+        } catch {
+          return res.status(400).json({ message: 'Tags must be a valid list of up to 30 keywords' });
+        }
+      }
+      if (variants !== undefined) {
+        try {
+          updates.variants = z.array(z.object({
+            size: z.string().trim().max(40).optional(),
+            color: z.string().trim().max(60).optional(),
+            pattern: z.string().trim().max(60).optional(),
+            sku: z.string().trim().max(100).optional(),
+            stock: z.coerce.number().int().min(0),
+          })).max(100).parse(typeof variants === 'string' ? JSON.parse(variants) : variants);
+        } catch {
+          return res.status(400).json({ message: 'Variants must be a valid list with non-negative stock values' });
+        }
+      }
       if (gender !== undefined) updates.gender = gender && gender.trim() ? gender.trim() : null;
       if (originCountry !== undefined) updates.originCountry = originCountry && originCountry.trim() ? originCountry.trim() : null;
       if (traditionalName !== undefined) updates.traditionalName = traditionalName && traditionalName.trim() ? traditionalName.trim() : null;
@@ -946,6 +1024,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Product status updated' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to update product status' });
+    }
+  });
+
+  app.post('/api/products/:id/submit', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      if (!Number.isSafeInteger(productId)) return res.status(400).json({ message: 'Invalid product ID' });
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+      const userId = (req.user as any)?.id;
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!vendor || vendor.status !== 'approved' || product.vendorId !== vendor.id) {
+        return res.status(403).json({ message: 'Approved vendor access required' });
+      }
+      if (!['draft', 'rejected'].includes(product.status || '')) {
+        return res.status(409).json({ message: 'Only draft or rejected products can be submitted' });
+      }
+      await storage.updateProductStatus(productId, 'pending');
+      res.json(await storage.getProduct(productId));
+    } catch (error) {
+      console.error('Error submitting product for review:', error);
+      res.status(500).json({ message: 'Failed to submit product for review' });
     }
   });
 
