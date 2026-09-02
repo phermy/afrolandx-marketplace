@@ -134,6 +134,9 @@ export const orders = pgTable("orders", {
   paymentReference: varchar("payment_reference"),
   shippingMethod: varchar("shipping_method"), // ups, fedex, dhl
   shippingQuoteRequestId: integer("shipping_quote_request_id").unique(),
+  shippingPaymentStatus: varchar("shipping_payment_status", { length: 32 }).notNull().default("included"), // included, awaiting_quote, pending, paid, rejected
+  shippingPaymentReference: varchar("shipping_payment_reference"),
+  shippingPaymentUrl: text("shipping_payment_url"),
   trackingNumber: varchar("tracking_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

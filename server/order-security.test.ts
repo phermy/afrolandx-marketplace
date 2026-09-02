@@ -9,6 +9,7 @@ import {
   findOwnedCartItem,
   isValidPaystackWebhookSignature,
   paymentVerificationError,
+  shippingPaymentVerificationError,
 } from "./order-security";
 
 const cart = [
@@ -114,6 +115,30 @@ test("payment verification rejects mismatched amount, currency, metadata, and re
   assert.equal(paymentVerificationError(order, verification({ reference: "other-reference" }), "order_42_abc"), "Payment reference mismatch");
   assert.equal(paymentVerificationError(order, verification(), "other-reference"), "Payment reference mismatch");
   assert.equal(paymentVerificationError(order, verification({ metadata: { orderId: 42, userId: "another-buyer" } }), "order_42_abc"), "Payment metadata mismatch");
+});
+
+test("shipping payment verification requires the exact quote amount and shipping metadata", () => {
+  const shippingOrder = {
+    id: 42,
+    userId: "buyer-1",
+    shippingAmount: "15000.00",
+    shippingPaymentReference: "shipping_42_abc",
+  };
+  const shippingVerification = (overrides: Record<string, unknown> = {}) => ({
+    status: true,
+    data: {
+      status: "success",
+      reference: "shipping_42_abc",
+      amount: 1500000,
+      currency: "NGN",
+      metadata: { orderId: 42, userId: "buyer-1", paymentType: "shipping" },
+      ...overrides,
+    },
+  });
+
+  assert.equal(shippingPaymentVerificationError(shippingOrder, shippingVerification(), "shipping_42_abc"), null);
+  assert.equal(shippingPaymentVerificationError(shippingOrder, shippingVerification({ amount: 1490000 }), "shipping_42_abc"), "Shipping payment amount mismatch");
+  assert.equal(shippingPaymentVerificationError(shippingOrder, shippingVerification({ metadata: { orderId: 42, userId: "buyer-1" } }), "shipping_42_abc"), "Shipping payment metadata mismatch");
 });
 
 test("Paystack webhook signatures require the exact raw body and secret", () => {

@@ -94,11 +94,13 @@ export interface Order {
   totalAmount: string;
   shippingAmount: string;
   paymentStatus: 'pending' | 'paid' | 'failed';
-  orderStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  orderStatus: 'awaiting_shipping_quote' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
   paymentReference?: string;
   shippingMethod?: string;
   shippingQuoteRequestId?: number | null;
+  shippingPaymentStatus: 'included' | 'awaiting_quote' | 'pending' | 'paid' | 'rejected';
+  shippingPaymentReference?: string | null;
   trackingNumber?: string;
   createdAt: string;
   updatedAt: string;

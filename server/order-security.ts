@@ -160,6 +160,20 @@ export function paymentVerificationError(order: any, verification: any, referenc
   return null;
 }
 
+export function shippingPaymentVerificationError(order: any, verification: any, reference: string): string | null {
+  const data = verification?.data;
+  if (!verification?.status || data?.status !== 'success') return 'Shipping payment was not successful';
+  if (data.reference !== reference || order.shippingPaymentReference !== reference) return 'Shipping payment reference mismatch';
+  if (data.currency !== 'NGN') return 'Shipping payment currency mismatch';
+
+  const expectedKobo = Math.round(Number(order.shippingAmount) * 100);
+  if (!Number.isSafeInteger(data.amount) || data.amount !== expectedKobo) return 'Shipping payment amount mismatch';
+  if (Number(data.metadata?.orderId) !== order.id || data.metadata?.userId !== order.userId || data.metadata?.paymentType !== 'shipping') {
+    return 'Shipping payment metadata mismatch';
+  }
+  return null;
+}
+
 export function isValidPaystackWebhookSignature(
   rawBody: unknown,
   signature: unknown,

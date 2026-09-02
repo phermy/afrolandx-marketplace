@@ -22,7 +22,8 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
     const transitioned = await storage.markOrderPaid(order.id, reference);
     if (!transitioned) return false;
 
-    await storage.updateOrderStatus(order.id, 'pending');
+    const awaitingShipping = order.shippingPaymentStatus === 'awaiting_quote';
+    await storage.updateOrderStatus(order.id, awaitingShipping ? 'awaiting_shipping_quote' : 'pending');
     await storage.clearCart(order.userId);
     const items = await storage.getOrderItemsWithProducts(order.id);
 
@@ -49,7 +50,9 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
       await storage.createNotification({
         userId: vendor.userId,
         title: 'New Order Received',
-        message: `Payment was confirmed for order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}.`,
+        message: awaitingShipping
+          ? `Item payment was confirmed for order #${order.id}. Afrolandx is confirming shipping before fulfillment begins.`
+          : `Payment was confirmed for order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}.`,
         type: 'order',
         orderId: order.id,
       }).catch(error => console.error('Failed to notify vendor:', error));
@@ -61,7 +64,9 @@ export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) 
       await storage.createNotification({
         userId: admin.id,
         title: 'New Order Placed',
-        message: `Order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}, has been paid.`,
+        message: awaitingShipping
+          ? `Order #${order.id} items are paid and the shipping quote is still pending.`
+          : `Order #${order.id}, worth ₦${Number(order.totalAmount).toLocaleString()}, has been paid.`,
         type: 'order',
         orderId: order.id,
       }).catch(error => console.error('Failed to notify admin:', error));

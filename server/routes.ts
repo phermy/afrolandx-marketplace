@@ -28,6 +28,7 @@ import {
   getShippingQuote,
   isValidPaystackWebhookSignature,
   paymentVerificationError,
+  shippingPaymentVerificationError,
   SHIPPING_QUOTES,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
@@ -325,6 +326,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const completeVerifiedOrder = createVerifiedOrderCompleter(storage);
+  const completeVerifiedShippingPayment = async (order: any, verification: any, reference: string): Promise<boolean> => {
+    const mismatch = shippingPaymentVerificationError(order, verification, reference);
+    if (mismatch) return false;
+    const transitioned = await storage.markShippingPaid(order.id, reference);
+    if (!transitioned) return (await storage.getOrder(order.id))?.shippingPaymentStatus === 'paid';
+    if (order.shippingQuoteRequestId) {
+      await storage.updateShippingQuoteRequest(order.shippingQuoteRequestId, { status: 'used' });
+    }
+    await storage.createNotification({
+      userId: order.userId,
+      title: 'Shipping payment confirmed',
+      message: `Shipping for order #${order.id} has been paid. Your order can now move to fulfillment.`,
+      type: 'shipping_quote',
+      orderId: order.id,
+    }).catch(error => console.error('Failed to notify buyer about shipping payment:', error));
+    return true;
+  };
 
   // Admin user management routes
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
@@ -1436,13 +1454,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expiresAt: null,
           });
 
+      const linkedOrder = await storage.getOrderByShippingQuoteRequestId(id);
+      if (linkedOrder) {
+        await storage.updateOrderShippingQuote(
+          id,
+          decision.status === 'quoted' ? decision.quotedAmount.toFixed(2) : '0.00',
+          decision.status === 'quoted' ? 'pending' : 'rejected',
+        );
+      }
+
       await storage.createNotification({
         userId: existing.userId,
         type: 'shipping_quote',
         title: decision.status === 'quoted' ? `${existing.carrier} shipping quote ready` : `${existing.carrier} quote update`,
         message: decision.status === 'quoted'
-          ? `Your shipping quote is ₦${decision.quotedAmount.toLocaleString()} and is valid for ${decision.validDays} day${decision.validDays === 1 ? '' : 's'}. Return to checkout to pay.`
+          ? linkedOrder
+            ? `Your ${existing.carrier} shipping quote for order #${linkedOrder.id} is ₦${decision.quotedAmount.toLocaleString()}. Open My Orders to pay the shipping balance.`
+            : `Your shipping quote is ₦${decision.quotedAmount.toLocaleString()} and is valid for ${decision.validDays} day${decision.validDays === 1 ? '' : 's'}. Return to checkout to pay.`
           : `We could not confirm this shipping route. ${decision.adminNotes}`,
+        ...(linkedOrder ? { orderId: linkedOrder.id } : {}),
       });
       res.json(updated);
     } catch (error) {
@@ -1475,6 +1505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let subtotal: number;
       let shippingPrice: number;
       let shippingQuoteRequestId: number | undefined;
+      let quotePending = false;
       try {
         subtotal = calculateCheckoutSubtotal(cartItems);
         if (shippingQuote.quoteRequired || shippingQuote.price === null) {
@@ -1486,18 +1517,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!confirmed || confirmed.userId !== userId || confirmed.carrier.toLowerCase() !== shippingMethod) {
             return res.status(404).json({ message: 'Confirmed shipping quote not found' });
           }
-          if (confirmed.status !== 'quoted' || !confirmed.quotedAmount || !confirmed.expiresAt || confirmed.expiresAt <= new Date()) {
-            return res.status(409).json({ message: 'This shipping quote is not confirmed or has expired' });
-          }
-          if (confirmed.currency !== 'NGN') return res.status(409).json({ message: 'Shipping quote currency must be NGN' });
           if (confirmed.cartFingerprint !== createCartFingerprint(cartItems)) {
             return res.status(409).json({ message: 'Your cart changed after this quote was requested. Please request a new quote.' });
           }
           if (!addressesMatch(confirmed.shippingAddress, shippingAddress)) {
             return res.status(409).json({ message: 'Your shipping address changed after this quote was requested. Please request a new quote.' });
           }
-          shippingPrice = Number(confirmed.quotedAmount);
-          if (!Number.isFinite(shippingPrice) || shippingPrice <= 0) throw new CheckoutValidationError('Shipping quote has an invalid amount');
+          if (confirmed.status === 'pending') {
+            quotePending = true;
+            shippingPrice = 0;
+          } else if (confirmed.status === 'quoted' && confirmed.quotedAmount && confirmed.expiresAt && confirmed.expiresAt > new Date()) {
+            if (confirmed.currency !== 'NGN') return res.status(409).json({ message: 'Shipping quote currency must be NGN' });
+            shippingPrice = Number(confirmed.quotedAmount);
+            if (!Number.isFinite(shippingPrice) || shippingPrice <= 0) throw new CheckoutValidationError('Shipping quote has an invalid amount');
+          } else {
+            return res.status(409).json({ message: 'This shipping quote is unavailable or has expired' });
+          }
         } else {
           shippingPrice = shippingQuote.price;
         }
@@ -1517,7 +1552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shippingAddress,
         shippingMethod,
         paymentStatus: 'pending',
-        orderStatus: 'pending',
+        orderStatus: quotePending ? 'awaiting_shipping_quote' : 'pending',
+        shippingPaymentStatus: quotePending ? 'awaiting_quote' : 'included',
         paymentReference: reference
       };
 
@@ -1528,7 +1564,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         selectedSize: item.selectedSize ?? null,
       }));
       const order = shippingQuoteRequestId
-        ? await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
+        ? quotePending
+          ? await storage.createOrderAwaitingShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
+          : await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
         : await storage.createOrder(orderData);
       if (!order) {
         return res.status(409).json({ message: 'This shipping quote has already been used or has expired. Please request a new quote.' });
@@ -1567,7 +1605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         throw error;
       }
-      if (shippingQuoteRequestId) {
+      if (shippingQuoteRequestId && !quotePending) {
         await storage.updateShippingQuoteRequest(shippingQuoteRequestId, { status: 'used' });
       }
 
@@ -1575,6 +1613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         order,
         paymentUrl: paymentData.data.authorization_url,
         reference: paymentData.data.reference,
+        awaitingShippingQuote: quotePending,
       });
     } catch (error) {
       console.error('Error initializing payment:', error);
@@ -1620,6 +1659,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/orders/:id/initialize-shipping-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const userId = (req.user as any)?.id;
+      if (!Number.isSafeInteger(orderId)) return res.status(400).json({ message: 'Invalid order ID' });
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+
+      const [order, user] = await Promise.all([storage.getOrder(orderId), storage.getUser(userId)]);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      if (!user?.email) return res.status(400).json({ message: 'User email required for payment' });
+      if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Pay for the order items before paying shipping' });
+      if (order.shippingPaymentStatus !== 'pending') {
+        return res.status(409).json({ message: order.shippingPaymentStatus === 'paid' ? 'Shipping is already paid' : 'Shipping quote is not ready for payment' });
+      }
+      if (!order.shippingQuoteRequestId) return res.status(409).json({ message: 'Shipping quote is missing' });
+
+      const quote = await storage.getShippingQuoteRequest(order.shippingQuoteRequestId);
+      if (!quote || quote.status !== 'quoted' || !quote.expiresAt || quote.expiresAt <= new Date()) {
+        return res.status(409).json({ message: 'Shipping quote has expired. Please contact Afrolandx for an updated quote.' });
+      }
+      const shippingAmount = Number(order.shippingAmount);
+      if (!Number.isFinite(shippingAmount) || shippingAmount <= 0 || shippingAmount !== Number(quote.quotedAmount)) {
+        return res.status(409).json({ message: 'Shipping amount does not match the confirmed quote' });
+      }
+
+      if (order.shippingPaymentReference) {
+        if (order.shippingPaymentUrl) {
+          return res.json({ paymentUrl: order.shippingPaymentUrl, reference: order.shippingPaymentReference, reused: true });
+        }
+        return res.status(409).json({ message: 'Shipping payment is already being prepared. Please try again shortly.' });
+      }
+
+      const reference = `shipping_${order.id}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const claim = await storage.claimShippingPaymentReference(order.id, userId, reference);
+      if (claim !== 'claimed') {
+        const current = await storage.getOrder(order.id);
+        if (claim === 'busy' && current?.shippingPaymentUrl && current.shippingPaymentReference) {
+          return res.json({ paymentUrl: current.shippingPaymentUrl, reference: current.shippingPaymentReference, reused: true });
+        }
+        return res.status(409).json({ message: 'Shipping payment is no longer available' });
+      }
+
+      try {
+        const callbackUrl = `${req.protocol}://${req.get('host')}/api/payment/callback`;
+        const paymentData = await getPaystackService().initializeTransaction(
+          user.email,
+          shippingAmount,
+          reference,
+          { orderId: order.id, userId, paymentType: 'shipping', shippingQuoteId: quote.id },
+          callbackUrl,
+          'NGN',
+        );
+        if (!paymentData?.data?.authorization_url) throw new Error('Payment provider did not return a checkout URL');
+        await storage.saveShippingPaymentUrl(order.id, reference, paymentData.data.authorization_url);
+        res.json({ paymentUrl: paymentData.data.authorization_url, reference: paymentData.data.reference });
+      } catch (error) {
+        await storage.clearShippingPaymentAttempt(order.id, userId, reference);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error initializing shipping payment:', error);
+      res.status(500).json({ message: 'Failed to initialize shipping payment. Please try again.' });
+    }
+  });
+
   // Payment callback endpoint for Paystack redirects
   app.get('/api/payment/callback', async (req, res) => {
     try {
@@ -1644,6 +1748,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const order = await storage.getOrder(orderId);
       if (!order) return res.redirect('/checkout?error=order_not_found');
+      if (verificationResult.data.metadata?.paymentType === 'shipping') {
+        if (!await completeVerifiedShippingPayment(order, verificationResult, paymentReference)) {
+          return res.redirect('/my-orders?shipping=failed');
+        }
+        return res.redirect(`/my-orders?shipping=success&orderId=${order.id}`);
+      }
       const mismatch = paymentVerificationError(order, verificationResult, paymentReference);
       if (mismatch) return res.redirect('/checkout?error=payment_verification_failed');
       await completeVerifiedOrder(order, paymentReference);
@@ -1681,6 +1791,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied: Approved vendor account required' });
       }
       if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Order payment has not been confirmed' });
+      if (!['included', 'paid'].includes(order.shippingPaymentStatus)) {
+        return res.status(409).json({ message: 'Shipping must be quoted and paid before fulfillment can begin' });
+      }
       const allowedNextStatus: Record<string, string> = { pending: 'processing', processing: 'shipped', shipped: 'delivered' };
       if (allowedNextStatus[order.orderStatus || ''] !== status) {
         return res.status(409).json({ message: `Order cannot move from ${order.orderStatus} to ${status}` });
@@ -1814,7 +1927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!['pending', 'processing'].includes(order.orderStatus || '')) {
         return res.status(400).json({ message: 'Order cannot be cancelled at this stage' });
       }
-      await storage.updateOrderStatus(orderId, 'cancelled');
+      if (!await storage.cancelOrderIfNoActiveShippingPayment(orderId, userId)) {
+        return res.status(409).json({ message: 'This order cannot be cancelled while a shipping payment is in progress' });
+      }
       // Notify admins
       const admins = await storage.getAdminUsers();
       for (const admin of admins) {
@@ -2037,6 +2152,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderId = Number(verification.data?.metadata?.orderId);
         const order = Number.isSafeInteger(orderId) ? await storage.getOrder(orderId) : undefined;
         if (!order) return res.status(200).json({ message: 'Webhook ignored' });
+        if (verification.data?.metadata?.paymentType === 'shipping') {
+          await completeVerifiedShippingPayment(order, verification, reference);
+          return res.status(200).json({ message: 'Webhook received' });
+        }
         const mismatch = paymentVerificationError(order, verification, reference);
         if (mismatch) return res.status(200).json({ message: 'Webhook ignored' });
         await completeVerifiedOrder(order, reference);
@@ -2232,8 +2351,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
+      if (status !== 'cancelled' && !['included', 'paid'].includes(order.shippingPaymentStatus)) {
+        return res.status(409).json({ message: 'Shipping must be quoted and paid before fulfillment can begin' });
+      }
 
-      await storage.updateOrderStatus(orderId, status);
+      if (status === 'cancelled') {
+        if (!await storage.cancelOrderIfNoActiveShippingPayment(orderId)) {
+          return res.status(409).json({ message: 'This order cannot be cancelled while a shipping payment is in progress' });
+        }
+      } else {
+        await storage.updateOrderStatus(orderId, status);
+      }
 
       // Automatically notify the customer when status changes
       const statusMessages: Record<string, { title: string; message: string }> = {
@@ -2822,6 +2950,9 @@ INSTRUCTIONS:
       if (!Number.isSafeInteger(orderId)) return res.status(400).json({ message: 'Invalid order ID' });
       const order = await storage.getOrder(orderId);
       if (!order || order.paymentStatus !== 'paid') return res.status(404).json({ message: 'Paid order not found' });
+      if (!['included', 'paid'].includes(order.shippingPaymentStatus)) {
+        return res.status(409).json({ message: 'Shipping must be paid before production can begin' });
+      }
       const items = await storage.getOrderItemsWithProducts(orderId);
       const vendorItems = [];
       for (const item of items) {
@@ -2859,6 +2990,10 @@ INSTRUCTIONS:
       const { notes } = req.body;
       const step = await storage.getProductionStep(id);
       if (!step) return res.status(404).json({ message: 'Production step not found' });
+      const order = await storage.getOrder(step.orderId);
+      if (!order || order.paymentStatus !== 'paid' || !['included', 'paid'].includes(order.shippingPaymentStatus)) {
+        return res.status(409).json({ message: 'Shipping must be paid before production can continue' });
+      }
       const items = await storage.getOrderItemsWithProducts(step.orderId);
       const relevantItems = step.orderItemId ? items.filter(item => item.id === step.orderItemId) : items;
       let ownsStep = false;

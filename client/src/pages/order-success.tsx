@@ -70,8 +70,10 @@ export default function OrderSuccess() {
                     Your Payment Was Successful! ✨
                   </h2>
                   <p className="text-green-700 leading-relaxed">
-                    We've received your payment and your order is now being processed. Our skilled artisans and vendors 
-                    are already preparing your authentic African fashion pieces with the utmost care and attention to detail.
+                    We've received your payment for your items.
+                    {order.shippingPaymentStatus === 'awaiting_quote'
+                      ? ' Afrolandx is now confirming your selected carrier rate. You can continue shopping and pay shipping later from My Orders when notified.'
+                      : ' Your shipping is confirmed and the order can now move to fulfillment.'}
                   </p>
                 </div>
 
@@ -90,15 +92,15 @@ export default function OrderSuccess() {
                   <div className="text-left space-y-3 text-blue-700">
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                      <p>Our vendors have been notified and will begin preparing your items</p>
+                      <p>{order.shippingPaymentStatus === 'awaiting_quote' ? 'Afrolandx confirms the current rate with your selected shipping company' : 'Our vendors have been notified and will begin preparing your items'}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
-                      <p>You'll receive email updates as your order progresses through each stage</p>
+                      <p>{order.shippingPaymentStatus === 'awaiting_quote' ? 'You receive an in-app notification when the shipping quote is ready' : "You'll receive updates as your order progresses through each stage"}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
-                      <p>Once shipped, you'll get tracking information and delivery updates</p>
+                      <p>{order.shippingPaymentStatus === 'awaiting_quote' ? 'Pay the confirmed shipping amount securely from My Orders' : "Once shipped, you'll get tracking information and delivery updates"}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>

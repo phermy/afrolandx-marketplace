@@ -89,9 +89,27 @@ function OrderTimeline({ status }: { status: string }) {
 
 function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id: number) => void; cancelling: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const { toast } = useToast();
   const isCancelled = order.orderStatus === 'cancelled';
   const isDelivered = order.orderStatus === 'delivered';
-  const canCancel = ['pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
+  const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
+  const separateShipping = ['awaiting_quote', 'pending', 'paid', 'rejected'].includes(order.shippingPaymentStatus);
+  const displayedTotal = Number(order.totalAmount) + (separateShipping ? Number(order.shippingAmount || 0) : 0);
+  const payShippingMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/orders/${order.id}/initialize-shipping-payment`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      if (!result.paymentUrl) throw new Error('Shipping checkout URL was not returned');
+      window.location.href = result.paymentUrl;
+    },
+    onError: (error: any) => toast({
+      title: 'Could not start shipping payment',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
 
   const paymentColor = order.paymentStatus === 'paid' || order.paymentStatus === 'completed'
     ? 'bg-green-100 text-green-700'
@@ -110,8 +128,9 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                 ${isCancelled ? 'bg-red-100 text-red-700' : isDelivered ? 'bg-green-100 text-green-700' :
                   order.orderStatus === 'shipped' ? 'bg-purple-100 text-purple-700' :
                   order.orderStatus === 'processing' ? 'bg-blue-100 text-blue-700' :
+                  order.orderStatus === 'awaiting_shipping_quote' ? 'bg-amber-100 text-amber-700' :
                   'bg-yellow-100 text-yellow-700'}`}>
-                {order.orderStatus}
+                {order.orderStatus === 'awaiting_shipping_quote' ? 'Awaiting shipping quote' : order.orderStatus}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${paymentColor}`}>
                 {order.paymentStatus}
@@ -123,7 +142,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-green-700">₦{parseFloat(order.totalAmount).toLocaleString()}</p>
+            <p className="text-xl font-bold text-green-700">₦{displayedTotal.toLocaleString()}</p>
             {!isCancelled && (
               <p className="text-xs text-gray-400">Est. delivery: {getEstimatedDelivery(order.shippingMethod, order.createdAt)}</p>
             )}
@@ -134,6 +153,46 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
       <CardContent className="space-y-4">
         {/* Timeline */}
         <OrderTimeline status={order.orderStatus} />
+
+        {order.paymentStatus === 'paid' && order.shippingPaymentStatus === 'awaiting_quote' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-3">
+            <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-800 text-sm">Items paid — shipping quote in progress</p>
+              <p className="text-xs text-amber-700">Afrolandx is confirming the {order.shippingMethod?.toUpperCase()} rate. You will be notified when it is ready, and your order will stay safely on hold.</p>
+            </div>
+          </div>
+        )}
+
+        {order.paymentStatus === 'paid' && order.shippingPaymentStatus === 'pending' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-medium text-blue-800 text-sm">Shipping quote confirmed</p>
+              <p className="text-xs text-blue-700">Pay ₦{Number(order.shippingAmount).toLocaleString()} shipping to release this order for fulfillment.</p>
+            </div>
+            <Button
+              size="sm"
+              disabled={payShippingMutation.isPending}
+              onClick={() => payShippingMutation.mutate()}
+              className="bg-blue-700 hover:bg-blue-800 text-white"
+            >
+              <CreditCard className="w-3.5 h-3.5 mr-1" />
+              {payShippingMutation.isPending ? 'Opening payment…' : `Pay shipping ₦${Number(order.shippingAmount).toLocaleString()}`}
+            </Button>
+          </div>
+        )}
+
+        {order.shippingPaymentStatus === 'paid' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+            Shipping payment confirmed. Your order is ready for fulfillment.
+          </div>
+        )}
+
+        {order.shippingPaymentStatus === 'rejected' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+            This carrier could not confirm the route. Afrolandx support will help arrange another shipping option.
+          </div>
+        )}
 
         {/* Shipped info banner */}
         {order.orderStatus === 'shipped' && (
@@ -267,6 +326,19 @@ export default function MyOrders() {
       window.history.replaceState({}, '', '/my-orders');
     }
   }, [toast]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shipping = params.get('shipping');
+    if (shipping === 'success') {
+      toast({ title: 'Shipping payment successful', description: `Shipping for order #${params.get('orderId') || ''} is confirmed.` });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders/my-orders'] });
+      window.history.replaceState({}, '', '/my-orders');
+    } else if (shipping === 'failed') {
+      toast({ title: 'Shipping payment was not completed', description: 'No shipping charge was accepted. Please try again.', variant: 'destructive' });
+      window.history.replaceState({}, '', '/my-orders');
+    }
+  }, [queryClient, toast]);
 
   // Detect status changes on live poll → notify customer
   useEffect(() => {

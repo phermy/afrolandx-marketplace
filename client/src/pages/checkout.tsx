@@ -434,7 +434,9 @@ export default function Checkout() {
           duration: request.estimatedDelivery || quote.duration,
           quoteRequestId: request.id,
         }
-      : quote;
+      : request?.status === 'pending' && request.cartMatches !== false
+        ? { ...quote, quoteRequestId: request.id }
+        : quote;
   });
   const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
@@ -662,6 +664,7 @@ export default function Checkout() {
                         {effectiveShippingQuotes.map((quote) => {
                           const request = requestForCarrier(quote.carrier);
                           const canSelect = !quote.quoteRequired || !!quote.quoteRequestId;
+                          const awaitingQuote = request?.status === 'pending' && !!quote.quoteRequestId;
                           return (
                           <div
                             key={quote.carrier}
@@ -680,7 +683,10 @@ export default function Checkout() {
                                   {quote.routes && <p className="text-xs text-gray-500 mt-1">{quote.routes}</p>}
                                   {quote.notes && <p className="text-xs text-gray-500 mt-1">{quote.notes}</p>}
                                   {quote.quoteRequired && request?.status === 'pending' && (
-                                    <Badge variant="outline" className="mt-2 border-amber-300 text-amber-700">Quote pending</Badge>
+                                     <div className="mt-2">
+                                       <Badge variant="outline" className="border-amber-300 text-amber-700">Quote pending</Badge>
+                                       <p className="mt-1 text-xs text-amber-700">You can select this carrier and pay for your items now. Shipping will be paid after Afrolandx confirms the rate.</p>
+                                     </div>
                                   )}
                                   {quote.quoteRequired && request?.status === 'rejected' && (
                                     <p className="mt-2 text-xs text-red-700">{request.adminNotes || 'This route could not be confirmed.'}</p>
@@ -693,7 +699,7 @@ export default function Checkout() {
                                 </div>
                                 <div className="text-right">
                                   <span className={`font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
-                                    {quote.price === null ? 'Rate on request' : formatPrice(quote.price)}
+                                    {awaitingQuote ? 'Pay shipping later' : quote.price === null ? 'Rate on request' : formatPrice(quote.price)}
                                   </span>
                                   {quote.quoteRequired && !quote.quoteRequestId && request?.status !== 'pending' && (
                                     <Button
@@ -802,7 +808,7 @@ export default function Checkout() {
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
                         <span className="font-medium">
-                          {selectedShippingQuote.price === null ? 'Rate on request' : formatPrice(selectedShippingQuote.price)}
+                          {selectedShippingQuote.price === null ? 'Pending — pay later' : formatPrice(selectedShippingQuote.price)}
                         </span>
                       </div>
                     )}
@@ -835,7 +841,9 @@ export default function Checkout() {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Pay {formatPrice(totalAmount)}
+                        {selectedShippingQuote?.price === null
+                          ? `Pay for items ${formatPrice(cartTotal)}`
+                          : `Pay ${formatPrice(totalAmount)}`}
                       </>
                     )}
                   </Button>
