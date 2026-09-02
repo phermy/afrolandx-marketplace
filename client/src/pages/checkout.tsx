@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { ShippingQuote, ShippingAddress } from '@/types';
+import type { ShippingQuote, ShippingAddress, ShippingQuoteRequest } from '@/types';
 
 
 // States / provinces per country
@@ -177,6 +177,7 @@ export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { cartItems, cartTotal } = useCart();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -285,6 +286,36 @@ export default function Checkout() {
     retry: false,
   });
 
+  const { data: quoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
+    queryKey: ['/api/shipping/quote-requests/mine'],
+    enabled: isAuthenticated && !!cartItems.length,
+    retry: false,
+    refetchInterval: 15000,
+  });
+
+  const requestQuoteMutation = useMutation({
+    mutationFn: async (carrier: string) => {
+      const response = await apiRequest('POST', '/api/shipping/quote-requests', { carrier, shippingAddress });
+      return response.json();
+    },
+    onSuccess: (request: ShippingQuoteRequest) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/shipping/quote-requests/mine'] });
+      toast({
+        title: request.status === 'quoted' ? 'Quote already available' : 'Quote requested',
+        description: request.status === 'quoted'
+          ? `Your ${request.carrier} quote is ready to select.`
+          : `Afrolandx will confirm the ${request.carrier} rate and notify you here.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not request quote',
+        description: error?.message || 'Check your shipping address and try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Auto-select the cheapest (first) shipping option when quotes load
   useEffect(() => {
     if (shippingQuotes.length > 0 && !selectedShipping) {
@@ -344,7 +375,7 @@ export default function Checkout() {
       return;
     }
 
-    const selectedQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
+    const selectedQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
     if (!selectedQuote) {
       toast({
         title: 'Error',
@@ -357,6 +388,9 @@ export default function Checkout() {
     const orderData = {
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
+      ...(selectedQuote.quoteRequired && selectedQuote.quoteRequestId
+        ? { shippingQuoteId: selectedQuote.quoteRequestId }
+        : {}),
     };
 
     createOrderMutation.mutate(orderData);
@@ -366,8 +400,35 @@ export default function Checkout() {
   const formatPrice = (ngnAmount: number) =>
     `₦${ngnAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-  const selectedShippingQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
+  const requestMatchesAddress = (request: ShippingQuoteRequest) =>
+    JSON.stringify(request.shippingAddress) === JSON.stringify(shippingAddress);
+  const requestForCarrier = (carrier: string) =>
+    quoteRequests.find(request => request.carrier === carrier && requestMatchesAddress(request));
+  const effectiveShippingQuotes = shippingQuotes.map(quote => {
+    const request = requestForCarrier(quote.carrier);
+    const usable = quote.quoteRequired
+      && request?.status === 'quoted'
+      && request.cartMatches !== false
+      && !!request.quotedAmount
+      && !!request.expiresAt
+      && new Date(request.expiresAt) > new Date();
+    return usable
+      ? {
+          ...quote,
+          price: Number(request.quotedAmount),
+          duration: request.estimatedDelivery || quote.duration,
+          quoteRequestId: request.id,
+        }
+      : quote;
+  });
+  const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
+
+  useEffect(() => {
+    if (!selectedShipping) return;
+    const selected = effectiveShippingQuotes.find(quote => quote.carrier === selectedShipping);
+    if (selected?.quoteRequired && !selected.quoteRequestId) setSelectedShipping('');
+  }, [effectiveShippingQuotes, selectedShipping]);
 
   if (isLoading) {
     return (
@@ -576,26 +637,52 @@ export default function Checkout() {
                   ) : (
                     <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
                       <div className="space-y-3">
-                        {shippingQuotes.map((quote) => (
-                          <div key={quote.carrier} className={`flex items-center space-x-3 p-4 border rounded-lg ${quote.quoteRequired ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                            <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={quote.quoteRequired} />
-                            <Label htmlFor={quote.carrier} className={`flex-1 ${quote.quoteRequired ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        {effectiveShippingQuotes.map((quote) => {
+                          const request = requestForCarrier(quote.carrier);
+                          const canSelect = !quote.quoteRequired || !!quote.quoteRequestId;
+                          return (
+                          <div key={quote.carrier} className={`flex items-start space-x-3 p-4 border rounded-lg ${canSelect ? 'hover:bg-gray-50' : 'bg-gray-50'}`}>
+                            <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={!canSelect} className="mt-1" />
+                            <Label htmlFor={quote.carrier} className={`flex-1 ${canSelect ? 'cursor-pointer' : 'cursor-default'}`}>
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="font-semibold">{quote.service}</p>
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
                                   {quote.routes && <p className="text-xs text-gray-500 mt-1">{quote.routes}</p>}
                                   {quote.notes && <p className="text-xs text-gray-500 mt-1">{quote.notes}</p>}
+                                  {quote.quoteRequired && request?.status === 'pending' && (
+                                    <Badge variant="outline" className="mt-2 border-amber-300 text-amber-700">Quote pending</Badge>
+                                  )}
+                                  {quote.quoteRequired && request?.status === 'rejected' && (
+                                    <p className="mt-2 text-xs text-red-700">{request.adminNotes || 'This route could not be confirmed.'}</p>
+                                  )}
+                                  {quote.quoteRequestId && request?.expiresAt && (
+                                    <p className="mt-2 text-xs text-green-700">
+                                      Confirmed · valid until {new Date(request.expiresAt).toLocaleDateString()}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="text-right">
-                                  <span className={`font-bold ${quote.quoteRequired ? 'text-gray-600' : 'text-nigerian-green'}`}>
+                                  <span className={`font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
                                     {quote.price === null ? 'Rate on request' : formatPrice(quote.price)}
                                   </span>
+                                  {quote.quoteRequired && !quote.quoteRequestId && request?.status !== 'pending' && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="mt-2 block ml-auto"
+                                      disabled={requestQuoteMutation.isPending}
+                                      onClick={() => requestQuoteMutation.mutate(quote.carrier)}
+                                    >
+                                      Request quote
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </Label>
                           </div>
-                        ))}
+                        )})}
                       </div>
                       {shippingQuotes.some(quote => quote.quoteRequired) && (
                         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">

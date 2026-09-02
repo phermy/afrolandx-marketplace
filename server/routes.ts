@@ -21,7 +21,9 @@ import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import {
   calculateCheckoutTotal,
+  calculateCheckoutSubtotal,
   CheckoutValidationError,
+  createCartFingerprint,
   findOwnedCartItem,
   getShippingQuote,
   isValidPaystackWebhookSignature,
@@ -40,6 +42,31 @@ const shippingAddressSchema = z.object({
   postalCode: z.string().trim().min(1).max(30),
   country: z.string().trim().min(2).max(100),
 });
+
+const quoteRequestSchema = z.object({
+  carrier: z.string().trim().min(1).max(120),
+  shippingAddress: shippingAddressSchema,
+});
+
+const quoteDecisionSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('quoted'),
+    quotedAmount: z.coerce.number().positive().max(100000000),
+    estimatedDelivery: z.string().trim().min(1).max(160),
+    adminNotes: z.string().trim().max(2000).optional().default(''),
+    validDays: z.coerce.number().int().min(1).max(30).default(7),
+  }),
+  z.object({
+    status: z.literal('rejected'),
+    adminNotes: z.string().trim().min(1).max(2000),
+  }),
+]);
+
+function addressesMatch(left: unknown, right: unknown): boolean {
+  const a = shippingAddressSchema.safeParse(left);
+  const b = shippingAddressSchema.safeParse(right);
+  return a.success && b.success && JSON.stringify(a.data) === JSON.stringify(b.data);
+}
 
 function safeImagePath(filename: string): string | null {
   if (!filename || filename !== path.basename(filename) || !/^[A-Za-z0-9._-]+$/.test(filename)) return null;
@@ -1270,6 +1297,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Buyer: request and view confirmed international shipping quotes.
+  app.get('/api/shipping/quote-requests/mine', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const [requests, cartItems] = await Promise.all([
+        storage.getShippingQuoteRequestsForUser(userId),
+        storage.getCartItems(userId),
+      ]);
+      const currentCartFingerprint = cartItems.length > 0 ? createCartFingerprint(cartItems) : null;
+      res.json(requests.map(request => ({
+        ...request,
+        cartMatches: request.cartFingerprint === currentCartFingerprint,
+        status: request.status === 'quoted' && request.expiresAt && request.expiresAt <= new Date()
+          ? 'expired'
+          : request.status,
+      })));
+    } catch (error) {
+      console.error('Error fetching shipping quote requests:', error);
+      res.status(500).json({ message: 'Failed to fetch shipping quote requests' });
+    }
+  });
+
+  app.post('/api/shipping/quote-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const input = quoteRequestSchema.parse(req.body);
+      const shippingOption = getShippingQuote(input.carrier);
+      if (!shippingOption || !shippingOption.quoteRequired) {
+        return res.status(400).json({ message: 'This carrier does not require a manual quote' });
+      }
+
+      const cartItems = await storage.getCartItems(userId);
+      if (cartItems.length === 0) return res.status(400).json({ message: 'Your cart is empty' });
+      try {
+        calculateCheckoutSubtotal(cartItems);
+      } catch (error) {
+        if (error instanceof CheckoutValidationError) return res.status(409).json({ message: error.message });
+        throw error;
+      }
+
+      const cartFingerprint = createCartFingerprint(cartItems);
+      const existing = (await storage.getShippingQuoteRequestsForUser(userId)).find(request =>
+        request.carrier.toLowerCase() === shippingOption.carrier.toLowerCase()
+        && request.cartFingerprint === cartFingerprint
+        && addressesMatch(request.shippingAddress, input.shippingAddress)
+        && (request.status === 'pending'
+          || (request.status === 'quoted' && !!request.expiresAt && request.expiresAt > new Date()))
+      );
+      if (existing) return res.status(200).json(existing);
+
+      const cartSnapshot = cartItems.map(item => ({
+        productId: item.productId,
+        name: item.product.name,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize ?? null,
+        unitPrice: item.product.price,
+        weight: item.product.weight ?? null,
+      }));
+      const totalWeight = cartItems.reduce((sum, item) => {
+        const weight = Number(item.product.weight || 0);
+        return sum + (Number.isFinite(weight) ? weight * item.quantity : 0);
+      }, 0);
+      const request = await storage.createShippingQuoteRequest({
+        userId,
+        carrier: shippingOption.carrier,
+        status: 'pending',
+        shippingAddress: input.shippingAddress,
+        cartSnapshot,
+        cartFingerprint,
+        totalWeight: totalWeight.toFixed(2),
+        currency: 'NGN',
+      });
+
+      const buyer = await storage.getUser(userId);
+      const admins = await storage.getAdminUsers();
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: 'shipping_quote',
+          title: 'New shipping quote request',
+          message: `${buyer?.firstName || buyer?.email || 'A buyer'} requested a ${shippingOption.carrier} quote to ${input.shippingAddress.country}.`,
+        });
+      }
+
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('Error creating shipping quote request:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Select a carrier and provide a complete shipping address' });
+      res.status(500).json({ message: 'Failed to request shipping quote' });
+    }
+  });
+
+  // Admin: review all requests and confirm or reject rates.
+  app.get('/api/admin/shipping-quote-requests', isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const requests = await storage.getAllShippingQuoteRequests();
+      const enriched = await Promise.all(requests.map(async request => ({
+        ...request,
+        status: request.status === 'quoted' && request.expiresAt && request.expiresAt <= new Date()
+          ? 'expired'
+          : request.status,
+        customer: sanitizeUser(await storage.getUser(request.userId)),
+      })));
+      res.json(enriched);
+    } catch (error) {
+      console.error('Error fetching admin shipping quotes:', error);
+      res.status(500).json({ message: 'Failed to fetch shipping quote requests' });
+    }
+  });
+
+  app.patch('/api/admin/shipping-quote-requests/:id', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id)) return res.status(400).json({ message: 'Invalid quote request ID' });
+      const existing = await storage.getShippingQuoteRequest(id);
+      if (!existing) return res.status(404).json({ message: 'Shipping quote request not found' });
+      if (existing.status !== 'pending') {
+        return res.status(409).json({ message: 'Only pending shipping quote requests can be reviewed' });
+      }
+
+      const decision = quoteDecisionSchema.parse(req.body);
+      const adminId = (req.user as any)?.id;
+      const updated = decision.status === 'quoted'
+        ? await storage.updateShippingQuoteRequest(id, {
+            status: 'quoted',
+            quotedAmount: decision.quotedAmount.toFixed(2),
+            currency: 'NGN',
+            estimatedDelivery: decision.estimatedDelivery,
+            adminNotes: decision.adminNotes || null,
+            confirmedBy: adminId,
+            expiresAt: new Date(Date.now() + decision.validDays * 24 * 60 * 60 * 1000),
+          })
+        : await storage.updateShippingQuoteRequest(id, {
+            status: 'rejected',
+            adminNotes: decision.adminNotes,
+            confirmedBy: adminId,
+            expiresAt: null,
+          });
+
+      await storage.createNotification({
+        userId: existing.userId,
+        type: 'shipping_quote',
+        title: decision.status === 'quoted' ? `${existing.carrier} shipping quote ready` : `${existing.carrier} quote update`,
+        message: decision.status === 'quoted'
+          ? `Your shipping quote is ₦${decision.quotedAmount.toLocaleString()} and is valid for ${decision.validDays} day${decision.validDays === 1 ? '' : 's'}. Return to checkout to pay.`
+          : `We could not confirm this shipping route. ${decision.adminNotes}`,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error reviewing shipping quote:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid NGN amount, delivery estimate, and validity period' });
+      res.status(500).json({ message: 'Failed to update shipping quote request' });
+    }
+  });
+
   // Initialize Paystack payment
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {
@@ -1278,11 +1460,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shippingMethod = typeof req.body.shippingMethod === 'string' ? req.body.shippingMethod.toLowerCase() : '';
       const shippingQuote = getShippingQuote(shippingMethod);
       if (!shippingQuote) return res.status(400).json({ message: 'Invalid shipping method' });
-      if (shippingQuote.quoteRequired || shippingQuote.price === null) {
-        return res.status(400).json({ message: `${shippingQuote.carrier} shipping requires a confirmed shipping quote before payment` });
-      }
-      const shippingPrice = shippingQuote.price;
-
       if (!isPaystackInitialized()) {
         return res.status(503).json({ message: 'Payment service not configured. Please contact administrator.' });
       }
@@ -1295,16 +1472,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const cartItems = await storage.getCartItems(userId);
       if (cartItems.length === 0) return res.status(400).json({ message: 'Your cart is empty' });
-      let checkoutTotal: ReturnType<typeof calculateCheckoutTotal>;
+      let subtotal: number;
+      let shippingPrice: number;
+      let shippingQuoteRequestId: number | undefined;
       try {
-        checkoutTotal = calculateCheckoutTotal(cartItems, shippingMethod);
-      } catch (error) {
-        if (error instanceof CheckoutValidationError) {
-          return res.status(409).json({ message: error.message });
+        subtotal = calculateCheckoutSubtotal(cartItems);
+        if (shippingQuote.quoteRequired || shippingQuote.price === null) {
+          shippingQuoteRequestId = Number(req.body.shippingQuoteId);
+          if (!Number.isSafeInteger(shippingQuoteRequestId)) {
+            return res.status(400).json({ message: `${shippingQuote.carrier} shipping requires a confirmed shipping quote before payment` });
+          }
+          const confirmed = await storage.getShippingQuoteRequest(shippingQuoteRequestId);
+          if (!confirmed || confirmed.userId !== userId || confirmed.carrier.toLowerCase() !== shippingMethod) {
+            return res.status(404).json({ message: 'Confirmed shipping quote not found' });
+          }
+          if (confirmed.status !== 'quoted' || !confirmed.quotedAmount || !confirmed.expiresAt || confirmed.expiresAt <= new Date()) {
+            return res.status(409).json({ message: 'This shipping quote is not confirmed or has expired' });
+          }
+          if (confirmed.currency !== 'NGN') return res.status(409).json({ message: 'Shipping quote currency must be NGN' });
+          if (confirmed.cartFingerprint !== createCartFingerprint(cartItems)) {
+            return res.status(409).json({ message: 'Your cart changed after this quote was requested. Please request a new quote.' });
+          }
+          if (!addressesMatch(confirmed.shippingAddress, shippingAddress)) {
+            return res.status(409).json({ message: 'Your shipping address changed after this quote was requested. Please request a new quote.' });
+          }
+          shippingPrice = Number(confirmed.quotedAmount);
+          if (!Number.isFinite(shippingPrice) || shippingPrice <= 0) throw new CheckoutValidationError('Shipping quote has an invalid amount');
+        } else {
+          shippingPrice = shippingQuote.price;
         }
+      } catch (error) {
+        if (error instanceof CheckoutValidationError) return res.status(409).json({ message: error.message });
         throw error;
       }
-      const { totalAmount } = checkoutTotal;
+      const totalAmount = subtotal + shippingPrice;
 
       const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
@@ -1320,16 +1521,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentReference: reference
       };
 
-      const order = await storage.createOrder(orderData);
+      const orderItemData = cartItems.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        priceAtTime: item.product.price,
+        selectedSize: item.selectedSize ?? null,
+      }));
+      const order = shippingQuoteRequestId
+        ? await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
+        : await storage.createOrder(orderData);
+      if (!order) {
+        return res.status(409).json({ message: 'This shipping quote has already been used or has expired. Please request a new quote.' });
+      }
 
-      for (const item of cartItems) {
-        await storage.createOrderItem({
-          orderId: order.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          priceAtTime: item.product.price,
-          selectedSize: item.selectedSize ?? null,
-        });
+      if (!shippingQuoteRequestId) {
+        for (const item of orderItemData) {
+          await storage.createOrderItem({ orderId: order.id, ...item });
+        }
       }
 
       // Initialize Paystack payment in buyer's currency
@@ -1340,15 +1548,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: order.id,
         userId,
         shippingMethod,
+        ...(shippingQuoteRequestId ? { shippingQuoteId: shippingQuoteRequestId } : {}),
         custom_fields: [
           { display_name: 'Order ID', variable_name: 'order_id', value: order.id.toString() },
         ],
       };
 
-      const paymentData = await paystack.initializeTransaction(
-        user.email, totalAmount, reference,
-        metadata, callbackUrl, 'NGN'
-      );
+      let paymentData;
+      try {
+        paymentData = await paystack.initializeTransaction(
+          user.email, totalAmount, reference,
+          metadata, callbackUrl, 'NGN'
+        );
+        if (!paymentData?.data?.authorization_url) throw new Error('Payment provider did not return a checkout URL');
+      } catch (error) {
+        if (shippingQuoteRequestId) {
+          await storage.releaseReservedShippingQuoteOrder(order.id, shippingQuoteRequestId, userId);
+        }
+        throw error;
+      }
+      if (shippingQuoteRequestId) {
+        await storage.updateShippingQuoteRequest(shippingQuoteRequestId, { status: 'used' });
+      }
 
       res.json({
         order,

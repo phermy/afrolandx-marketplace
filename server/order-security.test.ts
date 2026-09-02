@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   calculateCheckoutTotal,
   CheckoutValidationError,
+  createCartFingerprint,
   findOwnedCartItem,
   isValidPaystackWebhookSignature,
   paymentVerificationError,
@@ -13,6 +14,7 @@ const cart = [
   {
     id: 7,
     userId: "buyer-1",
+    productId: 12,
     quantity: 2,
     selectedSize: "M",
     product: {
@@ -69,6 +71,17 @@ test("checkout does not charge an unconfirmed partner shipping rate", () => {
   assert.throws(
     () => calculateCheckoutTotal(cart, "CargoNaija"),
     new CheckoutValidationError("CargoNaija shipping requires a confirmed shipping quote before payment"),
+  );
+});
+
+test("confirmed quote cart fingerprints are stable and change with cart contents", () => {
+  const fingerprint = createCartFingerprint(cart);
+  assert.equal(fingerprint, createCartFingerprint([...cart]));
+  assert.notEqual(fingerprint, createCartFingerprint([{ ...cart[0], quantity: 1 }]));
+  assert.notEqual(fingerprint, createCartFingerprint([{ ...cart[0], selectedSize: "L" }]));
+  assert.notEqual(
+    fingerprint,
+    createCartFingerprint([{ ...cart[0], product: { ...cart[0].product, price: "61500.00" } }]),
   );
 });
 

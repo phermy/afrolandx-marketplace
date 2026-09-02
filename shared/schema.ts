@@ -133,6 +133,7 @@ export const orders = pgTable("orders", {
   shippingAddress: jsonb("shipping_address").notNull(),
   paymentReference: varchar("payment_reference"),
   shippingMethod: varchar("shipping_method"), // ups, fedex, dhl
+  shippingQuoteRequestId: integer("shipping_quote_request_id").unique(),
   trackingNumber: varchar("tracking_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -162,6 +163,29 @@ export const notifications = pgTable("notifications", {
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// International shipping quotes requested by buyers and confirmed by admins.
+export const shippingQuoteRequests = pgTable("shipping_quote_requests", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  carrier: varchar("carrier", { length: 120 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull().default("pending"), // pending, quoted, rejected, expired
+  shippingAddress: jsonb("shipping_address").notNull(),
+  cartSnapshot: jsonb("cart_snapshot").notNull(),
+  cartFingerprint: varchar("cart_fingerprint", { length: 64 }).notNull(),
+  totalWeight: decimal("total_weight", { precision: 10, scale: 2 }).notNull().default("0"),
+  quotedAmount: decimal("quoted_amount", { precision: 10, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+  estimatedDelivery: varchar("estimated_delivery", { length: 160 }),
+  adminNotes: text("admin_notes"),
+  confirmedBy: varchar("confirmed_by").references(() => users.id),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("shipping_quote_requests_user_idx").on(table.userId),
+  index("shipping_quote_requests_status_idx").on(table.status),
+]);
 
 // Measurements table for customer body measurements
 export const measurements = pgTable("measurements", {
@@ -644,6 +668,12 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertShippingQuoteRequestSchema = createInsertSchema(shippingQuoteRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertMeasurementSchema = createInsertSchema(measurements).omit({
   id: true,
   createdAt: true,
@@ -840,6 +870,8 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertShippingQuoteRequest = z.infer<typeof insertShippingQuoteRequestSchema>;
+export type ShippingQuoteRequest = typeof shippingQuoteRequests.$inferSelect;
 export type InsertMeasurement = z.infer<typeof insertMeasurementSchema>;
 export type Measurement = typeof measurements.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;

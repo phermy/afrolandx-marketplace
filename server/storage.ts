@@ -7,6 +7,7 @@ import {
   orders,
   orderItems,
   notifications,
+  shippingQuoteRequests,
   measurements,
   messages,
   occasionProfiles,
@@ -41,6 +42,8 @@ import {
   type InsertOrderItem,
   type Notification,
   type InsertNotification,
+  type ShippingQuoteRequest,
+  type InsertShippingQuoteRequest,
   type Measurement,
   type InsertMeasurement,
   type Message,
@@ -130,6 +133,13 @@ export interface IStorage {
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
+  createOrderWithReservedShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined>;
+  releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void>;
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersForUser(userId: string): Promise<Order[]>;
@@ -147,6 +157,13 @@ export interface IStorage {
   dismissNotification(id: number, userId: string): Promise<void>;
   cleanupExpiredNotifications(): Promise<void>;
   getAdminUsers(): Promise<User[]>;
+
+  // Shipping quote request operations
+  createShippingQuoteRequest(request: InsertShippingQuoteRequest): Promise<ShippingQuoteRequest>;
+  getShippingQuoteRequest(id: number): Promise<ShippingQuoteRequest | undefined>;
+  getShippingQuoteRequestsForUser(userId: string): Promise<ShippingQuoteRequest[]>;
+  getAllShippingQuoteRequests(): Promise<ShippingQuoteRequest[]>;
+  updateShippingQuoteRequest(id: number, data: Partial<Pick<ShippingQuoteRequest, 'status' | 'quotedAmount' | 'currency' | 'estimatedDelivery' | 'adminNotes' | 'confirmedBy' | 'expiresAt'>>): Promise<ShippingQuoteRequest | undefined>;
   
   // Measurement operations
   createMeasurement(measurement: InsertMeasurement): Promise<Measurement>;
@@ -327,6 +344,7 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`DELETE FROM order_feedback WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM measurements WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM measurement_alerts WHERE user_id = ${userId} OR vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR acknowledged_by_vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId})`);
+      await tx.execute(sql`DELETE FROM shipping_quote_requests WHERE user_id = ${userId} OR confirmed_by = ${userId}`);
       await tx.execute(sql`DELETE FROM notifications WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM messages WHERE sender_id = ${userId} OR recipient_id = ${userId}`);
       await tx.execute(sql`UPDATE messages SET product_id = NULL WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
@@ -639,6 +657,53 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
+  async createOrderWithReservedShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined> {
+    return await db.transaction(async tx => {
+      const [reserved] = await tx.update(shippingQuoteRequests)
+        .set({ status: 'reserved', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, quoteId),
+          eq(shippingQuoteRequests.userId, userId),
+          eq(shippingQuoteRequests.status, 'quoted'),
+          sql`${shippingQuoteRequests.expiresAt} > NOW()`,
+        ))
+        .returning({ id: shippingQuoteRequests.id });
+      if (!reserved) return undefined;
+
+      const [newOrder] = await tx.insert(orders)
+        .values({ ...order, shippingQuoteRequestId: quoteId })
+        .returning();
+      if (items.length > 0) {
+        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
+      }
+      return newOrder;
+    });
+  }
+
+  async releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void> {
+    await db.transaction(async tx => {
+      await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await tx.delete(orders).where(and(
+        eq(orders.id, orderId),
+        eq(orders.userId, userId),
+        eq(orders.shippingQuoteRequestId, quoteId),
+        eq(orders.paymentStatus, 'pending'),
+      ));
+      await tx.update(shippingQuoteRequests)
+        .set({ status: 'quoted', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, quoteId),
+          eq(shippingQuoteRequests.userId, userId),
+          eq(shippingQuoteRequests.status, 'reserved'),
+        ));
+    });
+  }
+
   async createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem> {
     const [newOrderItem] = await db
       .insert(orderItems)
@@ -769,6 +834,38 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(sql`${users.roles}::jsonb ? 'admin'`);
     return adminUsers;
+  }
+
+  // Shipping quote request operations
+  async createShippingQuoteRequest(request: InsertShippingQuoteRequest): Promise<ShippingQuoteRequest> {
+    const [created] = await db.insert(shippingQuoteRequests).values(request).returning();
+    return created;
+  }
+
+  async getShippingQuoteRequest(id: number): Promise<ShippingQuoteRequest | undefined> {
+    const [request] = await db.select().from(shippingQuoteRequests).where(eq(shippingQuoteRequests.id, id));
+    return request;
+  }
+
+  async getShippingQuoteRequestsForUser(userId: string): Promise<ShippingQuoteRequest[]> {
+    return await db.select().from(shippingQuoteRequests)
+      .where(eq(shippingQuoteRequests.userId, userId))
+      .orderBy(desc(shippingQuoteRequests.createdAt));
+  }
+
+  async getAllShippingQuoteRequests(): Promise<ShippingQuoteRequest[]> {
+    return await db.select().from(shippingQuoteRequests).orderBy(desc(shippingQuoteRequests.createdAt));
+  }
+
+  async updateShippingQuoteRequest(
+    id: number,
+    data: Partial<Pick<ShippingQuoteRequest, 'status' | 'quotedAmount' | 'currency' | 'estimatedDelivery' | 'adminNotes' | 'confirmedBy' | 'expiresAt'>>,
+  ): Promise<ShippingQuoteRequest | undefined> {
+    const [updated] = await db.update(shippingQuoteRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(shippingQuoteRequests.id, id))
+      .returning();
+    return updated;
   }
 
   // Measurement operations

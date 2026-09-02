@@ -24,7 +24,7 @@ import {
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
   Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2,
 } from 'lucide-react';
-import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
+import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest } from '@/types';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -51,6 +51,12 @@ export default function AdminDashboard() {
   const [orderSearch, setOrderSearch] = useState('');
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
   const [activityLog, setActivityLog] = useState<Array<{ id: number; orderId: number; status: string; amount: string; time: Date }>>([]);
+  const [quoteDrafts, setQuoteDrafts] = useState<Record<number, {
+    quotedAmount: string;
+    estimatedDelivery: string;
+    validDays: string;
+    adminNotes: string;
+  }>>({});
   const prevOrderStatusRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
@@ -69,6 +75,12 @@ export default function AdminDashboard() {
   });
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
+  const { data: shippingQuoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
+    queryKey: ['/api/admin/shipping-quote-requests'],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+    refetchInterval: 15000,
+  });
   const { data: analytics, isLoading: analyticsLoading } = useQuery<any>({
     queryKey: ['/api/admin/analytics', analyticsRefresh],
     enabled: isAuthenticated && isAdmin(user),
@@ -170,6 +182,35 @@ export default function AdminDashboard() {
       toast({ title: 'Order updated', description: 'Fulfillment status saved.' });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+    },
+  });
+
+  const reviewShippingQuoteMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: 'quoted' | 'rejected' }) => {
+      const draft = quoteDrafts[id] || { quotedAmount: '', estimatedDelivery: '', validDays: '7', adminNotes: '' };
+      const payload = status === 'quoted'
+        ? {
+            status,
+            quotedAmount: Number(draft.quotedAmount),
+            estimatedDelivery: draft.estimatedDelivery,
+            validDays: Number(draft.validDays || 7),
+            adminNotes: draft.adminNotes,
+          }
+        : { status, adminNotes: draft.adminNotes };
+      const response = await apiRequest('PATCH', `/api/admin/shipping-quote-requests/${id}`, payload);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Shipping quote updated', description: 'The buyer has been notified.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/shipping-quote-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not update quote',
+        description: error?.message || 'Check the quote details and try again.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -374,6 +415,7 @@ export default function AdminDashboard() {
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>
             <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="shipping-quotes">Shipping Quotes {shippingQuoteRequests.filter(q => q.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{shippingQuoteRequests.filter(q => q.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="featured">Featured Products</TabsTrigger>
             <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
@@ -640,6 +682,133 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══ SHIPPING QUOTES TAB ═════════════════════════════════════════ */}
+          <TabsContent value="shipping-quotes">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2"><Truck className="w-5 h-5" />International Shipping Quotes</span>
+                  <Badge variant="secondary">{shippingQuoteRequests.filter(q => q.status === 'pending').length} pending</Badge>
+                </CardTitle>
+                <CardDescription>Confirm partner rates in Nigerian Naira. Buyers can only pay an unexpired quote tied to their unchanged cart and address.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {shippingQuoteRequests.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Truck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                    <p className="font-medium text-gray-700">No shipping quote requests yet</p>
+                    <p className="text-sm text-gray-500">Buyer requests from checkout will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {shippingQuoteRequests.map(request => {
+                      const address = request.shippingAddress;
+                      const draft = quoteDrafts[request.id] || {
+                        quotedAmount: '',
+                        estimatedDelivery: '',
+                        validDays: '7',
+                        adminNotes: '',
+                      };
+                      const setDraft = (updates: Partial<typeof draft>) =>
+                        setQuoteDrafts(current => ({
+                          ...current,
+                          [request.id]: { ...draft, ...updates },
+                        }));
+                      return (
+                        <div key={request.id} className="rounded-lg border p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold">{request.carrier}</h3>
+                                <Badge className={
+                                  request.status === 'quoted' ? 'bg-green-100 text-green-800'
+                                    : request.status === 'pending' ? 'bg-amber-100 text-amber-800'
+                                    : request.status === 'rejected' ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-700'
+                                }>{request.status}</Badge>
+                                <span className="text-xs text-gray-400">Request #{request.id}</span>
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {request.customer?.firstName} {request.customer?.lastName}
+                                {request.customer?.email && <span className="text-gray-400"> · {request.customer.email}</span>}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {address.city}, {address.state}, {address.country} {address.postalCode}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0)} item(s)
+                                {' · '}{Number(request.totalWeight || 0).toFixed(2)} kg recorded
+                                {' · '}requested {new Date(request.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            {request.status === 'quoted' && (
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-green-700">₦{Number(request.quotedAmount || 0).toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">{request.estimatedDelivery}</p>
+                                {request.expiresAt && <p className="text-xs text-gray-400">Expires {new Date(request.expiresAt).toLocaleString()}</p>}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-3 rounded-md bg-gray-50 p-3">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Cart snapshot</p>
+                            <div className="space-y-1">
+                              {request.cartSnapshot.map((item, index) => (
+                                <div key={`${item.productId}-${index}`} className="flex justify-between text-xs text-gray-600 gap-3">
+                                  <span>{item.name}{item.selectedSize ? ` (${item.selectedSize})` : ''} × {item.quantity}</span>
+                                  <span>₦{(Number(item.unitPrice) * item.quantity).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {request.status === 'pending' ? (
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Confirmed rate (₦)</label>
+                                <Input type="number" min="1" step="0.01" value={draft.quotedAmount} onChange={e => setDraft({ quotedAmount: e.target.value })} placeholder="25000" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Delivery estimate</label>
+                                <Input value={draft.estimatedDelivery} onChange={e => setDraft({ estimatedDelivery: e.target.value })} placeholder="5–7 business days" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Valid for days</label>
+                                <Input type="number" min="1" max="30" value={draft.validDays} onChange={e => setDraft({ validDays: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Notes / rejection reason</label>
+                                <Input value={draft.adminNotes} onChange={e => setDraft({ adminNotes: e.target.value })} placeholder="Optional for approval" />
+                              </div>
+                              <div className="md:col-span-4 flex flex-wrap justify-end gap-2">
+                                <Button
+                                  variant="destructive"
+                                  disabled={!draft.adminNotes.trim() || reviewShippingQuoteMutation.isPending}
+                                  onClick={() => reviewShippingQuoteMutation.mutate({ id: request.id, status: 'rejected' })}
+                                >
+                                  Reject request
+                                </Button>
+                                <Button
+                                  className="bg-green-600 hover:bg-green-700"
+                                  disabled={!draft.quotedAmount || !draft.estimatedDelivery.trim() || reviewShippingQuoteMutation.isPending}
+                                  onClick={() => reviewShippingQuoteMutation.mutate({ id: request.id, status: 'quoted' })}
+                                >
+                                  Confirm quote
+                                </Button>
+                              </div>
+                            </div>
+                          ) : request.adminNotes ? (
+                            <p className="mt-3 text-sm text-gray-600"><strong>Admin notes:</strong> {request.adminNotes}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

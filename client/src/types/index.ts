@@ -98,6 +98,7 @@ export interface Order {
   shippingAddress: ShippingAddress;
   paymentReference?: string;
   shippingMethod?: string;
+  shippingQuoteRequestId?: number | null;
   trackingNumber?: string;
   createdAt: string;
   updatedAt: string;
@@ -134,6 +135,35 @@ export interface ShippingQuote {
   localPrice?: number;
   localCurrency?: string;
   localSymbol?: string;
+  quoteRequestId?: number;
+}
+
+export interface ShippingQuoteRequest {
+  id: number;
+  userId: string;
+  carrier: string;
+  status: 'pending' | 'quoted' | 'rejected' | 'expired' | 'reserved' | 'used';
+  shippingAddress: ShippingAddress;
+  cartSnapshot: Array<{
+    productId: number;
+    name: string;
+    quantity: number;
+    selectedSize?: string | null;
+    unitPrice: string;
+    weight?: string | null;
+  }>;
+  cartFingerprint: string;
+  totalWeight: string;
+  quotedAmount?: string | null;
+  currency: 'NGN';
+  estimatedDelivery?: string | null;
+  adminNotes?: string | null;
+  confirmedBy?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cartMatches?: boolean;
+  customer?: User;
 }
 
 export interface AdminStats {

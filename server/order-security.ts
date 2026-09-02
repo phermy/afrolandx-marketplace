@@ -68,6 +68,18 @@ export type OwnedCartItem = {
   userId: string;
 };
 
+export function createCartFingerprint(cartItems: Array<CheckoutCartItem & { productId?: number; selectedSize?: string | null }>): string {
+  const normalized = cartItems
+    .map(item => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      selectedSize: item.selectedSize ?? null,
+      price: item.product ? Number(item.product.price).toFixed(2) : null,
+    }))
+    .sort((a, b) => (a.productId || 0) - (b.productId || 0) || String(a.selectedSize).localeCompare(String(b.selectedSize)));
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
 export class CheckoutValidationError extends Error {}
 
 export function findOwnedCartItem<T extends OwnedCartItem>(

@@ -2,3 +2,4 @@
 - [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
 - [Inbound mail routing](inbound-mail-routing.md) — outbound Resend delivery works, but afrolandx.com inboxes reject mail with SMTP relay-access errors
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
+- [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — confirmed partner quotes expire before payment starts, then lock into one server-priced order
