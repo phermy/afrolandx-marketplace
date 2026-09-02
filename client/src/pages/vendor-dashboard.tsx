@@ -69,6 +69,10 @@ export default function VendorDashboard() {
   const { data: vendor, isLoading: vendorLoading } = useQuery<Vendor>({
     queryKey: ["/api/vendors/me"],
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => query.state.data?.status === "pending" ? 10000 : false,
   });
 
   // Fetch categories

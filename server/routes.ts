@@ -478,6 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req.user as any)?.id;
       const vendor = await storage.getVendorByUserId(userId);
+      res.set('Cache-Control', 'no-store');
       res.json(vendor);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch vendor info' });
@@ -578,7 +579,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!await storage.getVendor(vendorId)) return res.status(404).json({ message: 'Vendor not found' });
       await storage.updateVendorStatus(vendorId, status);
-      res.json({ message: 'Vendor status updated' });
+      const updatedVendor = await storage.getVendor(vendorId);
+      res.json({ message: 'Vendor status updated', vendor: updatedVendor });
     } catch (error) {
       res.status(500).json({ message: 'Failed to update vendor status' });
     }

@@ -120,11 +120,18 @@ export default function AdminDashboard() {
 
   const updateVendorStatusMutation = useMutation({
     mutationFn: async ({ vendorId, status }: { vendorId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/vendors/${vendorId}/status`, { status });
+      const response = await apiRequest('PATCH', `/api/vendors/${vendorId}/status`, { status });
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast({ title: 'Done', description: 'Vendor status updated.' });
+      if (result?.vendor) {
+        queryClient.setQueryData<Vendor[]>(['/api/vendors'], (current = []) =>
+          current.map((vendor) => vendor.id === result.vendor.id ? { ...vendor, ...result.vendor } : vendor)
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
     },
     onError: (error) => {
