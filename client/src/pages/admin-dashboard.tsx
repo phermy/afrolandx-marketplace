@@ -22,7 +22,7 @@ import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
-  Globe, DollarSign, ShoppingBag, Users, Award, Zap,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2,
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
 import {
@@ -184,6 +184,25 @@ export default function AdminDashboard() {
       else await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
     },
     onSuccess: () => { toast({ title: 'Role updated.' }); queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] }); },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest('DELETE', `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      toast({ title: 'User deleted', description: 'The user and associated account data were permanently removed.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not delete user',
+        description: error?.message || 'The user could not be deleted.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const updateInquiryStatusMutation = useMutation({
@@ -1012,7 +1031,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap justify-end">
                         {['customer', 'vendor', 'admin'].map(role => {
                           const uHasRole = hasRole(u, role);
                           const isSelf = u.id === user?.id && role === 'admin' && uHasRole;
@@ -1027,6 +1046,24 @@ export default function AdminDashboard() {
                             </div>
                           );
                         })}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="gap-1"
+                          disabled={u.id === user?.id || deleteUserMutation.isPending}
+                          onClick={() => {
+                            if (u.id === user?.id) return;
+                            const label = u.firstName || u.lastName
+                              ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                              : u.email || 'this user';
+                            if (window.confirm(`Permanently delete ${label}? This removes their account, vendor profile, products, orders, and personal data.`)) {
+                              deleteUserMutation.mutate(u.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />Delete
+                        </Button>
                       </div>
                     </div>
                   ))}

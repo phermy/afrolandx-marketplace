@@ -310,6 +310,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Permanently delete a user/customer and their account-owned data (admin only).
+  app.delete('/api/admin/users/:userId', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      if (!userId || typeof userId !== 'string') {
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: 'You cannot delete your own admin account' });
+      }
+
+      const deleted = await storage.deleteUser(userId);
+      if (!deleted) return res.status(404).json({ message: 'User not found' });
+      res.json({ message: 'User and associated account data deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
+    }
+  });
+
   // Update user roles (admin only)
   app.patch('/api/admin/users/:userId/roles', isAuthenticated, isAdmin, async (req, res) => {
     try {
