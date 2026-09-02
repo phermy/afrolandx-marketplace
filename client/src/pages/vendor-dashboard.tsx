@@ -559,12 +559,11 @@ export default function VendorDashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="cacNumber">CAC Registration Number</Label>
+                    <Label htmlFor="cacNumber">Business registration / CAC number <span className="text-gray-500 font-normal">(Optional)</span></Label>
                     <Input
                       id="cacNumber"
                       name="cacNumber"
                       placeholder="CAC registration number"
-                      required
                       className="input-nigerian"
                     />
                   </div>
@@ -1254,7 +1253,7 @@ export default function VendorDashboard() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="editCacNumber">CAC Registration Number</Label>
+                      <Label htmlFor="editCacNumber">Business registration / CAC number <span className="text-gray-500 font-normal">(Optional)</span></Label>
                       <Input
                         id="editCacNumber"
                         value={profileForm.cacNumber}

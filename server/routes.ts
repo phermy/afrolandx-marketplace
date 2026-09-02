@@ -469,7 +469,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactName: z.string().trim().min(2).max(120),
         businessName: z.string().trim().min(2).max(160),
         phone: z.string().trim().min(7).max(30),
-        cacNumber: z.string().trim().min(3).max(60),
+        cacNumber: z.preprocess(
+          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
+          z.string().trim().min(3).max(60).nullable().optional(),
+        ),
         description: z.string().trim().min(10).max(2000),
       }).parse(req.body);
       const vendorData = insertVendorSchema.parse({
@@ -515,7 +518,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactName: z.string().trim().min(2).max(120).optional(),
         businessName: z.string().trim().min(2).max(160).optional(),
         phone: z.string().trim().min(7).max(30).optional(),
-        cacNumber: z.string().trim().min(3).max(60).optional(),
+        cacNumber: z.preprocess(
+          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
+          z.string().trim().min(3).max(60).nullable().optional(),
+        ),
         description: z.string().trim().min(10).max(2000).optional(),
       }).parse(req.body);
       if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
