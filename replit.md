@@ -10,6 +10,13 @@ The platform supports three user roles (customers, vendors, and administrators) 
 
 Preferred communication style: Simple, everyday language.
 
+## Brand and Legal Contact
+
+- Use the brand name **Afrolandx** consistently in customer- and vendor-facing content.
+- Display **CAC REG: 7039498** wherever formal company registration details are appropriate.
+- Use **info@afrolandx.com** for customer support, policy, privacy, complaints, vendor, and partnership contact links unless a dedicated approved address is added later.
+- Do not invent or publish a registered street address, phone number, social profile, or legal policy that has not been supplied and approved.
+
 ## Recent Changes
 
 ### December 16, 2025 - Discover Africa (Location-Based Services)

@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText } from 'lucide-react';
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
@@ -101,6 +101,7 @@ export default function Navbar() {
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
               <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
+              <Link href="/policies" className={navLinkClass('/policies')}><FileText className="w-4 h-4" /> Policies</Link>
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
               )}
@@ -259,6 +260,9 @@ export default function Navbar() {
             </Link>
             <Link href="/discover" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
+            </Link>
+            <Link href="/policies" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/policies')}><FileText className="w-5 h-5" /><span>Policies</span></div>
             </Link>
 
             {/* Account Section - only if logged in */}

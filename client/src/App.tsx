@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { CartProvider } from "@/contexts/CartContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Policies from "@/pages/policies";
+import PolicyDetail from "@/pages/policy-detail";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
 import Profile from "@/pages/profile";
@@ -97,6 +99,8 @@ function Router() {
       <Route path="/events" component={EventPlanner} />
       <Route path="/discover" component={DiscoverAfrica} />
       <Route path="/lookbook" component={Lookbook} />
+      <Route path="/policies/:slug" component={PolicyDetail} />
+      <Route path="/policies" component={Policies} />
 
       {/* Home — landing for guests, dashboard for logged-in users */}
       <Route path="/">

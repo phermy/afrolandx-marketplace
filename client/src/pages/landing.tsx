@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import SiteFooter from "@/components/site-footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -619,7 +620,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 md:py-12">
+      {false && (<div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             <div>
@@ -639,30 +640,30 @@ export default function Landing() {
             <div>
               <h3 className="font-semibold text-lg mb-4">Company</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Our Story</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
+                <li><a href="/" className="hover:text-white transition-colors">About Us</a></li>
+                <li><a href="/" className="hover:text-white transition-colors">Our Story</a></li>
+                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Careers</a></li>
+                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Press</a></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold text-lg mb-4">Support</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Shipping Info</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Returns</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
+                <li><a href="/policies" className="hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="/policies/shipping-policy" className="hover:text-white transition-colors">Shipping Info</a></li>
+                <li><a href="/policies/return-policy" className="hover:text-white transition-colors">Returns</a></li>
+                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Contact Us</a></li>
               </ul>
             </div>
             
             <div>
               <h3 className="font-semibold text-lg mb-4">Business</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#" onClick={() => setIsVendorModalOpen(true)} className="hover:text-white transition-colors">Sell with Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
+                <li><a href="/register" className="hover:text-white transition-colors">Sell with Us</a></li>
+                <li><a href="/policies/vendor-agreement-and-code-of-conduct" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
+                <li><a href="/policies" className="hover:text-white transition-colors">Marketplace policies</a></li>
+                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Partnership</a></li>
                 {(!isAuthenticated || (isAuthenticated && isAdmin(user))) && (
                   <li>
                     <button 
@@ -681,7 +682,8 @@ export default function Landing() {
             <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
           </div>
         </div>
-      </footer>
+      </div>)}
+      <SiteFooter />
 
       {/* Vendor Modal */}
       {isVendorModalOpen && (

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -69,6 +70,39 @@
     font-family: 'Inter', 'Open Sans', sans-serif;
   }
 }
+
+.site-footer { background: #172d29; color: #f7f0df; padding: 4.5rem 1.25rem 1.5rem; }
+.site-footer__inner { max-width: 78rem; margin: 0 auto; display: grid; grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr)); gap: 2.5rem; }
+.site-footer a { color: #e8dfc9; text-decoration: none; display: block; transition: color .2s ease, transform .2s ease; }
+.site-footer a:hover { color: #e2b45c; transform: translateX(2px); }
+.site-footer__brand { color: #e2b45c !important; font: 700 2rem/1 "Space Grotesk", sans-serif; letter-spacing: -.04em; margin-bottom: .85rem; }
+.site-footer__tagline { color: #b8c8bd; margin: 0 0 1.6rem; max-width: 15rem; }
+.site-footer__meta, .site-footer__email { color: #c6d2c7 !important; font-size: .86rem; margin-top: .45rem; }
+.site-footer__label { color: #e2b45c; font: 700 .72rem/1 "Space Grotesk", sans-serif; letter-spacing: .14em; text-transform: uppercase; margin: .25rem 0 1.15rem; }
+.site-footer__inner > div:not(:first-child) a { font-size: .94rem; margin: .72rem 0; }
+.site-footer__bottom { max-width: 78rem; border-top: 1px solid #3a5149; margin: 4rem auto 0; padding-top: 1.25rem; display: flex; justify-content: space-between; gap: 1rem; color: #9caf9f; font-size: .8rem; }
+.site-footer__bottom a { color: #b8c8bd; }
+.policy-shell, .policy-detail { max-width: 78rem; margin: 0 auto; padding: 7rem 1.25rem 8rem; }
+.policy-detail { max-width: 61rem; }
+.eyebrow { color: #af6f3d; font: 700 .72rem/1 "Space Grotesk", sans-serif; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 1.3rem; }
+.policy-title { color: #172d29; font: 700 clamp(2.8rem, 7vw, 6.6rem)/.94 "Space Grotesk", sans-serif; letter-spacing: -.07em; max-width: 55rem; margin: 0; }
+.policy-intro { color: #53665f; font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.55; max-width: 43rem; margin: 2rem 0 1rem; }
+.policy-date { color: #8b948b; font-size: .82rem; letter-spacing: .02em; }
+.policy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 4rem; }
+.policy-card { min-height: 17rem; padding: 1.6rem; background: #f2eadc; border: 1px solid #e4d9c5; color: #172d29 !important; display: flex !important; flex-direction: column; transition: transform .25s ease, background .25s ease; }
+.policy-card:hover { transform: translateY(-5px); background: #e8dfc9; }
+.policy-card__arrow { align-self: flex-end; color: #af6f3d; font-size: 1.4rem; }
+.policy-card h2 { font: 600 1.35rem/1.1 "Space Grotesk", sans-serif; letter-spacing: -.035em; margin: 2.2rem 0 .75rem; }
+.policy-card p { color: #64756d; line-height: 1.5; font-size: .94rem; margin: 0; }
+.policy-card__read { margin-top: auto; padding-top: 1.5rem; color: #af6f3d; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+.policy-back { color: #af6f3d !important; font-weight: 700; margin-bottom: 4rem; }
+.policy-article { border-top: 1px solid #d9cfbf; margin-top: 4rem; }
+.policy-article section { border-bottom: 1px solid #d9cfbf; padding: 2rem 0; display: grid; grid-template-columns: minmax(12rem, .7fr) 1.5fr; gap: 2rem; }
+.policy-article h2 { color: #172d29; font: 600 1.35rem/1.1 "Space Grotesk", sans-serif; margin: 0; }
+.policy-article p { color: #53665f; line-height: 1.7; margin: 0; }
+.policy-contact { margin-top: 3rem; color: #53665f; }.policy-contact a { color: #af6f3d; }
+@media (max-width: 1024px) { .site-footer__inner { grid-template-columns: 1.5fr repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .site-footer__inner, .policy-grid { grid-template-columns: 1fr; } .site-footer__bottom { display:block; }.site-footer__bottom a { margin-top: .6rem; }.policy-shell, .policy-detail { padding-top: 4.5rem; }.policy-article section { display: block; }.policy-article h2 { margin-bottom: .8rem; } }
 
 /* Nigerian cultural patterns */
 .pattern-bg {
