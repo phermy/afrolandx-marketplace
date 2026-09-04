@@ -101,7 +101,7 @@ export default function Navbar() {
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
               <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
-              <Link href="/policies" className={navLinkClass('/policies')}><FileText className="w-4 h-4" /> Policies</Link>
+              <Link href="/policies" className={navLinkClass('/policies')}>Policies</Link>
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
               )}
