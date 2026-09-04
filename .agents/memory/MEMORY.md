@@ -3,3 +3,4 @@
 - [Inbound mail routing](inbound-mail-routing.md) — outbound Resend delivery works, but afrolandx.com inboxes reject mail with SMTP relay-access errors
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
 - [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — every carrier requires a confirmed quote before payment, then locks into one server-priced order
+- [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations

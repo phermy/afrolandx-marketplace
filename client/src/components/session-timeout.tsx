@@ -26,7 +26,11 @@ export default function SessionTimeout() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const logout = useCallback(async () => {
-    try { await apiRequest("POST", "/api/auth/logout"); } catch (_) {}
+    try {
+      await apiRequest("POST", "/api/logout");
+    } catch (error) {
+      console.error("Automatic sign-out failed", error);
+    }
     window.location.href = "/login";
   }, []);
 

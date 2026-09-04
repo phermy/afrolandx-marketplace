@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import SiteFooter from "@/components/site-footer";
@@ -23,15 +24,15 @@ import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
 import AfricanProductCarousel, { AFRICAN_PRODUCTS } from "@/components/AfricanProductCarousel";
 
 const culturalSlides = [
-  { image: panAfricanImg,  country: "Pan-Africa",    label: "Unity in Diversity",            flag: "🌍" },
-  { image: maasaiImg,      country: "Kenya · Tanzania", label: "Maasai Warriors",             flag: "🇰🇪" },
-  { image: mandelaImg,     country: "South Africa",  label: "Spirit of African Heroes",       flag: "🇿🇦" },
-  { image: ethiopianImg,   country: "Ethiopia",      label: "Timkat Festival",                flag: "🇪🇹" },
-  { image: ashantImg,      country: "Ghana",         label: "Ashanti Royal Heritage",         flag: "🇬🇭" },
-  { image: moroccanImg,    country: "Morocco",       label: "Berber Tradition",               flag: "🇲🇦" },
-  { image: ndebeImg,       country: "South Africa",  label: "Ndebele Cultural Art",           flag: "🇿🇦" },
-  { image: rwandanImg,     country: "Rwanda",        label: "Intore Ceremony",                flag: "🇷🇼" },
-  { image: fabricImg,      country: "West Africa",   label: "Kente Cloth",                    flag: "🌍" },
+  { image: panAfricanImg, country: "Pan-Africa", label: "Unity in Diversity", flag: "AF" },
+  { image: maasaiImg, country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
+  { image: mandelaImg, country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
+  { image: ethiopianImg, country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
+  { image: ashantImg, country: "Ghana", label: "Ashanti Royal Heritage", flag: "GH" },
+  { image: moroccanImg, country: "Morocco", label: "Berber Tradition", flag: "MA" },
+  { image: ndebeImg, country: "South Africa", label: "Ndebele Cultural Art", flag: "ZA" },
+  { image: rwandanImg, country: "Rwanda", label: "Intore Ceremony", flag: "RW" },
+  { image: fabricImg, country: "West Africa", label: "Kente Cloth", flag: "AF" },
 ];
 
 export default function Landing() {
@@ -128,6 +129,7 @@ export default function Landing() {
               <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
               <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
               <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>
+              <Link href="/policies" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">Policies</Link>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">About</a>
             </div>
 
@@ -177,6 +179,10 @@ export default function Landing() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>
               </a>
+              <Link href="/policies" onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
+                <Info className="w-5 h-5" /><span>Policies</span>
+              </Link>
               <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
                 <Button onClick={() => { setIsMobileMenuOpen(false); handleLogin(); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
                   Sign In
@@ -447,14 +453,14 @@ export default function Landing() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {[
-              { name: "Traditional Wear", description: "Authentic African clothing", emoji: "👘" },
-              { name: "Aso Oke", description: "Handwoven fabrics", emoji: "🧵" },
-              { name: "Beads & Jewelry", description: "Traditional accessories", emoji: "📿" },
-              { name: "Modern Fusion", description: "Contemporary designs", emoji: "✨" },
+              { name: "Traditional Wear", description: "Authentic African clothing", mark: "01" },
+              { name: "Aso Oke", description: "Handwoven fabrics", mark: "02" },
+              { name: "Beads & Jewelry", description: "Traditional accessories", mark: "03" },
+              { name: "Modern Fusion", description: "Contemporary designs", mark: "04" },
             ].map((category, index) => (
               <Card key={index} className="text-center card-hover">
                 <CardContent className="p-4 md:p-6">
-                  <div className="text-3xl md:text-4xl mb-2 md:mb-4">{category.emoji}</div>
+                  <div className="text-xl md:text-2xl font-semibold text-nigerian-green mb-2 md:mb-4">{category.mark}</div>
                   <h3 className="text-sm md:text-lg font-semibold text-gray-900 mb-1 md:mb-2">{category.name}</h3>
                   <p className="hidden sm:block text-gray-600 text-xs md:text-sm">{category.description}</p>
                 </CardContent>
@@ -501,9 +507,6 @@ export default function Landing() {
                 <Badge variant="secondary" className="text-lg font-bold text-nigerian-green bg-green-100 px-4 py-2">
                   PAYSTACK
                 </Badge>
-                <div className="text-3xl text-gray-400">💳</div>
-                <div className="text-3xl text-gray-400">🏦</div>
-                <div className="text-3xl text-gray-400">📱</div>
               </div>
               <p className="text-sm text-gray-600">
                 Bank Transfer • Mobile Money • Card Payments • Bitcoin
@@ -620,69 +623,6 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      {false && (<div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            <div>
-              <div className="flex items-center text-2xl font-bold font-nigerian mb-4">
-                <img 
-                  src={logoImage} 
-                  alt="Afrolandx Logo" 
-                  className="w-8 h-8 mr-2"
-                />
-                Afrolandx
-              </div>
-              <p className="text-gray-400 mb-4">
-                Connecting the world to authentic African fashion and culture.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="/" className="hover:text-white transition-colors">Our Story</a></li>
-                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Press</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Support</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/policies" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="/policies/shipping-policy" className="hover:text-white transition-colors">Shipping Info</a></li>
-                <li><a href="/policies/return-policy" className="hover:text-white transition-colors">Returns</a></li>
-                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Contact Us</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Business</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="/register" className="hover:text-white transition-colors">Sell with Us</a></li>
-                <li><a href="/policies/vendor-agreement-and-code-of-conduct" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
-                <li><a href="/policies" className="hover:text-white transition-colors">Marketplace policies</a></li>
-                <li><a href="mailto:info@afrolandx.com" className="hover:text-white transition-colors">Partnership</a></li>
-                {(!isAuthenticated || (isAuthenticated && isAdmin(user))) && (
-                  <li>
-                    <button 
-                      onClick={handleAdminPortalClick} 
-                      className="hover:text-white transition-colors text-left"
-                    >
-                      Admin Portal
-                    </button>
-                  </li>
-                )}
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
-          </div>
-        </div>
-      </div>)}
       <SiteFooter />
 
       {/* Vendor Modal */}

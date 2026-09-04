@@ -101,6 +101,7 @@ function Router() {
       <Route path="/lookbook" component={Lookbook} />
       <Route path="/policies/:slug" component={PolicyDetail} />
       <Route path="/policies" component={Policies} />
+      <Route path="/quizzes/:id" component={Quiz} />
 
       {/* Home — landing for guests, dashboard for logged-in users */}
       <Route path="/">
@@ -122,7 +123,6 @@ function Router() {
           <Route path="/measurements" component={Measurements} />
           <Route path="/messages" component={Messages} />
           <Route path="/loyalty" component={Loyalty} />
-          <Route path="/quizzes/:id" component={Quiz} />
           <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
