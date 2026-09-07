@@ -22,9 +22,9 @@ import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
-  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus,
 } from 'lucide-react';
-import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest } from '@/types';
+import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -50,6 +50,9 @@ export default function AdminDashboard() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
+  const [repProductOpen, setRepProductOpen] = useState(false);
+  const [repProduct, setRepProduct] = useState({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
+  const [repProductImages, setRepProductImages] = useState<File[]>([]);
   const [activityLog, setActivityLog] = useState<Array<{ id: number; orderId: number; status: string; amount: string; time: Date }>>([]);
   const [quoteDrafts, setQuoteDrafts] = useState<Record<number, {
     quotedAmount: string;
@@ -70,6 +73,7 @@ export default function AdminDashboard() {
   const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
     queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
   });
@@ -217,6 +221,28 @@ export default function AdminDashboard() {
   const initCategoriesMutation = useMutation({
     mutationFn: async () => { const res = await apiRequest('POST', '/api/categories/init'); return res.json(); },
     onSuccess: (data: any) => { queryClient.invalidateQueries({ queryKey: ['/api/categories'] }); toast({ title: data?.message ?? 'Categories initialised.' }); },
+  });
+
+  const createRepProductMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      Object.entries(repProduct).forEach(([key, value]) => formData.append(key, value));
+      repProductImages.forEach(file => formData.append('images', file));
+      const response = await apiRequest('POST', `/api/admin/vendors/${repProduct.vendorId}/products`, formData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Vendor product draft created', description: 'The vendor has been notified and can now review and edit it.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
+      setRepProductOpen(false);
+      setRepProduct({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
+      setRepProductImages([]);
+    },
+    onError: (error: any) => toast({
+      title: 'Could not create product draft',
+      description: error?.message || 'Review the product details and try again.',
+      variant: 'destructive',
+    }),
   });
 
   const toggleUserRoleMutation = useMutation({
@@ -579,6 +605,11 @@ export default function AdminDashboard() {
 
           {/* ═══ PRODUCT APPROVALS TAB ══════════════════════════════════════ */}
           <TabsContent value="products">
+            <div className="mb-4 flex justify-end">
+              <Button onClick={() => setRepProductOpen(true)} className="bg-green-700 hover:bg-green-800">
+                <Plus className="mr-2 h-4 w-4" /> Create Product for Vendor
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -686,6 +717,47 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+            <Dialog open={repProductOpen} onOpenChange={setRepProductOpen}>
+              <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>Create a product draft for a vendor</DialogTitle>
+                  <DialogDescription>
+                    Photos are automatically corrected and optimised. The vendor will be notified to review and edit the draft before submitting it.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-2">
+                  <Select value={repProduct.vendorId} onValueChange={vendorId => setRepProduct(current => ({ ...current, vendorId }))}>
+                    <SelectTrigger><SelectValue placeholder="Select an approved vendor" /></SelectTrigger>
+                    <SelectContent>
+                      {vendors.filter(vendor => vendor.status === 'approved').map(vendor => (
+                        <SelectItem key={vendor.id} value={String(vendor.id)}>{vendor.businessName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input placeholder="Product title" value={repProduct.name} onChange={event => setRepProduct(current => ({ ...current, name: event.target.value }))} />
+                  <textarea className="min-h-28 rounded-md border px-3 py-2 text-sm" placeholder="Product description" value={repProduct.description} onChange={event => setRepProduct(current => ({ ...current, description: event.target.value }))} />
+                  <Select value={repProduct.categoryId} onValueChange={categoryId => setRepProduct(current => ({ ...current, categoryId }))}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>{categories.map(category => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input type="number" min="0.01" step="0.01" placeholder="Price (NGN)" value={repProduct.price} onChange={event => setRepProduct(current => ({ ...current, price: event.target.value }))} />
+                    <Input type="number" min="0" step="1" placeholder="Stock" value={repProduct.stock} onChange={event => setRepProduct(current => ({ ...current, stock: event.target.value }))} />
+                  </div>
+                  <Input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => setRepProductImages(Array.from(event.target.files || []).slice(0, 5))} />
+                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. Originals are preserved during automatic processing.</p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRepProductOpen(false)}>Cancel</Button>
+                  <Button
+                    disabled={createRepProductMutation.isPending || !repProduct.vendorId || !repProduct.categoryId || !repProduct.name.trim() || repProduct.description.trim().length < 10 || !repProduct.price}
+                    onClick={() => createRepProductMutation.mutate()}
+                  >
+                    {createRepProductMutation.isPending ? 'Creating…' : 'Create Draft & Notify Vendor'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* ═══ SHIPPING QUOTES TAB ═════════════════════════════════════════ */}

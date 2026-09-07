@@ -39,13 +39,17 @@ class CloudStorageService {
     try {
       // Optimize image with sharp
       const optimizedBuffer = await sharp(buffer)
-        .resize(800, 800, { 
+        .rotate()
+        .resize(1600, 1600, {
           fit: 'inside', 
           withoutEnlargement: true 
         })
-        .jpeg({ 
-          quality: 85,
-          progressive: true 
+        .normalize()
+        .sharpen({ sigma: 0.7 })
+        .jpeg({
+          quality: 90,
+          progressive: true,
+          mozjpeg: true,
         })
         .toBuffer();
 

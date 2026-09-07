@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images } from "lucide-react";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images, Sparkles } from "lucide-react";
 import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
@@ -322,6 +322,28 @@ export default function VendorDashboard() {
     setEditCurrentImages(prev => prev.filter(u => u !== url));
     setEditRemovedImages(prev => [...prev, url]);
   };
+
+  const aiRetouchMutation = useMutation({
+    mutationFn: async ({ file }: { file: File; index: number }) => {
+      if (!editingProduct) throw new Error('Open a product before enhancing an image');
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await apiRequest('POST', `/api/products/${editingProduct.id}/images/ai-retouch`, formData);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      setEditNewFiles(current => current.filter((_, index) => index !== variables.index));
+      setEditNewPreviews(current => current.filter((_, index) => index !== variables.index));
+      setEditCurrentImages((data.product?.images as string[]) || []);
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
+      toast({ title: 'AI retouch complete', description: data.message });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not enhance image',
+      description: error?.message || 'The original product was not changed.',
+      variant: 'destructive',
+    }),
+  });
 
   const resetAddForm = () => {
     setAddForm({
@@ -2049,6 +2071,15 @@ export default function VendorDashboard() {
                           <X className="w-3 h-3" />
                         </button>
                         <div className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">New</div>
+                        <button
+                          type="button"
+                          onClick={() => aiRetouchMutation.mutate({ file: editNewFiles[i], index: i })}
+                          disabled={aiRetouchMutation.isPending}
+                          className="absolute bottom-1 right-1 rounded-full bg-purple-700 px-2 py-1 text-[10px] font-medium text-white shadow disabled:opacity-50"
+                          title="Add both the original and an AI-retouched version"
+                        >
+                          <Sparkles className="mr-1 inline h-3 w-3" />AI enhance
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -2072,6 +2103,9 @@ export default function VendorDashboard() {
                 className="hidden"
                 onChange={handleEditFileChange}
               />
+              <p className="text-xs text-gray-500">
+                Every upload receives safe automatic lighting, orientation, sharpness, size, and compression improvements. AI enhancement is optional and always keeps an original copy for comparison.
+              </p>
 
               {editRemovedImages.length > 0 && (
                 <p className="text-xs text-orange-600 flex items-center gap-1">

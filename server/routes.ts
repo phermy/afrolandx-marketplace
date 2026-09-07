@@ -33,6 +33,7 @@ import {
   SHIPPING_QUOTES,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
+import { retouchProductImage, storeProductImage } from "./product-image";
 
 const shippingAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
@@ -665,6 +666,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes
+  app.post('/api/admin/vendors/:vendorId/products', isAuthenticated, isAdmin, upload.array('images', 5), async (req: any, res) => {
+    try {
+      const vendorId = Number(req.params.vendorId);
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor || vendor.status !== 'approved') {
+        return res.status(400).json({ message: 'Choose an approved vendor' });
+      }
+      const input = z.object({
+        name: z.string().trim().min(2).max(240),
+        description: z.string().trim().min(10).max(10000),
+        categoryId: z.coerce.number().int().positive(),
+        price: z.coerce.number().positive(),
+        stock: z.coerce.number().int().min(0),
+      }).parse(req.body);
+      const files = (req.files as Express.Multer.File[]) || [];
+      const imageUrls = await Promise.all(files.map(file => storeProductImage(file.buffer, 'products')));
+      const product = await storage.createProduct(insertProductSchema.parse({
+        vendorId,
+        categoryId: input.categoryId,
+        name: input.name,
+        shortDescription: input.description.slice(0, 240),
+        description: input.description,
+        price: input.price.toFixed(2),
+        stock: input.stock,
+        images: imageUrls,
+        status: 'draft',
+      }));
+      await storage.createNotification({
+        userId: vendor.userId,
+        type: 'rep_product_created',
+        title: 'A product draft was created for you',
+        message: `${product.name} is ready in My Products. Review the details, update anything needed, then submit it for approval.`,
+        productId: product.id,
+      });
+      res.json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Complete all required product fields', errors: error.errors });
+      }
+      console.error('Rep product creation failed:', error);
+      res.status(500).json({ message: 'Failed to create product draft' });
+    }
+  });
+
   app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
     const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
     
@@ -713,8 +758,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
                   const filename = `product-${uniqueSuffix}.jpg`;
                   const optimizedBuffer = await sharpMod.default(file.buffer)
-                    .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-                    .jpeg({ quality: 85, progressive: true })
+                    .rotate()
+                    .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+                    .normalize()
+                    .sharpen({ sigma: 0.7 })
+                    .jpeg({ quality: 90, progressive: true, mozjpeg: true })
                     .toBuffer();
                   fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimizedBuffer);
                   imageUrls.push(`/uploads/${filename}`);
@@ -746,13 +794,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // Optimize image before saving locally
               const optimizedBuffer = await sharp.default(file.buffer)
-                .resize(800, 800, { 
+                .rotate()
+                .resize(1600, 1600, {
                   fit: 'inside', 
                   withoutEnlargement: true 
                 })
-                .jpeg({ 
-                  quality: 85,
-                  progressive: true 
+                .normalize()
+                .sharpen({ sigma: 0.7 })
+                .jpeg({
+                  quality: 90,
+                  progressive: true,
+                  mozjpeg: true,
                 })
                 .toBuffer();
               
@@ -1029,8 +1081,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
                 const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
                 const optimized = await sharpMod.default(file.buffer)
-                  .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-                  .jpeg({ quality: 85, progressive: true }).toBuffer();
+                  .rotate()
+                  .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+                  .normalize()
+                  .sharpen({ sigma: 0.7 })
+                  .jpeg({ quality: 90, progressive: true, mozjpeg: true }).toBuffer();
                 fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimized);
                 newImageUrls.push(`/uploads/${filename}`);
               }
@@ -1047,8 +1102,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
             const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
             const optimized = await sharp.default(file.buffer || Buffer.alloc(0))
-              .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-              .jpeg({ quality: 85, progressive: true }).toBuffer();
+              .rotate()
+              .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+              .normalize()
+              .sharpen({ sigma: 0.7 })
+              .jpeg({ quality: 90, progressive: true, mozjpeg: true }).toBuffer();
             fs.writeFileSync(path.join(uploadDir, filename), optimized);
             newImageUrls.push(`/uploads/${filename}`);
           }
@@ -1065,6 +1123,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: 'Failed to upload images' });
       }
     });
+  });
+
+  app.post('/api/products/:id/images/ai-retouch', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    try {
+      const productId = Number(req.params.id);
+      const userId = (req.user as any)?.id;
+      const product = await storage.getProduct(productId);
+      const vendor = await storage.getVendorByUserId(userId);
+      if (!product || !vendor || vendor.status !== 'approved' || product.vendorId !== vendor.id) {
+        return res.status(403).json({ message: 'You can only enhance images for your own products' });
+      }
+      if (!req.file?.buffer) return res.status(400).json({ message: 'Choose an image to enhance' });
+
+      const originalUrl = await storeProductImage(req.file.buffer, 'products');
+      const retouchedBuffer = await retouchProductImage(req.file.buffer, req.file.mimetype);
+      const retouchedUrl = await storeProductImage(retouchedBuffer, 'products');
+      const currentImages = (product.images as string[]) || [];
+      await storage.updateProductImages(productId, [...currentImages, originalUrl, retouchedUrl]);
+      res.json({
+        originalUrl,
+        retouchedUrl,
+        product: await storage.getProduct(productId),
+        message: 'Original and AI-retouched images were added. Review both before removing either one.',
+      });
+    } catch (error: any) {
+      console.error('AI product image enhancement failed:', error);
+      const unavailable = String(error?.message || '').includes('not configured');
+      res.status(unavailable ? 503 : 502).json({
+        message: unavailable ? 'AI image enhancement is not configured' : 'AI could not enhance this image. Your product was not changed.',
+      });
+    }
   });
 
   app.delete('/api/products/:id', isAuthenticated, async (req: any, res) => {
