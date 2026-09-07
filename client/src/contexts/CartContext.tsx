@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { isUnauthorizedError } from '@/lib/authUtils';
+import { trackEvent } from '@/lib/analytics';
 import type { CartItem, Product } from '@/types';
 
 interface CartContextType {
@@ -50,9 +51,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       return { previousCart };
     },
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      trackEvent('cart_item_added', {
+        product_id: variables.productId,
+        quantity: variables.quantity ?? 1,
+        has_size: Boolean(variables.selectedSize),
+      });
       
       toast({
         title: 'Added to cart',

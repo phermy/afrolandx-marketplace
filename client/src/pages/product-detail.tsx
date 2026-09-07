@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/contexts/CartContext';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
+import { trackEvent, valueBand } from '@/lib/analytics';
 
 const FALLBACK_URL =
   'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=800&h=800&q=75';
@@ -34,6 +35,17 @@ export default function ProductDetail() {
     },
     enabled: !!productId,
   });
+
+  useEffect(() => {
+    if (!product) return;
+    trackEvent('product_viewed', {
+      product_id: product.id,
+      category_id: product.categoryId ?? 0,
+      vendor_id: product.vendorId,
+      price_band: valueBand(Number(product.price)),
+      stock_available: product.stock > 0,
+    });
+  }, [product]);
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {

@@ -20,6 +20,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent } from "@/lib/analytics";
 
 interface Question {
   question: string;
@@ -72,6 +73,13 @@ export default function QuizPage() {
       return response.json();
     },
     onSuccess: (data) => {
+      trackEvent("quiz_completed", {
+        quiz_id: quizId ?? 0,
+        passed: data.passed,
+        score_band: data.score >= 80 ? "high" : data.score >= 50 ? "medium" : "low",
+        points_earned_band: data.pointsEarned > 0 ? "earned" : "none",
+        question_count: data.totalQuestions,
+      });
       setResult(data);
       setShowResult(true);
       queryClient.invalidateQueries({ queryKey: ["/api/loyalty"] });

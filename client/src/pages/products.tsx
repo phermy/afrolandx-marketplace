@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AFRICAN_COUNTRIES, getCountryFlag } from '@shared/africanFashion';
 import type { Product, Category } from '@/types';
+import { trackEvent } from '@/lib/analytics';
 
 type GenderTab = 'all' | 'women' | 'men' | 'kids';
 
@@ -77,6 +78,18 @@ export default function Products() {
       default:           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
   });
+
+  useEffect(() => {
+    if (isLoading || isError) return;
+    trackEvent('product_list_viewed', {
+      category_id: selectedCategory ?? 0,
+      search_present: Boolean(searchQuery.trim()),
+      sort: sortBy,
+      result_count: sortedProducts.length,
+      gender: genderTab,
+      country_filter: Boolean(selectedCountry),
+    });
+  }, [genderTab, isError, isLoading, searchQuery, selectedCategory, selectedCountry, sortBy, sortedProducts.length]);
 
   const clearFilters = () => {
     setSearchQuery('');

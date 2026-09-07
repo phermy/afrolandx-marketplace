@@ -1,11 +1,23 @@
+import { useEffect } from "react";
 import { Link, useParams } from "wouter";
 import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
 import { policies, policyDate } from "@/lib/policies";
+import { trackEvent } from "@/lib/analytics";
 
 export default function PolicyDetail() {
   const { slug } = useParams<{ slug: string }>();
   const policy = policies.find((item) => item.slug === slug);
+  useEffect(() => {
+    if (!policy) return;
+    const policyIndex = policies.findIndex((item) => item.slug === policy.slug);
+    const policyGroup = policyIndex < 7 ? "customer" : policyIndex < 9 ? "marketplace" : "vendor";
+    trackEvent("policy_viewed", {
+      policy_slug: policy.slug,
+      policy_group: policyGroup,
+      policy_version: "2026-09-04",
+    });
+  }, [policy]);
   if (!policy) return <div className="min-h-screen bg-[#fbf8f2]"><Navbar /><main className="policy-shell"><p className="eyebrow">404 / Policy</p><h1 className="policy-title">That policy is not available.</h1><Link href="/policies" className="policy-back">Return to policies →</Link></main><SiteFooter /></div>;
   const index = policies.findIndex((item) => item.slug === policy.slug);
   const previous = policies[index - 1];

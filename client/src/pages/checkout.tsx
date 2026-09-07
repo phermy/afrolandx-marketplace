@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { ShippingQuote, ShippingAddress, ShippingQuoteRequest } from '@/types';
+import { trackEvent, valueBand } from '@/lib/analytics';
 
 
 // States / provinces per country
@@ -192,6 +193,17 @@ export default function Checkout() {
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [countryTouched, setCountryTouched] = useState(false);
+  const checkoutTracked = useRef(false);
+
+  useEffect(() => {
+    if (checkoutTracked.current || isLoading || !isAuthenticated || cartItems.length === 0) return;
+    checkoutTracked.current = true;
+    trackEvent('checkout_started', {
+      cart_item_count: cartItems.reduce((total, item) => total + item.quantity, 0),
+      cart_value_band: valueBand(cartTotal),
+      destination_country: shippingAddress.country,
+    });
+  }, [cartItems, cartTotal, isAuthenticated, isLoading, shippingAddress.country]);
 
   // If geo cache was empty on mount, fetch it now and update country
   useEffect(() => {
@@ -300,6 +312,11 @@ export default function Checkout() {
     },
     onSuccess: (request: ShippingQuoteRequest) => {
       queryClient.invalidateQueries({ queryKey: ['/api/shipping/quote-requests/mine'] });
+      trackEvent('shipping_quote_requested', {
+        carrier: request.carrier,
+        destination_country: shippingAddress.country,
+        quote_status: request.status,
+      });
       toast({
         title: request.status === 'quoted' ? 'Quote already available' : 'Quote requested',
         description: request.status === 'quoted'
@@ -347,6 +364,13 @@ export default function Checkout() {
     },
     onSuccess: (result) => {
       if (result.paymentUrl) {
+        const selectedQuote = effectiveShippingQuotes.find((quote) => quote.carrier === selectedShipping);
+        trackEvent('payment_initialized', {
+          payment_provider: 'paystack',
+          carrier: selectedShipping,
+          amount_band: valueBand(totalAmount),
+          quote_required: Boolean(selectedQuote?.quoteRequired),
+        });
         toast({
           title: 'Redirecting to Payment',
           description: 'You will be redirected to Paystack to complete your payment...',
@@ -656,7 +680,16 @@ export default function Checkout() {
                   ) : (
                     <RadioGroup
                       value={selectedShipping}
-                      onValueChange={setSelectedShipping}
+                      onValueChange={(carrier) => {
+                        setSelectedShipping(carrier);
+                        const quote = effectiveShippingQuotes.find((item) => item.carrier === carrier);
+                        trackEvent('shipping_method_selected', {
+                          carrier,
+                          quote_required: Boolean(quote?.quoteRequired),
+                          quote_available: quote?.price !== null,
+                          price_band: valueBand(Number(quote?.price ?? 0)),
+                        });
+                      }}
                       aria-label="Choose a shipping option"
                     >
                       <p className="mb-4 text-sm text-gray-600">

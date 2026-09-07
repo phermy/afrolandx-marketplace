@@ -20,6 +20,7 @@ import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFash
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
+import { trackEvent } from "@/lib/analytics";
 
 type VariantDraft = {
   size: string;
@@ -181,7 +182,12 @@ export default function VendorDashboard() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_vendor, variables) => {
+      trackEvent("vendor_application_submitted", {
+        application_status: "pending",
+        has_business_name: Boolean(variables.businessName.trim()),
+        has_cac_number: Boolean(variables.cacNumber.trim()),
+      });
       toast({
         title: "Application submitted!",
         description: "Your vendor application is under review. We'll notify you once approved.",

@@ -4,6 +4,7 @@ import { useCart } from '@/contexts/CartContext';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { trackEvent, valueBand } from '@/lib/analytics';
 
 
 export default function OrderSuccess() {
@@ -28,7 +29,18 @@ export default function OrderSuccess() {
   });
 
   useEffect(() => {
-    if (order) clearCart();
+    if (!order) return;
+    clearCart();
+    const eventKey = `analytics_payment_succeeded_${order.id}`;
+    if (sessionStorage.getItem(eventKey)) return;
+    sessionStorage.setItem(eventKey, '1');
+    trackEvent('payment_succeeded', {
+      order_id: order.id,
+      amount_band: valueBand(Number(order.totalAmount ?? order.total ?? 0)),
+      shipping_status: order.orderStatus === 'awaiting_shipping_quote' ? 'awaiting_quote' : 'confirmed',
+      item_count: Array.isArray(order.items) ? order.items.length : 0,
+      payment_provider: 'paystack',
+    });
   }, [clearCart, order]);
 
   if (isLoading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="min-h-[60vh] flex items-center justify-center"><div className="spinner-nigerian" /></div></div>;
