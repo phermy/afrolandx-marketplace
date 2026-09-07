@@ -413,6 +413,32 @@ export default function VendorDashboard() {
     },
   });
 
+  const generateListingMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await apiRequest('POST', '/api/products/ai-suggest-listing', formData);
+      return response.json();
+    },
+    onSuccess: (suggestion) => {
+      setAddForm(current => ({
+        ...current,
+        name: suggestion.title,
+        shortDescription: suggestion.shortDescription,
+        description: suggestion.description,
+        stock: current.stock || '1',
+      }));
+      setSelectedCategory(String(suggestion.categoryId));
+      trackEvent('ai_listing_generated', { source: 'vendor', category_id: suggestion.categoryId });
+      toast({ title: 'Listing draft generated', description: 'Review the wording, then enter your price before saving.' });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not generate listing',
+      description: error?.message || 'Try a clear, front-facing product photo.',
+      variant: 'destructive',
+    }),
+  });
+
   const handleVendorRegistration = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -1851,6 +1877,19 @@ export default function VendorDashboard() {
                     className="hidden"
                     onChange={handleAddFileChange}
                   />
+                  {addFiles.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-purple-200 text-purple-700 hover:bg-purple-50"
+                      disabled={generateListingMutation.isPending}
+                      onClick={() => generateListingMutation.mutate(addFiles[0])}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {generateListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
+                    </Button>
+                  )}
+                  <p className="text-xs text-gray-500">AI uses the first photo and fills listing suggestions only. Review the result and enter your own price.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

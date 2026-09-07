@@ -5,6 +5,8 @@ description: Safety and rollout rules for automatic and AI-assisted vendor produ
 
 Apply safe automatic orientation, lighting, sharpness, sizing, and compression improvements to product uploads. Treat generative AI retouching as optional, and always preserve an original version beside the result for vendor comparison.
 
+Photo-to-listing AI may suggest titles, descriptions, and a configured category, but pricing stays manual. It must not infer material, origin, authenticity, sizing, stock, care instructions, production methods, or sustainability from appearance.
+
 **Why:** The user approved automatic enhancement plus optional AI retouching, but product photos must remain truthful. Generative edits can accidentally change colours, patterns, proportions, labels, or other sellable details.
 
-**How to apply:** Never make AI retouching a requirement for listing. Do not silently replace an original. Keep prompts constrained to photographic cleanup, let vendors review both versions, and require explicit removal or selection decisions.
+**How to apply:** Never make AI retouching a requirement for listing. Do not silently replace an original. Keep prompts constrained to photographic cleanup, let vendors review both versions, and require explicit removal or selection decisions. Keep generated listing fields editable and require users to review them before saving.

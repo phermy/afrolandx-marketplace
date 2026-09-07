@@ -25,6 +25,7 @@ import {
   Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus,
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
+import { trackEvent } from '@/lib/analytics';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -241,6 +242,30 @@ export default function AdminDashboard() {
     onError: (error: any) => toast({
       title: 'Could not create product draft',
       description: error?.message || 'Review the product details and try again.',
+      variant: 'destructive',
+    }),
+  });
+
+  const generateRepListingMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await apiRequest('POST', '/api/products/ai-suggest-listing', formData);
+      return response.json();
+    },
+    onSuccess: (suggestion) => {
+      setRepProduct(current => ({
+        ...current,
+        name: suggestion.title,
+        description: suggestion.description,
+        categoryId: String(suggestion.categoryId),
+      }));
+      trackEvent('ai_listing_generated', { source: 'rep', category_id: suggestion.categoryId });
+      toast({ title: 'Listing copy generated', description: 'Review the suggested wording and enter the vendor’s confirmed price.' });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not generate listing',
+      description: error?.message || 'Try a clearer product photo.',
       variant: 'destructive',
     }),
   });
@@ -745,6 +770,17 @@ export default function AdminDashboard() {
                     <Input type="number" min="0" step="1" placeholder="Stock" value={repProduct.stock} onChange={event => setRepProduct(current => ({ ...current, stock: event.target.value }))} />
                   </div>
                   <Input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => setRepProductImages(Array.from(event.target.files || []).slice(0, 5))} />
+                  {repProductImages.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={generateRepListingMutation.isPending}
+                      onClick={() => generateRepListingMutation.mutate(repProductImages[0])}
+                    >
+                      <Zap className="mr-2 h-4 w-4" />
+                      {generateRepListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
+                    </Button>
+                  )}
                   <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. Originals are preserved during automatic processing.</p>
                 </div>
                 <DialogFooter>

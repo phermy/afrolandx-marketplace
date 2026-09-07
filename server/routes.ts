@@ -33,7 +33,7 @@ import {
   SHIPPING_QUOTES,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
-import { retouchProductImage, storeProductImage } from "./product-image";
+import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
 
 const shippingAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
@@ -666,6 +666,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product routes
+  app.post('/api/products/ai-suggest-listing', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const roles = Array.isArray((req.user as any)?.roles) ? (req.user as any).roles : [];
+      const vendor = await storage.getVendorByUserId(userId);
+      const allowed = roles.includes('admin') || (vendor && vendor.status === 'approved');
+      if (!allowed) return res.status(403).json({ message: 'Approved vendor or admin access required' });
+      if (!req.file?.buffer) return res.status(400).json({ message: 'Choose a product photo first' });
+
+      const categories = await storage.getCategories();
+      if (categories.length === 0) return res.status(409).json({ message: 'Product categories must be configured first' });
+      const suggestion = await suggestProductListing(req.file.buffer, req.file.mimetype, categories);
+      if (!suggestion.title || !suggestion.shortDescription || !suggestion.description || !suggestion.categoryId) {
+        return res.status(502).json({ message: 'AI could not identify enough visible product details' });
+      }
+      res.json(suggestion);
+    } catch (error: any) {
+      console.error('AI product listing suggestion failed:', error);
+      const unavailable = String(error?.message || '').includes('not configured');
+      res.status(unavailable ? 503 : 502).json({
+        message: unavailable ? 'AI product listing is not configured' : 'AI could not analyse this photo. Try a clearer front-facing image.',
+      });
+    }
+  });
+
   app.post('/api/admin/vendors/:vendorId/products', isAuthenticated, isAdmin, upload.array('images', 5), async (req: any, res) => {
     try {
       const vendorId = Number(req.params.vendorId);

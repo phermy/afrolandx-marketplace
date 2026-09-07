@@ -47,3 +47,64 @@ export async function retouchProductImage(buffer: Buffer, mimeType: string): Pro
   if (!encoded) throw new Error("AI enhancement did not return an image");
   return Buffer.from(encoded, "base64");
 }
+
+export type ProductListingSuggestion = {
+  title: string;
+  shortDescription: string;
+  description: string;
+  categoryId: number;
+};
+
+export async function suggestProductListing(
+  buffer: Buffer,
+  mimeType: string,
+  categories: Array<{ id: number; name: string }>,
+): Promise<ProductListingSuggestion> {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  if (!apiKey || !baseURL) throw new Error("AI product listing is not configured");
+
+  const image = await sharp(buffer)
+    .rotate()
+    .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  const openai = new OpenAI({ apiKey, baseURL });
+  const categoryChoices = categories.map(category => `${category.id}: ${category.name}`).join("\n");
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: `Create factual ecommerce listing copy from this product photo.
+
+Return JSON with exactly: title, shortDescription, description, categoryId.
+- title: concise, professional, no unsupported claims.
+- shortDescription: one sentence, maximum 180 characters.
+- description: 2-3 concise sentences describing only visible design, colour, pattern, silhouette, and apparent product type.
+- categoryId: choose exactly one ID from the list below.
+- Never infer or claim material composition, country of origin, traditional authenticity, brand, size, stock, care instructions, production method, or sustainability.
+- Do not include a price.
+
+Categories:
+${categoryChoices}`,
+        },
+        {
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${image.toString("base64")}`, detail: "high" },
+        },
+      ],
+    }],
+  });
+  const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+  const validCategoryIds = new Set(categories.map(category => category.id));
+  return {
+    title: String(parsed.title || "").trim().slice(0, 240),
+    shortDescription: String(parsed.shortDescription || "").trim().slice(0, 240),
+    description: String(parsed.description || "").trim().slice(0, 10000),
+    categoryId: validCategoryIds.has(Number(parsed.categoryId)) ? Number(parsed.categoryId) : categories[0]?.id,
+  };
+}
