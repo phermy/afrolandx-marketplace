@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/contexts/CartContext';
 import Navbar from '@/components/navbar';
@@ -9,6 +9,7 @@ import { trackEvent, valueBand } from '@/lib/analytics';
 
 export default function OrderSuccess() {
   const { clearCart } = useCart();
+  const processedOrderRef = useRef<number | null>(null);
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order_id');
   const reference = params.get('reference');
@@ -30,6 +31,8 @@ export default function OrderSuccess() {
 
   useEffect(() => {
     if (!order) return;
+    if (processedOrderRef.current === order.id) return;
+    processedOrderRef.current = order.id;
     clearCart();
     const eventKey = `analytics_payment_succeeded_${order.id}`;
     if (sessionStorage.getItem(eventKey)) return;
