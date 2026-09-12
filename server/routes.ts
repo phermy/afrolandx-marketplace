@@ -337,6 +337,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   const completeVerifiedOrder = createVerifiedOrderCompleter(storage, createSaleLedger);
+  const canAutomaticallyProcessOrder = async (orderId: number): Promise<boolean> => {
+    const current = await storage.getOrder(orderId);
+    if (!current
+      || current.paymentStatus !== 'paid'
+      || current.stockReservationStatus !== 'reserved'
+      || !['included', 'paid'].includes(current.shippingPaymentStatus)
+      || (current.shippingEstimatedAmount && !current.shippingFinalAmount)
+      || current.orderStatus === 'cancelled') {
+      return false;
+    }
+    const items = await storage.getOrderItemsWithProducts(orderId);
+    if (items.length === 0) return false;
+    const vendorIds = new Set<number>();
+    for (const item of items) {
+      const product = await storage.getProduct(item.productId);
+      if (!product) return false;
+      vendorIds.add(product.vendorId);
+    }
+    for (const vendorId of Array.from(vendorIds)) {
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor || vendor.status !== 'approved') return false;
+    }
+    return true;
+  };
   const completeVerifiedShippingPayment = async (order: any, verification: any, reference: string): Promise<boolean> => {
     const mismatch = shippingPaymentVerificationError(order, verification, reference);
     if (mismatch) return false;
@@ -345,10 +369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (order.shippingQuoteRequestId) {
       await storage.updateShippingQuoteRequest(order.shippingQuoteRequestId, { status: 'used' });
     }
+    const movedToProcessing = await canAutomaticallyProcessOrder(order.id);
+    if (movedToProcessing) await storage.updateOrderStatus(order.id, 'processing');
     await storage.createNotification({
       userId: order.userId,
       title: 'Shipping payment confirmed',
-      message: `Shipping for order #${order.id} has been paid. Your order can now move to fulfillment.`,
+      message: movedToProcessing
+        ? `Shipping for order #${order.id} has been paid. Your order is now being processed.`
+        : `Shipping for order #${order.id} has been paid and is awaiting fulfillment review.`,
       type: 'shipping_quote',
       orderId: order.id,
     }).catch(error => console.error('Failed to notify buyer about shipping payment:', error));
@@ -1814,6 +1842,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!reconciledOrder) {
           quoteDecisionClaim = undefined;
           return res.status(409).json({ message: 'The order was cancelled while the shipping price was being reconciled' });
+        }
+        if (decision.status === 'quoted' && balanceDue === 0 && await canAutomaticallyProcessOrder(linkedOrder.id)) {
+          await storage.updateOrderStatus(linkedOrder.id, 'processing');
         }
       }
 

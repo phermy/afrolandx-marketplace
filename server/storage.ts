@@ -155,6 +155,7 @@ export interface IStorage {
   cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
   markOrderPaid(id: number, reference: string): Promise<boolean>;
+  updateOrderStockReservationStatus(id: number, status: 'reserved' | 'failed'): Promise<void>;
   getOrderByShippingQuoteRequestId(quoteId: number): Promise<Order | undefined>;
   updateOrderShippingQuote(
     quoteId: number,
@@ -852,7 +853,11 @@ export class DatabaseStorage implements IStorage {
 
   async markShippingPaid(id: number, reference: string): Promise<boolean> {
     const updated = await db.update(orders)
-      .set({ shippingPaymentStatus: 'paid', orderStatus: 'pending', updatedAt: new Date() })
+      .set({
+        shippingPaymentStatus: 'paid',
+        orderStatus: 'pending',
+        updatedAt: new Date(),
+      })
       .where(and(
         eq(orders.id, id),
         eq(orders.paymentStatus, 'paid'),
@@ -951,7 +956,11 @@ export class DatabaseStorage implements IStorage {
       .set({
         paymentStatus: 'paid',
         paymentReference: reference,
-        orderStatus: 'pending',
+        orderStatus: sql`CASE
+          WHEN ${orders.shippingEstimatedAmount} IS NOT NULL AND ${orders.shippingFinalAmount} IS NULL
+            THEN 'awaiting_shipping_quote'
+          ELSE 'pending'
+        END`,
         updatedAt: new Date(),
       })
       .where(and(
@@ -961,6 +970,12 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ id: orders.id });
     return result.length > 0;
+  }
+
+  async updateOrderStockReservationStatus(id: number, status: 'reserved' | 'failed'): Promise<void> {
+    await db.update(orders)
+      .set({ stockReservationStatus: status, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.paymentStatus, 'paid')));
   }
 
   async decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean> {

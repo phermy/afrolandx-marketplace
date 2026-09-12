@@ -58,6 +58,12 @@ AfrolandX controls the payment and settlement process. Vendors do not collect cu
 3. Paystack processes the customer's payment.
 4. AfrolandX verifies the payment reference, amount, currency, order metadata, and successful status.
 5. Only a verified payment changes the order to paid and creates vendor sale entries.
+6. AfrolandX attempts to reserve every purchased item from stock.
+7. If stock is reserved, every vendor is approved, and shipping is fully resolved, the order moves automatically to Processing.
+
+If a final shipping quote or shipping balance is still outstanding, the paid order remains Awaiting Shipping Quote. It moves automatically to Processing after the final quote is covered or the remaining shipping balance is paid, provided stock is reserved and all vendors remain approved.
+
+If stock reservation fails or another condition is not satisfied, AfrolandX does not start fulfilment automatically. The order remains held for administrator review.
 
 A payment may contain:
 
@@ -107,7 +113,7 @@ Ledger entries include sales, refunds, and chargebacks. Each entry records the o
 
 ### Pending
 
-A sale becomes pending after the customer's payment is verified. It is not yet eligible for settlement.
+A vendor sale entry becomes pending after the customer's payment is verified. It is not yet eligible for settlement. The fulfilment order itself may move directly to Processing when the automatic safety conditions pass; ledger earnings still remain pending until delivery.
 
 ### Available
 

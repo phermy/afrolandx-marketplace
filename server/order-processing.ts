@@ -1,11 +1,13 @@
 type PaymentCompletionStorage = {
   markOrderPaid(id: number, reference: string): Promise<boolean>;
+  updateOrderStatus(id: number, status: string): Promise<void>;
+  updateOrderStockReservationStatus(id: number, status: 'reserved' | 'failed'): Promise<void>;
   clearCart(userId: string): Promise<void>;
   getOrderItemsWithProducts(orderId: number): Promise<Array<{ productId: number; quantity: number }>>;
   decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean>;
   addLoyaltyPoints(userId: string, points: number, actionType: string, description: string, referenceId?: number, referenceType?: string): Promise<void>;
   getProduct(id: number): Promise<{ vendorId: number } | undefined>;
-  getVendor(id: number): Promise<{ userId: string } | undefined>;
+  getVendor(id: number): Promise<{ userId: string; status?: string | null } | undefined>;
   getAdminUsers(): Promise<Array<{ id: string }>>;
   createNotification(notification: {
     userId: string;
@@ -29,12 +31,15 @@ export function createVerifiedOrderCompleter(
     await storage.clearCart(order.userId);
     const items = await storage.getOrderItemsWithProducts(order.id);
 
+    let allStockReserved = true;
     for (const item of items) {
       const reduced = await storage.decrementProductStockIfAvailable(item.productId, item.quantity);
       if (!reduced) {
+        allStockReserved = false;
         console.error(`Stock could not be reserved for paid order ${order.id}, product ${item.productId}`);
       }
     }
+    await storage.updateOrderStockReservationStatus(order.id, allStockReserved ? 'reserved' : 'failed');
 
     const points = Math.floor(Number(order.totalAmount) / 1000);
     if (points > 0) {
@@ -44,11 +49,19 @@ export function createVerifiedOrderCompleter(
     }
 
     const notifiedVendors = new Set<number>();
+    let allVendorsApproved = true;
     for (const item of items) {
       const product = await storage.getProduct(item.productId);
-      if (!product || notifiedVendors.has(product.vendorId)) continue;
+      if (!product) {
+        allVendorsApproved = false;
+        continue;
+      }
+      if (notifiedVendors.has(product.vendorId)) continue;
       const vendor = await storage.getVendor(product.vendorId);
-      if (!vendor) continue;
+      if (!vendor || vendor.status !== 'approved') {
+        allVendorsApproved = false;
+        continue;
+      }
       await storage.createNotification({
         userId: vendor.userId,
         title: 'New Order Received',
@@ -59,6 +72,10 @@ export function createVerifiedOrderCompleter(
         orderId: order.id,
       }).catch(error => console.error('Failed to notify vendor:', error));
       notifiedVendors.add(product.vendorId);
+    }
+    const shippingResolved = !awaitingShipping && ['included', 'paid'].includes(order.shippingPaymentStatus);
+    if (allStockReserved && allVendorsApproved && shippingResolved) {
+      await storage.updateOrderStatus(order.id, 'processing');
     }
 
     const admins = await storage.getAdminUsers();
