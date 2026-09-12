@@ -151,6 +151,45 @@ export class PaystackService {
       && (!refund?.currency || refund.currency === 'NGN')
     );
   }
+
+  async listBanks(): Promise<any[]> {
+    const result = await this.makeRequest('/bank?country=nigeria&currency=NGN&perPage=100');
+    return Array.isArray(result?.data) ? result.data : [];
+  }
+
+  async resolveBankAccount(accountNumber: string, bankCode: string): Promise<{ account_name: string; account_number: string }> {
+    if (!/^\d{10}$/.test(accountNumber)) throw new Error('Nigerian bank account number must contain 10 digits');
+    if (!/^[A-Za-z0-9_-]{2,32}$/.test(bankCode)) throw new Error('Invalid bank code');
+    const result = await this.makeRequest(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
+    if (!result?.status || !result?.data?.account_name) throw new Error('Paystack could not verify this bank account');
+    return result.data;
+  }
+
+  async createTransferRecipient(name: string, accountNumber: string, bankCode: string): Promise<any> {
+    const result = await this.makeRequest('/transferrecipient', 'POST', {
+      type: 'nuban',
+      name,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: 'NGN',
+    });
+    if (!result?.status || !result?.data?.recipient_code) throw new Error('Paystack could not create a payout recipient');
+    return result.data;
+  }
+
+  async initiateTransfer(amount: number, recipientCode: string, reference: string, reason: string): Promise<any> {
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Transfer amount must be positive');
+    const result = await this.makeRequest('/transfer', 'POST', {
+      source: 'balance',
+      amount: Math.round(amount * 100),
+      recipient: recipientCode,
+      reference,
+      reason,
+      currency: 'NGN',
+    });
+    if (!result?.status || !result?.data?.transfer_code) throw new Error(result?.message || 'Paystack could not initiate the transfer');
+    return result.data;
+  }
 }
 
 // Export singleton instance (will be initialized when secret key is provided)

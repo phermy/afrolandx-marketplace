@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText, CreditCard } from 'lucide-react';
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
@@ -191,12 +191,14 @@ export default function Navbar() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/vendor/finance"><span className="cursor-pointer">Finance & Statements</span></Link></DropdownMenuItem>
                       </>
                     )}
                     {isAdmin(user) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/admin/finance"><span className="cursor-pointer">Finance Administration</span></Link></DropdownMenuItem>
                       </>
                     )}
                     <DropdownMenuSeparator />
@@ -308,6 +310,9 @@ export default function Navbar() {
                 <Link href="/vendor/workshop" onClick={closeMobileMenu}>
                   <div className={mobileNavLinkClass('/vendor/workshop')}><Palette className="w-5 h-5" /><span>Workshop</span></div>
                 </Link>
+                <Link href="/vendor/finance" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/vendor/finance')}><CreditCard className="w-5 h-5" /><span>Finance & Statements</span></div>
+                </Link>
               </>
             )}
 
@@ -318,6 +323,11 @@ export default function Navbar() {
                 <Link href="/admin" onClick={closeMobileMenu}>
                   <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
                     <User className="w-5 h-5" /><span>Admin Panel</span>
+                  </div>
+                </Link>
+                <Link href="/admin/finance" onClick={closeMobileMenu}>
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
+                    <CreditCard className="w-5 h-5" /><span>Finance Administration</span>
                   </div>
                 </Link>
               </>

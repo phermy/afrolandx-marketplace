@@ -17,6 +17,8 @@ import MyOrders from "@/pages/my-orders";
 import OrderSuccess from "@/pages/order-success";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminFinance from "@/pages/admin-finance";
+import VendorFinance from "@/pages/vendor-finance";
 import Checkout from "@/pages/checkout";
 import Measurements from "@/pages/measurements";
 import Messages from "@/pages/messages";
@@ -109,10 +111,18 @@ function Router() {
       </Route>
 
       {/* Admin — available to both, protected internally */}
+      <Route path="/admin/finance">
+        <AdminProtectedRoute>
+          <AdminFinance />
+        </AdminProtectedRoute>
+      </Route>
       <Route path="/admin">
         <AdminProtectedRoute>
           <AdminDashboard />
         </AdminProtectedRoute>
+      </Route>
+      <Route path="/vendor/finance">
+        {isAuthenticated ? <VendorFinance /> : <AuthRedirect to="/login" />}
       </Route>
 
       {/* Authenticated-only pages */}

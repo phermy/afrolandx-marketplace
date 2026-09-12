@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "LF6rfTWeZaM6pfCJuujGq"
@@ -48,3 +47,17 @@ id = "atzL4nQa4p6YKWmhBa6JS"
 uri = "file://attached_assets/stock_images/rwandan_intore_dancer.png"
 type = "image"
 title = "rwandan intore dancer"
+
+[[outputs]]
+id = "UrYGv_4SzQ4v7czJKpM6f"
+uri = "file://docs/payment-and-vendor-settlement.md"
+type = "text"
+title = "AfrolandX Payment and Vendor Settlement Process"
+description = "Updated document covering the live 8% merchandise commission, verification, payout, refund, chargeback, and statement process."
+logical_id = "9b6b0412-7a0e-45f0-90ef-bf8617591273"
+content_hash = "sha256:4de1fe690deaf233e0d4ca0c2eed22c866097025beb812873129051af28c969e"
+size = 2429
+mtime_ms = 1789237953847
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/9b6b0412-7a0e-45f0-90ef-bf8617591273/8537c750-5109-45aa-9695-bad3363e8098"
+storage_version_token = "1789238309806582"
+content_type = "text/markdown"

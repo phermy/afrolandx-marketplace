@@ -10,6 +10,7 @@ import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
   insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
   insertProductStorySchema, insertFabricAssetSchema, orders, orderItems, products, vendors,
+  vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments,
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -34,6 +35,14 @@ import {
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
 import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import {
+  createFinanceReference,
+  createSaleLedger,
+  createSettlement,
+  getVendorFinance,
+  recordNegativeAdjustment,
+  releaseOrderEarnings,
+} from "./finance";
 
 const shippingAddressSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
@@ -327,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  const completeVerifiedOrder = createVerifiedOrderCompleter(storage);
+  const completeVerifiedOrder = createVerifiedOrderCompleter(storage, createSaleLedger);
   const completeVerifiedShippingPayment = async (order: any, verification: any, reference: string): Promise<boolean> => {
     const mismatch = shippingPaymentVerificationError(order, verification, reference);
     if (mismatch) return false;
@@ -594,6 +603,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/vendors/me/finance', isAuthenticated, async (req: any, res) => {
+    try {
+      const vendor = await storage.getVendorByUserId((req.user as any)?.id);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      res.set('Cache-Control', 'no-store');
+      res.json(await getVendorFinance(vendor.id));
+    } catch (error) {
+      console.error('Error fetching vendor finance:', error);
+      res.status(500).json({ message: 'Failed to fetch vendor finance details' });
+    }
+  });
+
+  app.get('/api/paystack/banks', isAuthenticated, async (_req, res) => {
+    try {
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const banks = await getPaystackService().listBanks();
+      res.set('Cache-Control', 'private, max-age=86400');
+      res.json(banks.map(bank => ({ name: bank.name, code: bank.code })).filter(bank => bank.name && bank.code));
+    } catch (error) {
+      console.error('Error fetching banks:', error);
+      res.status(502).json({ message: 'Could not load the bank list' });
+    }
+  });
+
+  app.put('/api/vendors/me/payout-account', isAuthenticated, async (req: any, res) => {
+    try {
+      const vendor = await storage.getVendorByUserId((req.user as any)?.id);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      if (vendor.verificationStatus !== 'verified') {
+        return res.status(409).json({ message: 'Complete vendor verification before adding a payout account' });
+      }
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const input = z.object({
+        accountNumber: z.string().regex(/^\d{10}$/),
+        bankCode: z.string().trim().min(2).max(32),
+        bankName: z.string().trim().min(2).max(160),
+      }).parse(req.body);
+      const paystack = getPaystackService();
+      const resolved = await paystack.resolveBankAccount(input.accountNumber, input.bankCode);
+      const recipient = await paystack.createTransferRecipient(resolved.account_name, input.accountNumber, input.bankCode);
+      const [account] = await db.insert(vendorPayoutAccounts).values({
+        vendorId: vendor.id,
+        bankCode: input.bankCode,
+        bankName: input.bankName,
+        accountName: resolved.account_name,
+        accountLast4: input.accountNumber.slice(-4),
+        recipientCode: recipient.recipient_code,
+        status: 'verified',
+        verifiedAt: new Date(),
+        updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: vendorPayoutAccounts.vendorId,
+        set: {
+          bankCode: input.bankCode,
+          bankName: input.bankName,
+          accountName: resolved.account_name,
+          accountLast4: input.accountNumber.slice(-4),
+          recipientCode: recipient.recipient_code,
+          status: 'verified',
+          verifiedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      }).returning();
+      res.json({
+        id: account.id,
+        bankName: account.bankName,
+        accountName: account.accountName,
+        accountLast4: account.accountLast4,
+        status: account.status,
+      });
+    } catch (error) {
+      console.error('Error saving payout account:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Choose a bank and enter a valid 10-digit account number' });
+      res.status(502).json({ message: error instanceof Error ? error.message : 'Could not verify payout account' });
+    }
+  });
+
   // Admin: list all vendors
   app.get('/api/vendors', isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -653,6 +739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const vendor = await storage.getVendor(vendorId);
       if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      if (status === 'approved' && vendor.verificationStatus !== 'verified') {
+        return res.status(409).json({ message: 'CAC, identity, and business verification must be completed before approval' });
+      }
       await storage.updateVendorStatus(vendorId, status);
       if (status === 'approved') {
         // Keep the authorization role in sync for legacy/manual vendor records.
@@ -662,6 +751,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Vendor status updated', vendor: updatedVendor });
     } catch (error) {
       res.status(500).json({ message: 'Failed to update vendor status' });
+    }
+  });
+
+  app.patch('/api/admin/vendors/:id/verification', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const vendorId = Number(req.params.id);
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      const input = z.object({
+        cacVerified: z.boolean(),
+        identityVerified: z.boolean(),
+        businessVerified: z.boolean(),
+        notes: z.string().trim().max(3000).optional().default(''),
+        decision: z.enum(['verified', 'rejected']),
+      }).parse(req.body);
+      if (input.decision === 'verified' && (!vendor.cacNumber || !input.cacVerified || !input.identityVerified || !input.businessVerified)) {
+        return res.status(400).json({ message: 'A CAC number and all three verification checks are required' });
+      }
+      const [updated] = await db.update(vendors).set({
+        verificationStatus: input.decision,
+        cacVerifiedAt: input.cacVerified ? new Date() : null,
+        identityVerifiedAt: input.identityVerified ? new Date() : null,
+        businessVerifiedAt: input.businessVerified ? new Date() : null,
+        verificationNotes: input.notes || null,
+        updatedAt: new Date(),
+      }).where(eq(vendors.id, vendorId)).returning();
+      await storage.createNotification({
+        userId: vendor.userId,
+        type: 'vendor_verification',
+        title: input.decision === 'verified' ? 'Vendor verification completed' : 'Vendor verification needs attention',
+        message: input.decision === 'verified'
+          ? 'Your CAC, identity, and business checks are complete. Afrolandx can now approve your vendor account.'
+          : `Your verification was not approved. ${input.notes || 'Contact support for the required corrections.'}`,
+      });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Complete the verification checklist' });
+      console.error('Error reviewing vendor verification:', error);
+      res.status(500).json({ message: 'Failed to update vendor verification' });
     }
   });
 
@@ -2103,6 +2231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update order status
       await storage.updateOrderStatus(orderId, status);
+      if (status === 'delivered') await releaseOrderEarnings(orderId);
 
       // Create customer notification based on status
       let notificationTitle = '';
@@ -2449,6 +2578,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (mismatch) return res.status(200).json({ message: 'Webhook ignored' });
         await completeVerifiedOrder(order, reference);
       }
+      if (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed') {
+        const reference = data?.reference;
+        if (typeof reference !== 'string') return res.status(200).json({ message: 'Webhook ignored' });
+        const [settlement] = await db.select().from(vendorSettlements)
+          .where(eq(vendorSettlements.providerReference, reference));
+        if (!settlement) return res.status(200).json({ message: 'Webhook ignored' });
+        if (event === 'transfer.success') {
+          await db.transaction(async tx => {
+            await tx.update(vendorSettlements).set({
+              status: 'paid',
+              transferCode: data?.transfer_code || settlement.transferCode,
+              paidAt: data?.transferred_at ? new Date(data.transferred_at) : new Date(),
+              failureReason: null,
+              updatedAt: new Date(),
+            }).where(eq(vendorSettlements.id, settlement.id));
+            await tx.update(vendorLedgerEntries).set({ status: 'settled' })
+              .where(eq(vendorLedgerEntries.settlementId, settlement.id));
+          });
+        } else if (settlement.status !== 'paid') {
+          await db.transaction(async tx => {
+            await tx.update(vendorSettlements).set({
+              status: event === 'transfer.reversed' ? 'reversed' : 'failed',
+              failureReason: String(data?.reason || data?.message || event),
+              updatedAt: new Date(),
+            }).where(eq(vendorSettlements.id, settlement.id));
+            await tx.update(vendorLedgerEntries).set({ settlementId: null, status: 'available' })
+              .where(eq(vendorLedgerEntries.settlementId, settlement.id));
+          });
+        }
+      }
 
       res.status(200).json({ message: 'Webhook received' });
     } catch (error) {
@@ -2549,6 +2708,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching admin orders:', error);
       res.status(500).json({ message: 'Failed to fetch admin orders' });
+    }
+  });
+
+  app.get('/api/admin/finance', isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const [ledger, settlements, adjustments] = await Promise.all([
+        db.select().from(vendorLedgerEntries).orderBy(desc(vendorLedgerEntries.createdAt)),
+        db.select().from(vendorSettlements).orderBy(desc(vendorSettlements.createdAt)),
+        db.select().from(orderFinancialAdjustments).orderBy(desc(orderFinancialAdjustments.createdAt)),
+      ]);
+      const vendorList = await storage.getAllVendors();
+      const vendorNames = Object.fromEntries(vendorList.map(vendor => [vendor.id, vendor.businessName]));
+      res.set('Cache-Control', 'no-store');
+      res.json({
+        commissionRate: 0.08,
+        ledger: ledger.map(entry => ({ ...entry, vendorName: vendorNames[entry.vendorId] || 'Unknown vendor' })),
+        settlements: settlements.map(settlement => ({ ...settlement, vendorName: vendorNames[settlement.vendorId] || 'Unknown vendor' })),
+        adjustments,
+      });
+    } catch (error) {
+      console.error('Error fetching admin finance:', error);
+      res.status(500).json({ message: 'Failed to fetch finance records' });
+    }
+  });
+
+  app.post('/api/admin/orders/:id/refunds', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const input = z.object({
+        amount: z.coerce.number().positive().max(100000000),
+        reason: z.string().trim().min(5).max(1000),
+      }).parse(req.body);
+      const order = await storage.getOrder(orderId);
+      if (!order || order.paymentStatus !== 'paid' || !order.paymentReference) {
+        return res.status(409).json({ message: 'A verified paid order is required' });
+      }
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const providerReference = createFinanceReference(`refund_${orderId}`);
+      const refund = await getPaystackService().createRefund(
+        order.paymentReference,
+        input.amount,
+        `Merchandise refund for order #${orderId}: ${input.reason}`,
+      );
+      if (!refund?.status) throw new Error('Paystack did not accept the refund');
+      const refundStatus = String(refund.data?.status || 'pending');
+      await recordNegativeAdjustment({
+        orderId,
+        kind: 'refund',
+        amount: input.amount,
+        providerReference,
+        reason: input.reason,
+        createdBy: (req.user as any)?.id,
+        status: refundStatus,
+      });
+      res.json({ message: 'Refund submitted', status: refundStatus, amount: input.amount });
+    } catch (error) {
+      console.error('Error creating merchandise refund:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid merchandise refund amount and reason' });
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to create refund' });
+    }
+  });
+
+  app.post('/api/admin/orders/:id/chargebacks', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const input = z.object({
+        amount: z.coerce.number().positive().max(100000000),
+        reference: z.string().trim().min(3).max(160),
+        reason: z.string().trim().min(5).max(1000),
+      }).parse(req.body);
+      await recordNegativeAdjustment({
+        orderId,
+        kind: 'chargeback',
+        amount: input.amount,
+        providerReference: input.reference,
+        reason: input.reason,
+        createdBy: (req.user as any)?.id,
+        status: 'confirmed',
+      });
+      res.json({ message: 'Chargeback recorded and allocated to vendor balances' });
+    } catch (error) {
+      console.error('Error recording chargeback:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid chargeback amount, reference, and reason' });
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to record chargeback' });
+    }
+  });
+
+  app.post('/api/admin/vendors/:id/settlements', isAuthenticated, isAdmin, async (req: any, res) => {
+    let settlementId: number | undefined;
+    try {
+      const vendorId = Number(req.params.id);
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor || vendor.status !== 'approved' || vendor.verificationStatus !== 'verified') {
+        return res.status(409).json({ message: 'An approved and verified vendor is required' });
+      }
+      const [account] = await db.select().from(vendorPayoutAccounts).where(and(
+        eq(vendorPayoutAccounts.vendorId, vendorId),
+        eq(vendorPayoutAccounts.status, 'verified'),
+      ));
+      if (!account) return res.status(409).json({ message: 'Vendor does not have a verified payout account' });
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const created = await createSettlement(vendorId, account.id, (req.user as any)?.id);
+      settlementId = created.settlement.id;
+      const reference = createFinanceReference(`settlement_${settlementId}`);
+      const transfer = await getPaystackService().initiateTransfer(
+        Number(created.settlement.netAmount),
+        created.recipientCode,
+        reference,
+        `Afrolandx vendor settlement #${settlementId}`,
+      );
+      const providerStatus = ['success', 'successful'].includes(String(transfer.status).toLowerCase()) ? 'paid' : 'processing';
+      const [updated] = await db.update(vendorSettlements).set({
+        status: providerStatus,
+        transferCode: transfer.transfer_code,
+        providerReference: reference,
+        paidAt: providerStatus === 'paid' ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(vendorSettlements.id, settlementId)).returning();
+      if (providerStatus === 'paid') {
+        await db.update(vendorLedgerEntries).set({ status: 'settled' })
+          .where(eq(vendorLedgerEntries.settlementId, settlementId));
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error('Error creating vendor settlement:', error);
+      if (settlementId) {
+        await db.transaction(async tx => {
+          await tx.update(vendorSettlements).set({
+            status: 'failed',
+            failureReason: error instanceof Error ? error.message : 'Transfer failed',
+            updatedAt: new Date(),
+          }).where(eq(vendorSettlements.id, settlementId!));
+          await tx.update(vendorLedgerEntries).set({ settlementId: null })
+            .where(eq(vendorLedgerEntries.settlementId, settlementId!));
+        }).catch(releaseError => console.error('Could not release failed settlement entries:', releaseError));
+      }
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to create vendor settlement' });
     }
   });
 
@@ -2653,6 +2949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         await storage.updateOrderStatus(orderId, status);
+        if (status === 'delivered') await releaseOrderEarnings(orderId);
       }
 
       // Automatically notify the customer when status changes

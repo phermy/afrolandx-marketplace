@@ -63,6 +63,11 @@ export const vendors = pgTable("vendors", {
   cacNumber: varchar("cac_number"),
   description: text("description"),
   status: varchar("status").default("pending"), // pending, approved, suspended
+  verificationStatus: varchar("verification_status", { length: 32 }).notNull().default("pending"), // pending, submitted, verified, rejected
+  cacVerifiedAt: timestamp("cac_verified_at"),
+  identityVerifiedAt: timestamp("identity_verified_at"),
+  businessVerifiedAt: timestamp("business_verified_at"),
+  verificationNotes: text("verification_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -156,6 +161,84 @@ export const orderItems = pgTable("order_items", {
   selectedSize: varchar("selected_size"), // size chosen by customer at time of order
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Vendor payout accounts contain only Paystack recipient identifiers and masked
+// account details. Full bank account numbers are never stored locally.
+export const vendorPayoutAccounts = pgTable("vendor_payout_accounts", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id).unique(),
+  provider: varchar("provider", { length: 32 }).notNull().default("paystack"),
+  bankCode: varchar("bank_code", { length: 32 }).notNull(),
+  bankName: varchar("bank_name", { length: 160 }).notNull(),
+  accountName: varchar("account_name", { length: 200 }).notNull(),
+  accountLast4: varchar("account_last4", { length: 4 }).notNull(),
+  recipientCode: varchar("recipient_code", { length: 120 }).notNull().unique(),
+  status: varchar("status", { length: 32 }).notNull().default("verified"),
+  verifiedAt: timestamp("verified_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const vendorSettlements = pgTable("vendor_settlements", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  payoutAccountId: integer("payout_account_id").notNull().references(() => vendorPayoutAccounts.id),
+  currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+  grossAmount: decimal("gross_amount", { precision: 12, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
+  adjustmentAmount: decimal("adjustment_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  netAmount: decimal("net_amount", { precision: 12, scale: 2 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"), // pending, processing, paid, failed
+  transferCode: varchar("transfer_code", { length: 120 }),
+  providerReference: varchar("provider_reference", { length: 120 }).unique(),
+  failureReason: text("failure_reason"),
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("vendor_settlements_vendor_idx").on(table.vendorId),
+  index("vendor_settlements_status_idx").on(table.status),
+]);
+
+export const vendorLedgerEntries = pgTable("vendor_ledger_entries", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  settlementId: integer("settlement_id").references(() => vendorSettlements.id),
+  entryType: varchar("entry_type", { length: 32 }).notNull(), // sale, refund, chargeback
+  currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+  grossAmount: decimal("gross_amount", { precision: 12, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 12, scale: 2 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("pending"), // pending, available, settled
+  externalReference: varchar("external_reference", { length: 160 }),
+  description: text("description"),
+  availableAt: timestamp("available_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("vendor_ledger_vendor_idx").on(table.vendorId),
+  index("vendor_ledger_order_idx").on(table.orderId),
+  uniqueIndex("vendor_ledger_reference_unique").on(table.vendorId, table.entryType, table.externalReference),
+]);
+
+export const orderFinancialAdjustments = pgTable("order_financial_adjustments", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  kind: varchar("kind", { length: 32 }).notNull(), // refund, chargeback
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("NGN"),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  providerReference: varchar("provider_reference", { length: 160 }).notNull().unique(),
+  reason: text("reason").notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("order_financial_adjustments_order_idx").on(table.orderId),
+]);
 
 // Notifications table for vendor and admin notifications
 export const notifications = pgTable("notifications", {

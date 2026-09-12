@@ -16,10 +16,14 @@ type PaymentCompletionStorage = {
   }): Promise<unknown>;
 };
 
-export function createVerifiedOrderCompleter(storage: PaymentCompletionStorage) {
+export function createVerifiedOrderCompleter(
+  storage: PaymentCompletionStorage,
+  createFinanceLedger: (orderId: number) => Promise<void> = async () => {},
+) {
   return async function completeVerifiedOrder(order: any, reference: string): Promise<boolean> {
     const transitioned = await storage.markOrderPaid(order.id, reference);
     if (!transitioned) return false;
+    await createFinanceLedger(order.id);
 
     const awaitingShipping = !!order.shippingEstimatedAmount && !order.shippingFinalAmount;
     await storage.clearCart(order.userId);
