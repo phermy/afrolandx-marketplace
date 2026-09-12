@@ -1,0 +1,27 @@
+AfrolandX Payment and Vendor Settlement Workflow
+Effective date: 12 September 2026
+Currency: Nigerian Naira (NGN)
+Marketplace commission: 8% of merchandise value
+Customer Payment
+Customers pay AfrolandX through Paystack. The verified payment may contain merchandise and shipping, but the two amounts are accounted for separately. Shipping is a pass-through amount and is not subject to the marketplace commission.
+Vendor Earnings
+When Paystack confirms an order payment, AfrolandX creates a permanent statement entry for each vendor represented in the order. The entry records:
+•	the vendor's merchandise value;
+•	AfrolandX's 8% commission; and
+•	the net amount payable to the vendor.
+Earnings remain pending until the order is delivered. Delivery makes them available for settlement.
+Vendor Verification
+An administrator must verify the vendor's CAC registration information, identity checks, and business checks before approving the vendor. An unverified vendor cannot be approved for selling or paid.
+Payout Accounts and Settlements
+A verified vendor provides their Nigerian bank account details to AfrolandX. AfrolandX uses Paystack to verify the account and process settlements. The vendor does not need to register with or manage Paystack. AfrolandX stores only the bank name, verified account name, last four account digits, and Paystack recipient code not the full account number.
+An administrator may settle only a positive available balance. Each settlement groups the included statement entries, sends the exact net amount through Paystack, and records the transfer status and reference. Failed transfers release the entries so they can be retried safely.
+Refunds and Chargebacks
+Administrators can issue merchandise refunds through Paystack and record confirmed chargebacks. A refund or chargeback:
+•	cannot exceed the order's remaining merchandise value;
+•	is allocated proportionally between vendors in a multi-vendor order;
+•	reverses the corresponding 8% commission; and
+•	reduces the vendor's available or future settlement balance.
+Shipping-price adjustments remain in the separate shipping reconciliation process.
+Statements and Access
+Vendors can view pending, available, and settled balances together with individual sale, refund, and chargeback entries. Administrators can review verification status, initiate settlements, and view settlement history.
+

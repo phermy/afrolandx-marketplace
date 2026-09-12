@@ -189,7 +189,10 @@ export async function createSettlement(vendorId: number, accountId: number, appr
       periodEnd: new Date(),
       approvedBy,
     }).returning();
-    await tx.update(vendorLedgerEntries).set({ settlementId: settlement.id })
+    await tx.update(vendorLedgerEntries).set({
+      settlementId: settlement.id,
+      status: "processing",
+    })
       .where(inArray(vendorLedgerEntries.id, entries.map(entry => entry.id)));
     return { settlement, recipientCode: account.recipientCode };
   });

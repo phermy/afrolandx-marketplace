@@ -2840,7 +2840,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             failureReason: error instanceof Error ? error.message : 'Transfer failed',
             updatedAt: new Date(),
           }).where(eq(vendorSettlements.id, settlementId!));
-          await tx.update(vendorLedgerEntries).set({ settlementId: null })
+          await tx.update(vendorLedgerEntries).set({
+            settlementId: null,
+            status: 'available',
+          })
             .where(eq(vendorLedgerEntries.settlementId, settlementId!));
         }).catch(releaseError => console.error('Could not release failed settlement entries:', releaseError));
       }
