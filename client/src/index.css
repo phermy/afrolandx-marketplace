@@ -72,7 +72,7 @@
 }
 
 .site-footer { background: #172d29; color: #f7f0df; padding: 4.5rem 1.25rem 1.5rem; }
-.site-footer__inner { max-width: 78rem; margin: 0 auto; display: grid; grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr)); gap: 2.5rem; }
+.site-footer__inner { max-width: 78rem; margin: 0 auto; display: grid; grid-template-columns: 1.5fr repeat(5, minmax(0, 1fr)); gap: 2.5rem; }
 .site-footer a { color: #e8dfc9; text-decoration: none; display: block; transition: color .2s ease, transform .2s ease; }
 .site-footer a:hover { color: #e2b45c; transform: translateX(2px); }
 .site-footer__brand { color: #e2b45c !important; font: 700 2rem/1 "Space Grotesk", sans-serif; letter-spacing: -.04em; margin-bottom: .85rem; }
@@ -80,6 +80,8 @@
 .site-footer__meta, .site-footer__email { color: #c6d2c7 !important; font-size: .86rem; margin-top: .45rem; }
 .site-footer__label { color: #e2b45c; font: 700 .72rem/1 "Space Grotesk", sans-serif; letter-spacing: .14em; text-transform: uppercase; margin: .25rem 0 1.15rem; }
 .site-footer__inner > div:not(:first-child) a { font-size: .94rem; margin: .72rem 0; }
+.site-footer__list { list-style: none; padding: 0; margin: 0; color: #e8dfc9; font-size: .94rem; }
+.site-footer__list li { margin: .72rem 0; line-height: 1.35; }
 .site-footer__bottom { max-width: 78rem; border-top: 1px solid #3a5149; margin: 4rem auto 0; padding-top: 1.25rem; display: flex; justify-content: space-between; gap: 1rem; color: #9caf9f; font-size: .8rem; }
 .site-footer__bottom a { color: #b8c8bd; }
 .policy-shell, .policy-detail { max-width: 80rem; margin: 0 auto; padding: 4.5rem 1.25rem 7rem; }

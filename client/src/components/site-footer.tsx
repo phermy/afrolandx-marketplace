@@ -38,6 +38,19 @@ export default function SiteFooter() {
           <Link href="/policies/vendor-orders-shipping-returns-and-settlement">Vendor operations</Link>
         </div>
         <div>
+          <p className="site-footer__label">Delivery partners</p>
+          <ul className="site-footer__list" aria-label="Delivery partners">
+            <li>UPS</li>
+            <li>FedEx</li>
+            <li>DHL</li>
+            <li>CargoNaija</li>
+            <li>Terminal Africa</li>
+            <li>Haulam</li>
+            <li>African Import Export Solutions</li>
+            <li>Hezelinks</li>
+          </ul>
+        </div>
+        <div>
           <p className="site-footer__label">Legal / Policies</p>
           <Link href="/policies">All policies</Link>
           <span className="site-footer__meta">Effective dates and policy updates are shown on each document.</span>
