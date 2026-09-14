@@ -54,6 +54,13 @@ interface PaystackVerifyResponse {
   };
 }
 
+export class PaystackRequestError extends Error {
+  constructor(message: string, public readonly ambiguous: boolean) {
+    super(message);
+    this.name = 'PaystackRequestError';
+  }
+}
+
 export class PaystackService {
   private baseURL = 'https://api.paystack.co';
   
@@ -77,17 +84,26 @@ export class PaystackService {
       options.body = JSON.stringify(data);
     }
 
-    const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+    let response: Response;
+    try {
+      response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+    } catch (error) {
+      throw new PaystackRequestError(
+        error instanceof Error ? `Paystack request outcome is unknown: ${error.message}` : 'Paystack request outcome is unknown',
+        true,
+      );
+    }
     const responseText = await response.text();
     let result: any;
     try {
       result = responseText ? JSON.parse(responseText) : {};
     } catch {
-      throw new Error(`Paystack returned an invalid response (${response.status})`);
+      throw new PaystackRequestError(`Paystack returned an invalid response (${response.status})`, response.ok);
     }
     
     if (!response.ok) {
-      throw new Error(typeof result.message === 'string' ? result.message : 'Paystack API error');
+      const ambiguous = response.status === 408 || response.status === 429 || response.status >= 500;
+      throw new PaystackRequestError(typeof result.message === 'string' ? result.message : 'Paystack API error', ambiguous);
     }
 
     return result;
@@ -141,7 +157,7 @@ export class PaystackService {
     });
   }
 
-  async findRefund(reference: string, amount: number): Promise<any | undefined> {
+  async findRefund(reference: string, amount: number, merchantReference?: string): Promise<any | undefined> {
     if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
     const result = await this.makeRequest(`/refund?transaction=${encodeURIComponent(reference)}`);
     const refunds = Array.isArray(result?.data) ? result.data : [];
@@ -149,6 +165,7 @@ export class PaystackService {
     return refunds.find((refund: any) =>
       Number(refund?.amount) === expectedKobo
       && (!refund?.currency || refund.currency === 'NGN')
+      && (!merchantReference || String(refund?.merchant_note || refund?.merchantNote || '').includes(merchantReference))
     );
   }
 
@@ -188,6 +205,24 @@ export class PaystackService {
       currency: 'NGN',
     });
     if (!result?.status || !result?.data?.transfer_code) throw new Error(result?.message || 'Paystack could not initiate the transfer');
+    return result.data;
+  }
+
+  async verifyTransfer(reference: string): Promise<any> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid transfer reference');
+    const result = await this.makeRequest(`/transfer/verify/${encodeURIComponent(reference)}`);
+    if (!result?.status || !result?.data) throw new Error('Paystack could not verify the transfer');
+    return result.data;
+  }
+
+  async finalizeTransfer(transferCode: string, otp: string): Promise<any> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(transferCode)) throw new Error('Invalid transfer code');
+    if (!/^\d{6}$/.test(otp)) throw new Error('Transfer OTP must contain 6 digits');
+    const result = await this.makeRequest('/transfer/finalize_transfer', 'POST', {
+      transfer_code: transferCode,
+      otp,
+    });
+    if (!result?.status || !result?.data) throw new Error('Paystack could not finalize the transfer');
     return result.data;
   }
 }

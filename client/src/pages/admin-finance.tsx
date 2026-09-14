@@ -17,6 +17,7 @@ export default function AdminFinance() {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [chargebackReference, setChargebackReference] = useState("");
+  const [settlementOtps, setSettlementOtps] = useState<Record<number, string>>({});
   const { data: finance } = useQuery<any>({ queryKey: ["/api/admin/finance"], retry: false });
   const { data: vendors = [] } = useQuery<any[]>({ queryKey: ["/api/vendors"], retry: false });
 
@@ -45,6 +46,30 @@ export default function AdminFinance() {
     },
     onSuccess: () => { refresh(); setAmount(""); setReason(""); setChargebackReference(""); toast({ title: "Financial adjustment recorded" }); },
     onError: (error: any) => toast({ title: "Adjustment failed", description: error?.message, variant: "destructive" }),
+  });
+  const reconcileMutation = useMutation({
+    mutationFn: async (settlementId: number) =>
+      (await apiRequest("POST", `/api/admin/settlements/${settlementId}/reconcile`)).json(),
+    onSuccess: () => { refresh(); toast({ title: "Settlement reconciled with Paystack" }); },
+    onError: (error: any) => toast({ title: "Reconciliation failed", description: error?.message, variant: "destructive" }),
+  });
+  const refundReconcileMutation = useMutation({
+    mutationFn: async (adjustmentId: number) =>
+      (await apiRequest("POST", `/api/admin/adjustments/${adjustmentId}/reconcile`)).json(),
+    onSuccess: () => { refresh(); toast({ title: "Refund reconciled with Paystack" }); },
+    onError: (error: any) => toast({ title: "Refund reconciliation failed", description: error?.message, variant: "destructive" }),
+  });
+  const otpMutation = useMutation({
+    mutationFn: async (settlementId: number) =>
+      (await apiRequest("POST", `/api/admin/settlements/${settlementId}/finalize-otp`, {
+        otp: settlementOtps[settlementId],
+      })).json(),
+    onSuccess: (_data, settlementId) => {
+      refresh();
+      setSettlementOtps(current => ({ ...current, [settlementId]: "" }));
+      toast({ title: "Transfer OTP submitted" });
+    },
+    onError: (error: any) => toast({ title: "OTP submission failed", description: error?.message, variant: "destructive" }),
   });
 
   return (
@@ -82,9 +107,21 @@ export default function AdminFinance() {
         <Card>
           <CardHeader><CardTitle>Settlement history</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="py-2">Vendor</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th><th>Date</th></tr></thead>
-              <tbody>{(finance?.settlements || []).map((settlement: any) => <tr key={settlement.id} className="border-b"><td className="py-2">{settlement.vendorName}</td><td>{ngn(settlement.grossAmount)}</td><td>{ngn(settlement.commissionAmount)}</td><td>{ngn(settlement.netAmount)}</td><td className="capitalize">{settlement.status}</td><td>{new Date(settlement.createdAt).toLocaleDateString("en-GB")}</td></tr>)}</tbody>
+            <table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="py-2">Vendor</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+              <tbody>{(finance?.settlements || []).map((settlement: any) => <tr key={settlement.id} className="border-b"><td className="py-2">{settlement.vendorName}</td><td>{ngn(settlement.grossAmount)}</td><td>{ngn(settlement.commissionAmount)}</td><td>{ngn(settlement.netAmount)}</td><td className="capitalize">{settlement.status}</td><td>{new Date(settlement.createdAt).toLocaleDateString("en-GB")}</td><td><div className="flex gap-2 items-center">{settlement.providerReference && settlement.status === "processing" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(settlement.id)}>Check Paystack</Button>}{settlement.status === "processing" && String(settlement.failureReason || "").toLowerCase().includes("otp") && <><Input className="w-24 h-8" value={settlementOtps[settlement.id] || ""} onChange={event => setSettlementOtps(current => ({ ...current, [settlement.id]: event.target.value.replace(/\D/g, "").slice(0, 6) }))} placeholder="6-digit OTP" /><Button size="sm" disabled={(settlementOtps[settlement.id] || "").length !== 6 || otpMutation.isPending} onClick={() => otpMutation.mutate(settlement.id)}>Submit OTP</Button></>}</div></td></tr>)}</tbody>
             </table>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Refund reconciliation</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {(finance?.adjustments || []).filter((adjustment: any) => adjustment.kind === "refund" && adjustment.status === "processing").map((adjustment: any) => (
+              <div key={adjustment.id} className="flex flex-wrap items-center justify-between gap-3 border rounded-lg p-3">
+                <div><p className="font-medium">Order #{adjustment.orderId} · {ngn(adjustment.amount)}</p><p className="text-xs text-gray-500">{adjustment.providerReference}</p></div>
+                <Button size="sm" variant="outline" disabled={refundReconcileMutation.isPending} onClick={() => refundReconcileMutation.mutate(adjustment.id)}>Check Paystack refund</Button>
+              </div>
+            ))}
+            {!(finance?.adjustments || []).some((adjustment: any) => adjustment.kind === "refund" && adjustment.status === "processing") && <p className="text-sm text-gray-500">No refunds require reconciliation.</p>}
           </CardContent>
         </Card>
       </main>

@@ -70,6 +70,18 @@ export async function recordNegativeAdjustment(input: {
   createdBy?: string;
   status: string;
 }): Promise<void> {
+  await claimNegativeAdjustment(input);
+  await finalizeNegativeAdjustment(input.providerReference, input.status);
+}
+
+export async function claimNegativeAdjustment(input: {
+  orderId: number;
+  kind: "refund" | "chargeback";
+  amount: number;
+  providerReference: string;
+  reason: string;
+  createdBy?: string;
+}): Promise<void> {
   await db.transaction(async tx => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${9100000 + input.orderId})`);
     const [order] = await tx.select().from(orders).where(eq(orders.id, input.orderId));
@@ -99,34 +111,67 @@ export async function recordNegativeAdjustment(input: {
       orderId: input.orderId,
       kind: input.kind,
       amount: money(input.amount).toFixed(2),
-      status: input.status,
+      status: "processing",
       providerReference: input.providerReference,
       reason: input.reason,
       createdBy: input.createdBy,
     });
+  });
+}
 
+export async function finalizeNegativeAdjustment(providerReference: string, status: string): Promise<void> {
+  await db.transaction(async tx => {
+    const [adjustment] = await tx.select().from(orderFinancialAdjustments)
+      .where(eq(orderFinancialAdjustments.providerReference, providerReference));
+    if (!adjustment) throw new Error("Financial adjustment claim was not found");
+    if (adjustment.status !== "processing") return;
+    const merchandiseRows = await tx
+      .select({
+        vendorId: products.vendorId,
+        amount: sql<string>`SUM(${orderItems.priceAtTime} * ${orderItems.quantity})`,
+      })
+      .from(orderItems)
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .where(eq(orderItems.orderId, adjustment.orderId))
+      .groupBy(products.vendorId);
+    const merchandiseTotal = money(merchandiseRows.reduce((sum, row) => sum + Number(row.amount), 0));
     let allocated = 0;
     for (let index = 0; index < merchandiseRows.length; index++) {
       const row = merchandiseRows[index];
       const share = index === merchandiseRows.length - 1
-        ? money(input.amount - allocated)
-        : money(input.amount * (Number(row.amount) / merchandiseTotal));
+        ? money(Number(adjustment.amount) - allocated)
+        : money(Number(adjustment.amount) * (Number(row.amount) / merchandiseTotal));
       allocated = money(allocated + share);
       const amounts = calculateCommission(share);
       await tx.insert(vendorLedgerEntries).values({
         vendorId: row.vendorId,
-        orderId: input.orderId,
-        entryType: input.kind,
+        orderId: adjustment.orderId,
+        entryType: adjustment.kind,
         grossAmount: (-amounts.gross).toFixed(2),
         commissionAmount: (-amounts.commission).toFixed(2),
         netAmount: (-amounts.net).toFixed(2),
         status: "available",
         availableAt: new Date(),
-        externalReference: input.providerReference,
-        description: `${input.kind === "refund" ? "Refund" : "Chargeback"} for order #${input.orderId}: ${input.reason}`,
+        externalReference: adjustment.providerReference,
+        description: `${adjustment.kind === "refund" ? "Refund" : "Chargeback"} for order #${adjustment.orderId}: ${adjustment.reason}`,
       }).onConflictDoNothing();
     }
+    await tx.update(orderFinancialAdjustments)
+      .set({ status, updatedAt: new Date() })
+      .where(and(
+        eq(orderFinancialAdjustments.providerReference, providerReference),
+        eq(orderFinancialAdjustments.status, "processing"),
+      ));
   });
+}
+
+export async function failNegativeAdjustment(providerReference: string, reason: string): Promise<void> {
+  await db.update(orderFinancialAdjustments)
+    .set({ status: "failed", reason, updatedAt: new Date() })
+    .where(and(
+      eq(orderFinancialAdjustments.providerReference, providerReference),
+      eq(orderFinancialAdjustments.status, "processing"),
+    ));
 }
 
 export async function getVendorFinance(vendorId: number) {

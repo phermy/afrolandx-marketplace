@@ -61,3 +61,17 @@ mtime_ms = 1789239354255
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/9b6b0412-7a0e-45f0-90ef-bf8617591273/816da1e2-151e-4a92-93b2-140404454424"
 storage_version_token = "1789239376183404"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "M1-V322_UWyOR8BR_EV1w"
+uri = "file://attached_assets/AfrolandX_Paystack_Clarification_Final.docx"
+type = "word_document"
+title = "AfrolandX Paystack Clarification — Final"
+description = "Reviewed and corrected merchant-review letter aligned with the implemented NGN payment, refund, vendor settlement, webhook, reconciliation, and OTP controls."
+logical_id = "10838771-897c-44f8-b442-a3ed2c1da777"
+content_hash = "sha256:10800e2993bc1ef1d02e7cfb3349418bd6967dc1394a441d3eebdbf76ffd750c"
+size = 41395
+mtime_ms = 1789385584599
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/10838771-897c-44f8-b442-a3ed2c1da777/ba7dc390-9436-461b-889d-1f573c2269e7"
+storage_version_token = "1789385622607910"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

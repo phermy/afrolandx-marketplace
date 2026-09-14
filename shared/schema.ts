@@ -138,6 +138,8 @@ export const orders = pgTable("orders", {
   shippingRefundAmount: decimal("shipping_refund_amount", { precision: 10, scale: 2 }),
   shippingRefundStatus: varchar("shipping_refund_status", { length: 32 }),
   paymentStatus: varchar("payment_status").default("pending"), // pending, paid, failed
+  checkoutRequestId: varchar("checkout_request_id", { length: 100 }).unique(),
+  paymentUrl: text("payment_url"),
   stockReservationStatus: varchar("stock_reservation_status", { length: 32 }).notNull().default("pending"), // pending, reserved, failed
   orderStatus: varchar("order_status").default("pending"), // pending, processing, shipped, delivered, cancelled
   shippingAddress: jsonb("shipping_address").notNull(),

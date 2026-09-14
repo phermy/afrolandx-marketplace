@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
-import { getPaystackService, isPaystackInitialized } from "./paystack";
+import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
 import { getChatbotService } from "./chatbot";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
@@ -39,6 +39,9 @@ import {
   createFinanceReference,
   createSaleLedger,
   createSettlement,
+  claimNegativeAdjustment,
+  failNegativeAdjustment,
+  finalizeNegativeAdjustment,
   getVendorFinance,
   recordNegativeAdjustment,
   releaseOrderEarnings,
@@ -1887,6 +1890,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req.user as any)?.id;
       const shippingAddress = shippingAddressSchema.parse(req.body.shippingAddress);
+      const checkoutRequestId = z.string().trim().min(12).max(100)
+        .regex(/^[A-Za-z0-9_-]+$/)
+        .parse(req.body.checkoutRequestId);
       const shippingMethod = typeof req.body.shippingMethod === 'string' ? req.body.shippingMethod.toLowerCase() : '';
       const shippingQuote = getShippingQuote(shippingMethod);
       if (!shippingQuote) return res.status(400).json({ message: 'Invalid shipping method' });
@@ -1898,6 +1904,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user || !user.email) {
         return res.status(400).json({ message: 'User email required for payment' });
+      }
+      const [existingCheckout] = await db.select().from(orders).where(and(
+        eq(orders.userId, userId),
+        eq(orders.checkoutRequestId, checkoutRequestId),
+      ));
+      if (existingCheckout) {
+        if (existingCheckout.paymentStatus !== 'pending' || !existingCheckout.paymentReference) {
+          return res.status(409).json({ message: 'This checkout request has already been completed or closed' });
+        }
+        if (existingCheckout.paymentUrl) {
+          return res.json({
+            order: existingCheckout,
+            paymentUrl: existingCheckout.paymentUrl,
+            reference: existingCheckout.paymentReference,
+            awaitingShippingQuote: existingCheckout.orderStatus === 'awaiting_shipping_quote',
+            estimatedShipping: !!existingCheckout.shippingEstimatedAmount,
+          });
+        }
+        const retryData = await getPaystackService().initializeTransaction(
+          user.email,
+          Number(existingCheckout.totalAmount),
+          existingCheckout.paymentReference,
+          {
+            orderId: existingCheckout.id,
+            userId,
+            shippingMethod: existingCheckout.shippingMethod,
+            ...(existingCheckout.shippingQuoteRequestId ? { shippingQuoteId: existingCheckout.shippingQuoteRequestId } : {}),
+          },
+          `${req.protocol}://${req.get('host')}/api/payment/callback`,
+          'NGN',
+        );
+        if (!retryData?.data?.authorization_url) throw new Error('Payment provider did not return a checkout URL');
+        await db.update(orders).set({
+          paymentUrl: retryData.data.authorization_url,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(orders.id, existingCheckout.id),
+          eq(orders.paymentStatus, 'pending'),
+        ));
+        return res.json({
+          order: existingCheckout,
+          paymentUrl: retryData.data.authorization_url,
+          reference: existingCheckout.paymentReference,
+          awaitingShippingQuote: existingCheckout.orderStatus === 'awaiting_shipping_quote',
+          estimatedShipping: !!existingCheckout.shippingEstimatedAmount,
+        });
       }
 
       const cartItems = await storage.getCartItems(userId);
@@ -1992,7 +2044,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: 'pending',
         orderStatus: quotePending ? 'awaiting_shipping_quote' : 'pending',
         shippingPaymentStatus: 'included',
-        paymentReference: reference
+        paymentReference: reference,
+        checkoutRequestId,
       };
 
       const orderItemData = cartItems.map(item => ({
@@ -2031,14 +2084,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       let paymentData;
+      let providerAcceptedPayment = false;
       try {
         paymentData = await paystack.initializeTransaction(
           user.email, totalAmount, reference,
           metadata, callbackUrl, 'NGN'
         );
         if (!paymentData?.data?.authorization_url) throw new Error('Payment provider did not return a checkout URL');
+        providerAcceptedPayment = true;
+        await db.update(orders).set({
+          paymentUrl: paymentData.data.authorization_url,
+          updatedAt: new Date(),
+        }).where(and(eq(orders.id, order.id), eq(orders.paymentStatus, 'pending')));
       } catch (error) {
-        if (shippingQuoteRequestId) {
+        const outcomeUnknown = error instanceof PaystackRequestError && error.ambiguous;
+        if (shippingQuoteRequestId && !providerAcceptedPayment && !outcomeUnknown) {
           await storage.releaseReservedShippingQuoteOrder(order.id, shippingQuoteRequestId, userId);
         }
         throw error;
@@ -2248,16 +2308,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let vendorOwnsItems = false;
+      const orderVendorIds = new Set<number>();
       for (const item of orderItems) {
         const product = await storage.getProduct(item.productId);
+        if (product) orderVendorIds.add(product.vendorId);
         if (product?.vendorId === vendor.id) {
           vendorOwnsItems = true;
-          break;
         }
       }
 
       if (!vendorOwnsItems) {
         return res.status(403).json({ message: 'Access denied: You can only update orders containing your products' });
+      }
+      if (orderVendorIds.size > 1) {
+        return res.status(409).json({
+          message: 'This order contains items from multiple vendors. Afrolandx must confirm the combined order status.',
+        });
       }
 
       // Update order status
@@ -2609,13 +2675,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (mismatch) return res.status(200).json({ message: 'Webhook ignored' });
         await completeVerifiedOrder(order, reference);
       }
+      if (event === 'refund.processed' || event === 'refund.failed') {
+        const merchantNote = String(data?.merchant_note || data?.merchantNote || '');
+        const providerReference = merchantNote.match(/refund_\d+_\d+_[a-f0-9]+/i)?.[0];
+        if (providerReference) {
+          if (event === 'refund.processed') {
+            await finalizeNegativeAdjustment(providerReference, 'processed');
+          } else {
+            await failNegativeAdjustment(
+              providerReference,
+              String(data?.reason || data?.message || 'Paystack reported that the refund failed'),
+            );
+          }
+        }
+      }
       if (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed') {
         const reference = data?.reference;
         if (typeof reference !== 'string') return res.status(200).json({ message: 'Webhook ignored' });
         const [settlement] = await db.select().from(vendorSettlements)
           .where(eq(vendorSettlements.providerReference, reference));
         if (!settlement) return res.status(200).json({ message: 'Webhook ignored' });
-        if (event === 'transfer.success') {
+        if (event === 'transfer.success' && settlement.status !== 'reversed') {
           await db.transaction(async tx => {
             await tx.update(vendorSettlements).set({
               status: 'paid',
@@ -2627,10 +2707,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await tx.update(vendorLedgerEntries).set({ status: 'settled' })
               .where(eq(vendorLedgerEntries.settlementId, settlement.id));
           });
-        } else if (settlement.status !== 'paid') {
+        } else if (event === 'transfer.reversed') {
           await db.transaction(async tx => {
             await tx.update(vendorSettlements).set({
-              status: event === 'transfer.reversed' ? 'reversed' : 'failed',
+              status: 'reversed',
+              failureReason: String(data?.reason || data?.message || event),
+              updatedAt: new Date(),
+            }).where(eq(vendorSettlements.id, settlement.id));
+            await tx.update(vendorLedgerEntries).set({ settlementId: null, status: 'available' })
+              .where(eq(vendorLedgerEntries.settlementId, settlement.id));
+          });
+        } else if (event === 'transfer.failed' && settlement.status !== 'paid' && settlement.status !== 'reversed') {
+          await db.transaction(async tx => {
+            await tx.update(vendorSettlements).set({
+              status: 'failed',
               failureReason: String(data?.reason || data?.message || event),
               updatedAt: new Date(),
             }).where(eq(vendorSettlements.id, settlement.id));
@@ -2765,6 +2855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/admin/orders/:id/refunds', isAuthenticated, isAdmin, async (req: any, res) => {
+    let adjustmentReference: string | undefined;
+    let providerAccepted = false;
     try {
       const orderId = Number(req.params.id);
       const input = z.object({
@@ -2776,28 +2868,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'A verified paid order is required' });
       }
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
-      const providerReference = createFinanceReference(`refund_${orderId}`);
-      const refund = await getPaystackService().createRefund(
-        order.paymentReference,
-        input.amount,
-        `Merchandise refund for order #${orderId}: ${input.reason}`,
-      );
-      if (!refund?.status) throw new Error('Paystack did not accept the refund');
-      const refundStatus = String(refund.data?.status || 'pending');
-      await recordNegativeAdjustment({
+      adjustmentReference = createFinanceReference(`refund_${orderId}`);
+      await claimNegativeAdjustment({
         orderId,
         kind: 'refund',
         amount: input.amount,
-        providerReference,
+        providerReference: adjustmentReference,
         reason: input.reason,
         createdBy: (req.user as any)?.id,
-        status: refundStatus,
       });
+      const refund = await getPaystackService().createRefund(
+        order.paymentReference,
+        input.amount,
+        `AfrolandX ${adjustmentReference}: ${input.reason}`,
+      );
+      if (!refund?.status) throw new Error('Paystack did not accept the refund');
+      providerAccepted = true;
+      const refundStatus = String(refund.data?.status || 'pending');
+      if (['processed', 'success', 'successful'].includes(refundStatus.toLowerCase())) {
+        await finalizeNegativeAdjustment(adjustmentReference, refundStatus);
+      }
       res.json({ message: 'Refund submitted', status: refundStatus, amount: input.amount });
     } catch (error) {
       console.error('Error creating merchandise refund:', error);
+      if (adjustmentReference && !providerAccepted && (!(error instanceof PaystackRequestError) || !error.ambiguous)) {
+        await failNegativeAdjustment(
+          adjustmentReference,
+          error instanceof Error ? error.message : 'Refund request failed',
+        ).catch(updateError => console.error('Could not release failed refund claim:', updateError));
+      }
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid merchandise refund amount and reason' });
-      res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to create refund' });
+      res.status(409).json({
+        message: error instanceof PaystackRequestError && error.ambiguous
+          ? 'Paystack did not confirm the refund outcome. The amount remains locked for administrator reconciliation and will not be submitted again automatically.'
+          : error instanceof Error ? error.message : 'Failed to create refund',
+      });
     }
   });
 
@@ -2828,6 +2933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/vendors/:id/settlements', isAuthenticated, isAdmin, async (req: any, res) => {
     let settlementId: number | undefined;
+    let transferSubmitted = false;
     try {
       const vendorId = Number(req.params.id);
       const vendor = await storage.getVendor(vendorId);
@@ -2843,17 +2949,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const created = await createSettlement(vendorId, account.id, (req.user as any)?.id);
       settlementId = created.settlement.id;
       const reference = createFinanceReference(`settlement_${settlementId}`);
+      await db.update(vendorSettlements).set({
+        status: 'processing',
+        providerReference: reference,
+        updatedAt: new Date(),
+      }).where(eq(vendorSettlements.id, settlementId));
       const transfer = await getPaystackService().initiateTransfer(
         Number(created.settlement.netAmount),
         created.recipientCode,
         reference,
         `Afrolandx vendor settlement #${settlementId}`,
       );
+      transferSubmitted = true;
       const providerStatus = ['success', 'successful'].includes(String(transfer.status).toLowerCase()) ? 'paid' : 'processing';
       const [updated] = await db.update(vendorSettlements).set({
         status: providerStatus,
         transferCode: transfer.transfer_code,
-        providerReference: reference,
+        failureReason: providerStatus === 'paid' ? null : `Paystack transfer status: ${String(transfer.status || 'pending')}`,
         paidAt: providerStatus === 'paid' ? new Date() : null,
         updatedAt: new Date(),
       }).where(eq(vendorSettlements.id, settlementId)).returning();
@@ -2865,20 +2977,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating vendor settlement:', error);
       if (settlementId) {
-        await db.transaction(async tx => {
-          await tx.update(vendorSettlements).set({
-            status: 'failed',
-            failureReason: error instanceof Error ? error.message : 'Transfer failed',
+        const outcomeUnknown = transferSubmitted || (error instanceof PaystackRequestError && error.ambiguous);
+        if (outcomeUnknown) {
+          await db.update(vendorSettlements).set({
+            status: 'processing',
+            failureReason: 'Paystack transfer outcome requires reconciliation before retry',
             updatedAt: new Date(),
-          }).where(eq(vendorSettlements.id, settlementId!));
-          await tx.update(vendorLedgerEntries).set({
-            settlementId: null,
-            status: 'available',
-          })
-            .where(eq(vendorLedgerEntries.settlementId, settlementId!));
-        }).catch(releaseError => console.error('Could not release failed settlement entries:', releaseError));
+          }).where(eq(vendorSettlements.id, settlementId))
+            .catch(updateError => console.error('Could not flag settlement for reconciliation:', updateError));
+        } else {
+          await db.transaction(async tx => {
+            await tx.update(vendorSettlements).set({
+              status: 'failed',
+              failureReason: error instanceof Error ? error.message : 'Transfer failed',
+              updatedAt: new Date(),
+            }).where(eq(vendorSettlements.id, settlementId!));
+            await tx.update(vendorLedgerEntries).set({
+              settlementId: null,
+              status: 'available',
+            })
+              .where(eq(vendorLedgerEntries.settlementId, settlementId!));
+          }).catch(releaseError => console.error('Could not release failed settlement entries:', releaseError));
+        }
       }
       res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to create vendor settlement' });
+    }
+  });
+
+  app.post('/api/admin/settlements/:id/reconcile', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const settlementId = Number(req.params.id);
+      if (!Number.isSafeInteger(settlementId)) return res.status(400).json({ message: 'Invalid settlement ID' });
+      const [settlement] = await db.select().from(vendorSettlements)
+        .where(eq(vendorSettlements.id, settlementId));
+      if (!settlement?.providerReference) {
+        return res.status(409).json({ message: 'This settlement does not have a Paystack transfer reference' });
+      }
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const transfer = await getPaystackService().verifyTransfer(settlement.providerReference);
+      const status = String(transfer?.status || '').toLowerCase();
+      if (['success', 'successful'].includes(status)) {
+        await db.transaction(async tx => {
+          await tx.update(vendorSettlements).set({
+            status: 'paid',
+            transferCode: transfer?.transfer_code || settlement.transferCode,
+            paidAt: transfer?.transferred_at ? new Date(transfer.transferred_at) : settlement.paidAt || new Date(),
+            failureReason: null,
+            updatedAt: new Date(),
+          }).where(eq(vendorSettlements.id, settlementId));
+          await tx.update(vendorLedgerEntries).set({ status: 'settled' })
+            .where(eq(vendorLedgerEntries.settlementId, settlementId));
+        });
+      } else if (status === 'failed' || status === 'reversed') {
+        await db.transaction(async tx => {
+          await tx.update(vendorSettlements).set({
+            status,
+            failureReason: String(transfer?.reason || `Paystack transfer ${status}`),
+            updatedAt: new Date(),
+          }).where(eq(vendorSettlements.id, settlementId));
+          await tx.update(vendorLedgerEntries).set({ settlementId: null, status: 'available' })
+            .where(eq(vendorLedgerEntries.settlementId, settlementId));
+        });
+      } else {
+        await db.update(vendorSettlements).set({
+          status: 'processing',
+          failureReason: `Paystack transfer status: ${status || 'pending'}`,
+          updatedAt: new Date(),
+        }).where(eq(vendorSettlements.id, settlementId));
+      }
+      const [updated] = await db.select().from(vendorSettlements)
+        .where(eq(vendorSettlements.id, settlementId));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error reconciling settlement:', error);
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Settlement reconciliation failed' });
+    }
+  });
+
+  app.post('/api/admin/adjustments/:id/reconcile', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const adjustmentId = Number(req.params.id);
+      if (!Number.isSafeInteger(adjustmentId)) return res.status(400).json({ message: 'Invalid adjustment ID' });
+      const [adjustment] = await db.select().from(orderFinancialAdjustments)
+        .where(eq(orderFinancialAdjustments.id, adjustmentId));
+      if (!adjustment || adjustment.kind !== 'refund' || adjustment.status !== 'processing') {
+        return res.status(409).json({ message: 'A processing refund adjustment is required' });
+      }
+      const order = await storage.getOrder(adjustment.orderId);
+      if (!order?.paymentReference) return res.status(409).json({ message: 'Original payment reference is unavailable' });
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const refund = await getPaystackService().findRefund(
+        order.paymentReference,
+        Number(adjustment.amount),
+        adjustment.providerReference,
+      );
+      if (refund) {
+        const status = String(refund.status || 'pending').toLowerCase();
+        if (['processed', 'success', 'successful'].includes(status)) {
+          await finalizeNegativeAdjustment(adjustment.providerReference, status);
+        } else if (['failed', 'rejected', 'cancelled'].includes(status)) {
+          await failNegativeAdjustment(
+            adjustment.providerReference,
+            String(refund.reason || refund.message || `Paystack refund ${status}`),
+          );
+        }
+      } else {
+        const createdAt = adjustment.createdAt?.getTime() || Date.now();
+        if (Date.now() - createdAt < 30 * 60 * 1000) {
+          return res.status(409).json({ message: 'Refund is not visible yet. Wait 30 minutes before releasing an uncertain claim.' });
+        }
+        await failNegativeAdjustment(
+          adjustment.providerReference,
+          'No matching Paystack refund was found after the reconciliation waiting period',
+        );
+      }
+      const [updated] = await db.select().from(orderFinancialAdjustments)
+        .where(eq(orderFinancialAdjustments.id, adjustmentId));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error reconciling refund:', error);
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Refund reconciliation failed' });
+    }
+  });
+
+  app.post('/api/admin/settlements/:id/finalize-otp', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const settlementId = Number(req.params.id);
+      const { otp } = z.object({ otp: z.string().regex(/^\d{6}$/) }).parse(req.body);
+      const [settlement] = await db.select().from(vendorSettlements)
+        .where(eq(vendorSettlements.id, settlementId));
+      if (!settlement || settlement.status !== 'processing' || !settlement.transferCode) {
+        return res.status(409).json({ message: 'A processing OTP-enabled settlement is required' });
+      }
+      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
+      const transfer = await getPaystackService().finalizeTransfer(settlement.transferCode, otp);
+      const status = String(transfer?.status || '').toLowerCase();
+      await db.update(vendorSettlements).set({
+        status: ['success', 'successful'].includes(status) ? 'paid' : 'processing',
+        failureReason: ['success', 'successful'].includes(status) ? null : `Paystack transfer status: ${status || 'pending'}`,
+        paidAt: ['success', 'successful'].includes(status) ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(vendorSettlements.id, settlementId));
+      if (['success', 'successful'].includes(status)) {
+        await db.update(vendorLedgerEntries).set({ status: 'settled' })
+          .where(eq(vendorLedgerEntries.settlementId, settlementId));
+      }
+      const [updated] = await db.select().from(vendorSettlements)
+        .where(eq(vendorSettlements.id, settlementId));
+      res.json(updated);
+    } catch (error) {
+      console.error('Error finalizing transfer OTP:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Enter the 6-digit Paystack transfer OTP' });
+      res.status(409).json({ message: error instanceof Error ? error.message : 'Transfer OTP finalization failed' });
     }
   });
 

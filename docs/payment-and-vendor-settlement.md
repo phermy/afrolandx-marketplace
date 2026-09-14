@@ -123,6 +123,8 @@ When the order is marked delivered, its pending sale entries become available. R
 
 When an administrator creates a settlement, the selected available entries are locked to that settlement and become processing. They cannot be selected for another settlement while the transfer is in progress.
 
+The Paystack transfer reference is persisted before submission. Network timeouts, rate limits, and provider 5xx responses are treated as unknown outcomes: the entries remain locked until a signed webhook or an administrator's Paystack reconciliation confirms the result. If Paystack requires transfer OTP, an administrator completes the protected OTP step before the settlement can become paid.
+
 ### Settled
 
 When Paystack confirms a successful transfer, the settlement is marked paid and its processing ledger entries become settled.
@@ -195,7 +197,9 @@ AfrolandX sends the exact net settlement amount to Paystack in NGN. Paystack tra
 
 Only an AfrolandX administrator can submit a merchandise refund.
 
-The administrator identifies the paid order, enters the merchandise refund amount and reason, and AfrolandX submits the refund to Paystack using the original payment reference.
+The administrator identifies the paid order, enters the merchandise refund amount and reason, and AfrolandX reserves the adjustment against the remaining refundable merchandise balance before submitting it to Paystack using the original payment reference.
+
+Pending or uncertain refunds remain locked and do not create vendor reversal entries until Paystack confirms processing. Signed refund webhooks finalize or fail the claim. An administrator can also reconcile by original transaction, amount, and AfrolandX adjustment reference; a no-match claim cannot be released until the reconciliation waiting period has elapsed.
 
 For accounting purposes:
 

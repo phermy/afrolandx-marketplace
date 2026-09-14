@@ -194,6 +194,15 @@ export default function Checkout() {
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [countryTouched, setCountryTouched] = useState(false);
   const checkoutTracked = useRef(false);
+  const checkoutRequestId = useRef((() => {
+    const existing = sessionStorage.getItem('checkout_request_id');
+    if (existing) return existing;
+    const created = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `checkout_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem('checkout_request_id', created);
+    return created;
+  })());
 
   useEffect(() => {
     if (checkoutTracked.current || isLoading || !isAuthenticated || cartItems.length === 0) return;
@@ -427,6 +436,7 @@ export default function Checkout() {
     const orderData = {
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
+      checkoutRequestId: checkoutRequestId.current,
       ...(selectedQuote.quoteRequired && selectedQuote.quoteRequestId
         ? { shippingQuoteId: selectedQuote.quoteRequestId }
         : {}),

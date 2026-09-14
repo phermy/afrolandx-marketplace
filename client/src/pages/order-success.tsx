@@ -33,6 +33,7 @@ export default function OrderSuccess() {
     if (!order) return;
     if (processedOrderRef.current === order.id) return;
     processedOrderRef.current = order.id;
+    sessionStorage.removeItem('checkout_request_id');
     clearCart();
     const eventKey = `analytics_payment_succeeded_${order.id}`;
     if (sessionStorage.getItem(eventKey)) return;

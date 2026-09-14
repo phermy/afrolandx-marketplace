@@ -5,6 +5,7 @@ import { createVerifiedOrderCompleter } from "./order-processing";
 test("duplicate callbacks and webhooks award points, clear carts, and decrement stock once", async () => {
   let pending = true;
   let markPaidCalls = 0;
+  let stockReserved = false;
   let clearCartCalls = 0;
   const stockCalls: Array<{ id: number; quantity: number }> = [];
   const pointsCalls: unknown[][] = [];
@@ -19,9 +20,11 @@ test("duplicate callbacks and webhooks award points, clear carts, and decrement 
       return true;
     },
     async updateOrderStatus(_id: number, status: string) {
-      statusUpdates.push(status);
+      if (!statusUpdates.includes(status)) statusUpdates.push(status);
     },
-    async updateOrderStockReservationStatus() {},
+    async getOrder() {
+      return { paymentStatus: pending ? "pending" : "paid", paymentReference: "order_42_abc" };
+    },
     async clearCart() {
       clearCartCalls++;
     },
@@ -31,8 +34,10 @@ test("duplicate callbacks and webhooks award points, clear carts, and decrement 
         { productId: 11, quantity: 1 },
       ];
     },
-    async decrementProductStockIfAvailable(id: number, quantity: number) {
-      stockCalls.push({ id, quantity });
+    async reserveOrderStock() {
+      if (stockReserved) return true;
+      stockReserved = true;
+      stockCalls.push({ id: 10, quantity: 2 }, { id: 11, quantity: 1 });
       return true;
     },
     async addLoyaltyPoints(...args: unknown[]) {

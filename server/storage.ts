@@ -155,7 +155,7 @@ export interface IStorage {
   cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
   markOrderPaid(id: number, reference: string): Promise<boolean>;
-  updateOrderStockReservationStatus(id: number, status: 'reserved' | 'failed'): Promise<void>;
+  reserveOrderStock(id: number): Promise<boolean>;
   getOrderByShippingQuoteRequestId(quoteId: number): Promise<Order | undefined>;
   updateOrderShippingQuote(
     quoteId: number,
@@ -972,10 +972,38 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async updateOrderStockReservationStatus(id: number, status: 'reserved' | 'failed'): Promise<void> {
-    await db.update(orders)
-      .set({ stockReservationStatus: status, updatedAt: new Date() })
-      .where(and(eq(orders.id, id), eq(orders.paymentStatus, 'paid')));
+  async reserveOrderStock(id: number): Promise<boolean> {
+    try {
+      return await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${9300000 + id})`);
+        const [order] = await tx.select().from(orders).where(eq(orders.id, id));
+        if (!order || order.paymentStatus !== 'paid') return false;
+        if (order.stockReservationStatus === 'reserved') return true;
+        const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
+        if (items.length === 0) return false;
+        for (const item of items) {
+          const updated = await tx.update(products)
+            .set({ stock: sql`${products.stock} - ${item.quantity}`, updatedAt: new Date() })
+            .where(and(eq(products.id, item.productId), gte(products.stock, item.quantity)))
+            .returning({ id: products.id });
+          if (updated.length === 0) throw new Error(`Insufficient stock for product ${item.productId}`);
+        }
+        await tx.update(orders)
+          .set({ stockReservationStatus: 'reserved', updatedAt: new Date() })
+          .where(eq(orders.id, id));
+        return true;
+      });
+    } catch (error) {
+      console.error(`Could not reserve stock for paid order ${id}:`, error);
+      await db.update(orders)
+        .set({ stockReservationStatus: 'failed', updatedAt: new Date() })
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.paymentStatus, 'paid'),
+          sql`${orders.stockReservationStatus} <> 'reserved'`,
+        ));
+      return false;
+    }
   }
 
   async decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean> {
