@@ -6,3 +6,4 @@
 - [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
 - [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
 - [Vendor settlement accounting](vendor-settlement-accounting.md) — commission is 8% of merchandise only; immutable vendor ledger entries drive refunds, availability, and payouts
+- [Rides safety publishing](rides-safety-publishing.md) — publish only confirmed support channels and operational safety capabilities; never expose source-document placeholders

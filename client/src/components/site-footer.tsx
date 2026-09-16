@@ -22,6 +22,7 @@ export default function SiteFooter() {
         </div>
         <div>
           <p className="site-footer__label">Help and support</p>
+          <Link href="/rides/help-safety">Rides Help & Safety</Link>
           <Link href="/policies/marketplace-terms">Marketplace Terms</Link>
           <Link href="/policies/privacy-and-cookie-policy">Privacy</Link>
           <Link href="/policies/shipping-policy">Shipping information</Link>

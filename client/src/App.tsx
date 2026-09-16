@@ -34,6 +34,7 @@ import ProductDetail from "@/pages/product-detail";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
+import RidesHelpSafety from "@/pages/rides-help-safety";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
@@ -102,6 +103,7 @@ function Router() {
       <Route path="/discover" component={DiscoverAfrica} />
       <Route path="/lookbook" component={Lookbook} />
       <Route path="/policies/:slug" component={PolicyDetail} />
+      <Route path="/rides/help-safety" component={RidesHelpSafety} />
       <Route path="/policies" component={Policies} />
       <Route path="/quizzes/:id" component={Quiz} />
 
