@@ -372,13 +372,7 @@ export default function Checkout() {
       return response.json();
     },
     onSuccess: (result) => {
-      if (result.completed) {
-        toast({
-          title: 'Payment Confirmed',
-          description: 'Your existing payment was verified and your order is confirmed.',
-        });
-        window.location.href = '/my-orders';
-      } else if (result.paymentUrl) {
+      if (result.paymentUrl) {
         const selectedQuote = effectiveShippingQuotes.find((quote) => quote.carrier === selectedShipping);
         trackEvent('payment_initialized', {
           payment_provider: 'paystack',

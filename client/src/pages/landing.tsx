@@ -3,13 +3,12 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import SiteFooter from "@/components/site-footer";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
-import { Menu, X, Package, Calendar, Zap, MapPin, Info, ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
+import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "lucide-react";
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -40,54 +39,21 @@ export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-  const [selectedSlide, setSelectedSlide] = useState(0);
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateMotionPreference = () => setPrefersReducedMotion(media.matches);
-    updateMotionPreference();
-    media.addEventListener("change", updateMotionPreference);
-    return () => media.removeEventListener("change", updateMotionPreference);
-  }, []);
 
   useEffect(() => {
     if (!emblaApi) return;
-    const onSelect = () => setSelectedSlide(emblaApi.selectedScrollSnap());
-    onSelect();
-    emblaApi.on("select", onSelect);
-    emblaApi.on("reInit", onSelect);
-    return () => {
-      emblaApi.off("select", onSelect);
-      emblaApi.off("reInit", onSelect);
-    };
+
+    const autoplay = setInterval(() => {
+      emblaApi.scrollNext();
+    }, 5000);
+
+    return () => clearInterval(autoplay);
   }, [emblaApi]);
 
-  useEffect(() => {
-    if (!emblaApi || isCarouselPaused || prefersReducedMotion) return;
-    const autoplay = window.setInterval(() => emblaApi.scrollNext(), 5000);
-    return () => window.clearInterval(autoplay);
-  }, [emblaApi, isCarouselPaused, prefersReducedMotion]);
-
-  useEffect(() => {
-    if (!isMobileMenuOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsMobileMenuOpen(false);
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isMobileMenuOpen]);
-
   // Fetch only approved products for display on landing page
-  const { data: products = [], isLoading: productsLoading, isError: productsError, refetch: refetchProducts } = useQuery<Product[]>({
+  const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     retry: false,
   });
@@ -127,8 +93,20 @@ export default function Landing() {
     window.location.href = '/login';
   };
 
-  const viewProduct = (productId: number) => {
-    window.location.href = `/products/${productId}`;
+  const handleAddToCart = (productId: number) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to add items to your cart",
+        variant: "default",
+      });
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 1000);
+      return;
+    }
+    // This would normally trigger the add to cart functionality
+    // But since user is not authenticated, we redirect to login
   };
 
   return (
@@ -169,9 +147,6 @@ export default function Landing() {
                 size="sm"
                 className="md:hidden"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-expanded={isMobileMenuOpen}
-                aria-controls="landing-mobile-menu"
-                aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
@@ -181,7 +156,7 @@ export default function Landing() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div id="landing-mobile-menu" className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto" role="navigation" aria-label="Mobile navigation">
+          <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
             <div className="px-4 py-4 space-y-1 pb-24">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Explore</p>
               <a href="/products" onClick={() => setIsMobileMenuOpen(false)}
@@ -222,22 +197,9 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
-      <section
-        className="relative overflow-hidden h-[calc(100vh-64px)]"
-        onMouseEnter={() => setIsCarouselPaused(true)}
-        onMouseLeave={() => setIsCarouselPaused(false)}
-        onFocusCapture={() => setIsCarouselPaused(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsCarouselPaused(false);
-        }}
-      >
+      <section className="relative overflow-hidden h-[calc(100vh-64px)]">
         {/* Cultural Images Carousel */}
-        <div
-          className="absolute inset-0"
-          ref={emblaRef}
-          aria-roledescription="carousel"
-          aria-label="African cultural highlights"
-        >
+        <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
             {culturalSlides.map((slide, index) => (
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
@@ -246,11 +208,7 @@ export default function Landing() {
                   alt={`${slide.label} — ${slide.country}`}
                   className="w-full h-full object-cover"
                 />
-                <div className={`absolute inset-0 ${
-                  index === 3
-                    ? "bg-gradient-to-r from-slate-950/70 via-slate-900/42 to-slate-900/18"
-                    : "bg-gradient-to-r from-slate-950/78 via-green-950/55 to-slate-900/30"
-                }`}></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
                 {/* Slide culture badge */}
                 <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
                   <span className="text-base sm:text-xl">{slide.flag}</span>
@@ -309,34 +267,17 @@ export default function Landing() {
           </div>
         </div>
 
-         {/* Carousel controls */}
-         <div className="absolute bottom-5 left-4 right-4 z-30 flex items-center justify-between">
-           <Button type="button" size="icon" variant="ghost" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous cultural slide" className="text-white hover:bg-white/20 hover:text-white">
-             <ArrowLeft className="h-5 w-5" />
-           </Button>
-           <div className="flex justify-center gap-2" aria-label="Choose cultural slide">
+        {/* Carousel Indicators */}
+        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
           {culturalSlides.map((_, index) => (
             <button
               key={index}
               onClick={() => emblaApi?.scrollTo(index)}
-               className={`h-2 rounded-full transition-all duration-300 ${selectedSlide === index ? "w-7 bg-amber-300" : "w-2 bg-white/50 hover:bg-white/80"}`}
+              className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
               aria-label={`Go to slide ${index + 1}`}
-               aria-current={selectedSlide === index ? "true" : undefined}
             />
           ))}
-           </div>
-           <Button type="button" size="icon" variant="ghost" onClick={() => emblaApi?.scrollNext()} aria-label="Next cultural slide" className="text-white hover:bg-white/20 hover:text-white">
-             <ArrowRight className="h-5 w-5" />
-           </Button>
-         </div>
-         <button
-           type="button"
-           onClick={() => setIsCarouselPaused((paused) => !paused)}
-           aria-label={isCarouselPaused ? "Resume cultural carousel" : "Pause cultural carousel"}
-           className="absolute bottom-6 right-16 z-30 rounded-full p-2 text-white/80 hover:bg-white/20"
-         >
-           {isCarouselPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-         </button>
+        </div>
       </section>
 
       {/* Featured Products Section */}
@@ -351,17 +292,7 @@ export default function Landing() {
             </p>
           </div>
 
-          {productsLoading ? (
-            <div className="text-center py-12" role="status">
-              <div className="spinner-nigerian mx-auto mb-3" />
-              <p className="text-gray-600">Loading featured products…</p>
-            </div>
-          ) : productsError ? (
-            <div className="text-center py-12">
-              <p className="text-gray-700 text-lg mb-4">We could not load products right now.</p>
-              <Button variant="outline" onClick={() => refetchProducts()}>Try again</Button>
-            </div>
-          ) : products.length > 0 ? (
+          {products.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
               {products.slice(0, 8).map((product) => {
                 // images[] is the authoritative source; imageUrl is a legacy fallback
@@ -417,12 +348,14 @@ export default function Landing() {
                         {product.stock} left
                       </span>
                     </div>
-                     <Button
-                       onClick={() => viewProduct(product.id)}
+                    <Button
+                      onClick={() => handleAddToCart(product.id)}
                       className="w-full btn-nigerian text-xs sm:text-sm py-1.5 sm:py-2 h-auto"
                       disabled={product.stock === 0}
                     >
-                      <span>{product.stock === 0 ? 'Out of Stock' : 'View Product'}</span>
+                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">{product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
+                      <span className="sm:hidden">{product.stock === 0 ? 'Sold Out' : 'Add'}</span>
                     </Button>
                   </CardContent>
                 </Card>
@@ -439,7 +372,7 @@ export default function Landing() {
 
           {products.length > 8 && (
             <div className="text-center mt-12">
-               <Button onClick={() => window.location.href = "/products"} size="lg" className="btn-nigerian">
+              <Button onClick={handleLogin} size="lg" className="btn-nigerian">
                 View All Products
               </Button>
             </div>
@@ -549,7 +482,7 @@ export default function Landing() {
         </div>
         <AfricanProductCarousel />
         <div className="text-center mt-6 md:mt-8">
-           <Button onClick={() => window.location.href = "/products"} size="lg" className="bg-nigerian-gold text-gray-900 hover:bg-yellow-400 font-bold px-8">
+          <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold text-gray-900 hover:bg-yellow-400 font-bold px-8">
             Shop All Products
           </Button>
         </div>
@@ -675,7 +608,7 @@ export default function Landing() {
             Join thousands of fashion enthusiasts who trust Afrolandx for authentic African clothing and accessories.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-             <Button onClick={() => window.location.href = "/products"} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold w-full sm:w-auto max-w-xs sm:max-w-none">
+            <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold w-full sm:w-auto max-w-xs sm:max-w-none">
               Start Shopping Now
             </Button>
             <Button
@@ -692,11 +625,23 @@ export default function Landing() {
       {/* Footer */}
       <SiteFooter />
 
-      <Dialog open={isVendorModalOpen} onOpenChange={setIsVendorModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Become a Vendor</DialogTitle>
-          </DialogHeader>
+      {/* Vendor Modal */}
+      {isVendorModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-xl font-bold">Become a Vendor</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setIsVendorModalOpen(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
               <p className="text-gray-600 mb-6">
                 Join our community of African artisans and designers. Share your authentic 
                 fashion creations with customers worldwide.
@@ -720,19 +665,21 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mt-6 space-y-3">
-                <Button onClick={() => window.location.href = "/register"} className="w-full btn-nigerian">
+                <Button onClick={handleLogin} className="w-full btn-nigerian">
                   Get Started as Vendor
                 </Button>
                 <Button 
                   variant="outline" 
                   className="w-full" 
-                  onClick={() => window.location.href = "/policies/vendor-onboarding-data-and-account-security"}
+                  onClick={() => setIsVendorModalOpen(false)}
                 >
-                  Read Vendor Requirements
+                  Learn More
                 </Button>
               </div>
-        </DialogContent>
-      </Dialog>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

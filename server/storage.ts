@@ -133,7 +133,6 @@ export interface IStorage {
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
-  createOrderWithItems(order: InsertOrder, items: Array<Omit<InsertOrderItem, 'orderId'>>): Promise<Order>;
   createOrderWithReservedShippingQuote(
     order: InsertOrder,
     quoteId: number,
@@ -147,7 +146,6 @@ export interface IStorage {
     items: Array<Omit<InsertOrderItem, 'orderId'>>,
   ): Promise<Order | undefined>;
   releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void>;
-  releasePendingOrder(orderId: number, userId: string): Promise<void>;
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersForUser(userId: string): Promise<Order[]>;
@@ -684,19 +682,6 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
-  async createOrderWithItems(
-    order: InsertOrder,
-    items: Array<Omit<InsertOrderItem, 'orderId'>>,
-  ): Promise<Order> {
-    return await db.transaction(async tx => {
-      const [newOrder] = await tx.insert(orders).values(order).returning();
-      if (items.length > 0) {
-        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
-      }
-      return newOrder;
-    });
-  }
-
   async createOrderWithReservedShippingQuote(
     order: InsertOrder,
     quoteId: number,
@@ -753,16 +738,6 @@ export class DatabaseStorage implements IStorage {
 
   async releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void> {
     await db.transaction(async tx => {
-      const [pendingOrder] = await tx.select({ id: orders.id })
-        .from(orders)
-        .where(and(
-          eq(orders.id, orderId),
-          eq(orders.userId, userId),
-          eq(orders.shippingQuoteRequestId, quoteId),
-          eq(orders.paymentStatus, 'pending'),
-        ))
-        .for('update');
-      if (!pendingOrder) return;
       await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
       await tx.delete(orders).where(and(
         eq(orders.id, orderId),
@@ -777,28 +752,6 @@ export class DatabaseStorage implements IStorage {
           eq(shippingQuoteRequests.userId, userId),
           eq(shippingQuoteRequests.status, 'reserved'),
         ));
-    });
-  }
-
-  async releasePendingOrder(orderId: number, userId: string): Promise<void> {
-    await db.transaction(async tx => {
-      const [pendingOrder] = await tx.select({ id: orders.id })
-        .from(orders)
-        .where(and(
-          eq(orders.id, orderId),
-          eq(orders.userId, userId),
-          eq(orders.paymentStatus, 'pending'),
-          isNull(orders.shippingQuoteRequestId),
-        ))
-        .for('update');
-      if (!pendingOrder) return;
-      await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
-      await tx.delete(orders).where(and(
-        eq(orders.id, orderId),
-        eq(orders.userId, userId),
-        eq(orders.paymentStatus, 'pending'),
-        isNull(orders.shippingQuoteRequestId),
-      ));
     });
   }
 

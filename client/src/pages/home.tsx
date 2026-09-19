@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
 import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
 import ProductCard from "@/components/product-card";
@@ -45,35 +44,16 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-  const [selectedSlide, setSelectedSlide] = useState(0);
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const updateMotionPreference = () => setPrefersReducedMotion(media.matches);
-    updateMotionPreference();
-    media.addEventListener("change", updateMotionPreference);
-    return () => media.removeEventListener("change", updateMotionPreference);
-  }, []);
 
   useEffect(() => {
     if (!emblaApi) return;
-    const onSelect = () => setSelectedSlide(emblaApi.selectedScrollSnap());
-    onSelect();
-    emblaApi.on("select", onSelect);
-    emblaApi.on("reInit", onSelect);
-    return () => {
-      emblaApi.off("select", onSelect);
-      emblaApi.off("reInit", onSelect);
-    };
-  }, [emblaApi]);
 
-  useEffect(() => {
-    if (!emblaApi || isCarouselPaused || prefersReducedMotion) return;
-    const autoplay = window.setInterval(() => emblaApi.scrollNext(), 5000);
-    return () => window.clearInterval(autoplay);
-  }, [emblaApi, isCarouselPaused, prefersReducedMotion]);
+    const autoplay = setInterval(() => {
+      emblaApi.scrollNext();
+    }, 5000);
+
+    return () => clearInterval(autoplay);
+  }, [emblaApi]);
 
   const scrollToProducts = () => {
     const productsSection = document.getElementById('products-section');
@@ -95,16 +75,12 @@ export default function Home() {
     queryKey: ["/api/categories"],
   });
 
-  const { data: featuredProducts = [], isLoading: featuredLoading, isError: featuredError, refetch: refetchFeatured } = useQuery<Product[]>({
+  const { data: featuredProducts = [] } = useQuery<Product[]>({
     queryKey: ["/api/products", "featured"],
-    queryFn: async () => {
-      const response = await fetch("/api/products?featured=true");
-      if (!response.ok) throw new Error("Could not load featured products");
-      return response.json();
-    },
+    queryFn: () => fetch("/api/products?featured=true").then(res => res.json()),
   });
 
-  const { data: allProducts = [], isError: productsError } = useQuery<Product[]>({
+  const { data: allProducts = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
@@ -140,22 +116,9 @@ export default function Home() {
       )}
 
       {/* Hero Section with Cultural Carousel */}
-      <section
-        className="relative overflow-hidden h-[calc(100vh-64px)]"
-        onMouseEnter={() => setIsCarouselPaused(true)}
-        onMouseLeave={() => setIsCarouselPaused(false)}
-        onFocusCapture={() => setIsCarouselPaused(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsCarouselPaused(false);
-        }}
-      >
+      <section className="relative overflow-hidden h-[calc(100vh-64px)]">
         {/* Cultural Images Carousel */}
-        <div
-          className="absolute inset-0"
-          ref={emblaRef}
-          aria-roledescription="carousel"
-          aria-label="African cultural highlights"
-        >
+        <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
             {culturalSlides.map((slide, index) => (
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
@@ -164,11 +127,7 @@ export default function Home() {
                   alt={`${slide.label} — ${slide.country}`}
                   className="w-full h-full object-cover"
                 />
-                <div className={`absolute inset-0 ${
-                  index === 3
-                    ? "bg-gradient-to-r from-slate-950/70 via-slate-900/42 to-slate-900/18"
-                    : "bg-gradient-to-r from-slate-950/78 via-green-950/55 to-slate-900/30"
-                }`}></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
                 {/* Slide culture badge */}
                 <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
                   <span className="text-base sm:text-xl">{slide.flag}</span>
@@ -210,10 +169,10 @@ export default function Home() {
               <Button
                 size="lg"
                 className="btn-gold w-full sm:w-auto max-w-xs sm:max-w-none"
-                onClick={() => setLocation('/products')}
+                onClick={scrollToProducts}
                 data-testid="button-shop-traditional-wear"
               >
-                Browse Products
+                Shop Traditional Wear
               </Button>
               <Button
                 size="lg"
@@ -227,34 +186,17 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Carousel controls */}
-        <div className="absolute bottom-5 left-4 right-4 z-30 flex items-center justify-between">
-          <Button type="button" size="icon" variant="ghost" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous cultural slide" className="text-white hover:bg-white/20 hover:text-white">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex justify-center gap-2" aria-label="Choose cultural slide">
+        {/* Carousel Indicators */}
+        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
           {culturalSlides.map((_, index) => (
             <button
               key={index}
               onClick={() => emblaApi?.scrollTo(index)}
-              className={`h-2 rounded-full transition-all duration-300 ${selectedSlide === index ? "w-7 bg-amber-300" : "w-2 bg-white/50 hover:bg-white/80"}`}
+              className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
               aria-label={`Go to slide ${index + 1}`}
-              aria-current={selectedSlide === index ? "true" : undefined}
             />
           ))}
-          </div>
-          <Button type="button" size="icon" variant="ghost" onClick={() => emblaApi?.scrollNext()} aria-label="Next cultural slide" className="text-white hover:bg-white/20 hover:text-white">
-            <ArrowRight className="h-5 w-5" />
-          </Button>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsCarouselPaused((paused) => !paused)}
-          aria-label={isCarouselPaused ? "Resume cultural carousel" : "Pause cultural carousel"}
-          className="absolute bottom-6 right-16 z-30 rounded-full p-2 text-white/80 hover:bg-white/20"
-        >
-          {isCarouselPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-        </button>
       </section>
 
       {/* Search and Filters */}
@@ -288,6 +230,17 @@ export default function Home() {
                   {category.name}
                 </Button>
               ))}
+              {!categories.some((c: any) => c.name.toLowerCase() === 'others') && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const otherscat = categories.find((c: any) => c.name.toLowerCase() === 'others');
+                    handleCategorySelect(otherscat ? otherscat.id : null);
+                  }}
+                >
+                  Others
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -328,22 +281,12 @@ export default function Home() {
               <h2 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-900 font-nigerian mb-1 md:mb-4">Featured Products</h2>
               <p className="text-xs sm:text-sm md:text-lg text-gray-600">Handpicked by our cultural fashion experts</p>
             </div>
-            <Button variant="outline" onClick={() => setLocation("/products")} className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white text-xs sm:text-sm px-2 sm:px-4 shrink-0">
+            <Button variant="outline" className="text-nigerian-green border-nigerian-green hover:bg-nigerian-green hover:text-white text-xs sm:text-sm px-2 sm:px-4 shrink-0">
               <span className="hidden sm:inline">View All Products </span>→
             </Button>
           </div>
 
-          {featuredLoading ? (
-            <div className="text-center py-12" role="status">
-              <div className="spinner-nigerian mx-auto mb-3" />
-              <p className="text-gray-500">Loading featured products…</p>
-            </div>
-          ) : featuredError ? (
-            <div className="text-center py-12">
-              <p className="text-gray-700 mb-4">Featured products could not be loaded.</p>
-              <Button variant="outline" onClick={() => refetchFeatured()}>Try again</Button>
-            </div>
-          ) : featuredProducts.length === 0 ? (
+          {featuredProducts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">No featured products available at the moment.</p>
             </div>
@@ -374,11 +317,7 @@ export default function Home() {
               </div>
             </div>
 
-            {productsError ? (
-              <div className="text-center py-12">
-                <p className="text-gray-600">Products could not be loaded. Please try again shortly.</p>
-              </div>
-            ) : filteredProducts.length > 0 ? (
+            {filteredProducts.length > 0 ? (
               <div className="product-grid">
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
