@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { Fragment, useEffect, useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -414,16 +414,15 @@ function BookingDialog({ deal, open, onClose }: { deal: DealInfo | null; open: b
   const bookMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/discover/bookings/initialize", {
-        dealTitle: deal!.title, dealType: deal!.type,
+        dealTitle: deal!.title,
         guestName: name, guestEmail: email, guestCount: guests,
-        bookingDate: date, totalAmountNgn: total,
+        bookingDate: date,
       });
       return res.json();
     },
     onSuccess: (data) => {
       if (data.authorizationUrl) {
-        window.open(data.authorizationUrl, "_blank");
-        setDone(true);
+        window.location.assign(data.authorizationUrl);
       }
     },
     onError: () => toast({ title: "Booking failed", description: "Please try again.", variant: "destructive" }),
@@ -688,8 +687,7 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
     },
     onSuccess: (data) => {
       if (data.authorizationUrl) {
-        window.open(data.authorizationUrl, "_blank");
-        setDone(true);
+        window.location.assign(data.authorizationUrl);
       }
     },
     onError: () => toast({ title: "Payment failed", description: "Please try again.", variant: "destructive" }),
@@ -704,7 +702,7 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
             <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold">Premium</Badge>
           </div>
           <h2 className="text-2xl font-black text-white mb-1">AfrolandX Explorer Premium</h2>
-          <p className="text-white/75 text-sm">₦2,500/month · Cancel anytime · 7-day free trial</p>
+          <p className="text-white/75 text-sm">₦2,500 for one month · Renew when you choose</p>
         </div>
         <div className="p-5">
           {done ? (
@@ -745,9 +743,9 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
                   disabled={!email || subscribeMutation.isPending}
                   onClick={() => subscribeMutation.mutate()}
                 >
-                  {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Start Free Trial — ₦2,500/mo</>}
+                  {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Buy one month — ₦2,500</>}
                 </Button>
-                <p className="text-xs text-center text-gray-400">Secure payment via Paystack · No charge during 7-day trial</p>
+                <p className="text-xs text-center text-gray-400">Secure one-time payment via Paystack</p>
               </div>
             </>
           )}
@@ -800,6 +798,7 @@ function GuideLearnMoreDialog({ open, onClose, onRegister }: { open: boolean; on
 }
 
 export default function DiscoverAfrica() {
+  const { toast } = useToast();
   // ── Discovery state ───────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -816,11 +815,41 @@ export default function DiscoverAfrica() {
   const [showPremium, setShowPremium] = useState(false);
   const [showGuideLearnMore, setShowGuideLearnMore] = useState(false);
 
-  const selectedCountry = africaLocations[selectedCountryCode];
+  const selectedCountry = africaLocations[selectedCountryCode] || africaLocations.NG || Object.values(africaLocations)[0];
   const selectedCity = useMemo(() => {
     if (!selectedCityName) return selectedCountry.cities[0];
     return selectedCountry.cities.find(c => c.name === selectedCityName) || selectedCountry.cities[0];
   }, [selectedCountry, selectedCityName]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("booking_ref") || params.get("premium_ref");
+    if (!reference) return;
+
+    let cancelled = false;
+    apiRequest("POST", "/api/discover/payment/verify", { reference })
+      .then(response => response.json())
+      .then(result => {
+        if (cancelled) return;
+        toast({
+          title: result.type === "booking" ? "Booking confirmed" : "Premium activated",
+          description: result.type === "booking"
+            ? "Your payment was verified and your booking is confirmed."
+            : "Your one-month Premium access is now active.",
+        });
+        window.history.replaceState({}, "", "/discover");
+      })
+      .catch(error => {
+        if (cancelled) return;
+        toast({
+          title: "Payment verification pending",
+          description: error instanceof Error ? error.message : "We could not verify this payment yet. Please try again.",
+          variant: "destructive",
+        });
+      });
+
+    return () => { cancelled = true; };
+  }, [toast]);
 
   // Filtered country list by region tab
   const filteredCountries = useMemo(() => {
@@ -1080,8 +1109,8 @@ export default function DiscoverAfrica() {
                 /* Masonry-style grid */
                 <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                   {places.map((place, idx) => (
-                    <>
-                      <div key={place.id} className="break-inside-avoid mb-4">
+                    <Fragment key={place.id}>
+                      <div className="break-inside-avoid mb-4">
                         <PlaceCard
                           place={place}
                           tall={idx % 5 === 0}
@@ -1090,7 +1119,7 @@ export default function DiscoverAfrica() {
                       </div>
                       {/* ══ REVENUE STREAM 3: "Claim Your Business" inline ad (every 8th card) ══ */}
                       {idx > 0 && (idx + 1) % 8 === 0 && (
-                        <div key={`claim-${idx}`} className="break-inside-avoid mb-4">
+                        <div className="break-inside-avoid mb-4">
                           <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 flex flex-col items-center text-center cursor-pointer hover:border-emerald-500 hover:shadow-lg transition-all group">
                             <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
                               <Building2 className="h-6 w-6 text-emerald-600" />
@@ -1117,7 +1146,7 @@ export default function DiscoverAfrica() {
                           </div>
                         </div>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </div>
               ) : null}

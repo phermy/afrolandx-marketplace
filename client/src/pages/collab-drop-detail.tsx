@@ -77,6 +77,13 @@ export default function CollabDropDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/collab-drops", id] });
       toast({ title: "RSVP Confirmed!", description: "You'll be notified when the drop goes live." });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "RSVP failed",
+        description: error.message || "Could not complete your RSVP.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -101,8 +108,8 @@ export default function CollabDropDetailPage() {
   const now = new Date();
   const start = new Date(drop.dropStartTime);
   const end = drop.dropEndTime ? new Date(drop.dropEndTime) : null;
-  const isLive = now >= start && (!end || now <= end);
-  const isUpcoming = now < start;
+  const isLive = drop.status === 'live' || (drop.status !== 'cancelled' && now >= start && (!end || now <= end));
+  const isUpcoming = drop.status === 'upcoming' && now < start;
   const spotsLeft = drop.rsvpCap ? drop.rsvpCap - (drop.rsvpCount || 0) : null;
   const hasRsvped = myRsvps.some(r => r.dropId === drop.id);
   const displayTitle = drop.title || drop.name;

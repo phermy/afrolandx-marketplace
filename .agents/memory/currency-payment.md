@@ -1,12 +1,12 @@
 ---
 name: Currency & payment model
-description: Afrolandx stores all prices in NGN (Naira). Payment via Paystack always in NGN. Detailed fixes applied.
+description: Afrolandx stores and charges all prices in NGN; every paid feature must use a server-derived amount and strict Paystack verification.
 ---
 
 ## Rule
-All product prices are stored in **NGN (Nigerian Naira)**. Never treat `product.price` as USD. Always charge Paystack in NGN. Never multiply cart totals by an exchange rate for payment.
+All product and service prices are stored in **NGN (Nigerian Naira)**. Never treat `product.price` as USD. Always charge Paystack in NGN. Never multiply cart totals by an exchange rate for payment. For every paid feature, derive the payable amount on the server and verify exact reference, amount, currency, ownership metadata, and customer identity before granting access.
 
-**Why:** The codebase originally had broken currency handling that treated Naira prices as USD (e.g., ₦60,500 displayed as "$60,500" and multiplied by ~1800 NGN/USD rate = ₦108,900,000 overcharge).
+**Why:** The codebase previously risked both currency-conversion overcharges and client-controlled service prices. Strict server pricing and verification prevent underpayment, cross-record activation, and access being granted after an unmatched transaction.
 
 ## How to apply
 - `formatPrice` anywhere should use ₦ symbol: `` `₦${parseFloat(price).toLocaleString()}` ``
@@ -14,7 +14,8 @@ All product prices are stored in **NGN (Nigerian Naira)**. Never treat `product.
 - Checkout `handleSubmit` sends `currency: 'NGN'` and `totalAmount` as the raw Naira sum (no multiplication)
 - `server/routes.ts` `/api/orders/initialize-payment`: `chargeCurrency = 'NGN'`, `chargeAmount = parseFloat(totalAmount)` — no currency conversion
 - Paystack's `initializeTransaction` multiplies by 100 for kobo internally — pass Naira amount directly
-- Shipping prices in `/api/shipping/quote` are in NGN: UPS ₦15,000, FedEx ₦25,000, DHL ₦40,000
+- International shipping rates are confirmed quotes in NGN. Estimates are deposits, not final carrier prices.
+- Discover bookings and Premium access follow the same server-priced, exact-match verification rule as product orders.
 
 ## Payment callback flow (normal path)
 1. POST `/api/orders/initialize-payment` → creates order + returns Paystack URL

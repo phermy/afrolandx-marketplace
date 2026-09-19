@@ -554,7 +554,7 @@ export const collabDrops = pgTable("collab_drops", {
   dropStartTime: timestamp("drop_start_time").notNull(),
   dropEndTime: timestamp("drop_end_time"),
   rsvpCap: integer("rsvp_cap"), // Max RSVPs allowed
-  rsvpCount: integer("rsvp_count").default(0),
+  rsvpCount: integer("rsvp_count").notNull().default(0),
   productIds: jsonb("product_ids").default([]), // Products in this drop
   status: varchar("status").default("upcoming"), // upcoming, live, ended, cancelled
   isExclusive: boolean("is_exclusive").default(false), // Requires loyalty tier
@@ -571,7 +571,9 @@ export const dropRsvps = pgTable("drop_rsvps", {
   status: varchar("status").default("confirmed"), // confirmed, cancelled, attended
   notificationSent: boolean("notification_sent").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("drop_rsvps_drop_user_unique").on(table.dropId, table.userId),
+]);
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -921,7 +923,7 @@ export const discoverBookings = pgTable("discover_bookings", {
   guestCount: integer("guest_count").notNull().default(1),
   bookingDate: varchar("booking_date", { length: 32 }).notNull(),
   totalAmountNgn: integer("total_amount_ngn").notNull(),
-  paymentReference: varchar("payment_reference", { length: 128 }),
+  paymentReference: varchar("payment_reference", { length: 128 }).unique(),
   paymentStatus: varchar("payment_status", { length: 32 }).default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -935,7 +937,7 @@ export const discoverPremium = pgTable("discover_premium", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
   guestEmail: varchar("guest_email", { length: 255 }),
-  paymentReference: varchar("payment_reference", { length: 128 }),
+  paymentReference: varchar("payment_reference", { length: 128 }).unique(),
   paymentStatus: varchar("payment_status", { length: 32 }).default("pending"),
   subscriptionStart: timestamp("subscription_start"),
   subscriptionEnd: timestamp("subscription_end"),

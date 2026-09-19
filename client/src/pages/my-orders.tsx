@@ -90,6 +90,7 @@ function OrderTimeline({ status }: { status: string }) {
 function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id: number) => void; cancelling: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isCancelled = order.orderStatus === 'cancelled';
   const isDelivered = order.orderStatus === 'delivered';
   const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
@@ -106,6 +107,24 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
     },
     onError: (error: any) => toast({
       title: 'Could not start shipping payment',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
+  const retryShippingQuoteMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/orders/${order.id}/shipping-quote/retry`, {});
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({
+        title: 'Replacement quote requested',
+        description: `${result.carrier} will now be reviewed for this order.`,
+      });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not request another quote',
       description: error?.message || 'Please try again.',
       variant: 'destructive',
     }),
@@ -195,8 +214,20 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
         )}
 
         {order.shippingPaymentStatus === 'rejected' && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
-            This carrier could not confirm the route. Afrolandx support will help arrange another shipping option.
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-medium text-red-800">This carrier could not confirm the route.</p>
+              <p className="text-xs text-red-700">Request the next available carrier without paying for the order again.</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={retryShippingQuoteMutation.isPending}
+              onClick={() => retryShippingQuoteMutation.mutate()}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${retryShippingQuoteMutation.isPending ? 'animate-spin' : ''}`} />
+              {retryShippingQuoteMutation.isPending ? 'Requesting…' : 'Request another quote'}
+            </Button>
           </div>
         )}
 

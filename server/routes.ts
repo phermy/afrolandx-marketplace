@@ -9,8 +9,8 @@ import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
   insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
-  insertProductStorySchema, insertFabricAssetSchema, orders, orderItems, products, vendors,
-  vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments,
+  insertProductStorySchema, insertFabricAssetSchema, insertCollabDropSchema, orders, orderItems, products, vendors,
+  vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests,
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1687,6 +1687,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/orders/:id/shipping-quote/retry', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const userId = (req.user as any)?.id;
+      if (!Number.isSafeInteger(orderId) || orderId <= 0) return res.status(400).json({ message: 'Invalid order ID' });
+
+      const order = await storage.getOrder(orderId);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      if (order.paymentStatus !== 'paid' || order.shippingPaymentStatus !== 'rejected' || order.orderStatus !== 'awaiting_shipping_quote') {
+        return res.status(409).json({ message: 'This order is not waiting for a replacement shipping quote' });
+      }
+      if (!order.shippingQuoteRequestId) return res.status(409).json({ message: 'Original shipping quote request not found' });
+      const originalRequest = await storage.getShippingQuoteRequest(order.shippingQuoteRequestId);
+      if (!originalRequest) return res.status(409).json({ message: 'Original shipping quote request not found' });
+
+      const currentIndex = SHIPPING_QUOTES.findIndex(option => option.carrier.toLowerCase() === String(order.shippingMethod || '').toLowerCase());
+      const requestedCarrier = typeof req.body?.carrier === 'string' ? req.body.carrier : '';
+      const replacementOption = getShippingQuote(requestedCarrier)
+        || SHIPPING_QUOTES[(currentIndex + 1 + SHIPPING_QUOTES.length) % SHIPPING_QUOTES.length];
+      if (!replacementOption) return res.status(400).json({ message: 'Choose a supported shipping company' });
+      const shippingAddress = shippingAddressSchema.parse(order.shippingAddress);
+
+      const replacement = await db.transaction(async tx => {
+        const [request] = await tx.insert(shippingQuoteRequests).values({
+          userId,
+          carrier: replacementOption.carrier,
+          status: 'pending',
+          shippingAddress,
+          cartSnapshot: originalRequest.cartSnapshot,
+          cartFingerprint: originalRequest.cartFingerprint,
+          totalWeight: originalRequest.totalWeight,
+          currency: 'NGN',
+        }).returning();
+        const [updatedOrder] = await tx.update(orders).set({
+          shippingQuoteRequestId: request.id,
+          shippingMethod: replacementOption.carrier.toLowerCase(),
+          shippingPaymentStatus: 'awaiting_quote',
+          shippingFinalAmount: null,
+          shippingPaymentReference: null,
+          shippingPaymentUrl: null,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(orders.id, orderId),
+          eq(orders.userId, userId),
+          eq(orders.paymentStatus, 'paid'),
+          eq(orders.shippingPaymentStatus, 'rejected'),
+          eq(orders.orderStatus, 'awaiting_shipping_quote'),
+        )).returning({ id: orders.id });
+        if (!updatedOrder) throw new Error('ORDER_NOT_RETRYABLE');
+        return request;
+      });
+
+      const buyer = await storage.getUser(userId);
+      for (const admin of await storage.getAdminUsers()) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: 'shipping_quote',
+          title: 'Replacement shipping quote requested',
+          message: `${buyer?.firstName || buyer?.email || 'A buyer'} requested a replacement ${replacement.carrier} quote for order #${orderId}.`,
+          orderId,
+        });
+      }
+      res.status(201).json(replacement);
+    } catch (error) {
+      console.error('Error retrying shipping quote:', error);
+      if (error instanceof z.ZodError) return res.status(409).json({ message: 'The saved shipping address is incomplete' });
+      if (error instanceof Error && error.message === 'ORDER_NOT_RETRYABLE') {
+        return res.status(409).json({ message: 'A replacement quote has already been requested' });
+      }
+      res.status(500).json({ message: 'Failed to request a replacement shipping quote' });
+    }
+  });
+
   // Admin: review all requests and confirm or reject rates.
   app.get('/api/admin/shipping-quote-requests', isAuthenticated, isAdmin, async (_req, res) => {
     try {
@@ -2043,7 +2116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shippingMethod,
         paymentStatus: 'pending',
         orderStatus: quotePending ? 'awaiting_shipping_quote' : 'pending',
-        shippingPaymentStatus: 'included',
+        shippingPaymentStatus: quotePending ? 'awaiting_quote' : 'included',
         paymentReference: reference,
         checkoutRequestId,
       };
@@ -4338,7 +4411,12 @@ INSTRUCTIONS:
   app.get('/api/collab-drops', async (req, res) => {
     try {
       const { status } = req.query;
-      const drops = await storage.getCollabDrops(status as string);
+      const requestedStatus = typeof status === 'string' ? status : undefined;
+      if (requestedStatus && !['upcoming', 'live', 'ended'].includes(requestedStatus)) {
+        return res.status(400).json({ message: 'Invalid collaboration status' });
+      }
+      const allDrops = await storage.getCollabDrops(requestedStatus);
+      const drops = allDrops.filter(drop => drop.status !== 'cancelled');
       
       // Enhance with product and designer details
       const enhanced = await Promise.all(drops.map(async (drop) => {
@@ -4367,9 +4445,10 @@ INSTRUCTIONS:
   app.get('/api/collab-drops/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Invalid drop ID' });
       const drop = await storage.getCollabDrop(id);
       
-      if (!drop) return res.status(404).json({ message: 'Drop not found' });
+      if (!drop || drop.status === 'cancelled') return res.status(404).json({ message: 'Drop not found' });
       
       const designer = await storage.getVendor(drop.designerId);
       const artisan = drop.artisanId ? await storage.getVendor(drop.artisanId) : null;
@@ -4396,11 +4475,11 @@ INSTRUCTIONS:
   app.post('/api/collab-drops/ai-suggest', async (req, res) => {
     try {
       const { query } = req.body as { query: string };
-      if (!query || query.trim().length < 3) {
+      if (!query || query.trim().length < 3 || query.trim().length > 300) {
         return res.status(400).json({ message: 'Please provide a search query.' });
       }
 
-      const allDrops = await storage.getCollabDrops();
+      const allDrops = (await storage.getCollabDrops()).filter(drop => drop.status !== 'cancelled');
       if (allDrops.length === 0) return res.json({ dropIds: [], explanation: 'No drops available yet.' });
 
       const chatbotService = getChatbotService();
@@ -4431,7 +4510,14 @@ Return ONLY valid JSON:
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return res.json(parsed);
+        const availableIds = new Set(allDrops.map(drop => drop.id));
+        const dropIds = Array.isArray(parsed?.dropIds)
+          ? parsed.dropIds.map(Number).filter((id: number) => Number.isSafeInteger(id) && availableIds.has(id)).slice(0, 5)
+          : [];
+        const explanation = typeof parsed?.explanation === 'string'
+          ? parsed.explanation.slice(0, 500)
+          : 'Showing matching collaboration drops.';
+        return res.json({ dropIds, explanation });
       }
       res.json({ dropIds: allDrops.map(d => d.id), explanation: 'Showing all available drops.' });
     } catch (error) {
@@ -4446,12 +4532,38 @@ Return ONLY valid JSON:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const vendor = await storage.getVendorByUserId(userId);
-      if (!vendor) return res.status(403).json({ message: 'Not a vendor' });
-      
-      const drop = await storage.createCollabDrop({ ...req.body, designerId: vendor.id });
+      if (!vendor || vendor.status !== 'approved') return res.status(403).json({ message: 'Approved vendor access required' });
+
+      const input = insertCollabDropSchema.parse({
+        ...req.body,
+        designerId: vendor.id,
+        status: 'upcoming',
+      });
+      if (!(input.dropStartTime instanceof Date) || input.dropStartTime <= new Date()) {
+        return res.status(400).json({ message: 'Drop start time must be in the future' });
+      }
+      if (input.dropEndTime && input.dropEndTime <= input.dropStartTime) {
+        return res.status(400).json({ message: 'Drop end time must be after the start time' });
+      }
+      if (input.artisanId) {
+        const artisan = await storage.getVendor(input.artisanId);
+        if (!artisan || artisan.status !== 'approved') return res.status(400).json({ message: 'Choose an approved artisan' });
+      }
+      const productIds = Array.isArray(input.productIds) ? input.productIds.map(Number) : [];
+      if (productIds.length > 50 || productIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+        return res.status(400).json({ message: 'Invalid collaboration products' });
+      }
+      for (const productId of productIds) {
+        const product = await storage.getProduct(productId);
+        if (!product || product.vendorId !== vendor.id) {
+          return res.status(403).json({ message: 'Collaboration drops may only include your products' });
+        }
+      }
+      const drop = await storage.createCollabDrop({ ...input, productIds });
       res.status(201).json(drop);
     } catch (error) {
       console.error('Error creating collab drop:', error);
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid collaboration drop', errors: error.errors });
       res.status(500).json({ message: 'Failed to create drop' });
     }
   });
@@ -4462,9 +4574,17 @@ Return ONLY valid JSON:
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
       
       const dropId = parseInt(req.params.id);
+      if (!Number.isSafeInteger(dropId) || dropId <= 0) return res.status(400).json({ message: 'Invalid drop ID' });
       const drop = await storage.getCollabDrop(dropId);
       
       if (!drop) return res.status(404).json({ message: 'Drop not found' });
+      const now = new Date();
+      if (drop.status === 'cancelled' || drop.status === 'ended' || (drop.dropEndTime && drop.dropEndTime <= now)) {
+        return res.status(409).json({ message: 'This collaboration drop is no longer accepting RSVPs' });
+      }
+      if (drop.status === 'live' || drop.dropStartTime <= now) {
+        return res.status(409).json({ message: 'RSVPs close when the collaboration drop goes live' });
+      }
       
       // Check if already RSVPed
       const hasRsvped = await storage.hasUserRsvped(userId, dropId);
@@ -4495,6 +4615,12 @@ Return ONLY valid JSON:
       res.status(201).json(rsvp);
     } catch (error) {
       console.error('Error creating RSVP:', error);
+      if (error instanceof Error && error.message === 'RSVP_ALREADY_EXISTS') {
+        return res.status(409).json({ message: 'Already RSVPed' });
+      }
+      if (error instanceof Error && error.message === 'RSVP_CAPACITY_REACHED') {
+        return res.status(409).json({ message: 'RSVP capacity reached' });
+      }
       res.status(500).json({ message: 'Failed to RSVP' });
     }
   });
@@ -5088,11 +5214,13 @@ Return ONLY valid JSON:
       const { db } = await import('./db');
       const { eq } = await import('drizzle-orm');
       const id = parseInt(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Invalid inquiry ID' });
       const { status } = req.body;
       if (!['pending', 'reviewed', 'approved', 'rejected'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
       }
-      await db.update(discoverInquiries).set({ status }).where(eq(discoverInquiries.id, id));
+      const [updated] = await db.update(discoverInquiries).set({ status }).where(eq(discoverInquiries.id, id)).returning({ id: discoverInquiries.id });
+      if (!updated) return res.status(404).json({ message: 'Inquiry not found' });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: 'Failed to update inquiry status' });
@@ -5118,17 +5246,33 @@ Return ONLY valid JSON:
     try {
       const { discoverInquiries } = await import('@shared/schema');
       const { db } = await import('./db');
-      const { type, name, email, phone, details } = req.body;
-      if (!type || !name || !email) {
-        return res.status(400).json({ message: 'type, name and email are required' });
-      }
-      const [inquiry] = await db.insert(discoverInquiries).values({ type, name, email, phone, details, status: 'pending' }).returning();
+      const input = z.object({
+        type: z.enum(['guide_registration', 'business_claim', 'deal_listing', 'destination_feature']),
+        name: z.string().trim().min(2).max(255),
+        email: z.string().trim().email().max(255).transform(value => value.toLowerCase()),
+        phone: z.string().trim().max(64).optional().nullable(),
+        details: z.record(z.string(), z.string().max(3000)).refine(
+          value => JSON.stringify(value).length <= 12000,
+          'Inquiry details are too long',
+        ),
+      }).parse(req.body);
+      const [inquiry] = await db.insert(discoverInquiries).values({ ...input, status: 'pending' }).returning();
       res.json({ success: true, inquiry });
     } catch (err) {
       console.error('[discover/inquiries]', err);
+      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Please check your inquiry details', errors: err.errors });
       res.status(500).json({ message: 'Failed to save inquiry' });
     }
   });
+
+  const discoverDeals = {
+    'Lagos Luxury Stay': { type: 'hotel', basePrice: 120000, discountPercent: 25 },
+    'Dinner for Two': { type: 'restaurant', basePrice: 35000, discountPercent: 30 },
+    'Cairo City Tour': { type: 'tour', basePrice: 45000, discountPercent: 20 },
+    'Cape Town Getaway': { type: 'hotel', basePrice: 180000, discountPercent: 35 },
+    'Nairobi Safari': { type: 'adventure', basePrice: 220000, discountPercent: 15 },
+    'Marrakech Medina Tour': { type: 'tour', basePrice: 55000, discountPercent: 40 },
+  } as const;
 
   // Initialize a deal booking + Paystack payment
   app.post('/api/discover/bookings/initialize', async (req: any, res) => {
@@ -5136,32 +5280,57 @@ Return ONLY valid JSON:
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
       const { discoverBookings } = await import('@shared/schema');
       const { db } = await import('./db');
-      const { dealTitle, dealType, guestName, guestEmail, guestCount, bookingDate, totalAmountNgn } = req.body;
-      if (!dealTitle || !guestEmail || !guestName || !bookingDate || !totalAmountNgn) {
-        return res.status(400).json({ message: 'Missing required booking fields' });
+      const input = z.object({
+        dealTitle: z.enum(Object.keys(discoverDeals) as [keyof typeof discoverDeals, ...(keyof typeof discoverDeals)[]]),
+        guestName: z.string().trim().min(2).max(255),
+        guestEmail: z.string().trim().email().max(255).transform(value => value.toLowerCase()),
+        guestCount: z.coerce.number().int().min(1).max(20),
+        bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }).parse(req.body);
+      const bookingDay = new Date(`${input.bookingDate}T00:00:00.000Z`);
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      if (!Number.isFinite(bookingDay.getTime()) || bookingDay < today) {
+        return res.status(400).json({ message: 'Choose a current or future booking date' });
       }
-      const reference = `discover_booking_${Date.now()}_${require('crypto').randomBytes(4).toString('hex')}`;
+      const deal = discoverDeals[input.dealTitle];
+      const perGuest = Math.round(deal.basePrice * (1 - deal.discountPercent / 100));
+      const totalAmountNgn = perGuest * input.guestCount;
+      const reference = `discover_booking_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
       const [booking] = await db.insert(discoverBookings).values({
         userId: req.user?.id || null,
-        dealTitle, dealType, guestName, guestEmail,
-        guestCount: parseInt(guestCount) || 1,
-        bookingDate, totalAmountNgn: parseInt(totalAmountNgn),
+        dealTitle: input.dealTitle,
+        dealType: deal.type,
+        guestName: input.guestName,
+        guestEmail: input.guestEmail,
+        guestCount: input.guestCount,
+        bookingDate: input.bookingDate,
+        totalAmountNgn,
         paymentReference: reference, paymentStatus: 'pending',
       }).returning();
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/discover?booking_ref=${reference}`;
-      const txn = await paystack.initializeTransaction(
-        guestEmail,
-        parseInt(totalAmountNgn),
-        reference,
-        { bookingId: booking.id, dealTitle, guestName },
-        callbackUrl,
-        'NGN'
-      );
+      let txn;
+      try {
+        txn = await paystack.initializeTransaction(
+          input.guestEmail,
+          totalAmountNgn,
+          reference,
+          { bookingId: booking.id, dealTitle: input.dealTitle, guestEmail: input.guestEmail },
+          callbackUrl,
+          'NGN'
+        );
+      } catch (error) {
+        if (!(error instanceof PaystackRequestError) || !error.ambiguous) {
+          await db.delete(discoverBookings).where(eq(discoverBookings.id, booking.id));
+        }
+        throw error;
+      }
       res.json({ success: true, bookingId: booking.id, authorizationUrl: txn.data.authorization_url, reference });
     } catch (err) {
       console.error('[discover/bookings/initialize]', err);
-      res.status(500).json({ message: 'Failed to initialize booking payment' });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Please check your booking details', errors: err.errors });
+      res.status(err instanceof PaystackRequestError ? 502 : 500).json({ message: 'Failed to initialize booking payment' });
     }
   });
 
@@ -5171,33 +5340,41 @@ Return ONLY valid JSON:
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
       const { discoverPremium } = await import('@shared/schema');
       const { db } = await import('./db');
-      const { email } = req.body;
-      if (!email) return res.status(400).json({ message: 'Email required' });
-      const reference = `discover_premium_${Date.now()}_${require('crypto').randomBytes(4).toString('hex')}`;
-      const now = new Date();
-      const monthLater = new Date(now); monthLater.setMonth(monthLater.getMonth() + 1);
+      const { email } = z.object({
+        email: z.string().trim().email().max(255).transform(value => value.toLowerCase()),
+      }).parse(req.body);
+      const reference = `discover_premium_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
       const [sub] = await db.insert(discoverPremium).values({
         userId: req.user?.id || null,
         guestEmail: email,
         paymentReference: reference,
         paymentStatus: 'pending',
-        subscriptionStart: now,
-        subscriptionEnd: monthLater,
+        subscriptionStart: null,
+        subscriptionEnd: null,
       }).returning();
       const paystack = getPaystackService();
       const callbackUrl = `${req.protocol}://${req.get('host')}/discover?premium_ref=${reference}`;
-      const txn = await paystack.initializeTransaction(
-        email,
-        2500, // ₦2,500 face value (function converts to kobo)
-        reference,
-        { subscriptionId: sub.id, plan: 'Explorer Premium Monthly' },
-        callbackUrl,
-        'NGN'
-      );
+      let txn;
+      try {
+        txn = await paystack.initializeTransaction(
+          email,
+          2500,
+          reference,
+          { subscriptionId: sub.id, plan: 'Explorer Premium Monthly', guestEmail: email },
+          callbackUrl,
+          'NGN'
+        );
+      } catch (error) {
+        if (!(error instanceof PaystackRequestError) || !error.ambiguous) {
+          await db.delete(discoverPremium).where(eq(discoverPremium.id, sub.id));
+        }
+        throw error;
+      }
       res.json({ success: true, subscriptionId: sub.id, authorizationUrl: txn.data.authorization_url, reference });
     } catch (err) {
       console.error('[discover/premium/initialize]', err);
-      res.status(500).json({ message: 'Failed to initialize premium payment' });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid email address' });
+      res.status(err instanceof PaystackRequestError ? 502 : 500).json({ message: 'Failed to initialize premium payment' });
     }
   });
 
@@ -5205,25 +5382,54 @@ Return ONLY valid JSON:
   app.post('/api/discover/payment/verify', async (req, res) => {
     try {
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
-      const { reference } = req.body;
-      if (!reference) return res.status(400).json({ message: 'reference required' });
-      const paystack = getPaystackService();
-      const verification = await paystack.verifyTransaction(reference);
-      if (verification.data.status !== 'success') {
-        return res.status(400).json({ message: 'Payment not successful', status: verification.data.status });
-      }
+      const { reference } = z.object({
+        reference: z.string().regex(/^discover_(booking|premium)_\d+_[a-f0-9]{8}$/),
+      }).parse(req.body);
       const { discoverBookings, discoverPremium } = await import('@shared/schema');
       const { db } = await import('./db');
-      const { eq } = await import('drizzle-orm');
-      if (reference.includes('booking')) {
-        await db.update(discoverBookings).set({ paymentStatus: 'paid' }).where(eq(discoverBookings.paymentReference, reference));
-      } else if (reference.includes('premium')) {
-        await db.update(discoverPremium).set({ paymentStatus: 'active' }).where(eq(discoverPremium.paymentReference, reference));
+      const isBooking = reference.startsWith('discover_booking_');
+      const [record] = isBooking
+        ? await db.select().from(discoverBookings).where(eq(discoverBookings.paymentReference, reference))
+        : await db.select().from(discoverPremium).where(eq(discoverPremium.paymentReference, reference));
+      if (!record) return res.status(404).json({ message: 'Payment record not found' });
+      if (record.paymentStatus === 'paid' || record.paymentStatus === 'active') {
+        return res.json({ success: true, status: record.paymentStatus, type: isBooking ? 'booking' : 'premium' });
       }
-      res.json({ success: true, status: 'paid' });
+
+      const verification = await getPaystackService().verifyTransaction(reference);
+      const expectedAmount = isBooking ? Number((record as any).totalAmountNgn) : 2500;
+      const expectedMetadataId = isBooking ? (record as any).id : (record as any).id;
+      const metadataId = isBooking ? Number(verification.data.metadata?.bookingId) : Number(verification.data.metadata?.subscriptionId);
+      const expectedEmail = String((record as any).guestEmail || '').toLowerCase();
+      const verifiedEmail = String(verification.data.customer?.email || verification.data.metadata?.guestEmail || '').toLowerCase();
+      if (
+        verification.data.status !== 'success'
+        || verification.data.reference !== reference
+        || verification.data.currency !== 'NGN'
+        || verification.data.amount !== Math.round(expectedAmount * 100)
+        || metadataId !== expectedMetadataId
+        || verifiedEmail !== expectedEmail
+      ) {
+        return res.status(409).json({ message: 'Payment details could not be matched to this purchase' });
+      }
+
+      if (isBooking) {
+        await db.update(discoverBookings)
+          .set({ paymentStatus: 'paid' })
+          .where(and(eq(discoverBookings.id, (record as any).id), eq(discoverBookings.paymentStatus, 'pending')));
+        return res.json({ success: true, status: 'paid', type: 'booking' });
+      }
+      const subscriptionStart = new Date();
+      const subscriptionEnd = new Date(subscriptionStart);
+      subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1);
+      await db.update(discoverPremium)
+        .set({ paymentStatus: 'active', subscriptionStart, subscriptionEnd })
+        .where(and(eq(discoverPremium.id, (record as any).id), eq(discoverPremium.paymentStatus, 'pending')));
+      res.json({ success: true, status: 'active', type: 'premium' });
     } catch (err) {
       console.error('[discover/payment/verify]', err);
-      res.status(500).json({ message: 'Verification failed' });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Invalid payment reference' });
+      res.status(err instanceof PaystackRequestError ? 502 : 500).json({ message: 'Verification failed' });
     }
   });
 

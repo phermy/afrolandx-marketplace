@@ -1641,27 +1641,46 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDropRsvp(rsvp: InsertDropRsvp): Promise<DropRsvp> {
-    const [newRsvp] = await db.insert(dropRsvps).values(rsvp).returning();
-    
-    // Increment RSVP count
-    await db.update(collabDrops).set({ 
-      rsvpCount: sql`${collabDrops.rsvpCount} + 1` 
-    }).where(eq(collabDrops.id, rsvp.dropId));
-    
-    return newRsvp;
+    return await db.transaction(async tx => {
+      const [updatedDrop] = await tx.update(collabDrops)
+        .set({ rsvpCount: sql`coalesce(${collabDrops.rsvpCount}, 0) + 1` })
+        .where(and(
+          eq(collabDrops.id, rsvp.dropId),
+          sql`(${collabDrops.rsvpCap} IS NULL OR coalesce(${collabDrops.rsvpCount}, 0) < ${collabDrops.rsvpCap})`,
+        ))
+        .returning({ id: collabDrops.id });
+      if (!updatedDrop) throw new Error('RSVP_CAPACITY_REACHED');
+
+      const [newRsvp] = await tx.insert(dropRsvps)
+        .values(rsvp)
+        .onConflictDoNothing({ target: [dropRsvps.dropId, dropRsvps.userId] })
+        .returning();
+      if (!newRsvp) throw new Error('RSVP_ALREADY_EXISTS');
+      return newRsvp;
+    });
   }
 
   async getDropRsvps(dropId: number): Promise<DropRsvp[]> {
-    return await db.select().from(dropRsvps).where(eq(dropRsvps.dropId, dropId));
+    return await db.select().from(dropRsvps).where(and(
+      eq(dropRsvps.dropId, dropId),
+      eq(dropRsvps.status, 'confirmed'),
+    ));
   }
 
   async getUserDropRsvps(userId: string): Promise<DropRsvp[]> {
-    return await db.select().from(dropRsvps).where(eq(dropRsvps.userId, userId));
+    return await db.select().from(dropRsvps).where(and(
+      eq(dropRsvps.userId, userId),
+      eq(dropRsvps.status, 'confirmed'),
+    ));
   }
 
   async hasUserRsvped(userId: string, dropId: number): Promise<boolean> {
     const [rsvp] = await db.select().from(dropRsvps).where(
-      and(eq(dropRsvps.userId, userId), eq(dropRsvps.dropId, dropId))
+      and(
+        eq(dropRsvps.userId, userId),
+        eq(dropRsvps.dropId, dropId),
+        eq(dropRsvps.status, 'confirmed'),
+      )
     );
     return !!rsvp;
   }

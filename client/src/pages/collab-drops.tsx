@@ -57,7 +57,7 @@ export default function CollabDropsPage() {
   const [aiResult, setAiResult] = useState<{ dropIds: number[]; explanation: string } | null>(null);
   const [showAiPanel, setShowAiPanel] = useState(false);
 
-  const { data: drops = [], isLoading } = useQuery<CollabDrop[]>({
+  const { data: drops = [], isLoading, isError, refetch } = useQuery<CollabDrop[]>({
     queryKey: ["/api/collab-drops"],
   });
 
@@ -110,15 +110,13 @@ export default function CollabDropsPage() {
 
   // Apply AI filter on top of text filter
   const displayedDrops = useMemo(() => {
-    if (!aiResult || aiResult.dropIds.length === 0) return textFiltered;
+    if (!aiResult) return textFiltered;
     const ids = new Set(aiResult.dropIds);
-    const matched = textFiltered.filter(d => ids.has(d.id));
-    const rest = textFiltered.filter(d => !ids.has(d.id));
-    return [...matched, ...rest];
+    return textFiltered.filter(d => ids.has(d.id));
   }, [textFiltered, aiResult]);
 
-  const liveDrops = displayedDrops.filter(isDropLive);
-  const upcomingDrops = displayedDrops.filter(isDropUpcoming);
+  const liveDrops = displayedDrops.filter(d => d.status === 'live' || (d.status !== 'cancelled' && isDropLive(d)));
+  const upcomingDrops = displayedDrops.filter(d => d.status === 'upcoming' && isDropUpcoming(d));
   const pastDrops = displayedDrops.filter(d => !isDropLive(d) && !isDropUpcoming(d));
 
   const clearAi = () => { setAiResult(null); setAiQuery(""); setShowAiPanel(false); };
@@ -138,6 +136,15 @@ export default function CollabDropsPage() {
             Exclusive limited-edition collections featuring collaborations between top African designers and traditional artisans.
           </p>
         </div>
+
+        {isError && (
+          <Card className="mb-6 border-red-200 bg-red-50">
+            <CardContent className="py-6 text-center">
+              <p className="text-sm text-red-800 mb-3">Collaboration drops could not be loaded.</p>
+              <Button variant="outline" onClick={() => refetch()}>Try again</Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Search + AI bar */}
         <div className="mb-6 space-y-3">
