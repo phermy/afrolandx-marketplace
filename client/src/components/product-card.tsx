@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { useCart } from '@/contexts/CartContext';
-import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,23 +22,12 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart, isAddingToCart, openCart } = useCart();
-  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
-  const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const handleAddToCart = () => {
-    if (!isAuthenticated) {
-      window.location.href = '/login';
-      return;
-    }
-    addToCart(product.id, 1);
-    setIsAddedToCart(true);
-    setTimeout(() => {
-      openCart();
-      setIsAddedToCart(false);
-    }, 1500);
+    // Product options and authentication are handled on the detail page.
+    setLocation(`/products/${product.id}`);
   };
 
   const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
@@ -89,9 +76,9 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           {getStatusBadge()}
 
-          {product.featured && (
+              {product.featured && (
             <Badge className="absolute top-2 right-2 z-10 bg-nigerian-gold text-white text-[10px] sm:text-xs px-1.5 py-0.5">
-              ⭐ Featured
+              Featured
             </Badge>
           )}
 
@@ -167,31 +154,15 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="mt-auto space-y-1.5">
             <Button
               onClick={handleAddToCart}
-              disabled={!isAvailable || isAddingToCart || isAddedToCart}
+              disabled={!isAvailable}
               size="sm"
-              className={`w-full text-xs sm:text-sm transition-all duration-200 ${
-                isAddedToCart ? 'bg-green-600 hover:bg-green-600' : 'btn-nigerian'
-              }`}
-              data-testid="button-add-to-cart"
+              className="w-full text-xs sm:text-sm transition-all duration-200 btn-nigerian"
+              data-testid="button-view-product"
             >
-              {isAddingToCart ? (
-                <span className="flex items-center justify-center gap-1">
-                  <div className="spinner-nigerian w-3 h-3" />
-                  Adding…
-                </span>
-              ) : isAddedToCart ? (
-                <span className="flex items-center justify-center gap-1">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Added!
-                </span>
-              ) : !isAvailable ? (
+              {!isAvailable ? (
                 isOutOfStock ? 'Out of Stock' : 'Unavailable'
-              ) : !isAuthenticated ? (
-                'Login to Buy'
               ) : (
-                'Add to Cart'
+                'View Product'
               )}
             </Button>
 

@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/:id', async (req, res) => {
+  app.get('/api/products/:id(\\d+)', async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
       const product = await storage.getProduct(productId);
@@ -1451,8 +1451,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Test Paystack integration with payment initialization
-  app.get('/api/test-paystack', async (req, res) => {
+  app.get('/api/test-paystack', isAuthenticated, isAdmin, async (req, res) => {
     try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(404).json({ message: 'Not found' });
+      }
       if (!isPaystackInitialized()) {
         return res.status(500).json({ 
           status: 'error', 
@@ -1910,7 +1913,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(orders.checkoutRequestId, checkoutRequestId),
       ));
       if (existingCheckout) {
-        if (existingCheckout.paymentStatus !== 'pending' || !existingCheckout.paymentReference) {
+        if (!existingCheckout.paymentReference) {
+          return res.status(409).json({ message: 'This checkout request has already been completed or closed' });
+        }
+        if (existingCheckout.paymentStatus === 'paid') {
+          return res.json({
+            completed: true,
+            orderId: existingCheckout.id,
+            reference: existingCheckout.paymentReference,
+          });
+        }
+        if (existingCheckout.paymentStatus !== 'pending') {
           return res.status(409).json({ message: 'This checkout request has already been completed or closed' });
         }
         if (existingCheckout.paymentUrl) {
@@ -1922,33 +1935,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             estimatedShipping: !!existingCheckout.shippingEstimatedAmount,
           });
         }
-        const retryData = await getPaystackService().initializeTransaction(
-          user.email,
-          Number(existingCheckout.totalAmount),
-          existingCheckout.paymentReference,
-          {
-            orderId: existingCheckout.id,
-            userId,
-            shippingMethod: existingCheckout.shippingMethod,
-            ...(existingCheckout.shippingQuoteRequestId ? { shippingQuoteId: existingCheckout.shippingQuoteRequestId } : {}),
-          },
-          `${req.protocol}://${req.get('host')}/api/payment/callback`,
-          'NGN',
-        );
-        if (!retryData?.data?.authorization_url) throw new Error('Payment provider did not return a checkout URL');
-        await db.update(orders).set({
-          paymentUrl: retryData.data.authorization_url,
-          updatedAt: new Date(),
-        }).where(and(
-          eq(orders.id, existingCheckout.id),
-          eq(orders.paymentStatus, 'pending'),
-        ));
-        return res.json({
-          order: existingCheckout,
-          paymentUrl: retryData.data.authorization_url,
-          reference: existingCheckout.paymentReference,
-          awaitingShippingQuote: existingCheckout.orderStatus === 'awaiting_shipping_quote',
-          estimatedShipping: !!existingCheckout.shippingEstimatedAmount,
+        try {
+          const verification = await getPaystackService().verifyTransaction(existingCheckout.paymentReference);
+          const providerStatus = verification.data.status?.toLowerCase();
+          if (providerStatus === 'success') {
+            const mismatch = paymentVerificationError(existingCheckout, verification, existingCheckout.paymentReference);
+            if (mismatch) return res.status(409).json({ message: mismatch });
+            await completeVerifiedOrder(existingCheckout, existingCheckout.paymentReference);
+            await db.update(orders).set({
+              paymentInitializationStatus: 'ready',
+              updatedAt: new Date(),
+            }).where(eq(orders.id, existingCheckout.id));
+            return res.json({
+              completed: true,
+              orderId: existingCheckout.id,
+              reference: existingCheckout.paymentReference,
+            });
+          }
+          if (providerStatus === 'failed' || providerStatus === 'abandoned') {
+            if (existingCheckout.shippingQuoteRequestId) {
+              await storage.releaseReservedShippingQuoteOrder(
+                existingCheckout.id,
+                existingCheckout.shippingQuoteRequestId,
+                userId,
+              );
+            } else {
+              await storage.releasePendingOrder(existingCheckout.id, userId);
+            }
+            return res.status(409).json({ message: 'The previous payment attempt was closed. Please try checkout again.' });
+          }
+          await db.update(orders).set({
+            paymentInitializationStatus: 'uncertain',
+            updatedAt: new Date(),
+          }).where(eq(orders.id, existingCheckout.id));
+        } catch (error) {
+          console.error('Unable to reconcile existing checkout:', error);
+        }
+        return res.status(409).json({
+          message: 'Payment initialization has an uncertain provider result. Please contact support before trying again.',
         });
       }
 
@@ -2046,6 +2070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shippingPaymentStatus: 'included',
         paymentReference: reference,
         checkoutRequestId,
+        paymentInitializationStatus: 'initializing',
       };
 
       const orderItemData = cartItems.map(item => ({
@@ -2054,19 +2079,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         priceAtTime: item.product.price,
         selectedSize: item.selectedSize ?? null,
       }));
-      const order = shippingQuoteRequestId
-        ? quotePending
-          ? await storage.createOrderAwaitingShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
-          : await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
-        : await storage.createOrder(orderData);
+      let order;
+      try {
+        order = shippingQuoteRequestId
+          ? quotePending
+            ? await storage.createOrderAwaitingShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
+            : await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
+          : await storage.createOrderWithItems(orderData, orderItemData);
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          const [concurrentCheckout] = await db.select().from(orders).where(and(
+            eq(orders.userId, userId),
+            eq(orders.checkoutRequestId, checkoutRequestId),
+          ));
+          if (concurrentCheckout?.paymentUrl && concurrentCheckout.paymentReference) {
+            return res.json({
+              order: concurrentCheckout,
+              paymentUrl: concurrentCheckout.paymentUrl,
+              reference: concurrentCheckout.paymentReference,
+              awaitingShippingQuote: concurrentCheckout.orderStatus === 'awaiting_shipping_quote',
+              estimatedShipping: !!concurrentCheckout.shippingEstimatedAmount,
+            });
+          }
+          return res.status(409).json({ message: 'This checkout is already being initialized. Please retry shortly.' });
+        }
+        throw error;
+      }
       if (!order) {
         return res.status(409).json({ message: 'This shipping quote has already been used or has expired. Please request a new quote.' });
-      }
-
-      if (!shippingQuoteRequestId) {
-        for (const item of orderItemData) {
-          await storage.createOrderItem({ orderId: order.id, ...item });
-        }
       }
 
       // Initialize Paystack payment in buyer's currency
@@ -2094,12 +2134,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         providerAcceptedPayment = true;
         await db.update(orders).set({
           paymentUrl: paymentData.data.authorization_url,
+          paymentInitializationStatus: 'ready',
           updatedAt: new Date(),
         }).where(and(eq(orders.id, order.id), eq(orders.paymentStatus, 'pending')));
       } catch (error) {
         const outcomeUnknown = error instanceof PaystackRequestError && error.ambiguous;
-        if (shippingQuoteRequestId && !providerAcceptedPayment && !outcomeUnknown) {
-          await storage.releaseReservedShippingQuoteOrder(order.id, shippingQuoteRequestId, userId);
+        if (outcomeUnknown || providerAcceptedPayment) {
+          await db.update(orders).set({
+            paymentInitializationStatus: 'uncertain',
+            updatedAt: new Date(),
+          }).where(and(eq(orders.id, order.id), eq(orders.paymentStatus, 'pending')));
+        }
+        if (!providerAcceptedPayment && !outcomeUnknown) {
+          if (shippingQuoteRequestId) {
+            await storage.releaseReservedShippingQuoteOrder(order.id, shippingQuoteRequestId, userId);
+          } else {
+            await storage.releasePendingOrder(order.id, userId);
+          }
         }
         throw error;
       }

@@ -140,6 +140,7 @@ export const orders = pgTable("orders", {
   paymentStatus: varchar("payment_status").default("pending"), // pending, paid, failed
   checkoutRequestId: varchar("checkout_request_id", { length: 100 }).unique(),
   paymentUrl: text("payment_url"),
+  paymentInitializationStatus: varchar("payment_initialization_status", { length: 32 }).notNull().default("pending"), // pending, initializing, ready, uncertain
   stockReservationStatus: varchar("stock_reservation_status", { length: 32 }).notNull().default("pending"), // pending, reserved, failed
   orderStatus: varchar("order_status").default("pending"), // pending, processing, shipped, delivered, cancelled
   shippingAddress: jsonb("shipping_address").notNull(),
