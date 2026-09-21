@@ -29,6 +29,7 @@ const basePolicies: Policy[] = [
   ]},
   { slug: "return-policy", title: "Return Policy", summary: "The process and eligibility guidance for returning an item.", sections: [
     { heading: "Requesting a return", body: "Start a return through the order page as soon as possible, stating the order number, reason and remedy requested. Do not send an item back without the return instructions provided for that order." },
+    { heading: "Listing classifications", body: "Each product shows one AfrolandX-approved classification: standard returns accepted, final sale, custom-made item or hygiene-sensitive item. A classification explains change-of-mind eligibility; it does not remove rights that apply to faulty, unsafe, damaged, counterfeit or materially misdescribed goods." },
     { heading: "Condition and evidence", body: "Keep the item, packaging, tags and relevant communications. Items should be returned in the condition required by the listing and return instructions, subject to applicable consumer rights and any disclosed exceptions." },
     { heading: "Review", body: "Afrolandx may request photographs, tracking or other evidence and may involve the vendor, verification agent or carrier. The outcome and any next step will be explained after review." },
     { heading: "Contact", body: contact },

@@ -20,6 +20,7 @@ import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFash
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
+import { RETURN_POLICY_OPTIONS, type ReturnPolicyValue } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
 
 type VariantDraft = {
@@ -41,7 +42,7 @@ export default function VendorDashboard() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ contactName: '', businessName: '', phone: '', cacNumber: '', description: '' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '' });
+  const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '', returnPolicy: 'standard_returns' as ReturnPolicyValue });
   const [editCurrentImages, setEditCurrentImages] = useState<string[]>([]);
   const [editRemovedImages, setEditRemovedImages] = useState<string[]>([]);
   const [editNewFiles, setEditNewFiles] = useState<File[]>([]);
@@ -56,7 +57,7 @@ export default function VendorDashboard() {
   const [addForm, setAddForm] = useState({
     name: '', shortDescription: '', description: '', tags: '', sku: '', price: '',
     compareAtPrice: '', stock: '', weight: '', dimensions: '', shippingClass: '',
-    processingTime: '', careInstructions: '', returnPolicy: '', metaTitle: '', metaDescription: '', imageUrl: '',
+    processingTime: '', careInstructions: '', returnPolicy: 'standard_returns' as ReturnPolicyValue, metaTitle: '', metaDescription: '', imageUrl: '',
     requiresMeasurements: false,
   });
   const [addFiles, setAddFiles] = useState<File[]>([]);
@@ -349,7 +350,7 @@ export default function VendorDashboard() {
     setAddForm({
       name: '', shortDescription: '', description: '', tags: '', sku: '', price: '',
       compareAtPrice: '', stock: '', weight: '', dimensions: '', shippingClass: '',
-      processingTime: '', careInstructions: '', returnPolicy: '', metaTitle: '', metaDescription: '', imageUrl: '',
+      processingTime: '', careInstructions: '', returnPolicy: 'standard_returns' as ReturnPolicyValue, metaTitle: '', metaDescription: '', imageUrl: '',
       requiresMeasurements: false,
     });
     setAddFiles([]);
@@ -524,7 +525,7 @@ export default function VendorDashboard() {
     if (addForm.shippingClass) fd.set('shippingClass', addForm.shippingClass);
     if (addForm.processingTime.trim()) fd.set('processingTime', addForm.processingTime.trim());
     if (addForm.careInstructions.trim()) fd.set('careInstructions', addForm.careInstructions.trim());
-    if (addForm.returnPolicy.trim()) fd.set('returnPolicy', addForm.returnPolicy.trim());
+    fd.set('returnPolicy', addForm.returnPolicy);
     if (addForm.metaTitle.trim()) fd.set('metaTitle', addForm.metaTitle.trim());
     if (addForm.metaDescription.trim()) fd.set('metaDescription', addForm.metaDescription.trim());
     fd.set('requiresMeasurements', String(addForm.requiresMeasurements));
@@ -960,6 +961,9 @@ export default function VendorDashboard() {
                                   price: product.price,
                                   stock: String(product.stock),
                                   imageUrl: product.imageUrl || '',
+                                 returnPolicy: RETURN_POLICY_OPTIONS.some(option => option.value === product.returnPolicy)
+                                   ? product.returnPolicy as ReturnPolicyValue
+                                   : 'standard_returns',
                                 });
                                 setEditGender(product.gender || '');
                                 setEditOriginCountry((product as any).originCountry || '');
@@ -1784,15 +1788,25 @@ export default function VendorDashboard() {
                    className="input-nigerian"
                  />
                </div>
-               <div className="space-y-1.5">
-                 <Label className="text-sm">Return Policy</Label>
-                 <Textarea
-                   placeholder="State your return or exchange terms."
-                   rows={2}
-                   value={addForm.returnPolicy}
-                   onChange={e => setAddForm(f => ({ ...f, returnPolicy: e.target.value }))}
-                   className="input-nigerian"
-                 />
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Return classification</Label>
+                  <Select
+                    value={addForm.returnPolicy}
+                    onValueChange={(value: ReturnPolicyValue) => setAddForm(f => ({ ...f, returnPolicy: value }))}
+                  >
+                    <SelectTrigger className="input-nigerian">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RETURN_POLICY_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    {RETURN_POLICY_OPTIONS.find(option => option.value === addForm.returnPolicy)?.description}
+                    {' '}AfrolandX reviews this selection and the standard marketplace policy always applies.
+                  </p>
                </div>
              </div>
 
@@ -2041,6 +2055,27 @@ export default function VendorDashboard() {
               />
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="font-medium">Return classification</Label>
+              <Select
+                value={editForm.returnPolicy}
+                onValueChange={(value: ReturnPolicyValue) => setEditForm(form => ({ ...form, returnPolicy: value }))}
+              >
+                <SelectTrigger className="input-nigerian">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RETURN_POLICY_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                {RETURN_POLICY_OPTIONS.find(option => option.value === editForm.returnPolicy)?.description}
+                {' '}AfrolandX reviews this selection before approving the listing.
+              </p>
+            </div>
+
             {/* Price + Stock */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -2169,6 +2204,7 @@ export default function VendorDashboard() {
                       price: editForm.price,
                       stock: parseInt(editForm.stock) || 0,
                       imageUrl: editForm.imageUrl || '',
+                       returnPolicy: editForm.returnPolicy,
                       gender: editGender || null,
                       originCountry: editOriginCountry || null,
                       traditionalName: editTraditionalName || null,

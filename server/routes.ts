@@ -11,6 +11,7 @@ import {
   insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
   insertProductStorySchema, insertFabricAssetSchema, insertCollabDropSchema, orders, orderItems, products, vendors,
   vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests,
+  returnPolicySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1043,7 +1044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shippingClass: req.body.shippingClass && req.body.shippingClass.trim() ? req.body.shippingClass.trim() : null,
           processingTime: req.body.processingTime && req.body.processingTime.trim() ? req.body.processingTime.trim() : null,
           careInstructions: req.body.careInstructions && req.body.careInstructions.trim() ? req.body.careInstructions.trim() : null,
-          returnPolicy: req.body.returnPolicy && req.body.returnPolicy.trim() ? req.body.returnPolicy.trim() : null,
+          returnPolicy: returnPolicySchema.parse(req.body.returnPolicy || "standard_returns"),
           metaTitle: req.body.metaTitle && req.body.metaTitle.trim() ? req.body.metaTitle.trim() : null,
           metaDescription: req.body.metaDescription && req.body.metaDescription.trim() ? req.body.metaDescription.trim() : null,
           requiresMeasurements: req.body.requiresMeasurements === 'true',
@@ -1180,7 +1181,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (shippingClass !== undefined) updates.shippingClass = shippingClass && shippingClass.trim() ? shippingClass.trim() : null;
       if (processingTime !== undefined) updates.processingTime = processingTime && processingTime.trim() ? processingTime.trim() : null;
       if (careInstructions !== undefined) updates.careInstructions = careInstructions && careInstructions.trim() ? careInstructions.trim() : null;
-      if (returnPolicy !== undefined) updates.returnPolicy = returnPolicy && returnPolicy.trim() ? returnPolicy.trim() : null;
+       if (returnPolicy !== undefined) {
+         const parsedReturnPolicy = returnPolicySchema.safeParse(returnPolicy);
+         if (!parsedReturnPolicy.success) {
+           return res.status(400).json({ message: 'Select an approved AfrolandX return classification' });
+         }
+         updates.returnPolicy = parsedReturnPolicy.data;
+       }
       if (metaTitle !== undefined) updates.metaTitle = metaTitle && metaTitle.trim() ? metaTitle.trim() : null;
       if (metaDescription !== undefined) updates.metaDescription = metaDescription && metaDescription.trim() ? metaDescription.trim() : null;
       if (requiresMeasurements !== undefined) updates.requiresMeasurements = requiresMeasurements === true || requiresMeasurements === 'true';

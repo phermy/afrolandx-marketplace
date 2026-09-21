@@ -15,6 +15,36 @@ import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const RETURN_POLICY_OPTIONS = [
+  {
+    value: "standard_returns",
+    label: "Standard returns accepted",
+    description: "Eligible returns follow the standard AfrolandX return and refund process.",
+  },
+  {
+    value: "final_sale",
+    label: "Final sale",
+    description: "Change-of-mind returns are not accepted, subject to applicable consumer rights.",
+  },
+  {
+    value: "custom_made",
+    label: "Custom-made item",
+    description: "Made-to-order or personalised items are normally non-returnable unless faulty or not as described.",
+  },
+  {
+    value: "hygiene_sensitive",
+    label: "Hygiene-sensitive item",
+    description: "Returns may be restricted after opening, use, or removal of a hygiene seal.",
+  },
+] as const;
+
+export const RETURN_POLICY_VALUES = RETURN_POLICY_OPTIONS.map(option => option.value) as [
+  (typeof RETURN_POLICY_OPTIONS)[number]["value"],
+  ...(typeof RETURN_POLICY_OPTIONS)[number]["value"][],
+];
+export const returnPolicySchema = z.enum(RETURN_POLICY_VALUES);
+export type ReturnPolicyValue = z.infer<typeof returnPolicySchema>;
+
 // Session storage table for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -739,6 +769,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
 }).extend({
   stock: z.number().min(0).default(0),
   imageUrl: z.string().optional(),
+  returnPolicy: returnPolicySchema.nullable().default("standard_returns"),
 });
 
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({
