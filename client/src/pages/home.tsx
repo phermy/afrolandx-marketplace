@@ -15,15 +15,16 @@ import { getUserRoleDisplay, isAdmin } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.png';
-import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.png';
-import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.png';
-import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.png';
-import moroccanImg from '@assets/stock_images/moroccan_berber_culture.png';
-import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
-import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
-import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
-import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
+import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.webp';
+import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.webp';
+import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.webp';
+import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.webp';
+import moroccanImg from '@assets/stock_images/moroccan_berber_culture.webp';
+import ndebeImg from '@assets/stock_images/ndebele_south_africa.webp';
+import panAfricanImg from '@assets/stock_images/pan_african_diversity.webp';
+import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
+import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
+import HeritageEditorial from "@/components/heritage-editorial";
 
 const culturalSlides = [
   { image: panAfricanImg,  country: "Pan-Africa",       label: "Unity in Diversity",         flag: "AF" },
@@ -200,6 +201,7 @@ export default function Home() {
       </section>
 
       {/* Search and Filters */}
+      <HeritageEditorial />
       <section className="py-8 bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">

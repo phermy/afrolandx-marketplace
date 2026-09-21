@@ -2075,16 +2075,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             shippingQuoteRequestId = request.id;
             if (!reusable) {
-              const buyer = await storage.getUser(userId);
               const admins = await storage.getAdminUsers();
-              for (const admin of admins) {
-                await storage.createNotification({
+              await Promise.all(admins.map(admin =>
+                storage.createNotification({
                   userId: admin.id,
                   type: 'shipping_quote',
                   title: 'New shipping quote request',
-                  message: `${buyer?.firstName || buyer?.email || 'A buyer'} placed an order using an estimated ${shippingQuote.carrier} shipping price. Confirm the final rate.`,
-                });
-              }
+                  message: `${user.firstName || user.email || 'A buyer'} placed an order using an estimated ${shippingQuote.carrier} shipping price. Confirm the final rate.`,
+                })
+              ));
             }
           }
           const confirmed = await storage.getShippingQuoteRequest(shippingQuoteRequestId);
@@ -2143,15 +2142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? quotePending
           ? await storage.createOrderAwaitingShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
           : await storage.createOrderWithReservedShippingQuote(orderData, shippingQuoteRequestId, userId, orderItemData)
-        : await storage.createOrder(orderData);
+        : await storage.createOrderWithItems(orderData, orderItemData);
       if (!order) {
         return res.status(409).json({ message: 'This shipping quote has already been used or has expired. Please request a new quote.' });
-      }
-
-      if (!shippingQuoteRequestId) {
-        for (const item of orderItemData) {
-          await storage.createOrderItem({ orderId: order.id, ...item });
-        }
       }
 
       // Initialize Paystack payment in buyer's currency

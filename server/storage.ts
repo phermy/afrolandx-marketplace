@@ -133,6 +133,10 @@ export interface IStorage {
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
+  createOrderWithItems(
+    order: InsertOrder,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order>;
   createOrderWithReservedShippingQuote(
     order: InsertOrder,
     quoteId: number,
@@ -680,6 +684,19 @@ export class DatabaseStorage implements IStorage {
       .values(order)
       .returning();
     return newOrder;
+  }
+
+  async createOrderWithItems(
+    order: InsertOrder,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order> {
+    return await db.transaction(async tx => {
+      const [newOrder] = await tx.insert(orders).values(order).returning();
+      if (items.length > 0) {
+        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
+      }
+      return newOrder;
+    });
   }
 
   async createOrderWithReservedShippingQuote(

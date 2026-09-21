@@ -12,15 +12,16 @@ import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "luc
 import type { Product } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.png';
-import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.png';
-import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.png';
-import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.png';
-import moroccanImg from '@assets/stock_images/moroccan_berber_culture.png';
-import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
-import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
-import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
-import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
+import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.webp';
+import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.webp';
+import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.webp';
+import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.webp';
+import moroccanImg from '@assets/stock_images/moroccan_berber_culture.webp';
+import ndebeImg from '@assets/stock_images/ndebele_south_africa.webp';
+import panAfricanImg from '@assets/stock_images/pan_african_diversity.webp';
+import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
+import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
+import HeritageEditorial from "@/components/heritage-editorial";
 
 const culturalSlides = [
   { image: panAfricanImg, country: "Pan-Africa", label: "Unity in Diversity", flag: "AF" },
@@ -123,7 +124,7 @@ export default function Landing() {
             </div>
 
             {/* Desktop Nav Links */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden lg:flex items-center space-x-6">
               <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-products">Products</a>
               <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
               <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
@@ -134,17 +135,17 @@ export default function Landing() {
 
             {/* Right actions */}
             <div className="flex items-center space-x-2">
-              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden md:flex border-green-700 text-green-700 hover:bg-green-50">
+              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden lg:flex border-green-700 text-green-700 hover:bg-green-50">
                 Sign In
               </Button>
-              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4 hidden md:flex">
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4 hidden lg:flex">
                 Sign Up
               </Button>
               {/* Mobile Hamburger */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden"
+                className="lg:hidden"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -155,7 +156,7 @@ export default function Landing() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+          <div className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
             <div className="px-4 py-4 space-y-1 pb-24">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Explore</p>
               <a href="/products" onClick={() => setIsMobileMenuOpen(false)}
@@ -280,6 +281,7 @@ export default function Landing() {
       </section>
 
       {/* Featured Products Section */}
+      <HeritageEditorial />
       <section className="py-12 md:py-20 bg-white" id="products">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-16">

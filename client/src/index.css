@@ -32,6 +32,116 @@
   --traditional-brown: hsl(25, 50%, 30%);
 }
 
+.heritage-editorial {
+  background: #f1e8d8;
+  color: #183d36;
+  padding: clamp(3.5rem, 8vw, 7.5rem) max(1.25rem, calc((100vw - 78rem) / 2));
+  position: relative;
+  overflow: hidden;
+}
+.heritage-editorial::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 9px;
+  background: repeating-linear-gradient(90deg, #c7683d 0 34px, #e0ae4f 34px 68px, #1b6856 68px 102px);
+}
+.heritage-editorial__intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, .8fr);
+  gap: 4rem;
+  align-items: end;
+}
+.heritage-kicker {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  color: #a45336;
+  font: 700 .72rem/1 "Space Grotesk", sans-serif;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin: 0 0 1.1rem;
+}
+.heritage-editorial h2 {
+  max-width: 47rem;
+  margin: 0;
+  font: 600 clamp(2.25rem, 5.5vw, 5.8rem)/.96 "Space Grotesk", sans-serif;
+  letter-spacing: -.065em;
+}
+.heritage-editorial__lede {
+  max-width: 28rem;
+  color: #4c655d;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin: 0 0 .25rem;
+}
+.heritage-notice {
+  display: flex;
+  gap: .65rem;
+  align-items: flex-start;
+  max-width: 52rem;
+  margin: 2.5rem 0 3rem;
+  padding: .9rem 1rem;
+  border-left: 3px solid #c7683d;
+  background: rgba(255, 249, 236, .72);
+  color: #4c655d;
+  font-size: .87rem;
+  line-height: 1.5;
+}
+.heritage-notice svg { flex: 0 0 auto; color: #a45336; margin-top: .15rem; }
+.heritage-notice strong { color: #183d36; }
+.heritage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.heritage-card {
+  background: #fbf5e9;
+  border: 1px solid rgba(24, 61, 54, .14);
+  display: grid;
+  grid-template-columns: minmax(8rem, .8fr) minmax(0, 1.2fr);
+  min-height: 18rem;
+  transition: transform .35s ease, box-shadow .35s ease;
+}
+.heritage-card:hover { transform: translateY(-5px); box-shadow: 0 18px 35px rgba(24,61,54,.13); }
+.heritage-card--wide { grid-column: span 2; grid-template-columns: minmax(13rem, 1.1fr) minmax(0, .9fr); }
+.heritage-card__image-wrap { position: relative; min-height: 100%; overflow: hidden; background: #d8cbb8; }
+.heritage-card__image-wrap img { width: 100%; height: 100%; min-height: 18rem; object-fit: cover; transition: transform .6s ease; }
+.heritage-card:hover img { transform: scale(1.04); }
+.heritage-card__index { position: absolute; left: .8rem; top: .8rem; padding: .3rem .45rem; background: #183d36; color: #f8eddb; font: 700 .68rem "Space Mono", monospace; }
+.heritage-card__body { padding: 1.35rem 1.4rem 1.2rem; display: flex; flex-direction: column; }
+.heritage-card__place { color: #a45336; display: flex; align-items: center; gap: .3rem; font: 700 .68rem "Space Grotesk", sans-serif; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .9rem; }
+.heritage-card h3 { margin: 0 0 .6rem; font: 600 clamp(1.25rem, 2vw, 1.8rem)/1.05 "Space Grotesk", sans-serif; letter-spacing: -.035em; }
+.heritage-card__copy { color: #536b62; font-size: .9rem; line-height: 1.6; margin: 0 0 1.2rem; }
+.heritage-card__source { color: #a45336; display: inline-flex; align-items: center; gap: .35rem; font-size: .7rem; line-height: 1.4; margin-top: auto; text-decoration: none; }
+.heritage-card__source:hover { text-decoration: underline; }
+@media (max-width: 700px) {
+  .heritage-editorial__intro { display: block; }
+  .heritage-editorial__lede { margin-top: 1.4rem; }
+  .heritage-grid { grid-template-columns: 1fr; }
+  .heritage-card, .heritage-card--wide { grid-column: auto; grid-template-columns: 42% 58%; min-height: 16rem; }
+  .heritage-card__image-wrap img { min-height: 16rem; }
+  .heritage-card__body { padding: 1rem; }
+  .heritage-card__copy { font-size: .82rem; }
+}
+@media (max-width: 520px) {
+  .heritage-card,
+  .heritage-card--wide {
+    grid-template-columns: 1fr;
+  }
+  .heritage-card__image-wrap,
+  .heritage-card__image-wrap img {
+    min-height: 17rem;
+    max-height: 20rem;
+  }
+  .heritage-card__body {
+    padding: 1.25rem;
+  }
+  .heritage-card__copy {
+    font-size: .9rem;
+  }
+}
+
 .dark {
   --background: hsl(240, 10%, 3.9%);
   --foreground: hsl(0, 0%, 98%);
