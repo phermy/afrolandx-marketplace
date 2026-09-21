@@ -5,8 +5,19 @@ import { initializePaystack } from "./paystack";
 import { initializeCloudStorage } from "./cloudStorage";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users, culturalQuizzes } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import {
+  users,
+  vendors,
+  products,
+  cartItems,
+  productStories,
+  fabricAssets,
+  culturalQuizzes,
+  eventCollections,
+  collabDrops,
+  dropRsvps,
+} from "@shared/schema";
+import { and, eq, inArray, lt } from "drizzle-orm";
 
 const app = express();
 app.use(express.json({
@@ -57,6 +68,96 @@ app.use((req, res, next) => {
   // Cloud storage migration disabled to prevent credential errors
   // Migration can be manually triggered via /api/admin/migrate-images when credentials are valid
   log('Cloud storage infrastructure ready, using optimized local image serving with automatic compression');
+
+  // Remove the confirmed legacy demo catalog while retaining products referenced
+  // by historical orders. The date boundary prevents future vendors or content
+  // with similar names from being affected.
+  try {
+    const legacyCutoff = new Date('2026-05-01T00:00:00.000Z');
+    await db.transaction(async (tx) => {
+      const legacyVendors = await tx
+        .select({ id: vendors.id })
+        .from(vendors)
+        .where(and(
+          eq(vendors.businessName, 'Adunni Fashion'),
+          lt(vendors.createdAt, legacyCutoff),
+        ));
+      const legacyVendorIds = legacyVendors.map(vendor => vendor.id);
+
+      if (legacyVendorIds.length > 0) {
+        const legacyProductIds = tx
+          .select({ id: products.id })
+          .from(products)
+          .where(inArray(products.vendorId, legacyVendorIds));
+
+        await tx.delete(cartItems).where(inArray(cartItems.productId, legacyProductIds));
+        await tx.delete(productStories).where(inArray(productStories.productId, legacyProductIds));
+        await tx.delete(fabricAssets).where(inArray(fabricAssets.productId, legacyProductIds));
+        await tx.update(products).set({
+          status: 'rejected',
+          featured: false,
+          stock: 0,
+          imageUrl: null,
+          images: [],
+          updatedAt: new Date(),
+        }).where(inArray(products.vendorId, legacyVendorIds));
+        await tx.update(vendors).set({
+          status: 'rejected',
+          updatedAt: new Date(),
+        }).where(inArray(vendors.id, legacyVendorIds));
+      }
+
+      const legacyDropNames = [
+        'Adire x Ankara: The Lagos Drop',
+        'Gold & Coral: Heritage Edition',
+        'Ekiti Indigo Summer Series',
+      ];
+      const legacyDropIds = tx
+        .select({ id: collabDrops.id })
+        .from(collabDrops)
+        .where(and(
+          inArray(collabDrops.name, legacyDropNames),
+          lt(collabDrops.createdAt, legacyCutoff),
+        ));
+      await tx.delete(dropRsvps).where(inArray(dropRsvps.dropId, legacyDropIds));
+      await tx.delete(collabDrops).where(and(
+        inArray(collabDrops.name, legacyDropNames),
+        lt(collabDrops.createdAt, legacyCutoff),
+      ));
+
+      await tx.delete(eventCollections).where(and(
+        inArray(eventCollections.name, [
+          'Royal Agbada Wedding Set',
+          'Coral Beads Bridal Package',
+          'Festival Aso-Ebi Collection',
+          'Naming Ceremony Welcome Set',
+          'Chieftaincy Title Regalia',
+        ]),
+        lt(eventCollections.createdAt, legacyCutoff),
+      ));
+
+      const testVendors = await tx
+        .select({ id: vendors.id })
+        .from(vendors)
+        .where(and(
+          eq(vendors.businessName, 'Test Vendor Co'),
+          lt(vendors.createdAt, legacyCutoff),
+        ));
+      for (const testVendor of testVendors) {
+        const [referencedProduct] = await tx
+          .select({ id: products.id })
+          .from(products)
+          .where(eq(products.vendorId, testVendor.id))
+          .limit(1);
+        if (!referencedProduct) {
+          await tx.delete(vendors).where(eq(vendors.id, testVendor.id));
+        }
+      }
+    });
+    log('Legacy demo storefront cleanup complete');
+  } catch (error) {
+    log(`Legacy demo storefront cleanup failed: ${error}`);
+  }
   
   // Ensure designated admin accounts have admin role on every boot
   const adminEmails = ["femi.elegbeleye@afrolandx.com", "oluwaseun.alo@afrolandx.com"];
