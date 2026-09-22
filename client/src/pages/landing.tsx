@@ -22,6 +22,7 @@ import panAfricanImg from '@assets/stock_images/pan_african_diversity.webp';
 import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
 import HeritageEditorial from "@/components/heritage-editorial";
+import HeritageCarousel from "@/components/heritage-carousel";
 
 type PublicMarketplaceStats = {
   verifiedVendors: number;
@@ -567,19 +568,7 @@ export default function Landing() {
                 Join Our Community
               </Button>
             </div>
-            <div className="relative overflow-hidden rounded-xl shadow-2xl bg-gray-900 min-h-[320px]">
-              <img
-                src={panAfricanImg}
-                alt="African heritage and community"
-                className="absolute inset-0 h-full w-full object-cover"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-lg">African Heritage</h3>
-                <p className="text-white/90 text-sm drop-shadow-md">Celebrating the visionaries who shaped our continent</p>
-              </div>
-            </div>
+            <HeritageCarousel />
           </div>
         </div>
       </section>
