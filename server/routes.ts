@@ -279,6 +279,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Privacy-safe public marketplace totals for the homepage.
+  app.get('/api/public/stats', async (_req, res) => {
+    try {
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      const result = await db.execute(sql`
+        SELECT
+          (
+            SELECT COUNT(*)::int
+            FROM vendors
+            WHERE status = 'approved'
+              AND verification_status = 'verified'
+              AND business_name NOT IN ('Adunni Fashion', 'Test Vendor Co')
+          ) AS verified_vendors,
+          (
+            SELECT COUNT(*)::int
+            FROM users
+            WHERE email_verified = true
+              AND roles @> '["customer"]'::jsonb
+          ) AS verified_customers,
+          (
+            SELECT COUNT(*)::int
+            FROM (
+              SELECT created_at FROM users
+                WHERE email_verified = true AND created_at >= NOW() - INTERVAL '24 hours'
+              UNION ALL
+              SELECT created_at FROM messages
+                WHERE created_at >= NOW() - INTERVAL '24 hours'
+              UNION ALL
+              SELECT created_at FROM orders
+                WHERE payment_status = 'paid' AND created_at >= NOW() - INTERVAL '24 hours'
+            ) daily_activity
+          ) AS daily_interactions,
+          (
+            SELECT COUNT(DISTINCT LOWER(TRIM(shipping_address->>'country')))::int
+            FROM orders
+            WHERE payment_status = 'paid'
+              AND NULLIF(TRIM(shipping_address->>'country'), '') IS NOT NULL
+          ) AS countries_served
+      `);
+      const stats = result.rows[0] as any;
+      res.json({
+        verifiedVendors: Number(stats?.verified_vendors || 0),
+        verifiedCustomers: Number(stats?.verified_customers || 0),
+        dailyInteractions: Number(stats?.daily_interactions || 0),
+        countriesServed: Number(stats?.countries_served || 0),
+        interactionWindow: '24h',
+      });
+    } catch (error) {
+      console.error('Failed to load public marketplace stats:', error);
+      res.status(500).json({ message: 'Failed to load marketplace stats' });
+    }
+  });
+
   // Exchange rates proxy
   app.get('/api/exchange-rates', async (_req, res) => {
     try {

@@ -23,6 +23,14 @@ import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
 import HeritageEditorial from "@/components/heritage-editorial";
 
+type PublicMarketplaceStats = {
+  verifiedVendors: number;
+  verifiedCustomers: number;
+  dailyInteractions: number;
+  countriesServed: number;
+  interactionWindow: '24h';
+};
+
 const culturalSlides = [
   { image: panAfricanImg, country: "Pan-Africa", label: "Unity in Diversity", flag: "AF" },
   { image: maasaiImg, country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
@@ -57,6 +65,18 @@ export default function Landing() {
     queryKey: ["/api/products"],
     retry: false,
   });
+
+  const { data: marketplaceStats } = useQuery<PublicMarketplaceStats>({
+    queryKey: ["/api/public/stats"],
+    retry: false,
+  });
+
+  const publicStats = [
+    { value: marketplaceStats?.verifiedVendors ?? 0, label: "Verified vendors" },
+    { value: marketplaceStats?.verifiedCustomers ?? 0, label: "Verified customers" },
+    { value: marketplaceStats?.dailyInteractions ?? 0, label: "Daily interactions" },
+    { value: marketplaceStats?.countriesServed ?? 0, label: "Countries served" },
+  ];
 
   useEffect(() => {
     // Check for authentication errors in URL
@@ -276,6 +296,20 @@ export default function Landing() {
               className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
               aria-label={`Go to slide ${index + 1}`}
             />
+          ))}
+        </div>
+      </section>
+
+      {/* Live marketplace proof points */}
+      <section id="marketplace-stats" className="border-b-[6px] border-emerald-500 bg-white" aria-label="Afrolandx marketplace statistics">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-gray-100 px-4 py-7 sm:px-6 md:grid-cols-4 md:divide-y-0 md:py-9 lg:px-8">
+          {publicStats.map((stat) => (
+            <div key={stat.label} className="px-3 py-4 text-center md:px-6 md:py-2">
+              <p className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+                {stat.value.toLocaleString()}{stat.value > 0 ? "+" : ""}
+              </p>
+              <p className="mt-1 text-xs font-medium text-gray-600 sm:text-sm">{stat.label}</p>
+            </div>
           ))}
         </div>
       </section>
