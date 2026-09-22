@@ -3,6 +3,10 @@ import beninBronzes from "@assets/heritage/benin-bronzes.webp";
 import crownDetail from "@assets/heritage/yoruba-crown-detail.webp";
 import kenteWeaving from "@assets/heritage/kente-weaving.webp";
 import dogonAncestor from "@assets/heritage/dogon-ancestor.webp";
+import amazighJewellery from "@assets/heritage/north-africa-amazigh.webp";
+import ethiopianGarment from "@assets/heritage/east-africa-ethiopian-garment.webp";
+import kubaTextile from "@assets/heritage/central-africa-kuba-textile.webp";
+import ndebeleBeadwork from "@assets/heritage/southern-africa-ndebele-beadwork.webp";
 
 type HeritageStory = {
   image: string;
@@ -11,7 +15,7 @@ type HeritageStory = {
   body: string;
   source: string;
   sourceUrl: string;
-  wide?: boolean;
+  objectPosition?: string;
 };
 
 const stories: HeritageStory[] = [
@@ -22,7 +26,6 @@ const stories: HeritageStory[] = [
     body: "Benin court artists developed the lost-wax process into a language of memory, rank, and ritual. These works belong to a historic royal tradition; they are shown here for learning, not sale.",
     source: "Wikimedia Commons · Benin bronzes documentation",
     sourceUrl: "https://commons.wikimedia.org/wiki/Category:Benin_bronzes",
-    wide: true,
   },
   {
     image: crownDetail,
@@ -47,6 +50,39 @@ const stories: HeritageStory[] = [
     body: "Dogon sculpture has been discussed in relation to lineage, memory, and ritual life. This museum-held figure is presented with care: its meaning belongs to the communities and histories that made it.",
     source: "Musée du Louvre · collections documentation",
     sourceUrl: "https://collections.louvre.fr/en/",
+    objectPosition: "center top",
+  },
+  {
+    image: amazighJewellery,
+    title: "Silver as a living archive",
+    place: "Agadir, Morocco · North Africa",
+    body: "Amazigh jewellery carries regional knowledge through silverwork, enamel, geometry, and protective forms. This museum display records a long design tradition rather than merchandise for sale.",
+    source: "Wikimedia Commons · Agadir municipal museum",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:2010-12-14_Morocco_Agadir_municipal_museum_exhibition_jewelry_berber.JPG",
+  },
+  {
+    image: ethiopianGarment,
+    title: "Pattern held in the weave",
+    place: "Ethiopia · East Africa",
+    body: "Ethiopian dress traditions bring handwoven cotton, border pattern, and skilled finishing together. Regional and community variations carry distinct histories that cannot be reduced to one national style.",
+    source: "Wikimedia Commons · traditional Ethiopian garment",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Detail,_Traditional_Ethiopian_Garment_(2131600381).jpg",
+  },
+  {
+    image: kubaTextile,
+    title: "Geometry in raffia cloth",
+    place: "Kuba peoples, DR Congo · Central Africa",
+    body: "Kuba textile artists transform raffia through weaving, embroidery, appliqué, and cut-pile techniques. Repeated forms shift deliberately, preserving rhythm without mechanical uniformity.",
+    source: "Wikimedia Commons · Royal Museum for Central Africa",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Fabric,_raffia_-_Kuba_-_Royal_Museum_for_Central_Africa_-_DSC05968.JPG",
+  },
+  {
+    image: ndebeleBeadwork,
+    title: "Identity built bead by bead",
+    place: "Ndebele peoples, South Africa · Southern Africa",
+    body: "Ndebele beadwork uses colour, pattern, and structure to communicate identity and social meaning. This early twentieth-century cape is shown as cultural documentation, not inventory.",
+    source: "Wikimedia Commons · Dallas Museum of Art",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Beadwork_Cape_(Linaga)_South_Africa_Ndebele_peoples_early_20th_century_Dallas_Museum_of_Art.jpg",
   },
 ];
 
@@ -68,10 +104,16 @@ export default function HeritageEditorial() {
       </div>
       <div className="heritage-grid">
         {stories.map((story, index) => (
-          <article className={`heritage-card ${story.wide ? "heritage-card--wide" : ""}`} key={story.title}>
+          <article className="heritage-card" key={story.title}>
             <div className="heritage-card__image-wrap">
-              <img src={story.image} alt={`${story.title}, ${story.place}`} loading={index === 0 ? "eager" : "lazy"} decoding="async" />
-              <span className="heritage-card__index">0{index + 1}</span>
+              <img
+                src={story.image}
+                alt={`${story.title}, ${story.place}`}
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                style={{ objectPosition: story.objectPosition || "center" }}
+              />
+              <span className="heritage-card__index">{String(index + 1).padStart(2, "0")}</span>
             </div>
             <div className="heritage-card__body">
               <p className="heritage-card__place"><MapPin size={13} /> {story.place}</p>

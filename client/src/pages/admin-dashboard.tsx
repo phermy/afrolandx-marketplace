@@ -50,6 +50,7 @@ export default function AdminDashboard() {
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
+  const [showHistoricalOrders, setShowHistoricalOrders] = useState(false);
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
   const [repProductOpen, setRepProductOpen] = useState(false);
   const [repProduct, setRepProduct] = useState({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
           newActivity.push({ id: Date.now() + o.id, orderId: o.id, status: o.orderStatus, amount: o.totalAmount, time: new Date() });
           toast({
             title: o.orderStatus === 'delivered' ? `✅ Order #${o.id} Delivered` : `❌ Order #${o.id} Cancelled`,
-            description: `$${parseFloat(o.totalAmount || 0).toFixed(2)} order has been ${o.orderStatus}.`,
+            description: `₦${parseFloat(o.totalAmount || 0).toLocaleString()} order has been ${o.orderStatus}.`,
           });
         }
       }
@@ -312,10 +313,14 @@ export default function AdminDashboard() {
   const pendingProducts = allProducts.filter(p => p.status === 'pending');
   const approvedProducts = allProducts.filter(p => p.status === 'approved');
   const featuredProducts = approvedProducts.filter(p => p.featured);
-  const pendingVendors = (vendors as any[]).filter(v => v.status === 'pending');
+  const liveVendors = (vendors as any[]).filter(v => !['Adunni Fashion', 'Test Vendor Co'].includes(v.businessName));
+  const pendingVendors = liveVendors.filter(v => v.status === 'pending');
+  const actualOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => !order.isHistoricalLegacy);
+  const historicalOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => order.isHistoricalLegacy);
 
   const filteredOrders = useMemo(() => {
-    let list = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    let list = (Array.isArray(adminOrders) ? adminOrders as any[] : [])
+      .filter((order: any) => showHistoricalOrders || !order.isHistoricalLegacy);
     if (orderStatusFilter !== 'all') list = list.filter((o: any) => o.orderStatus === orderStatusFilter);
     if (orderSearch.trim()) {
       const q = orderSearch.toLowerCase();
@@ -326,14 +331,16 @@ export default function AdminDashboard() {
       );
     }
     return list;
-  }, [adminOrders, orderStatusFilter, orderSearch]);
+  }, [adminOrders, orderStatusFilter, orderSearch, showHistoricalOrders]);
 
   const orderRevenueSummary = useMemo(() => {
-    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const orders = actualOrders;
     const total = orders.reduce((s: number, o: any) => s + parseFloat(o.totalAmount || '0'), 0);
-    const paid = orders.filter((o: any) => o.paymentStatus === 'paid' || o.paymentStatus === 'completed');
+    const paid = orders.filter((o: any) =>
+      (o.paymentStatus === 'paid' || o.paymentStatus === 'completed') && o.paymentReference
+    );
     return { total, paid: paid.length, pending: orders.filter((o: any) => o.orderStatus === 'pending').length };
-  }, [adminOrders]);
+  }, [actualOrders]);
 
   // Recommended products to feature (not featured, approved, best stock/rating)
   const recommendedToFeature = useMemo(() => {
@@ -350,8 +357,8 @@ export default function AdminDashboard() {
   const lowStockProducts = useMemo(() =>
     approvedProducts.filter(p => p.stock <= 5).slice(0, 10), [approvedProducts]);
 
-  const formatPrice = (p: string | number) => `$${parseFloat(String(p)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  const fmtCurrency = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+  const formatPrice = (p: string | number) => `₦${parseFloat(String(p)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmtCurrency = (n: number) => `₦${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -361,12 +368,14 @@ export default function AdminDashboard() {
   };
 
   const exportOrdersCSV = () => {
-    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const orders = showHistoricalOrders
+      ? (Array.isArray(adminOrders) ? adminOrders as any[] : [])
+      : actualOrders;
     const rows = [
       ['Order ID', 'Customer', 'Email', 'Total', 'Payment', 'Status', 'Date'],
       ...orders.map((o: any) => [
         o.id, `${o.customer?.firstName || ''} ${o.customer?.lastName || ''}`.trim(),
-        o.customer?.email || '', `$${parseFloat(o.totalAmount || 0).toFixed(2)}`,
+        o.customer?.email || '', `NGN ${parseFloat(o.totalAmount || 0).toFixed(2)}`,
         o.paymentStatus, o.orderStatus, new Date(o.createdAt).toLocaleDateString('en-GB'),
       ]),
     ];
@@ -441,9 +450,9 @@ export default function AdminDashboard() {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} paid orders` : '' },
-            { label: 'Total Orders', value: Array.isArray(adminOrders) ? String((adminOrders as any[]).length) : '0', icon: ShoppingBag, color: 'bg-blue-500', sub: `${orderRevenueSummary.pending} pending` },
-            { label: 'Active Vendors', value: String((vendors as any[]).filter((v: any) => v.status === 'approved').length), icon: Users, color: 'bg-purple-500', sub: `${pendingVendors.length} pending approval` },
+             { label: 'Actual Sales Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} verified paid orders` : '' },
+             { label: 'Actual Orders', value: String(actualOrders.length), icon: ShoppingBag, color: 'bg-blue-500', sub: `${historicalOrders.length} preserved historical records` },
+             { label: 'Active Vendors', value: String(liveVendors.filter((v: any) => v.status === 'approved' && v.verificationStatus === 'verified').length), icon: Users, color: 'bg-purple-500', sub: `${pendingVendors.length} pending approval` },
             { label: 'Fulfilment Rate', value: analytics ? `${analytics.fulfillmentRate}%` : '—', icon: TrendingUp, color: 'bg-orange-500', sub: `${analytics?.totalApprovedProducts || approvedProducts.length} live products` },
           ].map(({ label, value, icon: Icon, color, sub }) => (
             <Card key={label}>
@@ -491,7 +500,7 @@ export default function AdminDashboard() {
                 <>
                   {/* Revenue Trend */}
                   <Card>
-                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Revenue Trend — Last 30 Days</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Actual Sales Revenue — Last 30 Days</CardTitle></CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={220}>
                         <AreaChart data={analytics.revenueTrend}>
@@ -503,8 +512,8 @@ export default function AdminDashboard() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v}`} />
-                          <Tooltip formatter={(v: any) => [`$${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
+                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₦${Number(v).toLocaleString()}`} />
+                          <Tooltip formatter={(v: any) => [`₦${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
                           <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="url(#revGrad)" strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -962,7 +971,7 @@ export default function AdminDashboard() {
                             <span className="font-semibold capitalize">Order #{ev.orderId} {ev.status}</span>
                           </div>
                           <div className="flex items-center gap-3 text-gray-400">
-                            <span className="font-semibold text-gray-700">${parseFloat(ev.amount || '0').toFixed(2)}</span>
+                            <span className="font-semibold text-gray-700">₦{parseFloat(ev.amount || '0').toLocaleString()}</span>
                             <span>{ev.time.toLocaleTimeString()}</span>
                           </div>
                         </div>
@@ -975,10 +984,10 @@ export default function AdminDashboard() {
               {/* Summary row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label: 'Total Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
-                  { label: 'Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
+                   { label: 'Actual Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
+                   { label: 'Actual Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
                   { label: 'Pending', value: String(orderRevenueSummary.pending), color: 'text-orange-700', icon: AlertTriangle },
-                  { label: 'Total Orders', value: String(Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0), color: 'text-gray-700', icon: ShoppingBag },
+                   { label: 'Historical Records', value: String(historicalOrders.length), color: 'text-gray-700', icon: ShoppingBag },
                 ].map(({ label, value, color, icon: Icon }) => (
                   <Card key={label}><CardContent className="p-4 flex items-center gap-3">
                     <Icon className={`w-5 h-5 ${color}`} />
@@ -993,10 +1002,18 @@ export default function AdminDashboard() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    <CardTitle>All Orders</CardTitle>
-                    <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
-                      <Download className="w-3 h-3" />Export CSV
-                    </Button>
+                    <div>
+                      <CardTitle>{showHistoricalOrders ? 'All Order Records' : 'Actual Orders'}</CardTitle>
+                      <p className="mt-1 text-xs text-gray-500">Legacy records are preserved for audit purposes but excluded from sales reporting.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant={showHistoricalOrders ? 'secondary' : 'outline'} size="sm" onClick={() => setShowHistoricalOrders(value => !value)}>
+                        {showHistoricalOrders ? 'Hide history' : `Show history (${historicalOrders.length})`}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
+                        <Download className="w-3 h-3" />Export CSV
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1009,8 +1026,8 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap gap-1">
                       {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => {
                         const count = s === 'all'
-                          ? (Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0)
-                          : (Array.isArray(adminOrders) ? (adminOrders as any[]).filter((o: any) => o.orderStatus === s).length : 0);
+                           ? (showHistoricalOrders ? actualOrders.length + historicalOrders.length : actualOrders.length)
+                           : (showHistoricalOrders ? [...actualOrders, ...historicalOrders] : actualOrders).filter((o: any) => o.orderStatus === s).length;
                         return (
                           <Button key={s} size="sm" variant={orderStatusFilter === s ? 'default' : 'outline'} className="capitalize h-8 px-2 text-xs gap-1" onClick={() => setOrderStatusFilter(s)}>
                             {s}
@@ -1033,6 +1050,7 @@ export default function AdminDashboard() {
                                 <span className="font-semibold">Order #{order.id}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-700'}`}>{order.orderStatus}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.paymentStatus}</span>
+                                 {order.isHistoricalLegacy && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">historical · excluded from sales</span>}
                               </div>
                               <p className="text-sm text-gray-600">
                                 {order.customer?.firstName} {order.customer?.lastName} · <span className="text-gray-400">{order.customer?.email}</span>
@@ -1043,11 +1061,11 @@ export default function AdminDashboard() {
                               </p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-green-700 text-lg">${parseFloat(order.totalAmount || 0).toFixed(2)}</span>
+                              <span className="font-bold text-green-700 text-lg">₦{parseFloat(order.totalAmount || 0).toLocaleString()}</span>
                               <Select
                                 value={order.orderStatus}
                                 onValueChange={(status) => updateOrderStatusMutation.mutate({ orderId: order.id, status })}
-                                disabled={order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
+                                disabled={order.isHistoricalLegacy || order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
                               >
                                 <SelectTrigger className="w-38 h-8 text-xs">
                                   <Truck className="w-3 h-3 mr-1" /><SelectValue />

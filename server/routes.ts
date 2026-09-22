@@ -2892,7 +2892,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const vendor = product ? await storage.getVendor(product.vendorId) : null;
               return {
                 ...item,
-                vendorName: vendor?.businessName || 'Unknown Vendor'
+                 vendorName: vendor?.businessName || 'Unknown Vendor',
+                 isLegacyVendor: vendor?.businessName === 'Adunni Fashion',
               };
             })
           );
@@ -2900,6 +2901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             ...order,
             items: itemsWithVendors,
+             isHistoricalLegacy: itemsWithVendors.length > 0 && itemsWithVendors.every(item => item.isLegacyVendor),
             customer: {
               id: customer?.id,
               email: customer?.email,
@@ -3281,11 +3283,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getProducts({ status: 'pending' }),
       ]);
 
+      const liveVendors = vendors.filter(v => !['Adunni Fashion', 'Test Vendor Co'].includes(v.businessName));
+      const liveProducts = products.filter(product => product.status !== 'rejected');
       const stats = {
-        totalVendors: vendors.length,
-        totalProducts: products.length,
+        totalVendors: liveVendors.length,
+        totalProducts: liveProducts.length,
         pendingApprovals: pendingProducts.length,
-        approvedVendors: vendors.filter(v => v.status === 'approved').length,
+        approvedVendors: liveVendors.filter(v => v.status === 'approved' && v.verificationStatus === 'verified').length,
       };
 
       res.json(stats);
@@ -3380,15 +3384,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAllUsers(),
       ]);
 
+      const orderVendorRows = await db
+        .select({ orderId: orderItems.orderId, vendorName: vendors.businessName })
+        .from(orderItems)
+        .innerJoin(products, eq(orderItems.productId, products.id))
+        .innerJoin(vendors, eq(products.vendorId, vendors.id));
+      const orderVendorNames = new Map<number, string[]>();
+      for (const row of orderVendorRows) {
+        const names = orderVendorNames.get(row.orderId) ?? [];
+        names.push(row.vendorName);
+        orderVendorNames.set(row.orderId, names);
+      }
+      const classifiedOrders = allOrders.map(order => {
+        const vendorNames = orderVendorNames.get(order.id) ?? [];
+        return {
+          order,
+          isHistoricalLegacy: vendorNames.length > 0 && vendorNames.every(name => name === 'Adunni Fashion'),
+        };
+      });
+      const actualOrders = classifiedOrders.filter(entry => !entry.isHistoricalLegacy).map(entry => entry.order);
+      const historicalOrders = classifiedOrders.filter(entry => entry.isHistoricalLegacy).map(entry => entry.order);
+
       // Revenue metrics
-      const paidOrders = allOrders.filter(o => o.paymentStatus === 'paid' || o.paymentStatus === 'completed');
+      const paidOrders = actualOrders.filter(o =>
+        (o.paymentStatus === 'paid' || o.paymentStatus === 'completed')
+        && Boolean(o.paymentReference?.trim())
+      );
       const totalRevenue = paidOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount as string || '0'), 0);
       const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
 
       // Orders by status
       const ordersByStatus = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(status => ({
         status,
-        count: allOrders.filter(o => o.orderStatus === status).length,
+        count: actualOrders.filter(o => o.orderStatus === status).length,
       }));
 
       // Revenue trend – last 30 days bucketed by day
@@ -3422,7 +3450,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map(p => ({ id: p.id, name: p.name, price: p.price, quantity: p.stock ?? 0, value: parseFloat(p.price) * (p.stock ?? 0) }));
 
       // Vendor performance (products & revenue proxy)
-      const vendorPerformance = await Promise.all(allVendors.filter(v => v.status === 'approved').map(async v => {
+      const vendorPerformance = await Promise.all(allVendors.filter(v =>
+        v.status === 'approved'
+        && v.verificationStatus === 'verified'
+        && !['Adunni Fashion', 'Test Vendor Co'].includes(v.businessName)
+      ).map(async v => {
         const vProducts = allProducts.filter(p => p.vendorId === v.id && p.status === 'approved');
         return {
           id: v.id,
@@ -3436,7 +3468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Geographic distribution from shipping addresses
       const countryMap: Record<string, number> = {};
-      for (const o of allOrders) {
+      for (const o of actualOrders) {
         try {
           const addr = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : o.shippingAddress;
           const country = addr?.country || 'Unknown';
@@ -3457,9 +3489,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         totalRevenue,
         avgOrderValue,
-        totalOrders: allOrders.length,
+        totalOrders: actualOrders.length,
+        historicalOrders: historicalOrders.length,
         paidOrders: paidOrders.length,
-        fulfillmentRate: allOrders.length > 0 ? Math.round((allOrders.filter(o => o.orderStatus === 'delivered').length / allOrders.length) * 100) : 0,
+        fulfillmentRate: paidOrders.length > 0 ? Math.round((paidOrders.filter(o => o.orderStatus === 'delivered').length / paidOrders.length) * 100) : 0,
         ordersByStatus,
         revenueTrend,
         lowStockProducts,
