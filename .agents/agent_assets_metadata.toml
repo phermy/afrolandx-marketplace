@@ -75,3 +75,17 @@ mtime_ms = 1789385584599
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/10838771-897c-44f8-b442-a3ed2c1da777/ba7dc390-9436-461b-889d-1f573c2269e7"
 storage_version_token = "1789385622607910"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "rd6mHBs9T8YEi-TZojj-O"
+uri = "file://exports/afrolandx-completed-website-checklist.pdf"
+type = "pdf"
+title = "Afrolandx Completed Website Checklist"
+description = "Downloadable four-page PDF covering completed features, provider-dependent capabilities, and remaining work."
+logical_id = "df884a28-c824-4bbf-a755-b1ba38de3b7b"
+content_hash = "sha256:3aefb47877b47ee66a51bde6b5edacfb0f8860d36879118c4c9d928f4fa6edce"
+size = 80329
+mtime_ms = 1790081955340
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/df884a28-c824-4bbf-a755-b1ba38de3b7b/0cdb75f7-ac5a-42b0-ae98-a941c0c5d12a"
+storage_version_token = "1790081972105482"
+content_type = "application/pdf"
