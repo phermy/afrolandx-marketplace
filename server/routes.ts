@@ -36,6 +36,7 @@ import {
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
 import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import { sendExperienceFeedbackNotification } from "./email";
 import {
   createFinanceReference,
   createSaleLedger,
@@ -3880,11 +3881,26 @@ INSTRUCTIONS:
       }).returning({
         id: experienceFeedback.id,
         mood: experienceFeedback.mood,
+        comment: experienceFeedback.comment,
+        pagePath: experienceFeedback.pagePath,
         createdAt: experienceFeedback.createdAt,
       });
 
+      try {
+        await sendExperienceFeedbackNotification({
+          mood: feedback.mood as "sad" | "indifferent" | "happy",
+          comment: feedback.comment,
+          pagePath: feedback.pagePath,
+          createdAt: feedback.createdAt,
+        });
+      } catch (notificationError) {
+        console.error('Experience feedback was saved, but management notification failed:', notificationError);
+      }
+
       res.status(201).json({
-        ...feedback,
+        id: feedback.id,
+        mood: feedback.mood,
+        createdAt: feedback.createdAt,
         message: 'Thank you for sharing your experience with Afrolandx.',
       });
     } catch (error) {

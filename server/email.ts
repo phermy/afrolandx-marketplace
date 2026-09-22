@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
+const MANAGEMENT_EMAIL = "management@afrolandx.com";
 const APP_NAME = "Afrolandx";
 
 export function generateOtp(): string {
@@ -110,5 +111,51 @@ export async function sendPasswordResetEmail(email: string, firstName: string, o
       otp,
       "#ff9800",
     ),
+  );
+}
+
+type ExperienceFeedbackNotification = {
+  mood: "sad" | "indifferent" | "happy";
+  comment?: string | null;
+  pagePath?: string | null;
+  createdAt: Date;
+};
+
+export async function sendExperienceFeedbackNotification(
+  feedback: ExperienceFeedbackNotification,
+): Promise<void> {
+  const moodLabels = {
+    sad: "Sad 😢",
+    indifferent: "Indifferent 😐",
+    happy: "Happy 😊",
+  } as const;
+  const priority = feedback.mood === "sad" ? "[Action requested] " : "";
+  const safeMood = moodLabels[feedback.mood];
+  const safeComment = feedback.comment
+    ? escapeHtml(feedback.comment)
+    : "No written note was provided.";
+  const safePagePath = escapeHtml(feedback.pagePath || "/");
+  const safeSubmittedAt = escapeHtml(feedback.createdAt.toISOString());
+
+  await sendEmail(
+    MANAGEMENT_EMAIL,
+    `${priority}New Afrolandx feedback: ${safeMood}`,
+    `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f4f1e8; padding: 32px 20px;">
+        <div style="background: #ffffff; border-radius: 12px; padding: 32px; border-top: 5px solid ${feedback.mood === "sad" ? "#b42318" : "#1a5c2a"};">
+          <h1 style="color: #17352e; font-size: 24px; margin: 0 0 20px;">New Afrolandx experience feedback</h1>
+          <p style="color: #444; margin: 0 0 12px;"><strong>Mood:</strong> ${safeMood}</p>
+          <p style="color: #444; margin: 0 0 12px;"><strong>Page:</strong> ${safePagePath}</p>
+          <p style="color: #444; margin: 0 0 20px;"><strong>Submitted:</strong> ${safeSubmittedAt}</p>
+          <div style="background: #f8fbf8; border-radius: 8px; padding: 18px;">
+            <p style="color: #17352e; font-weight: bold; margin: 0 0 8px;">Visitor note</p>
+            <p style="color: #444; line-height: 1.6; white-space: pre-wrap; margin: 0;">${safeComment}</p>
+          </div>
+          <p style="color: #777; font-size: 12px; line-height: 1.5; margin: 24px 0 0;">
+            The complete response remains stored in the Afrolandx database. This notification intentionally excludes customer identity details.
+          </p>
+        </div>
+      </div>
+    `,
   );
 }
