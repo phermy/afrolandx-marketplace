@@ -24,53 +24,22 @@ function escapeHtml(value: string): string {
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  let resendError = "";
-
-  try {
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy("resend", "/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: `${APP_NAME} <${FROM_EMAIL}>`,
-        to: [to],
-        subject,
-        html,
-      }),
-    });
-
-    if (response.ok) return;
-    const providerMessage = await response.text().catch(() => "");
-    resendError = `Resend failed (${response.status})${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`;
-  } catch (error) {
-    resendError = `Resend failed: ${error instanceof Error ? error.message : "unknown error"}`;
-  }
-
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  if (!sendGridApiKey) {
-    throw new Error(`${resendError}; SendGrid fallback is not configured`);
-  }
-
-  const sendGridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+  const { ReplitConnectors } = await import("@replit/connectors-sdk");
+  const connectors = new ReplitConnectors();
+  const response = await connectors.proxy("resend", "/emails", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${sendGridApiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      personalizations: [{ to: [{ email: to }] }],
-      from: { email: FROM_EMAIL, name: APP_NAME },
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: [to],
       subject,
-      content: [{ type: "text/html", value: html }],
+      html,
     }),
   });
 
-  if (sendGridResponse.ok) return;
-  const sendGridMessage = await sendGridResponse.text().catch(() => "");
-  throw new Error(
-    `${resendError}; SendGrid failed (${sendGridResponse.status})${sendGridMessage ? `: ${sendGridMessage.slice(0, 200)}` : ""}`,
-  );
+  if (response.ok) return;
+  const providerMessage = await response.text().catch(() => "");
+  throw new Error(`Email delivery failed (${response.status})${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`);
 }
 
 function otpEmailHtml(title: string, greeting: string, description: string, codeLabel: string, otp: string, accent: string): string {
