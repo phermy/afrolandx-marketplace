@@ -979,6 +979,28 @@ export const insertDiscoverPremiumSchema = createInsertSchema(discoverPremium).o
 export type InsertDiscoverPremium = z.infer<typeof insertDiscoverPremiumSchema>;
 export type DiscoverPremium = typeof discoverPremium.$inferSelect;
 
+// ── Site-wide visitor experience feedback ──
+export const experienceFeedback = pgTable("experience_feedback", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  mood: varchar("mood", { length: 20 }).notNull(),
+  comment: text("comment"),
+  pagePath: varchar("page_path", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExperienceFeedbackSchema = createInsertSchema(experienceFeedback).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+}).extend({
+  mood: z.enum(["sad", "indifferent", "happy"]),
+  comment: z.string().trim().max(1000).optional().default(""),
+  pagePath: z.string().trim().max(500).optional().default("/"),
+});
+export type InsertExperienceFeedback = z.infer<typeof insertExperienceFeedbackSchema>;
+export type ExperienceFeedback = typeof experienceFeedback.$inferSelect;
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

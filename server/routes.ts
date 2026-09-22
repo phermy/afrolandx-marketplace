@@ -11,7 +11,7 @@ import {
   insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
   insertProductStorySchema, insertFabricAssetSchema, insertCollabDropSchema, orders, orderItems, products, vendors,
   vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests,
-  returnPolicySchema,
+  experienceFeedback, insertExperienceFeedbackSchema, returnPolicySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -3860,6 +3860,36 @@ INSTRUCTIONS:
     } catch (error) {
       console.error('Error submitting feedback:', error);
       res.status(500).json({ message: 'Failed to submit feedback' });
+    }
+  });
+
+  app.post('/api/experience-feedback', async (req, res) => {
+    try {
+      const parsed = insertExperienceFeedbackSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: 'Please choose how you feel before submitting feedback.',
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const [feedback] = await db.insert(experienceFeedback).values({
+        ...parsed.data,
+        comment: parsed.data.comment || null,
+        userId: req.user?.id ?? null,
+      }).returning({
+        id: experienceFeedback.id,
+        mood: experienceFeedback.mood,
+        createdAt: experienceFeedback.createdAt,
+      });
+
+      res.status(201).json({
+        ...feedback,
+        message: 'Thank you for sharing your experience with Afrolandx.',
+      });
+    } catch (error) {
+      console.error('Error submitting experience feedback:', error);
+      res.status(500).json({ message: 'We could not save your feedback. Please try again.' });
     }
   });
 

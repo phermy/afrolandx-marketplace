@@ -183,6 +183,35 @@
 .site-footer__list li { margin: .72rem 0; line-height: 1.35; }
 .site-footer__bottom { max-width: 78rem; border-top: 1px solid #3a5149; margin: 4rem auto 0; padding-top: 1.25rem; display: flex; justify-content: space-between; gap: 1rem; color: #9caf9f; font-size: .8rem; }
 .site-footer__bottom a { color: #b8c8bd; }
+.experience-feedback {
+  max-width: 78rem;
+  margin: 3.5rem auto 0;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid #3a5149;
+  display: grid;
+  grid-template-columns: minmax(14rem, .8fr) minmax(24rem, 1.2fr);
+  gap: 2rem;
+  align-items: center;
+}
+.experience-feedback__copy p:not(.site-footer__label) { color: #b8c8bd; font-size: .88rem; line-height: 1.5; margin: 0; max-width: 22rem; }
+.experience-feedback__copy strong { color: #f7f0df; display: block; font: 600 clamp(1.35rem, 2vw, 1.8rem)/1.1 "Space Grotesk", sans-serif; letter-spacing: -.035em; margin: .2rem 0 .5rem; }
+.experience-feedback__form fieldset { border: 0; margin: 0; padding: 0; }
+.experience-feedback__moods { display: flex; gap: .6rem; }
+.experience-feedback__mood { color: #d5dfd4; cursor: pointer; display: inline-flex; align-items: center; gap: .42rem; border: 1px solid #496157; border-radius: 999px; padding: .48rem .7rem .48rem .52rem; font-size: .78rem; transition: transform .2s ease, border-color .2s ease, background-color .2s ease, color .2s ease; }
+.experience-feedback__mood:hover { transform: translateY(-2px); border-color: #d9a64e; }
+.experience-feedback__mood:has(input:focus-visible) { outline: 2px solid #e2b45c; outline-offset: 3px; }
+.experience-feedback__mood.is-selected { background: #e2b45c; border-color: #e2b45c; color: #172d29; }
+.experience-feedback__mood input { position: absolute; opacity: 0; pointer-events: none; }
+.experience-feedback__face { font-family: "DM Sans", sans-serif; font-size: 1.25rem; line-height: .9; }
+.experience-feedback__entry { display: flex; gap: .55rem; margin-top: .8rem; }
+.experience-feedback__entry input { min-width: 0; flex: 1; border: 1px solid #496157; border-radius: .25rem; background: #203a34; color: #f7f0df; padding: .7rem .8rem; font: inherit; font-size: .8rem; }
+.experience-feedback__entry input::placeholder { color: #91a99c; }
+.experience-feedback__entry input:focus-visible { outline: 2px solid #e2b45c; outline-offset: 2px; }
+.experience-feedback__entry button { border: 0; border-radius: .25rem; background: #e2b45c; color: #172d29; cursor: pointer; padding: .7rem .95rem; font: 700 .76rem "Space Grotesk", sans-serif; white-space: nowrap; transition: transform .2s ease, background-color .2s ease, opacity .2s ease; }
+.experience-feedback__entry button:hover:not(:disabled) { transform: translateY(-2px); background: #efc66f; }
+.experience-feedback__entry button:focus-visible { outline: 2px solid #f7f0df; outline-offset: 3px; }
+.experience-feedback__entry button:disabled { cursor: not-allowed; opacity: .48; }
+.experience-feedback__message { min-height: 1.25rem; color: #e2b45c; font-size: .78rem; margin: .65rem 0 0; }
 .policy-shell, .policy-detail { max-width: 80rem; margin: 0 auto; padding: 4.5rem 1.25rem 7rem; }
 .policy-detail { max-width: 78rem; }
 .eyebrow { color: #9a6036; font: 700 .7rem/1 "Space Grotesk", sans-serif; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 1rem; }
@@ -215,7 +244,8 @@
 .policy-related { display:flex; justify-content:space-between; gap:1rem; margin-top:2.5rem; padding-top:1.25rem; border-top:1px solid #d9cfbf; }
 .policy-related a { color:#9a6036; font-weight:600; text-decoration:none; }
 @media (max-width: 1024px) { .site-footer__inner { grid-template-columns: 1.5fr repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .site-footer__inner, .policy-grid { grid-template-columns: 1fr; } .site-footer__bottom { display:block; }.site-footer__bottom a { margin-top: .6rem; }.policy-shell, .policy-detail { padding-top: 3rem; }.policy-layout { display:block; }.policy-toc { position:static; margin-bottom:2rem; }.policy-toc a { display:inline-block; margin-right:1rem; }.policy-related { display:block; }.policy-related a { display:block; margin:.6rem 0; } }
+@media (max-width: 760px) { .site-footer__inner, .policy-grid { grid-template-columns: 1fr; } .experience-feedback { grid-template-columns: 1fr; gap: 1rem; } .site-footer__bottom { display:block; }.site-footer__bottom a { margin-top: .6rem; }.policy-shell, .policy-detail { padding-top: 3rem; }.policy-layout { display:block; }.policy-toc { position:static; margin-bottom:2rem; }.policy-toc a { display:inline-block; margin-right:1rem; }.policy-related { display:block; }.policy-related a { display:block; margin:.6rem 0; } }
+@media (max-width: 440px) { .experience-feedback__moods { gap: .35rem; } .experience-feedback__mood { padding-right: .55rem; } .experience-feedback__mood > span:last-child { display: none; } .experience-feedback__entry { display: grid; grid-template-columns: 1fr; } }
 
 /* Nigerian cultural patterns */
 .pattern-bg {
