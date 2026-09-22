@@ -10,6 +10,7 @@ import {
   findOwnedCartItem,
   isValidPaystackWebhookSignature,
   paymentVerificationError,
+  recommendShippingCarriers,
   shippingPaymentVerificationError,
 } from "./order-security";
 
@@ -81,6 +82,18 @@ test("testing checkout generates a server-controlled NGN shipping estimate for e
     assert.equal(estimate % 500, 0);
   }
   assert.throws(() => calculateEstimatedShippingAmount(subtotal, "Unknown"), new CheckoutValidationError("Invalid shipping method"));
+});
+
+test("shipping recommendations are deterministic, explainable, and never claim live rates", () => {
+  const first = recommendShippingCarriers({ country: "Nigeria", totalWeight: 18, subtotal: 300000 });
+  const second = recommendShippingCarriers({ country: "Nigeria", totalWeight: 18, subtotal: 300000 });
+
+  assert.deepEqual(first, second);
+  assert.equal(first.liveRates, false);
+  assert.equal(first.basis, "static_catalog_rules");
+  assert.equal(first.ranked.length, 8);
+  assert.ok(first.ranked[0].reasons.length > 0);
+  assert.ok(first.ranked.every((item, index) => index === 0 || first.ranked[index - 1].score >= item.score));
 });
 
 test("confirmed quote cart fingerprints are stable and change with cart contents", () => {

@@ -124,6 +124,9 @@ function Router() {
       <Route path="/vendor/finance">
         {isAuthenticated ? <VendorFinance /> : <AuthRedirect to="/login" />}
       </Route>
+      <Route path="/checkout">
+        {isAuthenticated ? <Checkout /> : <AuthRedirect to="/login" />}
+      </Route>
 
       {/* Authenticated-only pages */}
       {isAuthenticated ? (
@@ -136,7 +139,6 @@ function Router() {
           <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />
           <Route path="/vendor" component={VendorDashboard} />
-          <Route path="/checkout" component={Checkout} />
         </>
       ) : null}
 

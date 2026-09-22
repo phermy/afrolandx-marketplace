@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { ShippingQuote, ShippingAddress, ShippingQuoteRequest } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { ShippingQuote, ShippingAddress, ShippingQuoteRequest, SavedAddress, ShippingRecommendationResponse, ShippingQuoteResponse } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 
 
@@ -174,6 +175,24 @@ function detectCountryFromGeo(): string {
   }
 }
 
+const isShippingAddressComplete = (address: ShippingAddress) =>
+  Boolean(
+    address.firstName.trim()
+    && address.lastName.trim()
+    && address.address1.trim().length >= 3
+    && address.city.trim()
+    && address.state.trim()
+    && address.postalCode.trim()
+    && address.country.trim(),
+  );
+
+const canonicalAddressFingerprint = (address: ShippingAddress) => JSON.stringify(
+  Object.fromEntries(Object.entries(address).map(([key, value]) => [
+    key,
+    typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : value,
+  ])),
+);
+
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { cartItems, cartTotal } = useCart();
@@ -193,6 +212,12 @@ export default function Checkout() {
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [countryTouched, setCountryTouched] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('manual');
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [addressLabel, setAddressLabel] = useState('Home');
+  const [makeDefault, setMakeDefault] = useState(false);
+  const shippingSelectionIsManual = useRef(false);
+  const addressInitialized = useRef(false);
   const checkoutTracked = useRef(false);
   const checkoutRequestId = useRef((() => {
     const existing = sessionStorage.getItem('checkout_request_id');
@@ -296,7 +321,36 @@ export default function Checkout() {
   }, [user]);
 
   // Fetch shipping quotes (all prices in NGN)
-  const { data: shippingQuotes = [], isLoading: isLoadingShipping, isError: shippingError } = useQuery<ShippingQuote[]>({
+  const { data: savedAddresses = [], isLoading: isLoadingAddresses } = useQuery<SavedAddress[]>({
+    queryKey: ['/api/delivery-addresses'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/delivery-addresses');
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : (payload.addresses || []);
+    },
+    enabled: isAuthenticated,
+    retry: false,
+  });
+
+  const saveAddressMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/delivery-addresses', {
+        ...shippingAddress,
+        label: addressLabel.trim() || 'Address',
+        isDefault: makeDefault,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setSaveAddress(false);
+      setMakeDefault(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/delivery-addresses'] });
+      toast({ title: 'Address saved', description: 'You can use it again on your next order.' });
+    },
+    onError: () => toast({ title: 'Could not save address', description: 'Please check the address and try again.', variant: 'destructive' }),
+  });
+
+  const { data: shippingQuoteResponse, isLoading: isLoadingShipping, isError: shippingError } = useQuery<ShippingQuote[] | ShippingQuoteResponse>({
     queryKey: ['/api/shipping/quote'],
     queryFn: async () => {
       const res = await fetch('/api/shipping/quote', { credentials: 'include' });
@@ -306,8 +360,24 @@ export default function Checkout() {
     enabled: !!cartItems.length,
     retry: false,
   });
+  const shippingQuotes = Array.isArray(shippingQuoteResponse)
+    ? shippingQuoteResponse
+    : shippingQuoteResponse?.quotes || [];
 
-  const { data: quoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
+  const { data: shippingRecommendation } = useQuery<ShippingRecommendationResponse>({
+    queryKey: ['/api/shipping/recommendation', cartItems, shippingAddress],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/shipping/recommendation?country=${encodeURIComponent(shippingAddress.country)}`,
+      );
+      return response.json();
+    },
+    enabled: isAuthenticated && !!cartItems.length && isShippingAddressComplete(shippingAddress),
+    retry: false,
+  });
+
+  const { data: quoteRequests = [], isLoading: isLoadingQuoteRequests } = useQuery<ShippingQuoteRequest[]>({
     queryKey: ['/api/shipping/quote-requests/mine'],
     enabled: isAuthenticated && !!cartItems.length,
     retry: false,
@@ -342,19 +412,8 @@ export default function Checkout() {
     },
   });
 
-  const isShippingAddressComplete = () =>
-    Boolean(
-      shippingAddress.firstName.trim()
-      && shippingAddress.lastName.trim()
-      && shippingAddress.address1.trim().length >= 3
-      && shippingAddress.city.trim()
-      && shippingAddress.state.trim()
-      && shippingAddress.postalCode.trim()
-      && shippingAddress.country.trim(),
-    );
-
   const handleRequestQuote = (carrier: string) => {
-    if (!isShippingAddressComplete()) {
+    if (!isShippingAddressComplete(shippingAddress)) {
       toast({
         title: 'Complete your shipping address',
         description: 'Enter your name, address, city, state, postal code, and country before requesting a quote.',
@@ -450,7 +509,7 @@ export default function Checkout() {
     `₦${ngnAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const requestMatchesAddress = (request: ShippingQuoteRequest) =>
-    JSON.stringify(request.shippingAddress) === JSON.stringify(shippingAddress);
+    canonicalAddressFingerprint(request.shippingAddress) === canonicalAddressFingerprint(shippingAddress);
   const requestForCarrier = (carrier: string) =>
     quoteRequests.find(request => request.carrier === carrier && requestMatchesAddress(request));
   const effectiveShippingQuotes = shippingQuotes.map(quote => {
@@ -477,10 +536,61 @@ export default function Checkout() {
   });
   const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
+  const recommendedCarrier = shippingRecommendation?.ranked?.[0]?.carrier
+    || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.recommendation : null)
+    || '';
+  const recommendationReasons = shippingRecommendation?.ranked?.[0]?.reasons
+    || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.reasons : [])
+    || [];
+  const confirmedCarrier = effectiveShippingQuotes.find((quote) => {
+    const request = requestForCarrier(quote.carrier);
+    return request?.status === 'quoted' && request.cartMatches !== false && Boolean(quote.quoteRequestId);
+  })?.carrier || '';
+
+  useEffect(() => {
+    if (addressInitialized.current || !savedAddresses.length) return;
+    const preferred = savedAddresses.find(address => address.isDefault)
+      || [...savedAddresses].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0];
+    if (preferred) {
+      addressInitialized.current = true;
+      setSelectedAddressId(String(preferred.id));
+      setShippingAddress({
+        firstName: preferred.firstName,
+        lastName: preferred.lastName,
+        address1: preferred.address1,
+        address2: preferred.address2 || '',
+        city: preferred.city,
+        state: preferred.state,
+        postalCode: preferred.postalCode,
+        country: preferred.country,
+      });
+    }
+  }, [savedAddresses]);
+
+  useEffect(() => {
+    if (shippingSelectionIsManual.current) return;
+    if (confirmedCarrier) {
+      if (selectedShipping !== confirmedCarrier) setSelectedShipping(confirmedCarrier);
+      return;
+    }
+    if (isLoadingQuoteRequests || selectedShipping) return;
+    if (recommendedCarrier && effectiveShippingQuotes.some(quote => quote.carrier === recommendedCarrier)) {
+      setSelectedShipping(recommendedCarrier);
+    }
+  }, [recommendedCarrier, confirmedCarrier, effectiveShippingQuotes, selectedShipping, isLoadingQuoteRequests]);
+
+  const addressFingerprint = JSON.stringify(shippingAddress);
+  const cartFingerprint = cartItems.map(item => `${item.id}:${item.quantity}:${item.selectedSize || ''}`).join('|');
+  useEffect(() => {
+    setSelectedShipping(current => current && effectiveShippingQuotes.some(quote => quote.carrier === current) ? current : '');
+  }, [addressFingerprint, cartFingerprint, effectiveShippingQuotes]);
 
   useEffect(() => {
     if (!selectedShipping) return;
-    if (!effectiveShippingQuotes.some(quote => quote.carrier === selectedShipping)) setSelectedShipping('');
+    if (!effectiveShippingQuotes.some(quote => quote.carrier === selectedShipping)) {
+      shippingSelectionIsManual.current = false;
+      setSelectedShipping('');
+    }
   }, [effectiveShippingQuotes, selectedShipping]);
 
   if (isLoading) {
@@ -514,6 +624,51 @@ export default function Checkout() {
                   <CardTitle>Shipping Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {savedAddresses.length > 0 && (
+                    <div className="rounded-lg border border-green-200 bg-green-50/60 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-900">Saved addresses</p>
+                          <p className="text-xs text-gray-600">Choose one to prefill checkout, then adjust any field below.</p>
+                        </div>
+                        {isLoadingAddresses && <span className="text-xs text-gray-500">Loading…</span>}
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {savedAddresses.map((address) => (
+                          <button
+                            type="button"
+                            key={address.id}
+                            onClick={() => {
+                              setSelectedAddressId(String(address.id));
+                              setShippingAddress({
+                                firstName: address.firstName,
+                                lastName: address.lastName,
+                                address1: address.address1,
+                                address2: address.address2 || '',
+                                city: address.city,
+                                state: address.state,
+                                postalCode: address.postalCode,
+                                country: address.country,
+                              });
+                              setCountryTouched(true);
+                            }}
+                            className={`rounded-md border p-3 text-left transition-colors ${
+                              selectedAddressId === String(address.id)
+                                ? 'border-nigerian-green bg-white ring-1 ring-nigerian-green'
+                                : 'border-gray-200 bg-white hover:border-nigerian-green'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm">{address.label}</span>
+                              {address.isDefault && <Badge variant="outline" className="border-green-300 text-green-700">Default</Badge>}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-600">{address.address1}, {address.city}</p>
+                            <p className="text-xs text-gray-500">{address.state}, {address.country}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName">First Name</Label>
@@ -667,6 +822,30 @@ export default function Checkout() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="rounded-lg border border-dashed border-gray-300 p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <Checkbox checked={saveAddress} onCheckedChange={(checked) => setSaveAddress(checked === true)} />
+                      <span>
+                        <span className="block text-sm font-medium text-gray-900">Save this address</span>
+                        <span className="block text-xs text-gray-500">Keep it ready for your next Afrolandx order.</span>
+                      </span>
+                    </label>
+                    {saveAddress && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+                        <div>
+                          <Label htmlFor="addressLabel">Address label</Label>
+                          <Input id="addressLabel" value={addressLabel} onChange={(event) => setAddressLabel(event.target.value)} placeholder="Home, Office" className="input-nigerian" />
+                        </div>
+                        <label className="flex items-center gap-2 pb-3 text-sm">
+                          <Checkbox checked={makeDefault} onCheckedChange={(checked) => setMakeDefault(checked === true)} />
+                          Make default
+                        </label>
+                        <Button type="button" variant="outline" disabled={saveAddressMutation.isPending || !isShippingAddressComplete(shippingAddress)} onClick={() => saveAddressMutation.mutate()}>
+                          {saveAddressMutation.isPending ? 'Saving…' : 'Save address'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -691,6 +870,7 @@ export default function Checkout() {
                     <RadioGroup
                       value={selectedShipping}
                       onValueChange={(carrier) => {
+                        shippingSelectionIsManual.current = true;
                         setSelectedShipping(carrier);
                         const quote = effectiveShippingQuotes.find((item) => item.carrier === carrier);
                         trackEvent('shipping_method_selected', {
@@ -705,6 +885,12 @@ export default function Checkout() {
                       <p className="mb-4 text-sm text-gray-600">
                         Choose a delivery service. A server-generated testing estimate is included now, and Afrolandx will confirm the final carrier price after the order is placed.
                       </p>
+                      {recommendedCarrier && effectiveShippingQuotes.some((quote) => quote.carrier === recommendedCarrier) && (
+                        <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                          <span className="font-semibold">Recommended: {recommendedCarrier}.</span>{' '}
+                          {recommendationReasons[0] || 'This option best matches your destination and cart.'}
+                        </div>
+                      )}
                       <div className="space-y-3">
                         {effectiveShippingQuotes.map((quote) => {
                           const request = requestForCarrier(quote.carrier);

@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
@@ -54,6 +55,7 @@ export default function VendorDashboard() {
   const [selectedTraditionalName, setSelectedTraditionalName] = useState<string>('');
   const [editOriginCountry, setEditOriginCountry] = useState<string>('');
   const [editTraditionalName, setEditTraditionalName] = useState<string>('');
+  const [orderTrackingNumbers, setOrderTrackingNumbers] = useState<Record<number, string>>({});
   const [addForm, setAddForm] = useState({
     name: '', shortDescription: '', description: '', tags: '', sku: '', price: '',
     compareAtPrice: '', stock: '', weight: '', dimensions: '', shippingClass: '',
@@ -137,8 +139,8 @@ export default function VendorDashboard() {
 
   // Order status update mutation
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      return await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
+    mutationFn: async ({ orderId, status, trackingNumber }: { orderId: number; status: string; trackingNumber?: string }) => {
+      return await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status, trackingNumber });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/orders"] });
@@ -724,6 +726,13 @@ export default function VendorDashboard() {
               Welcome back, {vendor?.businessName}!
             </h1>
             <p className="text-gray-600">Manage your products and track your sales</p>
+            <Link
+              href="/products"
+              className="inline-flex items-center mt-3 text-sm font-semibold text-nigerian-green hover:text-green-700 transition-colors"
+            >
+              Shop as buyer
+              <span aria-hidden="true" className="ml-1">→</span>
+            </Link>
           </div>
           <Button
             className="btn-nigerian gap-2 text-base px-5 py-2.5 h-auto shadow-md"
@@ -1087,15 +1096,32 @@ export default function VendorDashboard() {
                                   )}
                                   
                                   {order.orderStatus === 'processing' && (
-                                    <Button
-                                      size="sm"
-                                      onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'shipped' })}
-                                      disabled={updateOrderStatusMutation.isPending}
-                                      className="bg-purple-600 hover:bg-purple-700 text-white"
-                                    >
-                                      <Truck className="w-3 h-3 mr-1" />
-                                      Mark Shipped
-                                    </Button>
+                                    <div className="flex flex-col gap-2">
+                                      <Label htmlFor={`tracking-${order.id}`} className="text-xs">Tracking number</Label>
+                                      <Input
+                                        id={`tracking-${order.id}`}
+                                        value={orderTrackingNumbers[order.id] || ''}
+                                        onChange={(event) => setOrderTrackingNumbers(current => ({
+                                          ...current,
+                                          [order.id]: event.target.value,
+                                        }))}
+                                        placeholder="Enter carrier tracking number"
+                                        className="h-9 min-w-56"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        onClick={() => updateOrderStatusMutation.mutate({
+                                          orderId: order.id,
+                                          status: 'shipped',
+                                          trackingNumber: orderTrackingNumbers[order.id]?.trim(),
+                                        })}
+                                        disabled={updateOrderStatusMutation.isPending || !orderTrackingNumbers[order.id]?.trim()}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                                      >
+                                        <Truck className="w-3 h-3 mr-1" />
+                                        Mark Shipped
+                                      </Button>
+                                    </div>
                                   )}
                                   
                                   {order.orderStatus === 'shipped' && (

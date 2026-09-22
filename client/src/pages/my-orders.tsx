@@ -94,6 +94,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
   const isCancelled = order.orderStatus === 'cancelled';
   const isDelivered = order.orderStatus === 'delivered';
   const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
+  const canBuyAgain = !isCancelled && Array.isArray(order.items) && order.items.length > 0;
   const separateShipping = ['awaiting_quote', 'pending', 'paid', 'rejected'].includes(order.shippingPaymentStatus);
   const displayedTotal = Number(order.totalAmount) + (separateShipping ? Number(order.shippingAmount || 0) : 0);
   const payShippingMutation = useMutation({
@@ -125,6 +126,41 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
     },
     onError: (error: any) => toast({
       title: 'Could not request another quote',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
+  const buyAgainMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/cart/restore-order/${order.id}`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      const added = Array.isArray(result?.added)
+        ? result.added.length
+        : Number(result?.added ?? result?.restored ?? result?.restoredCount ?? 0);
+      const skipped = Array.isArray(result?.skipped)
+        ? result.skipped.length
+        : Number(result?.skipped ?? result?.skippedCount ?? 0);
+      const adjusted = Array.isArray(result?.adjusted)
+        ? result.adjusted.length
+        : Number(result?.quantityAdjusted ?? result?.adjusted ?? result?.adjustedCount ?? 0);
+      const restored = added + adjusted;
+      const summary = [
+        added ? `${added} added` : '',
+        adjusted ? `${adjusted} quantity adjusted` : '',
+        skipped ? `${skipped} unavailable` : '',
+      ].filter(Boolean).join(' · ');
+      toast({
+        title: restored > 0 ? 'Items added to cart' : 'Nothing added to cart',
+        description: summary || result?.message || 'The items from this order are no longer available.',
+        variant: restored > 0 ? 'default' : 'destructive',
+      });
+      if (restored > 0) window.location.href = '/checkout';
+    },
+    onError: (error: any) => toast({
+      title: 'Could not buy this order again',
       description: error?.message || 'Please try again.',
       variant: 'destructive',
     }),
@@ -284,6 +320,9 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.productName}</p>
                       <p className="text-xs text-gray-500">by {item.vendorName}</p>
+                       {item.selectedSize && (
+                         <p className="text-xs text-gray-500 mt-0.5">Size: {item.selectedSize}</p>
+                       )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-green-700">₦{parseFloat(item.priceAtTime).toLocaleString()}</p>
@@ -325,6 +364,18 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
               Leave a Review
             </Button>
           )}
+           {canBuyAgain && (
+             <Button
+               size="sm"
+               variant="outline"
+               disabled={buyAgainMutation.isPending}
+               onClick={() => buyAgainMutation.mutate()}
+               className="text-nigerian-green border-green-200 hover:bg-green-50"
+             >
+               <RefreshCw className={`w-3 h-3 mr-1 ${buyAgainMutation.isPending ? 'animate-spin' : ''}`} />
+               {buyAgainMutation.isPending ? 'Adding items…' : 'Buy again'}
+             </Button>
+           )}
           {order.paymentStatus === 'failed' && (
             <Button size="sm" className="bg-nigerian-green hover:bg-green-700 text-white"
               onClick={() => window.location.href = '/checkout'}>

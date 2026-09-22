@@ -75,6 +75,6 @@ test("duplicate callbacks and webhooks award points, clear carts, and decrement 
   assert.deepEqual(pointsCalls[0], [
     "buyer-1", 136, "purchase", "Points for Order #42", 42, "order",
   ]);
-  assert.equal(notifications.length, 3);
+  assert.equal(notifications.length, 4);
   assert.deepEqual(statusUpdates, ["processing"]);
 });

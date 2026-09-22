@@ -4,6 +4,7 @@ import {
   categories,
   products,
   cartItems,
+  savedDeliveryAddresses,
   orders,
   orderItems,
   notifications,
@@ -36,6 +37,8 @@ import {
   type InsertProduct,
   type CartItem,
   type InsertCartItem,
+  type SavedDeliveryAddress,
+  type InsertSavedDeliveryAddress,
   type Order,
   type InsertOrder,
   type OrderItem,
@@ -130,6 +133,10 @@ export interface IStorage {
   updateCartItemQuantity(id: number, userId: string, quantity: number): Promise<boolean>;
   removeFromCart(id: number, userId: string): Promise<boolean>;
   clearCart(userId: string): Promise<void>;
+  getSavedDeliveryAddresses(userId: string): Promise<SavedDeliveryAddress[]>;
+  createSavedDeliveryAddress(address: InsertSavedDeliveryAddress): Promise<SavedDeliveryAddress>;
+  updateSavedDeliveryAddress(id: number, userId: string, data: Partial<InsertSavedDeliveryAddress>): Promise<SavedDeliveryAddress | undefined>;
+  deleteSavedDeliveryAddress(id: number, userId: string): Promise<boolean>;
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
@@ -156,6 +163,9 @@ export interface IStorage {
   getAllOrders(): Promise<Order[]>;
   getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
+  transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean>;
+  markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean>;
+  updateOrderTracking(id: number, trackingNumber: string): Promise<boolean>;
   cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
   markOrderPaid(id: number, reference: string): Promise<boolean>;
@@ -391,6 +401,7 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`DELETE FROM product_fit_metrics WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM product_stories WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM fabric_assets WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
+      await tx.execute(sql`DELETE FROM saved_delivery_addresses WHERE user_id = ${userId}`);
       await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ${userId} OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
       await tx.execute(sql`DELETE FROM orders WHERE user_id = ${userId}`);
@@ -608,39 +619,35 @@ export class DatabaseStorage implements IStorage {
 
   // Cart operations
   async addToCart(cartItem: InsertCartItem): Promise<CartItem> {
-    // Match on product + size: same product with different size = separate cart item
-    const conditions = [
-      eq(cartItems.userId, cartItem.userId),
-      eq(cartItems.productId, cartItem.productId),
-    ];
-    if (cartItem.selectedSize) {
-      conditions.push(eq(cartItems.selectedSize, cartItem.selectedSize));
-    } else {
-      conditions.push(isNull(cartItems.selectedSize));
-    }
+    return db.transaction(async tx => {
+      // Serialize additions for this buyer/product so simultaneous Buy again
+      // and Add to cart requests cannot create duplicates or exceed stock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${cartItem.userId}), ${cartItem.productId})`);
+      const conditions = [
+        eq(cartItems.userId, cartItem.userId),
+        eq(cartItems.productId, cartItem.productId),
+      ];
+      if (cartItem.selectedSize) conditions.push(eq(cartItems.selectedSize, cartItem.selectedSize));
+      else conditions.push(isNull(cartItems.selectedSize));
 
-    const [existingItem] = await db
-      .select()
-      .from(cartItems)
-      .where(and(...conditions));
+      const [[product], [existingItem]] = await Promise.all([
+        tx.select().from(products).where(eq(products.id, cartItem.productId)).limit(1),
+        tx.select().from(cartItems).where(and(...conditions)).limit(1),
+      ]);
+      if (!product || product.status !== 'approved') throw new Error('Product is not available');
+      const nextQuantity = (existingItem?.quantity || 0) + (cartItem.quantity || 1);
+      if (nextQuantity > product.stock) throw new Error('Requested quantity exceeds available stock');
 
-    if (existingItem) {
-      const [updatedItem] = await db
-        .update(cartItems)
-        .set({ 
-          quantity: (existingItem.quantity || 0) + (cartItem.quantity || 1),
-          updatedAt: new Date()
-        })
-        .where(eq(cartItems.id, existingItem.id))
-        .returning();
-      return updatedItem;
-    } else {
-      const [newItem] = await db
-        .insert(cartItems)
-        .values(cartItem)
-        .returning();
+      if (existingItem) {
+        const [updatedItem] = await tx.update(cartItems)
+          .set({ quantity: nextQuantity, updatedAt: new Date() })
+          .where(eq(cartItems.id, existingItem.id))
+          .returning();
+        return updatedItem;
+      }
+      const [newItem] = await tx.insert(cartItems).values(cartItem).returning();
       return newItem;
-    }
+    });
   }
 
   async getCartItems(userId: string): Promise<(CartItem & { product: Product })[]> {
@@ -675,6 +682,60 @@ export class DatabaseStorage implements IStorage {
 
   async clearCart(userId: string): Promise<void> {
     await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  }
+
+  async getSavedDeliveryAddresses(userId: string): Promise<SavedDeliveryAddress[]> {
+    return db.select().from(savedDeliveryAddresses)
+      .where(eq(savedDeliveryAddresses.userId, userId))
+      .orderBy(desc(savedDeliveryAddresses.isDefault), desc(savedDeliveryAddresses.updatedAt));
+  }
+
+  async createSavedDeliveryAddress(address: InsertSavedDeliveryAddress): Promise<SavedDeliveryAddress> {
+    return db.transaction(async tx => {
+      if (address.isDefault) {
+        await tx.update(savedDeliveryAddresses).set({ isDefault: false, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.userId, address.userId));
+      }
+      const [created] = await tx.insert(savedDeliveryAddresses).values(address).returning();
+      return created;
+    });
+  }
+
+  async updateSavedDeliveryAddress(id: number, userId: string, data: Partial<InsertSavedDeliveryAddress>): Promise<SavedDeliveryAddress | undefined> {
+    return db.transaction(async tx => {
+      const [ownedAddress] = await tx.select({ id: savedDeliveryAddresses.id })
+        .from(savedDeliveryAddresses)
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .limit(1);
+      if (!ownedAddress) return undefined;
+      if (data.isDefault) {
+        await tx.update(savedDeliveryAddresses).set({ isDefault: false, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.userId, userId));
+      }
+      const [updated] = await tx.update(savedDeliveryAddresses)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .returning();
+      return updated;
+    });
+  }
+
+  async deleteSavedDeliveryAddress(id: number, userId: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      const [deleted] = await tx.delete(savedDeliveryAddresses)
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .returning();
+      if (!deleted) return false;
+      if (deleted.isDefault) {
+        const [replacement] = await tx.select().from(savedDeliveryAddresses)
+          .where(eq(savedDeliveryAddresses.userId, userId))
+          .orderBy(desc(savedDeliveryAddresses.updatedAt)).limit(1);
+        if (replacement) await tx.update(savedDeliveryAddresses)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.id, replacement.id));
+      }
+      return true;
+    });
   }
 
   // Order operations
@@ -942,6 +1003,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id));
   }
 
+  async transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({ orderStatus: status, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus)))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({ orderStatus: 'shipped', trackingNumber, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus)))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async updateOrderTracking(id: number, trackingNumber: string): Promise<boolean> {
+    const result = await db.update(orders)
+      .set({ trackingNumber, updatedAt: new Date() })
+      .where(eq(orders.id, id))
+      .returning({ id: orders.id });
+    return result.length > 0;
+  }
+
   async cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean> {
     const conditions = [
       eq(orders.id, id),
@@ -1040,16 +1125,13 @@ export class DatabaseStorage implements IStorage {
 
   // Notification operations
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    // Set expiration time to 2 minutes from now for order notifications
-    const expirationTime = notification.type === 'order' 
-      ? new Date(Date.now() + 2 * 60 * 1000) // 2 minutes
-      : null;
-
     const [newNotification] = await db
       .insert(notifications)
       .values({
         ...notification,
-        expiresAt: expirationTime
+        // Lifecycle notifications are durable. Callers that need a transient
+        // alert may provide an explicit expiresAt.
+        expiresAt: notification.expiresAt ?? null,
       })
       .returning();
     return newNotification;

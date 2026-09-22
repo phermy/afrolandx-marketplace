@@ -116,6 +116,7 @@ export interface OrderItem {
   productId: number;
   quantity: number;
   priceAtTime: string;
+  selectedSize?: string | null;
   createdAt: string;
 }
 
@@ -128,6 +129,30 @@ export interface ShippingAddress {
   state: string;
   postalCode: string;
   country: string;
+}
+
+export interface SavedAddress extends ShippingAddress {
+  id: number;
+  label: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ShippingRecommendationResponse {
+  basis: 'static_catalog_rules';
+  liveRates: false;
+  ranked: Array<{
+    carrier: string;
+    score: number;
+    reasons: string[];
+  }>;
+}
+
+export interface ShippingQuoteResponse {
+  quotes: ShippingQuote[];
+  recommendation: string | null;
+  reasons: string[];
 }
 
 export interface ShippingQuote {

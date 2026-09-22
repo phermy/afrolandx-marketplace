@@ -189,6 +189,9 @@ export default function Navbar() {
                     {isVendor(user) && (
                       <>
                         <DropdownMenuSeparator />
+                         <DropdownMenuItem>
+                           <Link href="/products"><span className="cursor-pointer">Shop as buyer</span></Link>
+                         </DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/finance"><span className="cursor-pointer">Finance & Statements</span></Link></DropdownMenuItem>
@@ -304,6 +307,9 @@ export default function Navbar() {
             {isAuthenticated && isVendor(user) && (
               <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Vendor</p>
+                 <Link href="/products" onClick={closeMobileMenu}>
+                   <div className={mobileNavLinkClass('/products')}><ShoppingCart className="w-5 h-5" /><span>Shop as buyer</span></div>
+                 </Link>
                 <Link href="/vendor" onClick={closeMobileMenu}>
                   <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Vendor Dashboard</span></div>
                 </Link>

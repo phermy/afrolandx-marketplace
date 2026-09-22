@@ -12,6 +12,7 @@ import {
   insertProductStorySchema, insertFabricAssetSchema, insertCollabDropSchema, orders, orderItems, products, vendors,
   vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests,
   experienceFeedback, insertExperienceFeedbackSchema, returnPolicySchema,
+  insertSavedDeliveryAddressSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -33,6 +34,7 @@ import {
   paymentVerificationError,
   shippingPaymentVerificationError,
   SHIPPING_QUOTES,
+  recommendShippingCarriers,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
 import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
@@ -80,9 +82,18 @@ const quoteDecisionSchema = z.discriminatedUnion('status', [
 ]);
 
 function addressesMatch(left: unknown, right: unknown): boolean {
-  const a = shippingAddressSchema.safeParse(left);
-  const b = shippingAddressSchema.safeParse(right);
-  return a.success && b.success && JSON.stringify(a.data) === JSON.stringify(b.data);
+  try {
+    return JSON.stringify(canonicalAddress(left)) === JSON.stringify(canonicalAddress(right));
+  } catch {
+    return false;
+  }
+}
+
+function canonicalAddress(address: unknown) {
+  const parsed = shippingAddressSchema.parse(address);
+  return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
+    key, typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : value,
+  ]));
 }
 
 function safeImagePath(filename: string): string | null {
@@ -1511,6 +1522,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cart routes
+  // Saved delivery addresses are always scoped to the authenticated buyer.
+  app.get('/api/delivery-addresses', isAuthenticated, async (req: any, res) => {
+    try { res.json(await storage.getSavedDeliveryAddresses(req.user.id)); }
+    catch { res.status(500).json({ message: 'Failed to fetch saved delivery addresses' }); }
+  });
+  app.post('/api/delivery-addresses', isAuthenticated, async (req: any, res) => {
+    try {
+      const body = z.object({
+        label: z.string().trim().min(1).max(80).default('My address'),
+        isDefault: z.boolean().optional().default(false),
+        ...shippingAddressSchema.shape,
+      }).parse(req.body);
+      const address = await storage.createSavedDeliveryAddress({ ...body, userId: req.user.id });
+      res.status(201).json(address);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid delivery address', errors: error.errors });
+      res.status(500).json({ message: 'Failed to save delivery address' });
+    }
+  });
+  app.patch('/api/delivery-addresses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id)) return res.status(400).json({ message: 'Invalid address ID' });
+      const body = z.object({
+        label: z.string().trim().min(1).max(80).optional(),
+        isDefault: z.boolean().optional(),
+        ...shippingAddressSchema.shape,
+      }).partial().parse(req.body);
+      const updated = await storage.updateSavedDeliveryAddress(id, req.user.id, body);
+      if (!updated) return res.status(404).json({ message: 'Delivery address not found' });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid delivery address', errors: error.errors });
+      res.status(500).json({ message: 'Failed to update delivery address' });
+    }
+  });
+  app.delete('/api/delivery-addresses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id)) return res.status(400).json({ message: 'Invalid address ID' });
+      if (!await storage.deleteSavedDeliveryAddress(id, req.user.id)) return res.status(404).json({ message: 'Delivery address not found' });
+      res.status(204).end();
+    } catch { res.status(500).json({ message: 'Failed to delete delivery address' }); }
+  });
+
+  app.post('/api/cart/restore-order/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const userId = req.user.id;
+      const order = await storage.getOrder(orderId);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      const items = await storage.getOrderItemsWithProducts(orderId);
+      const added: any[] = [], skipped: any[] = [], adjusted: any[] = [];
+      for (const item of items) {
+        const product = await storage.getProduct(item.productId);
+        const base = { productId: item.productId, selectedSize: item.selectedSize ?? null, quantity: item.quantity };
+        if (!product || product.status !== 'approved') { skipped.push({ ...base, reason: 'product_unavailable' }); continue; }
+        if (product.stock < 1) { skipped.push({ ...base, reason: 'out_of_stock' }); continue; }
+        const sizes = Array.isArray(product.sizes) ? product.sizes.filter((s): s is string => typeof s === 'string') : [];
+        if (sizes.length > 0 && (!item.selectedSize || !sizes.includes(item.selectedSize))) {
+          skipped.push({ ...base, reason: 'size_unavailable' }); continue;
+        }
+        const quantity = Math.min(item.quantity, product.stock);
+        const existing = (await storage.getCartItems(userId)).find(cart =>
+          cart.productId === item.productId && (cart.selectedSize ?? null) === (item.selectedSize ?? null));
+        const room = Math.max(0, product.stock - (existing?.quantity || 0));
+        const toAdd = Math.min(quantity, room);
+        if (toAdd < 1) { skipped.push({ ...base, reason: 'cart_stock_limit' }); continue; }
+        try {
+          await storage.addToCart({ userId, productId: item.productId, quantity: toAdd, selectedSize: item.selectedSize ?? null });
+        } catch (error) {
+          if (error instanceof Error && error.message === 'Requested quantity exceeds available stock') {
+            skipped.push({ ...base, reason: 'cart_stock_limit' });
+            continue;
+          }
+          throw error;
+        }
+        const result = { ...base, quantity: toAdd };
+        (toAdd < item.quantity ? adjusted : added).push(result);
+      }
+      res.json({ added, adjusted, skipped });
+    } catch (error) {
+      console.error('Error restoring order to cart:', error);
+      res.status(500).json({ message: 'Failed to restore order items' });
+    }
+  });
+
   app.post('/api/cart', isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
@@ -1539,6 +1637,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: 'Validation error', errors: error.errors });
+      } else if (error instanceof Error && error.message === 'Requested quantity exceeds available stock') {
+        res.status(409).json({ message: error.message });
       } else {
         console.error('Error adding to cart:', error);
         res.status(500).json({ message: 'Failed to add to cart' });
@@ -1605,14 +1705,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const cartItems = await storage.getCartItems((req.user as any)?.id);
       const subtotal = cartItems.length > 0 ? calculateCheckoutSubtotal(cartItems) : 0;
-      res.json(SHIPPING_QUOTES.map(quote => ({
-        ...quote,
-        estimatedPrice: subtotal > 0 ? calculateEstimatedShippingAmount(subtotal, quote.carrier) : null,
-        currency: 'NGN',
-      })));
+      const totalWeight = cartItems.reduce((sum, item) => sum + Number(item.product.weight || 0) * item.quantity, 0);
+      const recommendation = recommendShippingCarriers({
+        country: typeof req.query.country === 'string' ? req.query.country : '',
+        totalWeight,
+        subtotal,
+      });
+      const quotes = SHIPPING_QUOTES.map(quote => ({
+          ...quote,
+          estimatedPrice: subtotal > 0 ? calculateEstimatedShippingAmount(subtotal, quote.carrier) : null,
+          currency: 'NGN',
+          recommendation: recommendation.ranked.find(item => item.carrier === quote.carrier) || null,
+        }));
+      // Keep the historic array response contract; recommendation details are
+      // available through the focused endpoint below.
+      res.json(quotes);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch shipping quotes' });
     }
+  });
+
+  app.get('/api/shipping/recommendation', isAuthenticated, async (req: any, res) => {
+    try {
+      const cartItems = await storage.getCartItems(req.user.id);
+      const subtotal = cartItems.length ? calculateCheckoutSubtotal(cartItems) : 0;
+      const totalWeight = cartItems.reduce((sum, item) => sum + Number(item.product.weight || 0) * item.quantity, 0);
+      res.json(recommendShippingCarriers({ country: String(req.query.country || ''), subtotal, totalWeight }));
+    } catch { res.status(500).json({ message: 'Failed to calculate shipping recommendation' }); }
   });
 
   // Buyer: request and view confirmed international shipping quotes.
@@ -2058,7 +2177,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!Number.isSafeInteger(shippingQuoteRequestId)) {
             const existingRequests = await storage.getShippingQuoteRequestsForUser(userId);
             const cartFingerprint = createCartFingerprint(cartItems);
-            const reusable = existingRequests.find(request =>
+            // Prefer a confirmed, unexpired quote. This makes returning buyers
+            // fast while still binding the quote to the exact cart/address.
+            const reusableConfirmed = existingRequests.find(request =>
+              request.carrier.toLowerCase() === shippingMethod
+              && request.status === 'quoted'
+              && !!request.expiresAt && request.expiresAt > new Date()
+              && request.cartFingerprint === cartFingerprint
+              && addressesMatch(request.shippingAddress, shippingAddress)
+            );
+            const reusable = reusableConfirmed || existingRequests.find(request =>
               request.carrier.toLowerCase() === shippingMethod
               && request.status === 'pending'
               && request.cartFingerprint === cartFingerprint
@@ -2357,6 +2485,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const { status } = req.body;
+      const trackingNumber = status === 'shipped'
+        ? z.string().trim().min(3).max(120).parse(req.body.trackingNumber)
+        : undefined;
       const userId = (req.user as any)?.id;
 
       const vendorAllowedStatuses = ['processing', 'shipped', 'delivered'];
@@ -2413,7 +2544,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update order status
-      await storage.updateOrderStatus(orderId, status);
+      if (status === 'shipped') {
+        if (!await storage.markOrderShipped(orderId, 'processing', trackingNumber!)) {
+          return res.status(409).json({ message: 'Order status changed before shipping could be recorded. Refresh and try again.' });
+        }
+      } else {
+        if (!await storage.transitionOrderStatus(orderId, order.orderStatus || '', status)) {
+          return res.status(409).json({ message: 'Order status changed before the update could be recorded. Refresh and try again.' });
+        }
+      }
       if (status === 'delivered') await releaseOrderEarnings(orderId);
 
       // Create customer notification based on status
@@ -2427,7 +2566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
         case 'shipped':
           notificationTitle = 'Order Shipped! 🚚';
-          notificationMessage = `Great news! Your order #${orderId} has been shipped by ${vendor.businessName}. It should arrive soon.`;
+          notificationMessage = `Great news! Your order #${orderId} has been shipped by ${vendor.businessName}. Tracking: ${trackingNumber}.`;
           break;
         case 'delivered':
           notificationTitle = 'Order Delivered! ✅';
@@ -2442,12 +2581,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: notificationMessage,
           type: 'order',
           orderId: order.id
-        });
+        }).catch(error => console.error('Failed to notify buyer of order transition:', error));
       }
+      await storage.createNotification({
+        userId: vendor.userId,
+        title: `Order #${orderId} marked ${status}`,
+        message: `Your order update for #${orderId} was recorded as ${status}.`,
+        type: 'order',
+        orderId: order.id,
+      }).catch(error => console.error('Failed to notify vendor of order transition:', error));
 
-      res.json({ message: 'Order status updated successfully' });
+      res.json({ message: 'Order status updated successfully', trackingNumber });
     } catch (error) {
       console.error('Error updating order status:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'A tracking number is required before marking an order shipped' });
+      }
       res.status(500).json({ message: 'Failed to update order status' });
     }
   });
@@ -2498,6 +2647,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
+      const allowedNextStatus: Record<string, string> = { pending: 'processing', processing: 'shipped', shipped: 'delivered' };
+      if (status !== 'cancelled' && allowedNextStatus[order.orderStatus || ''] !== status) {
+        return res.status(409).json({ message: `Order cannot move from ${order.orderStatus} to ${status}` });
+      }
       if (order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
       // Return with items
       const rawItems = await storage.getOrderItemsWithProducts(orderId);
@@ -3300,10 +3453,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin: update order fulfillment status with automatic notifications
+  app.patch('/api/admin/orders/:id/tracking', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id);
+      const trackingNumber = z.string().trim().min(3).max(120).parse(req.body.trackingNumber);
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+      if (!['shipped', 'delivered'].includes(order.orderStatus || '')) {
+        return res.status(409).json({ message: 'Tracking can be added once an order is shipped' });
+      }
+      await storage.updateOrderTracking(orderId, trackingNumber);
+      await storage.createNotification({
+        userId: order.userId,
+        title: 'Tracking information updated',
+        message: `Tracking for order #${orderId}: ${trackingNumber}`,
+        type: 'order',
+        orderId,
+      }).catch(error => console.error('Failed to notify tracking update:', error));
+      res.json({ trackingNumber });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: 'A valid tracking number is required' });
+      res.status(500).json({ message: 'Failed to update tracking information' });
+    }
+  });
+
+  // Advisory stalled-order scan. It only creates deduplicated notifications;
+  // it never changes fulfillment, payments, inventory, or settlements.
+  const scanStalledOrders = async () => {
+    const now = Date.now();
+    const ordersToCheck = await storage.getAllOrders();
+    const admins = await storage.getAdminUsers();
+    let alerts = 0;
+    for (const order of ordersToCheck) {
+      if (['delivered', 'cancelled'].includes(order.orderStatus || '') || order.paymentStatus !== 'paid') continue;
+      const ageHours = (now - new Date(order.updatedAt || order.createdAt || now).getTime()) / 3600000;
+      const stalled = (order.orderStatus === 'awaiting_shipping_quote' && ageHours > 24)
+        || (order.orderStatus === 'processing' && ageHours > 72)
+        || (order.orderStatus === 'shipped' && !order.trackingNumber && ageHours > 24)
+        || (order.stockReservationStatus === 'failed');
+      if (!stalled) continue;
+      const stallReason = order.stockReservationStatus === 'failed'
+        ? 'stock_failed'
+        : order.orderStatus === 'awaiting_shipping_quote'
+          ? 'shipping_quote'
+          : order.orderStatus === 'shipped'
+            ? 'missing_tracking'
+            : 'processing';
+      const stallType = `stalled_order:${stallReason}`;
+      const message = order.stockReservationStatus === 'failed'
+        ? `Order #${order.id} is paid but stock reservation failed and needs review.`
+        : `Order #${order.id} has remained ${order.orderStatus} for ${Math.round(ageHours)} hours and needs review.`;
+      for (const admin of admins) {
+        const existing = (await storage.getUserNotifications(admin.id)).some(notification =>
+          notification.orderId === order.id && notification.type === stallType);
+        if (existing) continue;
+        try {
+          await storage.createNotification({
+            userId: admin.id,
+            type: stallType,
+            orderId: order.id,
+            title: 'Order needs attention',
+            message,
+          });
+          alerts++;
+        } catch (error: any) {
+          if (error?.code !== '23505') console.error('Failed to create stalled order alert:', error);
+        }
+      }
+    }
+    return { scanned: ordersToCheck.length, alerts };
+  };
+
+  app.post('/api/admin/orders/stalled-scan', isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      res.json(await scanStalledOrders());
+    } catch (error) {
+      console.error('Stalled-order scan failed:', error);
+      res.status(500).json({ message: 'Failed to scan stalled orders' });
+    }
+  });
+
+  const stalledOrderScanTimer = setInterval(() => {
+    scanStalledOrders().catch(error => console.error('Scheduled stalled-order scan failed:', error));
+  }, 15 * 60 * 1000);
+  stalledOrderScanTimer.unref();
+
   app.patch('/api/admin/orders/:id/status', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
       const { status } = req.body;
+      const trackingNumber = status === 'shipped'
+        ? z.string().trim().min(3).max(120).parse(req.body.trackingNumber)
+        : undefined;
       const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
@@ -3322,7 +3563,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(409).json({ message: 'This order cannot be cancelled while a shipping payment is in progress' });
         }
       } else {
-        await storage.updateOrderStatus(orderId, status);
+        if (status === 'shipped') {
+          if (!await storage.markOrderShipped(orderId, 'processing', trackingNumber!)) {
+            return res.status(409).json({ message: 'Only a processing order can be marked shipped. Refresh and try again.' });
+          }
+        } else {
+          if (!await storage.transitionOrderStatus(orderId, order.orderStatus || '', status)) {
+            return res.status(409).json({ message: 'Order status changed before the update could be recorded. Refresh and try again.' });
+          }
+        }
         if (status === 'delivered') await releaseOrderEarnings(orderId);
       }
 
@@ -3334,7 +3583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         shipped: {
           title: '🚚 Order Shipped!',
-          message: `Your Order #${orderId} has been shipped and is on its way to you. Expected delivery: 3–5 business days.`,
+          message: `Your Order #${orderId} has been shipped. Tracking: ${trackingNumber}.`,
         },
         delivered: {
           title: '✅ Order Delivered!',
@@ -3371,6 +3620,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Order status updated', status });
     } catch (error) {
       console.error('Error updating order status:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'A tracking number is required before marking an order shipped' });
+      }
       res.status(500).json({ message: 'Failed to update order status' });
     }
   });

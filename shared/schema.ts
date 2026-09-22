@@ -157,6 +157,30 @@ export const cartItems = pgTable("cart_items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Buyer-owned delivery addresses. Checkout still sends a validated address
+// snapshot so historical orders remain immutable if this record changes.
+export const savedDeliveryAddresses = pgTable("saved_delivery_addresses", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  label: varchar("label", { length: 80 }).notNull().default("My address"),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  address1: varchar("address1", { length: 250 }).notNull(),
+  address2: varchar("address2", { length: 250 }).notNull().default(""),
+  city: varchar("city", { length: 120 }).notNull(),
+  state: varchar("state", { length: 120 }).notNull(),
+  postalCode: varchar("postal_code", { length: 30 }).notNull(),
+  country: varchar("country", { length: 100 }).notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("saved_delivery_addresses_user_idx").on(table.userId),
+  uniqueIndex("saved_delivery_addresses_one_default_idx")
+    .on(table.userId)
+    .where(sql`${table.isDefault} = true`),
+]);
+
 // Orders table
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
@@ -285,7 +309,11 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").notNull().default(false),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("notifications_stalled_order_unique")
+    .on(table.userId, table.type, table.orderId)
+    .where(sql`${table.type} LIKE 'stalled_order:%' AND ${table.orderId} IS NOT NULL`),
+]);
 
 // International shipping quotes requested by buyers and confirmed by admins.
 export const shippingQuoteRequests = pgTable("shipping_quote_requests", {
@@ -778,6 +806,12 @@ export const insertCartItemSchema = createInsertSchema(cartItems).omit({
   updatedAt: true,
 });
 
+export const insertSavedDeliveryAddressSchema = createInsertSchema(savedDeliveryAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   createdAt: true,
@@ -1012,6 +1046,8 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type CartItem = typeof cartItems.$inferSelect;
+export type SavedDeliveryAddress = typeof savedDeliveryAddresses.$inferSelect;
+export type InsertSavedDeliveryAddress = z.infer<typeof insertSavedDeliveryAddressSchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;

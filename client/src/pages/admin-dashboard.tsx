@@ -181,8 +181,8 @@ export default function AdminDashboard() {
   });
 
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/admin/orders/${orderId}/status`, { status });
+    mutationFn: async ({ orderId, status, trackingNumber }: { orderId: number; status: string; trackingNumber?: string }) => {
+      await apiRequest('PATCH', `/api/admin/orders/${orderId}/status`, { status, trackingNumber });
     },
     onSuccess: () => {
       toast({ title: 'Order updated', description: 'Fulfillment status saved.' });
@@ -1064,7 +1064,15 @@ export default function AdminDashboard() {
                               <span className="font-bold text-green-700 text-lg">₦{parseFloat(order.totalAmount || 0).toLocaleString()}</span>
                               <Select
                                 value={order.orderStatus}
-                                onValueChange={(status) => updateOrderStatusMutation.mutate({ orderId: order.id, status })}
+                                onValueChange={(status) => {
+                                  if (status === 'shipped') {
+                                    const trackingNumber = window.prompt('Enter the carrier tracking number');
+                                    if (!trackingNumber?.trim()) return;
+                                    updateOrderStatusMutation.mutate({ orderId: order.id, status, trackingNumber: trackingNumber.trim() });
+                                    return;
+                                  }
+                                  updateOrderStatusMutation.mutate({ orderId: order.id, status });
+                                }}
                                 disabled={order.isHistoricalLegacy || order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
                               >
                                 <SelectTrigger className="w-38 h-8 text-xs">

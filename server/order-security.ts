@@ -51,6 +51,45 @@ export const SHIPPING_QUOTES = [
   },
 ] as const;
 
+/** Static, explainable ranking only; carrier quotes remain authoritative. */
+export function recommendShippingCarriers(input: {
+  country?: string;
+  totalWeight?: number;
+  subtotal?: number;
+}) {
+  const countryInput = (input.country || '').trim().toLowerCase();
+  const countryAliases: Record<string, string> = {
+    'united states': 'usa',
+    'united states of america': 'usa',
+    us: 'usa',
+    'united kingdom': 'uk',
+    'great britain': 'uk',
+    gb: 'uk',
+    ng: 'nigeria',
+  };
+  const country = countryAliases[countryInput] || countryInput;
+  const weight = Math.max(0, Number(input.totalWeight) || 0);
+  const subtotal = Math.max(0, Number(input.subtotal) || 0);
+  const domestic = country === 'nigeria' || country === 'ng';
+  const ranked = SHIPPING_QUOTES.map((carrier, index) => {
+    let score = 50 - index;
+    const reasons: string[] = [];
+    const routes = 'routes' in carrier ? carrier.routes?.toLowerCase() : '';
+    if (!domestic && routes?.includes(country)) {
+      score += 25; reasons.push('listed route coverage');
+    }
+    if (weight > 15 && ['cargonaija', 'african import export solutions'].includes(carrier.carrier.toLowerCase())) {
+      score += 12; reasons.push('better fit for heavier consignments');
+    }
+    if (subtotal > 250000 && carrier.service.toLowerCase().includes('express')) {
+      score += 4; reasons.push('express option for higher-value orders');
+    }
+    if (!reasons.length) reasons.push('available for manual quote review');
+    return { carrier: carrier.carrier, score, reasons };
+  }).sort((a, b) => b.score - a.score);
+  return { basis: 'static_catalog_rules', liveRates: false, ranked };
+}
+
 export type CheckoutCartItem = {
   quantity: number;
   selectedSize?: string | null;

@@ -32,6 +32,17 @@ export function createVerifiedOrderCompleter(
 
     const awaitingShipping = !!order.shippingEstimatedAmount && !order.shippingFinalAmount;
     if (transitioned) await storage.clearCart(order.userId);
+    if (transitioned) {
+      await storage.createNotification({
+        userId: order.userId,
+        title: 'Payment confirmed',
+        message: awaitingShipping
+          ? `Payment for order #${order.id} was confirmed. We are preparing your items while final shipping is confirmed.`
+          : `Payment for order #${order.id} was confirmed. Your order is being prepared.`,
+        type: 'order',
+        orderId: order.id,
+      }).catch(error => console.error('Failed to notify buyer about payment:', error));
+    }
     const items = await storage.getOrderItemsWithProducts(order.id);
 
     const allStockReserved = await storage.reserveOrderStock(order.id);
