@@ -649,7 +649,7 @@ export default function VendorDashboard() {
                 </Button>
                 {vendor && (
                   <p className="text-center text-sm text-gray-500">
-                    You're already a vendor — registration is not needed again.
+                    You're already a vendor. Registration is not needed again.
                   </p>
                 )}
               </form>
@@ -869,7 +869,7 @@ export default function VendorDashboard() {
                   <div>
                     <CardTitle>My Products</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
-                      {products.length === 0 ? 'No products yet' : `${products.length} product${products.length !== 1 ? 's' : ''} — ${products.filter(p => p.status === 'approved').length} live in shop`}
+                      {products.length === 0 ? 'No products yet' : `${products.length} product${products.length !== 1 ? 's' : ''}; ${products.filter(p => p.status === 'approved').length} live in shop`}
                     </p>
                   </div>
                   <Button className="btn-nigerian gap-2" onClick={() => setIsAddSheetOpen(true)}>
@@ -931,17 +931,17 @@ export default function VendorDashboard() {
                             </div>
                             {product.status === 'pending' && (
                               <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Waiting for admin approval — usually within 24 hrs
+                                <Clock className="w-3 h-3" /> Waiting for admin approval, usually within 24 hrs
                               </p>
                             )}
                             {product.status === 'draft' && (
                               <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                <Pencil className="w-3 h-3" /> Draft — edit it before submitting for admin review
+                                <Pencil className="w-3 h-3" /> Draft. Edit it before submitting for admin review
                               </p>
                             )}
                             {product.status === 'rejected' && (
                               <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Rejected — edit and resubmit
+                                <AlertCircle className="w-3 h-3" /> Rejected. Edit and resubmit
                               </p>
                             )}
                           </div>
@@ -1422,7 +1422,7 @@ export default function VendorDashboard() {
               <Plus className="w-5 h-5 text-nigerian-green" /> Add New Product
             </SheetTitle>
             <SheetDescription>
-              Fill in the details below. Your product goes live after admin approval — usually within 24 hours.
+              Fill in the details below. Your product goes live after admin approval, usually within 24 hours.
             </SheetDescription>
           </SheetHeader>
 
@@ -1555,14 +1555,14 @@ export default function VendorDashboard() {
                 onChange={e => { setSelectedSizeSystem(e.target.value); setSelectedSizes([]); }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
               >
-                <option value="">— No sizes (one size fits all) —</option>
+                <option value="">No sizes (one size fits all)</option>
                 <option value="International">International (XS – XXXL)</option>
                 <option value="UK Numeric">UK Numeric (6 – 24)</option>
                 <option value="US Numeric">US Numeric (0 – 18)</option>
                 <option value="EU Numeric">EU Numeric (32 – 52)</option>
                 <option value="Kids by Age">Kids by Age</option>
-                <option value="Shoes EU">Shoes — EU (35 – 47)</option>
-                <option value="Shoes UK">Shoes — UK (2 – 13)</option>
+                <option value="Shoes EU">Shoes (EU 35 – 47)</option>
+                <option value="Shoes UK">Shoes (UK 2 – 13)</option>
                 <option value="One Size">One Size</option>
               </select>
               {selectedSizeSystem && selectedSizeSystem !== '' && (() => {
@@ -1905,9 +1905,9 @@ export default function VendorDashboard() {
                   >
                     <Upload className="w-6 h-6 text-gray-400 mb-1" />
                     <span className="text-sm font-medium text-gray-600">
-                      {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected — click to add more` : 'Click here to choose photos'}
+                      {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected. Click to add more` : 'Click here to choose photos'}
                     </span>
-                    <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — up to 15 MB each</span>
+                    <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP. Up to 15 MB each</span>
                   </label>
                   <input
                     id="add-product-images"
@@ -1953,7 +1953,7 @@ export default function VendorDashboard() {
             {/* Review notice */}
             <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
               <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
-              <span>Products are reviewed by an admin before going live in the shop — usually within 24 hours.</span>
+              <span>Products are reviewed by an admin before going live in the shop, usually within 24 hours.</span>
             </div>
 
             {/* Save or submit */}
@@ -2135,7 +2135,7 @@ export default function VendorDashboard() {
               {/* Existing images grid */}
               {editCurrentImages.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-2">Current photos — click × to remove</p>
+                  <p className="text-xs text-gray-500 mb-2">Current photos. Click × to remove</p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {editCurrentImages.map((url, i) => (
                       <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
@@ -2193,7 +2193,7 @@ export default function VendorDashboard() {
               >
                 <Upload className="w-5 h-5 text-gray-400 mb-1" />
                 <span className="text-sm text-gray-500 font-medium">Click to add more photos</span>
-                <span className="text-xs text-gray-400">JPG, PNG, WEBP — up to 15 MB each</span>
+                <span className="text-xs text-gray-400">JPG, PNG, WEBP. Up to 15 MB each</span>
               </label>
               <input
                 id="edit-images-upload"

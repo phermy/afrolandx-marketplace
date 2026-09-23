@@ -19,7 +19,7 @@ const leaders: Leader[] = [
   {
     kind: "profile",
     id: "femi-elegbeleye",
-    name: "Dr. Femi Abiodun Elegbeleye",
+    name: "Dr. Femi A Elegbeleye",
     label: "Co-founder",
     role: "Co-Founder & Lead Senior Software Engineer",
     portrait: femiPortrait,
@@ -43,7 +43,7 @@ const leaders: Leader[] = [
       "Drawing on her experience in research, evaluation, project management and business operations, she translates evidence and market insights into practical strategies that support African vendors and connect their products with customers worldwide.",
     ],
   },
-  { kind: "name-only", id: "nathan-chibuike", name: "Mr. Nathan Chinemerem Chibuike" },
+  { kind: "name-only", id: "nathan-chubuike", name: "Mr. Nathan C Chubuike" },
   {
     kind: "profile",
     id: "genesis-francis",
@@ -107,7 +107,7 @@ export default function LeadershipProfiles() {
                 </h5>
                 <p className="mt-2 text-sm font-medium leading-snug text-[#315d3a]">{leader.role}</p>
                 <div className="mt-5 space-y-3 text-sm leading-6 text-gray-600">
-                  {leader.bio.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                  {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
                 </div>
               </div>
             </article>

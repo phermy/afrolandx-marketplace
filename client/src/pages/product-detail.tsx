@@ -250,13 +250,13 @@ export default function ProductDetail() {
             {product.description && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-600 leading-relaxed text-sm">{product.description}</p>
+                <p className="reading-copy text-gray-600 leading-relaxed text-sm">{product.description}</p>
               </div>
             )}
 
             <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
               <h3 className="font-semibold text-gray-900">Returns: {returnPolicy.label}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">{returnPolicy.description}</p>
+              <p className="reading-copy mt-1 text-sm leading-relaxed text-gray-600">{returnPolicy.description}</p>
               <a href="/policies/return-policy" className="mt-2 inline-block text-sm font-medium text-nigerian-green hover:underline">
                 Read the standard AfrolandX return and refund policy
               </a>

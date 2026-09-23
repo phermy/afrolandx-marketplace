@@ -189,7 +189,7 @@ function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; ope
         <ScrollArea className="max-h-[calc(90vh-192px)]">
           <div className="p-5 space-y-3">
             {place.editorialSummary?.text && (
-              <p className="text-muted-foreground text-sm leading-relaxed">{place.editorialSummary.text}</p>
+              <p className="reading-copy text-muted-foreground text-sm leading-relaxed">{place.editorialSummary.text}</p>
             )}
             <div className="space-y-2">
               <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl">
@@ -768,7 +768,7 @@ function GuideLearnMoreDialog({ open, onClose, onRegister }: { open: boolean; on
           <div className="space-y-4 pr-2">
             {[
               { step: "1", title: "Register & Get Verified", body: "Submit your application with your city, specialties, and languages. Our team verifies guides within 3 business days." },
-              { step: "2", title: "Create Your Tours", body: "Build custom tour packages — street food walks, cultural visits, market tours, nightlife guides, or anything unique to your city." },
+              { step: "2", title: "Create Your Tours", body: "Build custom tour packages, including street food walks, cultural visits, market tours, nightlife guides, or anything unique to your city." },
               { step: "3", title: "Accept Bookings", body: "Travellers book directly through AfrolandX. You receive confirmed bookings with guest details and payment guaranteed upfront." },
               { step: "4", title: "Earn & Grow", body: "Keep 85% of every booking fee. AfrolandX takes 15% to cover platform, insurance, and marketing. Build reviews to command higher prices." },
             ].map(s => (
@@ -1189,7 +1189,7 @@ export default function DiscoverAfrica() {
                 </div>
                 <h3 className="text-2xl font-black text-white mb-1">🇳🇬 Discover Nigeria</h3>
                 <p className="text-white/80 text-sm mb-3">
-                  From Lagos's vibrant nightlife to Abuja's modern skyline and Calabar's cultural festivals — Nigeria is calling.
+                  From Lagos's vibrant nightlife to Abuja's modern skyline and Calabar's cultural festivals. Nigeria is calling.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["🏙️ Lagos", "🏛️ Abuja", "🎭 Calabar", "🌊 Port Harcourt"].map(tag => (
@@ -1214,7 +1214,7 @@ export default function DiscoverAfrica() {
             <span
               className="font-semibold text-emerald-600 cursor-pointer hover:underline"
               onClick={() => setInquiryType("destination_feature")}
-            >Feature your country or city here</span> — reach 50,000+ monthly travellers.
+            >Feature your country or city here</span> to reach 50,000+ monthly travellers.
           </p>
 
           {/* Region tabs */}
@@ -1311,7 +1311,7 @@ export default function DiscoverAfrica() {
               <p className="text-white/80 text-base mb-6 leading-relaxed">
                 Are you a local in Lagos, Nairobi, Cairo, Cape Town or any African city? 
                 Register as an AfrolandX Expert Guide and earn by showing visitors the real, 
-                authentic side of your city — street food, hidden markets, cultural tours and more.
+                authentic side of your city, including street food, hidden markets, cultural tours and more.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
                 {[
@@ -1360,7 +1360,7 @@ export default function DiscoverAfrica() {
                 AfrolandX Explorer Premium
               </h2>
               <p className="text-white/70 text-sm mb-6 max-w-xl">
-                Unlock the full power of AfrolandX Discover — curated city guides, exclusive deals, 
+                Unlock the full power of AfrolandX Discover with curated city guides, exclusive deals,
                 offline access and priority support for travellers who want more.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
@@ -1382,7 +1382,7 @@ export default function DiscoverAfrica() {
                   className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl px-8 py-5 text-base shadow-xl"
                   onClick={() => setShowPremium(true)}
                 >
-                  <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium — ₦2,500/mo
+                  <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium for ₦2,500/mo
                 </Button>
                 <div className="text-white/60 text-xs">
                   Cancel anytime · 7-day free trial

@@ -267,7 +267,7 @@ export default function Checkout() {
     if (cancelled) {
       toast({
         title: 'Payment Cancelled',
-        description: 'Your payment was cancelled. Your cart is still saved — complete your order when ready.',
+        description: 'Your payment was cancelled. Your cart is still saved. Complete your order when ready.',
         variant: 'destructive',
       });
       window.history.replaceState({}, '', window.location.pathname);
@@ -1017,7 +1017,7 @@ export default function Checkout() {
                   {/* Currency indicator */}
                   <div className="text-xs px-3 py-2 rounded-md flex items-center gap-2 bg-green-50 text-green-700 border border-green-200">
                     <span>✓</span>
-                    <span>All prices in Nigerian Naira (₦) — charged via Paystack</span>
+                    <span>All prices are in Nigerian Naira (₦) and are charged via Paystack</span>
                   </div>
 
                   {/* Pricing Breakdown */}

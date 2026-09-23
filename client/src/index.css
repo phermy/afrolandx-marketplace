@@ -170,6 +170,19 @@
   }
 }
 
+/* Keep longer reading passages aligned without stretching short interface copy. */
+@media (min-width: 640px) {
+  .reading-copy,
+  .heritage-editorial__lede,
+  .heritage-card__copy,
+  .policy-intro,
+  .policy-article p {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: none;
+  }
+}
+
 .site-footer { background: #172d29; color: #f7f0df; padding: 4.5rem 1.25rem 1.5rem; }
 .site-footer__inner { max-width: 78rem; margin: 0 auto; display: grid; grid-template-columns: 1.5fr repeat(5, minmax(0, 1fr)); gap: 2.5rem; }
 .site-footer a { color: #e8dfc9; text-decoration: none; display: block; transition: color .2s ease, transform .2s ease; }

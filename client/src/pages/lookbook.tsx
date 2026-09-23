@@ -34,7 +34,7 @@ const EVENT_TYPES = [
 ];
 
 const EVENT_SIZES = [
-  { value: "1", label: "Solo — Just me (1)" },
+  { value: "1", label: "Solo: Just me (1)" },
   { value: "2", label: "Couple (2)" },
   { value: "4", label: "Small family (3–4)" },
   { value: "6", label: "Family (5–6)" },
@@ -43,7 +43,7 @@ const EVENT_SIZES = [
   { value: "25", label: "Small group / Aso-ebi (20–30)" },
   { value: "50", label: "Large group (30–60)" },
   { value: "100", label: "Corporate / Community event (60+)" },
-  { value: "others", label: "Others — custom size" },
+  { value: "others", label: "Others: custom size" },
 ];
 
 // Country → currency mapping
@@ -215,7 +215,7 @@ export default function LookbookPage() {
             <h1 className="text-3xl font-bold">AI Lookbook Studio</h1>
           </div>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Describe any outfit in your own words — our AI stylist will pick the perfect pieces from our collection.
+            Describe any outfit in your own words. Our AI stylist will pick the perfect pieces from our collection.
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export default function LookbookPage() {
               What are you looking for?
             </CardTitle>
             <CardDescription>
-              Describe your occasion, style, colours, or any preferences — the more detail, the better the match.
+              Describe your occasion, style, colours, or any preferences. The more detail you provide, the better the match.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -364,7 +364,7 @@ export default function LookbookPage() {
             <Card>
               <CardContent className="py-14 text-center">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
-                <p className="text-muted-foreground">No lookbooks yet — describe your style above and hit Generate!</p>
+                <p className="text-muted-foreground">No lookbooks yet. Describe your style above and hit Generate!</p>
               </CardContent>
             </Card>
           ) : (

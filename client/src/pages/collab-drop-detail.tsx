@@ -155,7 +155,7 @@ export default function CollabDropDetailPage() {
               </p>
             )}
 
-            <p className="text-muted-foreground leading-relaxed">{drop.description}</p>
+            <p className="reading-copy text-muted-foreground leading-relaxed">{drop.description}</p>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">

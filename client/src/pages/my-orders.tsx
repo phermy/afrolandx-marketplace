@@ -213,7 +213,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-3">
             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-800 text-sm">Payment received — final shipping price in progress</p>
+              <p className="font-medium text-amber-800 text-sm">Payment received. We are confirming the final shipping price.</p>
               <p className="text-xs text-amber-700">Your estimated shipping deposit is included. Afrolandx is confirming the {order.shippingMethod?.toUpperCase()} rate; only any remaining difference will be collected.</p>
             </div>
           </div>
@@ -487,7 +487,7 @@ export default function MyOrders() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 font-nigerian">My Orders</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Live tracking — auto-refreshes every 30 seconds
+              Live tracking refreshes every 30 seconds
               {isFetching && <RefreshCw className="inline w-3 h-3 ml-1 animate-spin text-green-500" />}
             </p>
           </div>

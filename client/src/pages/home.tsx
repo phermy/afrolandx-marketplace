@@ -102,7 +102,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm sm:text-base">
-                Admin Mode — Welcome back, {user?.firstName || user?.email}
+                Admin Mode: Welcome back, {user?.firstName || user?.email}
               </span>
             </div>
             <Button
@@ -160,8 +160,8 @@ export default function Home() {
               </span>
             </h1>
             <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork — 
-              authentic fashion from all 54 African nations.
+              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork.
+              Authentic fashion from all 54 African nations.
             </p>
             <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-4">
               Authentic fashion from all 54 African nations.

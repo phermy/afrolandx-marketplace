@@ -210,7 +210,7 @@ export default function Landing() {
                   Sign In
                 </Button>
                 <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
-                  Sign Up — Create Account
+                  Sign Up: Create Account
                 </Button>
               </div>
             </div>
@@ -263,8 +263,8 @@ export default function Landing() {
             </h1>
             {/* Full description — hidden on small screens to save space */}
             <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork — 
-              celebrate the rich cultural heritage of all 54 African nations.
+              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork.
+              Celebrate the rich cultural heritage of all 54 African nations.
             </p>
             {/* Compact description — only on mobile */}
             <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-2">
@@ -555,13 +555,13 @@ export default function Landing() {
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-4 md:mb-6" style={{ lineHeight: '1.3' }}>
                 Celebrating African Heritage
               </h2>
-              <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
+              <p className="reading-copy text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
                 Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
                 connecting African artisans with fashion enthusiasts worldwide. Our mission is 
                 to preserve and promote the rich heritage of African traditional fashion while 
                 supporting local communities.
               </p>
-              <p className="hidden sm:block text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
+              <p className="reading-copy hidden sm:block text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
                 Every purchase you make helps support African artisans, preserves traditional 
                 crafting techniques, and celebrates the vibrant culture of Africa.
               </p>

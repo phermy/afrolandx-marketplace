@@ -123,7 +123,7 @@ export default function MeasurementsPage() {
           <div className="mt-6 p-4 rounded-xl bg-nigerian-green/5 border border-nigerian-green/20 flex gap-3 items-start">
             <span className="text-2xl shrink-0">💡</span>
             <p className="text-sm text-gray-700">
-              <strong className="text-nigerian-green">Why measurements matter:</strong> Sharing your exact body measurements helps our vendors craft clothing that fits you perfectly — no returns, no alterations needed.
+              <strong className="text-nigerian-green">Why measurements matter:</strong> Sharing your exact body measurements helps our vendors craft clothing that fits you perfectly, with no returns or alterations needed.
             </p>
           </div>
         </div>
@@ -257,7 +257,7 @@ export default function MeasurementsPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">No measurements yet</h2>
             <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
-              Add your body measurements so vendors can tailor clothing that fits you perfectly — from Agbada to Ankara dresses.
+              Add your body measurements so vendors can tailor clothing that fits you perfectly, from Agbada to Ankara dresses.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
@@ -273,8 +273,8 @@ export default function MeasurementsPage() {
             <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto text-left">
               {[
                 { step: "1", icon: "📐", title: "Enter your sizes", desc: "Fill in chest, waist, hips and other measurements in cm or inches." },
-                { step: "2", icon: "📤", title: "Send to vendor", desc: "Choose a vendor and submit — they'll receive your measurements instantly." },
-                { step: "3", icon: "👗", title: "Get a perfect fit", desc: "Your order is tailored to your exact body — no alterations needed." },
+                { step: "2", icon: "📤", title: "Send to vendor", desc: "Choose a vendor and submit. They'll receive your measurements instantly." },
+                { step: "3", icon: "👗", title: "Get a perfect fit", desc: "Your order is tailored to your exact body, with no alterations needed." },
               ].map(item => (
                 <div key={item.step} className="flex gap-4 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
                   <div className="w-10 h-10 rounded-full bg-nigerian-green text-white text-sm font-bold flex items-center justify-center shrink-0">

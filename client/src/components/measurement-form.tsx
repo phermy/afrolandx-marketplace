@@ -217,7 +217,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           setUnit("cm");
           setScanData({ scanMethod: "ai_scan", scanSessionId: sessionId, scanData: response });
           setScanStatus("completed");
-          toast({ title: "Scan complete!", description: isDemoMode ? "Demo measurements loaded — review and submit." : "Measurements loaded — review and submit." });
+          toast({ title: "Scan complete!", description: isDemoMode ? "Demo measurements loaded. Review and submit." : "Measurements loaded. Review and submit." });
           setTimeout(() => setScanStatus("idle"), 3000);
         } else if (response.status === "pending" || response.status === "processing") {
           attempts++;
@@ -245,13 +245,13 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-gray-900 text-sm">AI Body Scan</h3>
             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-              Use your phone camera to get accurate measurements in 60 seconds — no tape measure needed.
+              Use your phone camera to get accurate measurements in 60 seconds. No tape measure needed.
             </p>
             {scanStatus === "completed" && (
               <p className="text-xs text-green-600 font-medium mt-1.5">✓ Measurements loaded! Review below and submit.</p>
             )}
             {scanStatus === "error" && (
-              <p className="text-xs text-red-500 mt-1.5">Scan failed — please enter measurements manually.</p>
+              <p className="text-xs text-red-500 mt-1.5">Scan failed. Please enter measurements manually.</p>
             )}
           </div>
           <Button
@@ -370,7 +370,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
                   🦾
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Arms & Legs <span className="text-gray-400 font-normal ml-1">— optional</span></h3>
+                  <h3 className="font-semibold text-gray-900 text-sm">Arms & Legs <span className="text-gray-400 font-normal ml-1">(optional)</span></h3>
                   <p className="text-xs text-gray-400">Sleeve, arm, inseam and outseam lengths</p>
                 </div>
               </div>

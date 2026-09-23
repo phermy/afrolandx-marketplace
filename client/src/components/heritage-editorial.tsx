@@ -95,7 +95,7 @@ export default function HeritageEditorial() {
           <h2 id="heritage-heading">Before the marketplace, there is the making.</h2>
         </div>
         <p className="heritage-editorial__lede">
-          AfrolandX is a marketplace for living makers. This small editorial archive gives context to the materials, techniques, and histories that deserve to be understood — without turning museum objects into inventory.
+          AfrolandX is a marketplace for living makers. This small editorial archive gives context to the materials, techniques, and histories that deserve to be understood without turning museum objects into inventory.
         </p>
       </div>
       <div className="heritage-notice">

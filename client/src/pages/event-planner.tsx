@@ -44,7 +44,7 @@ const eventTypes = [
 ];
 
 const eventSizes = [
-  { value: "1", label: "Solo — Just me (1)" },
+  { value: "1", label: "Solo: Just me (1)" },
   { value: "2", label: "Couple (2)" },
   { value: "4", label: "Small family (3–4)" },
   { value: "6", label: "Family (5–6)" },
@@ -53,7 +53,7 @@ const eventSizes = [
   { value: "25", label: "Small group / Aso-ebi (20–30)" },
   { value: "50", label: "Large group (30–60)" },
   { value: "100", label: "Corporate / Community event (60+)" },
-  { value: "others", label: "Others — custom size" },
+  { value: "others", label: "Others: custom size" },
 ];
 
 // Country → currency mapping
