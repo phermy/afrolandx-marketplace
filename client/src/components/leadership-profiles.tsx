@@ -69,51 +69,50 @@ export default function LeadershipProfiles() {
           Meet the team behind Afrolandx
         </h3>
       </div>
-      <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {leaders.map((leader, index) => (
-          <li key={leader.id} className="flex items-center gap-4 rounded-xl border border-[#e7e4d9] bg-white p-4 shadow-sm">
-            <span aria-hidden="true" className="font-nigerian text-lg font-bold text-[#1a5c2a]">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <span className="font-nigerian font-semibold leading-snug text-gray-900">{leader.name}</span>
+      <ol className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {leaders.map((leader) => (
+          <li key={leader.id}>
+            <article
+              aria-labelledby={`${leader.id}-name`}
+              className="h-full overflow-hidden rounded-2xl border border-[#e7e4d9] bg-white shadow-sm"
+            >
+              <div className="h-52 overflow-hidden bg-[#eef1eb] sm:h-56">
+                {leader.kind === "profile" && (
+                  <img
+                    src={leader.portrait}
+                    alt={`Portrait of ${leader.name}`}
+                    loading="lazy"
+                    decoding="async"
+                    style={{ objectPosition: leader.imagePosition }}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              <div className="p-5 sm:p-6">
+                {leader.kind === "profile" && (
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a5c2a]">
+                    {leader.label}
+                  </p>
+                )}
+                <h4
+                  id={`${leader.id}-name`}
+                  className={`${leader.kind === "profile" ? "mt-2" : ""} font-nigerian text-xl font-bold leading-tight text-gray-900`}
+                >
+                  {leader.name}
+                </h4>
+                {leader.kind === "profile" && (
+                  <>
+                    <p className="mt-2 text-sm font-medium leading-snug text-[#315d3a]">{leader.role}</p>
+                    <div className="mt-5 space-y-3 text-sm leading-6 text-gray-600">
+                      {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
+                    </div>
+                  </>
+                )}
+              </div>
+            </article>
           </li>
         ))}
       </ol>
-      <div className="mt-10 md:mt-12">
-        <h4 className="mb-5 font-nigerian text-xl font-bold text-gray-900">Team profiles</h4>
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {leaders.filter((leader): leader is Extract<Leader, { kind: "profile" }> => leader.kind === "profile").map((leader) => (
-            <article
-              key={leader.id}
-              aria-labelledby={`${leader.id}-name`}
-              className="overflow-hidden rounded-2xl border border-[#e7e4d9] bg-white shadow-sm"
-            >
-              <div className="h-52 overflow-hidden bg-[#e9ede8] sm:h-56">
-                <img
-                  src={leader.portrait}
-                  alt={`Portrait of ${leader.name}`}
-                  loading="lazy"
-                  decoding="async"
-                  style={{ objectPosition: leader.imagePosition }}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="p-5 sm:p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a5c2a]">
-                  {leader.label}
-                </p>
-                <h5 id={`${leader.id}-name`} className="mt-2 font-nigerian text-xl font-bold leading-tight text-gray-900">
-                  {leader.name}
-                </h5>
-                <p className="mt-2 text-sm font-medium leading-snug text-[#315d3a]">{leader.role}</p>
-                <div className="mt-5 space-y-3 text-sm leading-6 text-gray-600">
-                  {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
