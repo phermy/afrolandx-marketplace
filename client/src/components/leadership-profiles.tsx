@@ -1,6 +1,6 @@
 import genesisPortrait from "@assets/WhatsApp_Image_2026-09-23_at_2.00.25_PM_1790170453875.jpeg";
 import helenPortrait from "@assets/WhatsApp_Image_2026-09-21_at_9.51.03_AM_1790170887996.jpeg";
-import femiPortrait from "@assets/femi-elegbeleye-office-portrait.webp";
+import femiPortrait from "@assets/femi-elegbeleye-original-blue-suit-card-v2.webp";
 
 const leaders = [
   {
@@ -34,7 +34,7 @@ const leaders = [
     label: "Co-founder",
     role: "Co-Founder & Lead Senior Software Engineer",
     portrait: femiPortrait,
-    imagePosition: "center 42%",
+    imagePosition: "center",
     bio: [
       "Femi leads the design, development and technical strategy of Afrolandx’s digital platforms, including the marketplace and Afrolandx Rides. His research spans Artificial Intelligence, Machine Learning, Cybersecurity, IoT, Blockchain, Trustworthy AI and intelligent software systems.",
       "Drawing on software engineering, academic research and technology development, he builds secure, scalable platforms that support African businesses and cross-border commerce. He focuses on translating research and innovation into practical solutions for Africa’s digital economy.",
