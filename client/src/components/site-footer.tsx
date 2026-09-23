@@ -43,7 +43,7 @@ export default function SiteFooter() {
           <Link href="/" className="site-footer__brand">Afrolandx</Link>
           <p className="site-footer__tagline">African stories, made tangible.</p>
           <p className="site-footer__meta">CAC REG: 7039498</p>
-          <a className="site-footer__email" href="mailto:info@afrolandx.com">info@afrolandx.com</a>
+          <a className="site-footer__email" href="mailto:support@afrolandx.com">support@afrolandx.com</a>
         </div>
         <div>
           <p className="site-footer__label">Company</p>
@@ -58,7 +58,7 @@ export default function SiteFooter() {
           <Link href="/policies/shipping-policy">Shipping information</Link>
           <Link href="/policies/return-policy">Returns</Link>
           <Link href="/policies/complaints-and-dispute-resolution">Complaints</Link>
-          <a href="mailto:info@afrolandx.com">Contact support</a>
+          <a href="mailto:support@afrolandx.com">Contact support</a>
         </div>
         <div>
           <p className="site-footer__label">Vendor resources</p>

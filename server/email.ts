@@ -2,6 +2,8 @@ import crypto from "crypto";
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
 const MANAGEMENT_EMAIL = "femi.elegbeleye@afrolandx.com";
+// Replies must reach an existing Titan mailbox, even when the sender is no-reply.
+const SUPPORT_EMAIL = "support@afrolandx.com";
 const APP_NAME = "Afrolandx";
 
 export function generateOtp(): string {
@@ -32,6 +34,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
     body: JSON.stringify({
       from: `${APP_NAME} <${FROM_EMAIL}>`,
       to: [to],
+      reply_to: SUPPORT_EMAIL,
       subject,
       html,
     }),
