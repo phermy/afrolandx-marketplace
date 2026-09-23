@@ -4199,7 +4199,7 @@ INSTRUCTIONS:
           createdAt: feedback.createdAt,
         });
       } catch (notificationError) {
-        console.error('Experience feedback was saved, but management notification failed:', notificationError);
+        console.error('Experience feedback was saved, but support notification failed:', notificationError);
       }
 
       res.status(201).json({

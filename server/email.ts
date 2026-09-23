@@ -1,7 +1,6 @@
 import crypto from "crypto";
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
-const MANAGEMENT_EMAIL = "femi.elegbeleye@afrolandx.com";
 // Replies must reach an existing Titan mailbox, even when the sender is no-reply.
 const SUPPORT_EMAIL = "support@afrolandx.com";
 const APP_NAME = "Afrolandx";
@@ -141,7 +140,7 @@ export async function sendExperienceFeedbackNotification(
   const safeSubmittedAt = escapeHtml(feedback.createdAt.toISOString());
 
   await sendEmail(
-    MANAGEMENT_EMAIL,
+    SUPPORT_EMAIL,
     `${priority}New Afrolandx feedback: ${safeMood}`,
     `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f4f1e8; padding: 32px 20px;">
