@@ -23,6 +23,7 @@ import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
 import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
 import HeritageEditorial from "@/components/heritage-editorial";
 import HeritageCarousel from "@/components/heritage-carousel";
+import LegalLeadProfile from "@/components/legal-lead-profile";
 
 type PublicMarketplaceStats = {
   verifiedVendors: number;
@@ -570,6 +571,7 @@ export default function Landing() {
             </div>
             <HeritageCarousel />
           </div>
+          <LegalLeadProfile />
         </div>
       </section>
 
