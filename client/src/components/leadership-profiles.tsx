@@ -19,7 +19,7 @@ const leaders: Leader[] = [
   {
     kind: "profile",
     id: "femi-elegbeleye",
-    name: "Dr. Femi A Elegbeleye",
+    name: "Dr. Femi A. Elegbeleye",
     label: "Co-founder",
     role: "Co-Founder & Lead Senior Software Engineer",
     portrait: femiPortrait,
@@ -43,11 +43,11 @@ const leaders: Leader[] = [
       "Drawing on her experience in research, evaluation, project management and business operations, she translates evidence and market insights into practical strategies that support African vendors and connect their products with customers worldwide.",
     ],
   },
-  { kind: "name-only", id: "nathan-chubuike", name: "Mr. Nathan C Chubuike" },
+  { kind: "name-only", id: "nathan-chibuike", name: "Mr. Nathan C. Chibuike" },
   {
     kind: "profile",
     id: "genesis-francis",
-    name: "Genesis Francis, Esq",
+    name: "Genesis Francis Esq.",
     label: "Legal lead",
     role: "Legal Lead · Notary Public",
     portrait: genesisPortrait,
