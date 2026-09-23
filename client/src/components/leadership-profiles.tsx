@@ -30,7 +30,7 @@ const leaders = [
   },
   {
     id: "femi-elegbeleye",
-    name: "Dr. Femi Abiodun Elegbeleye, PhD",
+    name: "Dr. Femi A. Elegbeleye",
     label: "Co-founder",
     role: "Co-Founder & Lead Senior Software Engineer",
     portrait: femiPortrait,
