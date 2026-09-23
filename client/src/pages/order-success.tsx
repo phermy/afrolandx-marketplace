@@ -112,7 +112,7 @@ export default function OrderSuccess() {
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
-                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'You receive an in-app notification when the final shipping price is ready' : "You'll receive updates as your order progresses through each stage"}</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'You receive a notification in the app when the final shipping price is ready' : "You'll receive updates as your order progresses through each stage"}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
@@ -128,7 +128,7 @@ export default function OrderSuccess() {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-yellow-800 text-sm">
                     <span className="font-semibold">Note:</span> Both vendors and our admin team have been automatically 
-                    notified about your order. Expect processing to begin within 1-2 business hours.
+                    notified about your order. Expect processing to begin within one to two business hours.
                   </p>
                 </div>
               </div>

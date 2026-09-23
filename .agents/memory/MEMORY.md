@@ -7,3 +7,4 @@
 - [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
 - [Vendor settlement accounting](vendor-settlement-accounting.md) — commission is 8% of merchandise only; immutable vendor ledger entries drive refunds, availability, and payouts
 - [Identity-preserving portraits](identity-preserving-portraits.md) — for real-person edits, keep original subject pixels; generative edits can redraw faces despite strict prompts
+- [Hyphen-free website copy](hyphen-free-copy.md) — rewrite visible phrases grammatically instead of just deleting hyphens; keep technical values and proper names intact

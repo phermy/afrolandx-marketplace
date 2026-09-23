@@ -34,7 +34,7 @@ type PublicMarketplaceStats = {
 };
 
 const culturalSlides = [
-  { image: panAfricanImg, country: "Pan-Africa", label: "Unity in Diversity", flag: "AF" },
+  { image: panAfricanImg, country: "Across Africa", label: "Unity in Diversity", flag: "AF" },
   { image: maasaiImg, country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
   { image: mandelaImg, country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
   { image: ethiopianImg, country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
@@ -556,7 +556,7 @@ export default function Landing() {
                 Celebrating African Heritage
               </h2>
               <p className="reading-copy text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
-                Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
+                Afrolandx is more than just an online marketplace. We're a cultural bridge
                 connecting African artisans with fashion enthusiasts worldwide. Our mission is 
                 to preserve and promote the rich heritage of African traditional fashion while 
                 supporting local communities.

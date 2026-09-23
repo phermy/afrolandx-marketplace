@@ -27,7 +27,7 @@ import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
 import HeritageEditorial from "@/components/heritage-editorial";
 
 const culturalSlides = [
-  { image: panAfricanImg,  country: "Pan-Africa",       label: "Unity in Diversity",         flag: "AF" },
+  { image: panAfricanImg,  country: "Across Africa",    label: "Unity in Diversity",         flag: "AF" },
   { image: maasaiImg,      country: "Kenya · Tanzania", label: "Maasai Warriors",            flag: "KE" },
   { image: mandelaImg,     country: "South Africa",     label: "Spirit of African Heroes",   flag: "ZA" },
   { image: ethiopianImg,   country: "Ethiopia",         label: "Timkat Festival",            flag: "ET" },

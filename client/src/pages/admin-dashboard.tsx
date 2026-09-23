@@ -488,7 +488,7 @@ export default function AdminDashboard() {
           <TabsContent value="analytics">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Real-Time Platform Analytics</h2>
+                <h2 className="text-lg font-semibold">Live Platform Analytics</h2>
                 <Button variant="outline" size="sm" onClick={() => setAnalyticsRefresh(r => r + 1)} disabled={analyticsLoading}>
                   <RefreshCw className={`w-3 h-3 mr-1 ${analyticsLoading ? 'animate-spin' : ''}`} />Refresh
                 </Button>
@@ -1174,7 +1174,7 @@ export default function AdminDashboard() {
                     <CardTitle className="text-base flex items-center gap-2">
                       <Zap className="w-4 h-4 text-blue-500" />Recommended to Feature
                     </CardTitle>
-                    <CardDescription>Top non-featured products ranked by inventory value and availability.</CardDescription>
+                    <CardDescription>Top products that are not featured, ranked by inventory value and availability.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">

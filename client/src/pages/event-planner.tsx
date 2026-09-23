@@ -50,7 +50,7 @@ const eventSizes = [
   { value: "6", label: "Family (5–6)" },
   { value: "10", label: "Extended family (7–10)" },
   { value: "15", label: "Wedding party / Bridal train (10–20)" },
-  { value: "25", label: "Small group / Aso-ebi (20–30)" },
+  { value: "25", label: "Small group / Aso Ebi (20–30)" },
   { value: "50", label: "Large group (30–60)" },
   { value: "100", label: "Corporate / Community event (60+)" },
   { value: "others", label: "Others: custom size" },

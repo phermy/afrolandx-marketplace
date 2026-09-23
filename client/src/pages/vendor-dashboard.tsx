@@ -437,7 +437,7 @@ export default function VendorDashboard() {
     },
     onError: (error: any) => toast({
       title: 'Could not generate listing',
-      description: error?.message || 'Try a clear, front-facing product photo.',
+      description: error?.message || 'Try a clear product photo taken straight on.',
       variant: 'destructive',
     }),
   });
@@ -1667,7 +1667,7 @@ export default function VendorDashboard() {
                 />
               </div>
                <div className="space-y-1.5">
-                 <Label className="font-semibold">Compare-at Price (₦)</Label>
+                 <Label className="font-semibold">Comparison Price (₦)</Label>
                  <Input
                    type="number"
                    min="0"
@@ -2176,7 +2176,7 @@ export default function VendorDashboard() {
                           onClick={() => aiRetouchMutation.mutate({ file: editNewFiles[i], index: i })}
                           disabled={aiRetouchMutation.isPending}
                           className="absolute bottom-1 right-1 rounded-full bg-purple-700 px-2 py-1 text-[10px] font-medium text-white shadow disabled:opacity-50"
-                          title="Add both the original and an AI-retouched version"
+                          title="Add both the original and a version enhanced with AI"
                         >
                           <Sparkles className="mr-1 inline h-3 w-3" />AI enhance
                         </button>

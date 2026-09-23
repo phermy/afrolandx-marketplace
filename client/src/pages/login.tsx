@@ -83,13 +83,13 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail }),
       });
-      if (!response.ok) throw new Error((await readResponse(response, "We couldn't send the sign-in code.")).message);
+      if (!response.ok) throw new Error((await readResponse(response, "We couldn't send the code to sign in.")).message);
       setCodeEmail(normalizedEmail);
       setCodeStep("verify");
       setCode("");
-      toast({ title: "Code sent", description: "Check your email for your 6-digit sign-in code." });
+      toast({ title: "Code sent", description: "Check your email for the code." });
     } catch (submitError: any) {
-      setError(submitError.message || "We couldn't send the sign-in code. Please try again.");
+      setError(submitError.message || "We couldn't send the code to sign in. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +102,7 @@ export default function LoginPage() {
   async function verifyCode(event: React.FormEvent) {
     event.preventDefault();
     if (code.length !== 6) {
-      setError("Enter the 6-digit code from your email.");
+      setError("Enter all six digits from the code in your email.");
       return;
     }
     setError("");
@@ -142,8 +142,8 @@ export default function LoginPage() {
   if (mode === "code") {
     return (
       <AuthShell
-        title={codeStep === "request" ? "Sign in with a code" : "Enter your sign-in code"}
-        description={codeStep === "request" ? "We’ll email you a one-time code. No password needed." : `We sent a 6-digit code to ${codeEmail}.`}
+        title={codeStep === "request" ? "Sign in with a code" : "Enter your code to sign in"}
+        description={codeStep === "request" ? "We’ll email you a code you can use once. No password needed." : `We sent a code to ${codeEmail}. Enter all six digits below.`}
         headerLink={{ href: "/register", label: "Create account" }}
       >
          <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
@@ -168,13 +168,13 @@ export default function LoginPage() {
               />
             </label>
             <button type="submit" disabled={isLoading} className={authButtonClass}>
-              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send sign-in code"}
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send code to sign in"}
             </button>
           </form>
         ) : (
           <form onSubmit={verifyCode} className="space-y-5">
             <div className="flex justify-center py-2">
-              <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit sign-in code" autoComplete="one-time-code" autoFocus>
+              <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="Enter the six digits of your code to sign in" autoComplete="one-time-code" autoFocus>
                 <InputOTPGroup>
                   <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
                   /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
@@ -242,7 +242,7 @@ export default function LoginPage() {
         </button>
       </form>
       <button type="button" onClick={switchToCode} className="mt-6 flex w-full items-center justify-center gap-2 text-sm font-medium text-[#6d6d69] hover:text-[#087f4f] focus:outline-none focus:underline">
-        <KeyRound className="h-4 w-4" /> Use an email sign-in code instead
+        <KeyRound className="h-4 w-4" /> Use an email code to sign in instead
       </button>
     </AuthShell>
   );

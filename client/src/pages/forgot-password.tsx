@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (code.length !== 6) {
-      setError("Enter the 6-digit code from your email.");
+      setError("Enter all six digits from the code in your email.");
       return;
     }
     if (newPassword.length < 8) {
@@ -140,7 +140,7 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={resetPassword} className="space-y-5">
           <div className="flex justify-center py-1">
-            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit password reset code" autoComplete="one-time-code" autoFocus required>
+            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="Enter the six digits of your password reset code" autoComplete="one-time-code" autoFocus required>
               <InputOTPGroup>
                 <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
                 /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />

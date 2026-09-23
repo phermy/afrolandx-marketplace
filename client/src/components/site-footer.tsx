@@ -89,7 +89,7 @@ export default function SiteFooter() {
       </div>
       <section className="experience-feedback" aria-labelledby="experience-feedback-title">
         <div className="experience-feedback__copy">
-          <p id="experience-feedback-title" className="site-footer__label">A small check-in</p>
+          <p id="experience-feedback-title" className="site-footer__label">Tell us what you think</p>
           <p>
             <strong>How does Afrolandx feel today?</strong>
             Your honest first impression helps us make this corner of Africa feel more welcoming.

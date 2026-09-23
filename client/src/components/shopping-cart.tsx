@@ -233,21 +233,21 @@ export default function ShoppingCart() {
                         <span className="text-blue-600 mr-2">🚚</span>
                         UPS Express
                       </span>
-                      <span className="text-gray-600">5-7 days</span>
+                      <span className="text-gray-600">5 to 7 days</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center">
                         <span className="text-purple-600 mr-2">✈️</span>
                         FedEx International
                       </span>
-                      <span className="text-gray-600">3-5 days</span>
+                      <span className="text-gray-600">3 to 5 days</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center">
                         <span className="text-yellow-600 mr-2">📦</span>
                         DHL Express
                       </span>
-                      <span className="text-gray-600">2-4 days</span>
+                      <span className="text-gray-600">2 to 4 days</span>
                     </div>
                     <div className="pt-2 mt-2 border-t text-xs text-gray-600">
                       <p className="font-semibold text-gray-800 mb-1">International partners (rate on request)</p>

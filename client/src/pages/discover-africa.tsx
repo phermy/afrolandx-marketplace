@@ -745,7 +745,7 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
                 >
                   {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Buy one month — ₦2,500</>}
                 </Button>
-                <p className="text-xs text-center text-gray-400">Secure one-time payment via Paystack</p>
+                <p className="text-xs text-center text-gray-400">One payment, securely processed by Paystack</p>
               </div>
             </>
           )}
@@ -1366,7 +1366,7 @@ export default function DiscoverAfrica() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
                 {[
                   { icon: <Sparkles className="h-5 w-5 text-yellow-400" />, title: "Curated City Guides", desc: "Expert-written guides for 20+ African cities" },
-                  { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Members-Only Deals", desc: "Exclusive discounts you won't find anywhere else" },
+                  { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Exclusive Member Deals", desc: "Exclusive discounts you won't find anywhere else" },
                   { icon: <TrendingUp className="h-5 w-5 text-emerald-400" />, title: "Trending Alerts", desc: "Get notified when hot new places open nearby" },
                   { icon: <Star className="h-5 w-5 text-sky-400" />, title: "Priority Listings", desc: "Your business listed at the top of every search" },
                 ].map(f => (

@@ -90,7 +90,7 @@ export default function RegisterPage() {
   async function verifyEmail(event: React.FormEvent) {
     event.preventDefault();
     if (code.length !== 6) {
-      setError("Enter the 6-digit code from your email.");
+      setError("Enter all six digits from the code in your email.");
       return;
     }
     setError("");
@@ -135,7 +135,7 @@ export default function RegisterPage() {
 
   if (step === "verify") {
     return (
-      <AuthShell title="Check your email" description={`We sent a 6-digit verification code to ${registeredEmail}.`} headerLink={{ href: "/login", label: "Log in" }}>
+      <AuthShell title="Check your email" description={`We sent a verification code to ${registeredEmail}. Enter all six digits below.`} headerLink={{ href: "/login", label: "Log in" }}>
          <button type="button" onClick={() => { setStep("form"); setError(""); }} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
           <ArrowLeft className="h-4 w-4" /> Use a different email
         </button>
@@ -147,7 +147,7 @@ export default function RegisterPage() {
          {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
         <form onSubmit={verifyEmail} className="space-y-5">
           <div className="flex justify-center py-2">
-            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="6-digit verification code" autoComplete="one-time-code" autoFocus>
+            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="Enter the six digits of your verification code" autoComplete="one-time-code" autoFocus>
               <InputOTPGroup>
                 <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
                 /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
