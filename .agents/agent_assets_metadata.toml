@@ -89,3 +89,17 @@ mtime_ms = 1790081955340
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/df884a28-c824-4bbf-a755-b1ba38de3b7b/90fac848-5fd5-4516-bbd5-6b81a812f782"
 storage_version_token = "1790082063257797"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "6mjhzES0D_VJ9vW92RHSP"
+uri = "file://attached_assets/femi-elegbeleye-office-portrait.png"
+type = "image"
+title = "Femi Elegbeleye — edited office portrait"
+description = "Professional office portrait created from the supplied photo, with a laptop at the desk."
+logical_id = "827841a3-b585-4b3b-a692-899f9a95bbec"
+content_hash = "sha256:d58af92cbe0c77fe0a5ab59171f5e32dbea20f4d1c9930b679c9e6b9b487183f"
+size = 1348734
+mtime_ms = 1790171954513
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/827841a3-b585-4b3b-a692-899f9a95bbec/6e4d28a5-2bf0-4141-a868-1a4153f3cc74"
+storage_version_token = "1790172119292679"
+content_type = "image/png"
