@@ -1,6 +1,6 @@
 - [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
 - [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
-- [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support inbox confirmed working, but other aliases still need checking
+- [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support and info inboxes confirmed working
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
 - [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — every carrier requires a confirmed quote before payment, then locks into one server-priced order
 - [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
