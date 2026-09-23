@@ -13,7 +13,14 @@ type Leader =
       imagePosition: string;
       bio: string[];
     }
-  | { kind: "name-only"; id: string; name: string };
+  | {
+      kind: "pending-profile";
+      id: string;
+      name: string;
+      label?: string;
+      role?: string;
+      linkedinUrl?: string;
+    };
 
 const leaders: Leader[] = [
   {
@@ -29,7 +36,13 @@ const leaders: Leader[] = [
       "Drawing on software engineering, academic research and technology development, he builds secure, scalable platforms that support African businesses and cross-border commerce. He focuses on translating research and innovation into practical solutions for Africa’s digital economy.",
     ],
   },
-  { kind: "name-only", id: "babajide-omojowo", name: "Mr. Babajide Omojowo" },
+  {
+    kind: "pending-profile",
+    id: "babajide-omojowo",
+    name: "Mr. Babajide Omojowo",
+    label: "Co-founder",
+    linkedinUrl: "https://www.linkedin.com/in/omojowo-babajide-ccnp-cissp-21706b87/",
+  },
   {
     kind: "profile",
     id: "helen-oni",
@@ -43,7 +56,12 @@ const leaders: Leader[] = [
       "Drawing on her experience in research, evaluation, project management and business operations, she translates evidence and market insights into practical strategies that support African vendors and connect their products with customers worldwide.",
     ],
   },
-  { kind: "name-only", id: "nathan-chibuike", name: "Mr. Nathan C. Chibuike" },
+  {
+    kind: "pending-profile",
+    id: "nathan-chibuike",
+    name: "Mr. Nathan C. Chibuike",
+    role: "UX Designer & Project Manager",
+  },
   {
     kind: "profile",
     id: "genesis-francis",
@@ -89,24 +107,34 @@ export default function LeadershipProfiles() {
                 )}
               </div>
               <div className="p-5 sm:p-6">
-                {leader.kind === "profile" && (
+                {leader.label && (
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1a5c2a]">
                     {leader.label}
                   </p>
                 )}
                 <h4
                   id={`${leader.id}-name`}
-                  className={`${leader.kind === "profile" ? "mt-2" : ""} font-nigerian text-xl font-bold leading-tight text-gray-900`}
+                  className={`${leader.label ? "mt-2 " : ""}font-nigerian text-xl font-bold leading-tight text-gray-900`}
                 >
                   {leader.name}
                 </h4>
+                {leader.role && (
+                  <p className="mt-2 text-sm font-medium leading-snug text-[#315d3a]">{leader.role}</p>
+                )}
                 {leader.kind === "profile" && (
-                  <>
-                    <p className="mt-2 text-sm font-medium leading-snug text-[#315d3a]">{leader.role}</p>
-                    <div className="mt-5 space-y-3 text-sm leading-6 text-gray-600">
-                      {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
-                    </div>
-                  </>
+                  <div className="mt-5 space-y-3 text-sm leading-6 text-gray-600">
+                    {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
+                  </div>
+                )}
+                {leader.kind === "pending-profile" && leader.linkedinUrl && (
+                  <a
+                    href={leader.linkedinUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 inline-block text-sm font-medium text-[#1a5c2a] underline-offset-4 hover:underline focus-visible:underline"
+                  >
+                    View LinkedIn profile <span aria-hidden="true">↗</span>
+                  </a>
                 )}
               </div>
             </article>
