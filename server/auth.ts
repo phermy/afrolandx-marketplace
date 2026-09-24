@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
 import { pool } from "./db";
+import { registerHumanVerification } from "./human-verification";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -134,6 +135,7 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+  registerHumanVerification(app);
 
   passport.use(new LocalStrategy({ usernameField: "email" }, async (rawEmail, password, done) => {
     try {

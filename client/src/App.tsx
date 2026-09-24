@@ -38,6 +38,7 @@ import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import SessionTimeout from "@/components/session-timeout";
+import HumanVerification from "@/components/human-verification";
 import { useEffect } from "react";
 
 function SessionKickoutGuard() {
@@ -158,6 +159,7 @@ function App() {
           <Chatbot />
           <SessionTimeout />
           <SessionKickoutGuard />
+          <HumanVerification />
         </TooltipProvider>
       </CartProvider>
     </QueryClientProvider>
