@@ -117,3 +117,17 @@ mtime_ms = 1790174956175
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/c3cfd6df-c862-425d-a565-ed245a2d60df/4da21882-3cf3-4959-bf81-96d5e2f8d0c3"
 storage_version_token = "1790175111314822"
 content_type = "image/png"
+
+[[outputs]]
+id = "PolBzSY0oLmaOCVL20ASX"
+uri = "file://attached_assets/femi-elegbeleye-original-blue-suit-card-v2.webp"
+type = "image"
+title = "Dr. Femi A. Elegbeleye — profile photo"
+description = "The photo currently used on the Afrolandx About page. Download the WebP image from this card."
+logical_id = "ea1c8d64-4f0b-4edf-ac01-1453ac20a890"
+content_hash = "sha256:874560e7a7231c9fcc2d5729b6b69b56531b6331e7125b1807d92b85d68af583"
+size = 15732
+mtime_ms = 1790175046939
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/ea1c8d64-4f0b-4edf-ac01-1453ac20a890/050e9b0d-0acf-4ea5-95ba-67ad3143d00a"
+storage_version_token = "1790217165086805"
+content_type = "image/webp"
