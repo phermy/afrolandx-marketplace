@@ -12,6 +12,7 @@ type Leader =
       portrait: string;
       imagePosition: string;
       bio: string[];
+      linkedinUrl?: string;
     }
   | {
       kind: "pending-profile";
@@ -31,6 +32,7 @@ const leaders: Leader[] = [
     role: "Cofounder & Lead Senior Software Engineer",
     portrait: femiPortrait,
     imagePosition: "center",
+    linkedinUrl: "https://www.linkedin.com/in/femi-elegbeleye-phd-94221499/",
     bio: [
       "Femi leads the design, development and technical strategy of Afrolandx’s digital platforms, including the marketplace and Afrolandx Rides. His research spans Artificial Intelligence, Machine Learning, Cybersecurity, IoT, Blockchain, Trustworthy AI and intelligent software systems.",
       "Drawing on software engineering, academic research and technology development, he builds secure, scalable platforms that support African businesses and international commerce. He focuses on translating research and innovation into practical solutions for Africa’s digital economy.",
@@ -46,11 +48,12 @@ const leaders: Leader[] = [
   {
     kind: "profile",
     id: "helen-oni",
-    name: "Dr. Helen Oni",
+    name: "Dr. Helen T. Oni",
     label: "Cofounder",
     role: "Cofounder & Head of Research, Policy & Strategy",
     portrait: helenPortrait,
     imagePosition: "center 22%",
+    linkedinUrl: "https://www.linkedin.com/in/dr-helen-t-oni-phd-b8baa4116/",
     bio: [
       "Helen leads research, policy development and strategic planning across the marketplace, including vendor onboarding, customer protection, payments, logistics and international market opportunities.",
       "Drawing on her experience in research, evaluation, project management and business operations, she translates evidence and market insights into practical strategies that support African vendors and connect their products with customers worldwide.",
@@ -126,7 +129,7 @@ export default function LeadershipProfiles() {
                     {leader.bio.map((paragraph) => <p key={paragraph} className="reading-copy">{paragraph}</p>)}
                   </div>
                 )}
-                {leader.kind === "pending-profile" && leader.linkedinUrl && (
+                {leader.linkedinUrl && (
                   <a
                     href={leader.linkedinUrl}
                     target="_blank"
