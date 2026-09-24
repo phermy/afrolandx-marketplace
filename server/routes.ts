@@ -165,6 +165,13 @@ const localUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.get('/downloads/femi-elegbeleye-profile.jpg', (_req, res) => {
+    const publicRoot = app.get('env') === 'development' ? 'client/public' : 'dist/public';
+    const photoPath = path.resolve(process.cwd(), publicRoot, 'downloads/femi-elegbeleye-profile.jpg');
+    if (!fs.existsSync(photoPath)) return res.status(404).send('Photo not available');
+    res.download(photoPath, 'femi-elegbeleye-profile.jpg');
+  });
+
   // Optimized image serving route
   app.get('/uploads/:filename', async (req, res) => {
     const filename = req.params.filename;
