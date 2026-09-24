@@ -12,3 +12,7 @@ Outbound email through Resend can deliver successfully to external providers. So
 **Rule:** A successful email test from the development workspace does not show what the published site sends until the site is republished after the code change.
 **Why:** The live feedback form kept sending to its old recipient after a later workspace change; the most recent publish preceded that change.
 **How to apply:** Compare publish timing with workspace changes before diagnosing a second email path or editing working routing again.
+
+**Rule:** Give Titan-only diagnostics and configuration requests as a concise handoff to the Titan administrator, rather than asking the requester to manage that account.
+**Why:** The requester explicitly said they are not the person managing Titan.
+**How to apply:** For missing external deliveries, ask the administrator for the outbound SMTP delivery trace and DKIM verification status; do not request account credentials or suggest speculative DNS changes.
