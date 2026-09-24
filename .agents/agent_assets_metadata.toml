@@ -131,3 +131,17 @@ mtime_ms = 1790175046939
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/ea1c8d64-4f0b-4edf-ac01-1453ac20a890/050e9b0d-0acf-4ea5-95ba-67ad3143d00a"
 storage_version_token = "1790217165086805"
 content_type = "image/webp"
+
+[[outputs]]
+id = "WWRLKxczbbZNOp_98Ljqp"
+uri = "file://attached_assets/femi-elegbeleye-about-photo.jpg"
+type = "image"
+title = "Download Dr. Femi’s About photo (JPG)"
+description = "JPG copy of the profile photo shown on the About page. Open this file card and choose Download."
+logical_id = "80ab902e-a29b-467c-a0d3-c7996c32557d"
+content_hash = "sha256:3dc21e9b1b205a28ad451aac02153d4852456580a8021bf729d5eae3d7dfbdfa"
+size = 72619
+mtime_ms = 1790217223246
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/80ab902e-a29b-467c-a0d3-c7996c32557d/38c64b1b-75cf-4d44-bd09-1144981db529"
+storage_version_token = "1790217228370364"
+content_type = "image/jpeg"
