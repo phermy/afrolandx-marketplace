@@ -10,13 +10,13 @@ import craftImg from "@assets/stock_images/nigerian_tribal_chie_4e3710c4.jpg";
 const slides = [
   {
     image: panAfricanImg,
-    alt: "Women wearing colorful African traditional dress",
+    alt: "Women wearing colourful African traditional dress",
     title: "African Heritage",
     description: "Celebrating the creativity and traditions of our continent",
   },
   {
     image: beadworkImg,
-    alt: "Woman wearing traditional African beaded jewelry",
+    alt: "Woman wearing traditional African beaded jewellery",
     title: "Beautiful Beadwork",
     description: "Adornment inspired by generations of artistry",
   },
@@ -24,7 +24,7 @@ const slides = [
     image: textileImg,
     alt: "Brightly colored African patterned textiles",
     title: "Bold African Textiles",
-    description: "Colors and patterns that tell a story",
+    description: "Colours and patterns that tell a story",
   },
   {
     image: artisanImg,

@@ -104,7 +104,7 @@ export default function NotificationPanel() {
                     className="text-xs px-2 py-1 h-6 hover:bg-blue-100"
                     disabled={markAsReadMutation.isPending}
                   >
-                    Mark Read
+                      Mark as read
                   </Button>
                 )}
               </div>

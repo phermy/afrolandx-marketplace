@@ -497,7 +497,7 @@ export default function AdminDashboard() {
               </Badge>
             )}
             <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
-              {initCategoriesMutation.isPending ? 'Initialising…' : 'Init Categories'}
+              {initCategoriesMutation.isPending ? 'Initialising…' : 'Initialise categories'}
             </Button>
           </div>
         </div>
@@ -648,7 +648,7 @@ export default function AdminDashboard() {
                             </BarChart>
                           </ResponsiveContainer>
                         ) : (
-                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. Orders will populate this chart.</p>
+                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. The chart will update as orders come in.</p>
                         )}
                       </CardContent>
                     </Card>
@@ -739,7 +739,7 @@ export default function AdminDashboard() {
                   <span>Product Approval Queue</span>
                   <Badge variant="secondary">{pendingProducts.length} pending</Badge>
                 </CardTitle>
-                <CardDescription>Review each product against quality standards before approving for the storefront.</CardDescription>
+                <CardDescription>Review each product against quality standards before approving it for the storefront.</CardDescription>
               </CardHeader>
               <CardContent>
                 {pendingProducts.length === 0 ? (
@@ -902,14 +902,14 @@ export default function AdminDashboard() {
                   <span className="flex items-center gap-2"><Truck className="w-5 h-5" />International Shipping Quotes</span>
                   <Badge variant="secondary">{shippingQuoteRequests.filter(q => q.status === 'pending').length} pending</Badge>
                 </CardTitle>
-                <CardDescription>Confirm partner rates in Nigerian Naira. Buyers can only pay an unexpired quote tied to their unchanged cart and address.</CardDescription>
+                <CardDescription>Confirm partner rates in Nigerian Naira. Buyers can pay only an unexpired quote linked to an unchanged cart and shipping address.</CardDescription>
               </CardHeader>
               <CardContent>
                 {shippingQuoteRequests.length === 0 ? (
                   <div className="py-12 text-center">
                     <Truck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                    <p className="font-medium text-gray-700">No shipping quote requests yet</p>
-                    <p className="text-sm text-gray-500">Buyer requests from checkout will appear here.</p>
+                    <p className="font-medium text-gray-700">No shipping quote requests yet.</p>
+                    <p className="text-sm text-gray-500">Shipping quote requests from checkout will appear here.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -948,9 +948,10 @@ export default function AdminDashboard() {
                                 {address.city}, {address.state}, {address.country} {address.postalCode}
                               </p>
                               <p className="text-xs text-gray-500 mt-1">
-                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0)} item(s)
+                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0)}{' '}
+                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0) === 1 ? 'item' : 'items'}
                                 {' · '}{Number(request.totalWeight || 0).toFixed(2)} kg recorded
-                                {' · '}requested {new Date(request.createdAt).toLocaleString()}
+                                {' · '}Requested {new Date(request.createdAt).toLocaleString()}
                               </p>
                             </div>
                             {request.status === 'quoted' && (
@@ -985,12 +986,12 @@ export default function AdminDashboard() {
                                 <Input value={draft.estimatedDelivery} onChange={e => setDraft({ estimatedDelivery: e.target.value })} placeholder="5–7 business days" />
                               </div>
                               <div>
-                                <label className="text-xs font-medium text-gray-600">Valid for days</label>
+                                <label className="text-xs font-medium text-gray-600">Validity period (days)</label>
                                 <Input type="number" min="1" max="30" value={draft.validDays} onChange={e => setDraft({ validDays: e.target.value })} />
                               </div>
                               <div>
-                                <label className="text-xs font-medium text-gray-600">Notes / rejection reason</label>
-                                <Input value={draft.adminNotes} onChange={e => setDraft({ adminNotes: e.target.value })} placeholder="Optional for approval" />
+                                <label className="text-xs font-medium text-gray-600">Notes or rejection reason</label>
+                                <Input value={draft.adminNotes} onChange={e => setDraft({ adminNotes: e.target.value })} placeholder="Optional for quotes; required for rejections" />
                               </div>
                               <div className="md:col-span-4 flex flex-wrap justify-end gap-2">
                                 <Button
@@ -1030,8 +1031,8 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${ordersFetching ? 'bg-green-400 animate-pulse' : 'bg-green-500'}`} />
                     <span className="text-xs text-gray-500">
-                      Live tracking · auto-refreshes every 30s
-                      {ordersUpdatedAt ? ` · last: ${new Date(ordersUpdatedAt).toLocaleTimeString()}` : ''}
+                      Live order tracking · refreshes every 30 seconds
+                      {ordersUpdatedAt ? ` · Last updated: ${new Date(ordersUpdatedAt).toLocaleTimeString()}` : ''}
                     </span>
                   </div>
                 </div>
@@ -1499,7 +1500,7 @@ export default function AdminDashboard() {
                 </DialogHeader>
                 <div className="space-y-2">
                   <label htmlFor="confirm-test-deletion" className="text-sm font-medium">
-                    Type {testDeletion?.preview.email} to confirm
+                    To confirm, type {testDeletion?.preview.email}.
                   </label>
                   <Input
                     id="confirm-test-deletion"

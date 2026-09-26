@@ -280,9 +280,9 @@ export default function ProductDetail() {
                 ) : !isAvailable ? (
                   isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'
                 ) : !isAuthenticated ? (
-                  'Login to Buy'
+                  'Sign In to Buy'
                 ) : hasSizes && !selectedSize ? (
-                  'Select a Size First'
+                  'Select a Size to Continue'
                 ) : (
                   'Add to Cart'
                 )}

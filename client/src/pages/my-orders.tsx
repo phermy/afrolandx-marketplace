@@ -121,7 +121,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       toast({
         title: 'Replacement quote requested',
-        description: `${result.carrier} will now be reviewed for this order.`,
+        description: `We’ll review ${result.carrier} for your order.`,
       });
     },
     onError: (error: any) => toast({
@@ -253,7 +253,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-sm font-medium text-red-800">This carrier could not confirm the route.</p>
-              <p className="text-xs text-red-700">Request the next available carrier without paying for the order again.</p>
+              <p className="text-xs text-red-700">Request a quote from the next available carrier without paying for your items again.</p>
             </div>
             <Button
               size="sm"
@@ -530,7 +530,7 @@ export default function MyOrders() {
             <CardContent className="text-center py-16">
               <ShoppingBag className="w-16 h-16 mx-auto text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-700 mb-2">No orders yet</h3>
-              <p className="text-gray-500 mb-6 text-sm">You haven't placed any orders yet. Explore our African fashion collection!</p>
+              <p className="text-gray-500 mb-6 text-sm">Explore our African fashion collection to find something you love.</p>
               <Button onClick={() => window.location.href = '/products'} className="btn-nigerian">
                 Start Shopping
               </Button>
@@ -552,7 +552,7 @@ export default function MyOrders() {
         {/* Help note */}
         <div className="mt-8 text-center text-xs text-gray-400">
           <AlertCircle className="inline w-3 h-3 mr-1" />
-          Need help with an order? Contact our support team via the chat button.
+          Need help with an order? Use the chat button to contact our support team.
         </div>
       </div>
     </div>

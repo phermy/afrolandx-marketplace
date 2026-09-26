@@ -169,6 +169,16 @@
     font-family: 'DM Sans', sans-serif;
     hyphens: none;
   }
+
+  /* Keep reading copy consistent without stretching headings, navigation or controls. */
+  :where(p, article li, .reading-copy):not(:where(
+    header *, nav *, footer *, button *, [role="button"] *,
+    .text-center, .text-center *, .text-left, .text-left *,
+    .text-right, .text-right *
+  )) {
+    text-align: justify;
+    text-justify: inter-word;
+  }
 }
 
 /* Justify long-form copy on every screen without stretching short interface labels. */
@@ -180,6 +190,28 @@
   text-align: justify;
   text-justify: inter-word;
   hyphens: none;
+}
+
+/* Narrow phone columns leave excessive gaps when words are forced to fill a line. */
+@layer base {
+  @media (max-width: 640px) {
+    :where(p, article li, .reading-copy):not(:where(
+      header *, nav *, footer *, button *, [role="button"] *,
+      .text-center, .text-center *, .text-left, .text-left *,
+      .text-right, .text-right *
+    )) {
+      text-align: start;
+    }
+  }
+}
+@media (max-width: 640px) {
+  .reading-copy,
+  .heritage-editorial__lede,
+  .heritage-card__copy,
+  .policy-intro,
+  .policy-article p {
+    text-align: start;
+  }
 }
 
 .site-footer { background: #172d29; color: #f7f0df; padding: 4.5rem 1.25rem 1.5rem; }

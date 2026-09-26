@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
           <CheckCircle className="mx-auto h-14 w-14 text-green-600" />
           <p className="mt-4 text-sm text-gray-600">You can now sign in with your new password.</p>
           <button type="button" onClick={() => setLocation("/login")} className="mt-6 flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2">
-            Go to login
+            Go to sign in
           </button>
         </div>
       </AuthShell>

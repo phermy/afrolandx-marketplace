@@ -107,7 +107,7 @@ export default function MeasurementsPage() {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Measurements</h1>
                 <p className="text-gray-500 text-sm mt-0.5">
-                  Your body measurements for perfectly fitted Nigerian fashion
+                  Save your measurements to help create a better fit for Nigerian fashion
                 </p>
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function MeasurementsPage() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">No measurements yet</h2>
             <p className="text-gray-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
-              Add your body measurements so vendors can tailor clothing that fits you perfectly, from Agbada to Ankara dresses.
+              Add your body measurements so vendors can tailor clothing to your measurements, from Agbada to Ankara dresses.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
@@ -265,7 +265,7 @@ export default function MeasurementsPage() {
                 className="btn-nigerian gap-2"
                 data-testid="button-add-first"
               >
-                <Plus className="w-4 h-4" /> Add My First Measurements
+                <Plus className="w-4 h-4" /> Add My Measurements
               </Button>
             </div>
 

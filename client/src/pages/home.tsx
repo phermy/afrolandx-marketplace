@@ -160,8 +160,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork.
-              Authentic fashion from all 54 African nations.
+              From Nigerian Aso Oke and Ghanaian Kente to Ethiopian Habesha clothing and Maasai beadwork, explore authentic fashion from all 54 African nations.
             </p>
             <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-4">
               Authentic fashion from all 54 African nations.
@@ -378,7 +377,7 @@ export default function Home() {
       <section className="py-10 md:py-16 bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-12">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">Why Choose Afrolandx</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">Why Choose Afrolandx?</h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600">Your trusted marketplace for authentic African fashion</p>
           </div>
 

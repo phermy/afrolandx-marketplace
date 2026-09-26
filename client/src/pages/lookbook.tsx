@@ -30,7 +30,7 @@ const EVENT_TYPES = [
   { value: "engagement", label: "Engagement / Courtship" },
   { value: "corporate", label: "Corporate / Business Event" },
   { value: "religious", label: "Religious / Church Event" },
-  { value: "others", label: "Others / Custom Event" },
+  { value: "others", label: "Other / Custom event" },
 ];
 
 const EVENT_SIZES = [
@@ -43,7 +43,7 @@ const EVENT_SIZES = [
   { value: "25", label: "Small group / Aso Ebi (20–30)" },
   { value: "50", label: "Large group (30–60)" },
   { value: "100", label: "Corporate / Community event (60+)" },
-  { value: "others", label: "Others: custom size" },
+  { value: "others", label: "Custom size" },
 ];
 
 // Country → currency mapping
@@ -147,7 +147,7 @@ export default function LookbookPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lookbooks"] });
-      toast({ title: "Lookbook Ready!", description: "Your outfit selected with AI is below." });
+      toast({ title: "Lookbook ready!", description: "Your outfit, chosen by AI, is ready below." });
       setStylePrompt("");
     },
     onError: () => {
@@ -271,7 +271,7 @@ export default function LookbookPage() {
                 <Label>Event Size <span className="text-muted-foreground text-xs">(optional)</span></Label>
                 <Select value={eventSize} onValueChange={setEventSize}>
                   <SelectTrigger>
-                    <SelectValue placeholder="How many outfits needed?" />
+                    <SelectValue placeholder="How many outfits do you need?" />
                   </SelectTrigger>
                   <SelectContent>
                     {EVENT_SIZES.map(s => (
@@ -282,7 +282,7 @@ export default function LookbookPage() {
                 {eventSize === "others" && (
                   <Input
                     type="number"
-                    placeholder="Enter exact number of outfits"
+                    placeholder="Enter the exact number of outfits"
                     value={customSize}
                     onChange={(e) => setCustomSize(e.target.value)}
                     className="mt-2"
@@ -364,7 +364,7 @@ export default function LookbookPage() {
             <Card>
               <CardContent className="py-14 text-center">
                 <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
-                <p className="text-muted-foreground">No lookbooks yet. Describe your style above and hit Generate!</p>
+                <p className="text-muted-foreground">No lookbooks yet. Describe your style above, then select Generate My Lookbook to get started.</p>
               </CardContent>
             </Card>
           ) : (

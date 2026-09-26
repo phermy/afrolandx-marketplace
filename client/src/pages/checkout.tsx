@@ -287,7 +287,7 @@ export default function Checkout() {
     if (!isLoading && !isAuthenticated) {
       toast({
         title: 'Unauthorized',
-        description: 'Please sign in to checkout.',
+        description: 'Please sign in to check out.',
         variant: 'destructive',
       });
       setTimeout(() => {
@@ -451,7 +451,7 @@ export default function Checkout() {
       if (isUnauthorizedError(error)) {
         toast({
           title: 'Unauthorized',
-          description: 'Please sign in to place order.',
+          description: 'Please sign in to place an order.',
           variant: 'destructive',
         });
         setTimeout(() => {
@@ -629,7 +629,7 @@ export default function Checkout() {
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-gray-900">Saved addresses</p>
-                          <p className="text-xs text-gray-600">Choose one to prefill checkout, then adjust any field below.</p>
+                          <p className="text-xs text-gray-600">Choose a saved address to fill in the checkout form, then adjust any fields below.</p>
                         </div>
                         {isLoadingAddresses && <span className="text-xs text-gray-500">Loading…</span>}
                       </div>

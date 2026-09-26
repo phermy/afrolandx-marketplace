@@ -86,7 +86,7 @@ export default function VendorDashboard() {
     if (!isLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        description: "You’ve been signed out. Redirecting you to sign in…",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -226,7 +226,7 @@ export default function VendorDashboard() {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          description: "You’ve been signed out. Redirecting you to sign in…",
           variant: "destructive",
         });
         setTimeout(() => { window.location.href = "/login"; }, 500);
@@ -605,9 +605,9 @@ export default function VendorDashboard() {
               {/* Already-registered notice */}
               {hasVendorRole && !vendor && (
                 <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-center">
-                  <p className="text-amber-800 font-medium mb-1">Your vendor profile needs to be completed.</p>
+                  <p className="text-amber-800 font-medium mb-1">Please complete your vendor profile.</p>
                   <p className="text-amber-700 text-sm mb-3">
-                    Your account has vendor access, but its vendor application details are missing. Complete this form to restore your vendor profile.
+                    Your account is registered as a vendor, but its application details are missing. Complete this form to restore your vendor profile.
                   </p>
                   <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] })}>
                     Refresh status
@@ -617,7 +617,7 @@ export default function VendorDashboard() {
 
               <form onSubmit={handleVendorRegistration} className="space-y-6">
                 <div>
-                  <Label htmlFor="contactName">Vendor Name</Label>
+                  <Label htmlFor="contactName">Contact Name</Label>
                   <Input
                     id="contactName"
                     name="contactName"
@@ -708,7 +708,7 @@ export default function VendorDashboard() {
                 You'll receive an email notification once your application is approved.
               </p>
               <p className="text-sm text-gray-600 mb-4">
-                A CAC registration number and administrator verification are required before you can upload products or sell.
+                You must provide a CAC registration number and pass administrator verification before you can upload products or sell.
               </p>
               <form className="mb-6 space-y-2 text-left" onSubmit={event => {
                 event.preventDefault();
@@ -979,17 +979,17 @@ export default function VendorDashboard() {
                             </div>
                             {product.status === 'pending' && (
                               <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Waiting for admin approval, usually within 24 hrs
+                                <Clock className="w-3 h-3" /> Awaiting administrator approval, usually within 24 hours.
                               </p>
                             )}
                             {product.status === 'draft' && (
                               <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                <Pencil className="w-3 h-3" /> Draft. Edit it before submitting for admin review
+                                <Pencil className="w-3 h-3" /> This is a draft. Edit it before submitting it for review.
                               </p>
                             )}
                             {product.status === 'rejected' && (
                               <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" /> Rejected. Edit and resubmit
+                                <AlertCircle className="w-3 h-3" /> Rejected. Edit the product and resubmit it for review.
                               </p>
                             )}
                           </div>
@@ -1070,7 +1070,7 @@ export default function VendorDashboard() {
               <CardContent>
                 {Array.isArray(vendorOrders) && vendorOrders.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No orders yet. Start selling to see orders here!</p>
+                  <p className="text-gray-500 text-lg">No orders yet. Orders will appear here after your first sale.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1200,7 +1200,7 @@ export default function VendorDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Customer Measurements</CardTitle>
-                <p className="text-gray-600">View and acknowledge measurements submitted by customers</p>
+                <p className="text-gray-600">View and acknowledge measurements submitted by your customers.</p>
               </CardHeader>
               <CardContent>
                 {Array.isArray(vendorMeasurements) && vendorMeasurements.length === 0 ? (
@@ -1353,7 +1353,7 @@ export default function VendorDashboard() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="editContactName">Vendor Name</Label>
+                        <Label htmlFor="editContactName">Contact Name</Label>
                         <Input
                           id="editContactName"
                           value={profileForm.contactName}
@@ -1425,7 +1425,7 @@ export default function VendorDashboard() {
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <Label>Vendor Name</Label>
+                      <Label>Contact Name</Label>
                       <Input value={vendor?.contactName || ""} disabled className="input-nigerian" />
                     </div>
                     <div>
@@ -1470,7 +1470,7 @@ export default function VendorDashboard() {
               <Plus className="w-5 h-5 text-nigerian-green" /> Add New Product
             </SheetTitle>
             <SheetDescription>
-              Fill in the details below. Your product goes live after admin approval, usually within 24 hours.
+              Complete the details below. Your product will appear in the shop after an administrator approves it, usually within 24 hours.
             </SheetDescription>
           </SheetHeader>
 
@@ -1491,7 +1491,7 @@ export default function VendorDashboard() {
              <div className="space-y-1.5">
                <Label className="font-semibold">Short Description <span className="text-red-500">*</span></Label>
                <Input
-                 placeholder="A quick summary buyers can scan"
+                 placeholder="Add a brief summary buyers can scan quickly."
                  value={addForm.shortDescription}
                  maxLength={240}
                  onChange={e => setAddForm(f => ({ ...f, shortDescription: e.target.value }))}
@@ -1693,7 +1693,7 @@ export default function VendorDashboard() {
             {/* Description */}
             <div className="space-y-1.5">
                <Label className="font-semibold">Full Description <span className="text-red-500">*</span></Label>
-               <p className="text-xs text-gray-400">Include fabric, origin, fit, care, and the occasion it suits.</p>
+               <p className="text-xs text-gray-400">Include the fabric, origin, fit, care instructions, and occasions suited to this product.</p>
               <Textarea
                  placeholder="Describe the fabric, craftsmanship, fit, origin, sizing, occasion, and care instructions…"
                  rows={5}
@@ -1752,7 +1752,7 @@ export default function VendorDashboard() {
                </div>
              </div>
              <div className="space-y-1.5">
-               <Label className="font-semibold">Total Stock Qty <span className="text-red-500">*</span></Label>
+                <Label className="font-semibold">Total stock quantity <span className="text-red-500">*</span></Label>
                <Input
                  type="number"
                  min="0"
@@ -1820,7 +1820,7 @@ export default function VendorDashboard() {
 
              {/* Tailoring, shipping, and fulfillment */}
              <div className="space-y-3 rounded-xl border border-gray-200 p-3">
-               <Label className="font-semibold">Tailoring & Fulfillment</Label>
+                <Label className="font-semibold">Tailoring & Fulfilment</Label>
                <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
                  <input
                    type="checkbox"
@@ -1830,12 +1830,12 @@ export default function VendorDashboard() {
                  />
                  <span>
                    <span className="font-medium">Requires customer measurements</span>
-                   <span className="block text-xs text-gray-400">Customers will be directed to submit measurements before fulfillment.</span>
+                    <span className="block text-xs text-gray-400">Customers will be asked to submit their measurements before their order is fulfilled.</span>
                  </span>
                </label>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                  <div className="space-y-1.5">
-                   <Label className="text-sm">Processing / Lead Time</Label>
+                    <Label className="text-sm">Processing time</Label>
                    <Input
                      placeholder="e.g. 7–14 days made to order"
                      value={addForm.processingTime}
@@ -1852,7 +1852,7 @@ export default function VendorDashboard() {
                    >
                      <option value="">Choose shipping class</option>
                      <option value="standard">Standard</option>
-                     <option value="fragile">Fragile / Handle with care</option>
+                      <option value="fragile">Fragile: handle with care</option>
                      <option value="oversized">Oversized</option>
                    </select>
                  </div>
@@ -1888,7 +1888,7 @@ export default function VendorDashboard() {
                  />
                </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Return classification</Label>
+                   <Label className="text-sm">Product return classification</Label>
                   <Select
                     value={addForm.returnPolicy}
                     onValueChange={(value: ReturnPolicyValue) => setAddForm(f => ({ ...f, returnPolicy: value }))}
@@ -1978,7 +1978,7 @@ export default function VendorDashboard() {
                   >
                     <Upload className="w-6 h-6 text-gray-400 mb-1" />
                     <span className="text-sm font-medium text-gray-600">
-                      {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected. Click to add more` : 'Click here to choose photos'}
+                      {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected. Choose more photos` : 'Choose photos'}
                     </span>
                     <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP. Up to 15 MB each</span>
                   </label>
@@ -2002,7 +2002,7 @@ export default function VendorDashboard() {
                       {generateListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
                     </Button>
                   )}
-                  <p className="text-xs text-gray-500">AI uses the first photo and fills listing suggestions only. Review the result and enter your own price.</p>
+                  <p className="text-xs text-gray-500">AI uses only the first photo to suggest listing details. Review the suggestions and enter your own price.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2026,7 +2026,7 @@ export default function VendorDashboard() {
             {/* Review notice */}
             <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
               <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
-              <span>Products are reviewed by an admin before going live in the shop, usually within 24 hours.</span>
+              <span>Products are reviewed by an administrator before appearing in the shop, usually within 24 hours.</span>
             </div>
 
             {/* Save or submit */}
@@ -2155,7 +2155,7 @@ export default function VendorDashboard() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="font-medium">Return classification</Label>
+              <Label className="font-medium">Product return classification</Label>
               <Select
                 value={editForm.returnPolicy}
                 onValueChange={(value: ReturnPolicyValue) => setEditForm(form => ({ ...form, returnPolicy: value }))}
@@ -2208,7 +2208,7 @@ export default function VendorDashboard() {
               {/* Existing images grid */}
               {editCurrentImages.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-2">Current photos. Click × to remove</p>
+                  <p className="text-xs text-gray-500 mb-2">Current photos. Select × to remove a photo.</p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {editCurrentImages.map((url, i) => (
                       <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-50">

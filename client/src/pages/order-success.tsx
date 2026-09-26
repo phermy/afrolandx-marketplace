@@ -73,7 +73,7 @@ export default function OrderSuccess() {
             🎉 Order Placed Successfully!
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Thank you for celebrating African heritage with us
+            Thank you for celebrating African heritage with us.
           </p>
         </div>
 
@@ -108,15 +108,15 @@ export default function OrderSuccess() {
                   <div className="text-left space-y-3 text-blue-700">
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Afrolandx confirms the final rate with your selected shipping company' : 'Our vendors have been notified and will begin preparing your items'}</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Afrolandx confirms the final rate with your selected shipping company.' : 'Our vendors have been notified and will begin preparing your items.'}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
-                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'You receive a notification in the app when the final shipping price is ready' : "You'll receive updates as your order progresses through each stage"}</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'You will receive a notification in the app when the final shipping price is ready.' : "You'll receive updates as your order progresses through each stage."}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
-                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Pay only any remaining shipping difference securely from My Orders' : "Once shipped, you'll get tracking information and delivery updates"}</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Pay any remaining shipping difference securely from My Orders.' : "Once shipped, you'll get tracking information and delivery updates."}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
@@ -127,8 +127,7 @@ export default function OrderSuccess() {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-yellow-800 text-sm">
-                    <span className="font-semibold">Note:</span> Both vendors and our admin team have been automatically 
-                    notified about your order. Expect processing to begin within one to two business hours.
+                    <span className="font-semibold">Note:</span> The relevant vendors and our admin team have been notified automatically about your order. Processing is expected to begin within one to two business hours.
                   </p>
                 </div>
               </div>

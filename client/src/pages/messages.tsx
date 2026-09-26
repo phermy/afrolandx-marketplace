@@ -151,7 +151,7 @@ export default function Messages() {
                     ))
                   ) : (
                     <div className="p-4 text-center text-muted-foreground">
-                      No conversations yet. Message a vendor to get started!
+                      No conversations yet. Start a conversation with a vendor!
                     </div>
                   )}
                 </ScrollArea>

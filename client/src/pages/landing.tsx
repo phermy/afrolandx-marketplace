@@ -263,12 +263,11 @@ export default function Landing() {
             </h1>
             {/* Full description — hidden on small screens to save space */}
             <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork.
-              Celebrate the rich cultural heritage of all 54 African nations.
+              From Nigerian Aso Oke and Ghanaian Kente to Ethiopian Habesha clothing and Maasai beadwork, celebrate the rich cultural heritage of all 54 African nations.
             </p>
             {/* Compact description — only on mobile */}
             <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-2">
-              Authentic fashion from across all 54 African nations.
+              Authentic fashion from all 54 African nations.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
               <Button

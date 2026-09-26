@@ -189,7 +189,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               ) : !isAvailable ? (
                 isOutOfStock ? 'Out of Stock' : 'Unavailable'
               ) : !isAuthenticated ? (
-                'Login to Buy'
+                'Log in to buy'
               ) : (
                 'Add to Cart'
               )}

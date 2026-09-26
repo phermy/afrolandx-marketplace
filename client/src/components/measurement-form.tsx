@@ -72,17 +72,17 @@ const UPPER_BODY: FieldConfig[] = [
 
 const HEIGHT_SHOULDER: FieldConfig[] = [
   { name: "height",       label: "Height",        placeholder: u => u === "cm" ? "e.g. 170" : "e.g. 67", hint: "Your total standing height" },
-  { name: "shoulderWidth",label: "Shoulder Width",placeholder: u => u === "cm" ? "e.g. 45" : "e.g. 18",  hint: "Measure shoulder tip to shoulder tip" },
+  { name: "shoulderWidth",label: "Shoulder width",placeholder: u => u === "cm" ? "e.g. 45" : "e.g. 18",  hint: "Measure from shoulder tip to shoulder tip" },
 ];
 
 const ARMS: FieldConfig[] = [
-  { name: "sleeveLength", label: "Sleeve Length", placeholder: u => u === "cm" ? "e.g. 60" : "e.g. 24",  hint: "From shoulder seam to wrist" },
-  { name: "armLength",    label: "Arm Length",    placeholder: u => u === "cm" ? "e.g. 58" : "e.g. 23",  hint: "From armpit to wrist" },
+  { name: "sleeveLength", label: "Sleeve length", placeholder: u => u === "cm" ? "e.g. 60" : "e.g. 24",  hint: "Measure from the shoulder seam to the wrist" },
+  { name: "armLength",    label: "Arm length",    placeholder: u => u === "cm" ? "e.g. 58" : "e.g. 23",  hint: "Measure from the armpit to the wrist" },
 ];
 
 const LEGS: FieldConfig[] = [
-  { name: "inseam",       label: "Inseam",        placeholder: u => u === "cm" ? "e.g. 80" : "e.g. 31",  hint: "From crotch to ankle (inner leg)" },
-  { name: "outseam",      label: "Outseam",       placeholder: u => u === "cm" ? "e.g. 105" : "e.g. 41", hint: "From waist to ankle (outer leg)" },
+  { name: "inseam",       label: "Inseam",        placeholder: u => u === "cm" ? "e.g. 80" : "e.g. 31",  hint: "Measure from the crotch to the ankle along the inner leg" },
+  { name: "outseam",      label: "Outseam",       placeholder: u => u === "cm" ? "e.g. 105" : "e.g. 41", hint: "Measure from the waist to the ankle along the outer leg" },
 ];
 
 function SectionHeader({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
@@ -269,7 +269,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
 
       <div className="flex items-center gap-3">
         <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-xs text-gray-400 font-medium">or enter manually</span>
+        <span className="text-xs text-gray-400 font-medium">Or enter your measurements manually</span>
         <div className="flex-1 h-px bg-gray-200" />
       </div>
 
@@ -278,7 +278,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
 
           {/* Unit Toggle */}
           <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-2">Measurement Unit</label>
+            <label className="text-sm font-semibold text-gray-700 block mb-2">Measurement units</label>
             <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50 gap-1">
               {(["cm", "inches"] as Unit[]).map(u => (
                 <button
@@ -301,7 +301,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
           {/* Vendor Selection */}
           {!vendorId && vendors && vendors.length > 0 && (
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2">Send to Vendor <span className="text-gray-400 font-normal">(optional)</span></label>
+              <label className="text-sm font-semibold text-gray-700 block mb-2">Send to a vendor <span className="text-gray-400 font-normal">(optional)</span></label>
               <FormField
                 control={form.control}
                 name="vendorId"
@@ -474,7 +474,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
                 className="input-nigerian"
                 data-testid="input-scan-height"
               />
-              <p className="text-xs text-gray-400 mt-1">Used as a reference for scaling all other measurements</p>
+              <p className="text-xs text-gray-400 mt-1">Used as a reference for scaling your other measurements</p>
             </div>
           </div>
           <div className="flex gap-2 pt-2">

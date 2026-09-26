@@ -9,7 +9,7 @@ interface MenuSection { featured: MenuLink[]; columns: MenuColumn[]; }
 const MENU: Record<string, MenuSection> = {
   Women: {
     featured: [
-      { label: 'Discover Women', href: '/products?gender=women' },
+      { label: "Shop women's styles", href: '/products?gender=women' },
       { label: 'New In', href: '/products?gender=women' },
       { label: 'Sale', href: '/products?gender=women' },
     ],
@@ -17,7 +17,7 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'Traditional Dresses',
         links: [
-          { label: 'Shop All Women\'s', href: '/products?gender=women' },
+          { label: "Shop all women's styles", href: '/products?gender=women' },
           { label: 'Ankara Dress', href: '/products?search=ankara+dress&gender=women' },
           { label: 'Boubou & Kaftan', href: '/products?search=boubou+kaftan' },
           { label: 'Aso Oke Sets', href: '/products?search=aso+oke' },
@@ -63,7 +63,7 @@ const MENU: Record<string, MenuSection> = {
 
   Men: {
     featured: [
-      { label: 'Discover Men', href: '/products?gender=men' },
+      { label: "Shop men's styles", href: '/products?gender=men' },
       { label: 'New In', href: '/products?gender=men' },
       { label: 'Sale', href: '/products?gender=men' },
     ],
@@ -71,7 +71,7 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'Traditional Wear',
         links: [
-          { label: 'Shop All Men\'s', href: '/products?gender=men' },
+          { label: "Shop all men's styles", href: '/products?gender=men' },
           { label: 'Agbada Sets', href: '/products?search=agbada' },
           { label: 'Kaftan & Jalabiya', href: '/products?search=kaftan' },
           { label: 'Buba & Sokoto', href: '/products?search=buba+sokoto' },
@@ -144,7 +144,7 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'Baby & Toddler',
         links: [
-          { label: 'Shop All Baby', href: '/products?search=baby' },
+          { label: 'Shop all baby and toddler styles', href: '/products?search=baby' },
           { label: 'Baby Ankara', href: '/products?search=baby+ankara' },
           { label: 'Naming Ceremony Sets', href: '/products?search=naming+baby' },
           { label: 'Christening Sets', href: '/products?search=christening' },
@@ -256,7 +256,7 @@ const MENU: Record<string, MenuSection> = {
           { label: 'French Lace', href: '/products?search=french+lace' },
           { label: 'Swiss Voile Lace', href: '/products?search=swiss+lace' },
           { label: 'Austrian Lace', href: '/products?search=austrian+lace' },
-          { label: 'Sequence Fabric', href: '/products?search=sequence' },
+          { label: 'Sequin fabric', href: '/products?search=sequence' },
         ],
       },
     ],
@@ -571,7 +571,7 @@ export default function MegaMenu() {
               <div className="flex-shrink-0 w-44 hidden lg:block">
                 <div className="bg-gradient-to-br from-nigerian-green/10 to-nigerian-gold/10 rounded-2xl p-5 text-center">
                   <p className="text-2xl mb-2">🌍</p>
-                  <p className="text-xs font-bold text-nigerian-green mb-1">Authentic African</p>
+                  <p className="text-xs font-bold text-nigerian-green mb-1">Authentic African fashion</p>
                   <p className="text-xs text-gray-500 mb-3">54 countries, one marketplace</p>
                   <button
                     onClick={() => handleLinkClick('/lookbook')}
@@ -582,7 +582,7 @@ export default function MegaMenu() {
                 </div>
                 <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
                   <p className="text-xs font-bold text-amber-700 mb-1">⭐ Collab Drops</p>
-                  <p className="text-xs text-amber-600 mb-2">Limited edition designer collabs are live now</p>
+                  <p className="text-xs text-amber-600 mb-2">Limited edition designer collaborations are available now.</p>
                   <button
                     onClick={() => handleLinkClick('/collab-drops')}
                     className="text-xs font-semibold text-amber-700 hover:underline"

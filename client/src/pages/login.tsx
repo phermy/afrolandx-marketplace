@@ -143,11 +143,11 @@ export default function LoginPage() {
     return (
       <AuthShell
         title={codeStep === "request" ? "Sign in with a code" : "Enter your code to sign in"}
-        description={codeStep === "request" ? "We’ll email you a code you can use once. No password needed." : `We sent a code to ${codeEmail}. Enter all six digits below.`}
+        description={codeStep === "request" ? "We’ll email you a code that works once, so you won’t need a password." : `We sent a code to ${codeEmail}. Enter all six digits below.`}
         headerLink={{ href: "/register", label: "Create account" }}
       >
          <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
-          <ArrowLeft className="h-4 w-4" /> Back to password login
+          <ArrowLeft className="h-4 w-4" /> Back to sign in with a password
         </button>
          {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
 
@@ -185,7 +185,7 @@ export default function LoginPage() {
               {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : "Verify and sign in"}
             </button>
             <div className="flex items-center justify-between text-sm">
-               <button type="button" onClick={() => { setCodeStep("request"); setError(""); }} className="text-[#6d6d69] hover:text-[#20201f] hover:underline">Use another email</button>
+               <button type="button" onClick={() => { setCodeStep("request"); setError(""); }} className="text-[#6d6d69] hover:text-[#20201f] hover:underline">Use a different email address</button>
                <button type="button" onClick={resendCode} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">Resend code</button>
             </div>
           </form>

@@ -53,10 +53,10 @@ function QuoteEditor({ plan, onChange }: { plan: Plan; onChange: () => void }) {
   return (
     <form className="mt-5 space-y-4 rounded-lg border bg-white p-4" onSubmit={submit}>
       <h4 className="font-semibold">Prepare a new quotation</h4>
-      <p className="text-sm text-gray-600">Quote your planning fee separately from hotels, venues, food and clothing. Online event payments are not available yet. Afrolandx records 8% of your fee as commission only when the customer confirms the event was delivered.</p>
+      <p className="text-sm text-gray-600">List your planning fee separately from estimated costs for hotels, venues, food, and clothing. Online event payments are not available yet. Afrolandx records an 8% commission on your fee only after the customer confirms that the event was delivered.</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-medium">Your planning fee (NGN)<Input required type="number" min="100" max="100000000" step="1" value={fee} onChange={e => setFee(e.target.value)} /></label>
-        <label className="text-sm font-medium">Quote valid for (days)<Input required type="number" min="1" max="30" value={days} onChange={e => setDays(e.target.value)} /></label>
+        <label className="text-sm font-medium">Quote validity (days)<Input required type="number" min="1" max="30" value={days} onChange={e => setDays(e.target.value)} /></label>
       </div>
       {Number(fee) >= 100 && <p className="text-sm">Afrolandx commission due on completion: <strong>{money(Math.round(Number(fee) * .08))}</strong> · Remaining planning fee: <strong>{money(Number(fee) - Math.round(Number(fee) * .08))}</strong></p>}
       <h5 className="text-sm font-semibold">Suggested suppliers and booking requests</h5>
@@ -154,7 +154,7 @@ export default function EventServices() {
       <div className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-widest text-green-800">Personal planning services</p>
         <h2 className="mt-1 text-2xl font-bold text-gray-900">Plan the whole occasion</h2>
-        <p className="mt-2 max-w-3xl text-gray-600">Find an approved planner for venues, hotels, food and looks. Request a written quote, then manage your event in one place. Supplier availability and external bookings are confirmed by the planner, not automatically by Afrolandx. Event fee payments are not collected through this page.</p>
+        <p className="mt-2 max-w-3xl text-gray-600">Find an approved planner for venues, hotels, food, and outfits. Request a written quote, then manage your event in one place. The planner, not Afrolandx, confirms supplier availability and any external bookings. Event fees are not collected through this page.</p>
       </div>
       {error && <p role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{notice}</p>}
@@ -170,7 +170,7 @@ export default function EventServices() {
       {planners.isError && <p className="text-sm text-red-700">Planners could not be loaded.</p>}
       {!planners.isLoading && !planners.isError && !planners.data?.length && <p className="rounded-lg border bg-white p-5 text-sm text-gray-600">No planners are approved yet. You can still explore the outfit collections below.</p>}
       {user && selectedPlanner && <Card className="mt-6">
-        <CardHeader><CardTitle>Tell your planner about your event</CardTitle><CardDescription>Sharing a brief requests a quote; it does not book or charge you.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Tell your planner about your event</CardTitle><CardDescription>Submitting this brief requests a quote. It does not make a booking or charge you.</CardDescription></CardHeader>
         <CardContent><form className="grid gap-4 md:grid-cols-2" onSubmit={async e => {
           e.preventDefault();
           const result = await act("/api/event-plans", { ...brief, plannerId: selectedPlanner, guestCount: Number(brief.guestCount), budgetNgn: brief.budgetNgn ? Number(brief.budgetNgn) : null });
@@ -207,14 +207,14 @@ export default function EventServices() {
               <p>Afrolandx commission due from planner after customer confirms completion, 8% of planner fee: <strong>{money(plan.commissionNgn || 0)}</strong></p>
               {asPlanner && <p>Planning fee after commission: <strong>{money(plan.plannerNetNgn || 0)}</strong></p>}
               {plan.quoteValidUntil && <p className="mt-1">Quote valid until {new Date(plan.quoteValidUntil).toLocaleDateString()}</p>}
-              <p className="mt-2 text-xs">This is a quotation, not a payment receipt. No event payments are taken here. Venue, hotel, food and clothing estimates are not included in the 8% commission. A supplier suggestion is not a confirmed reservation.</p>
+              <p className="mt-2 text-xs">This is a quotation, not a payment receipt. No event payments are taken here. Estimates for venues, hotels, food, and clothing are not included in the 8% commission. A supplier suggestion is not a confirmed reservation.</p>
               <a className="mt-3 inline-block font-semibold text-green-800 underline" href={`/api/event-plans/${plan.id}/statement`} target="_blank" rel="noopener noreferrer">Open printable quotation and commission statement</a>
             </div>}
             {!!plan.quoteItems?.length && <div className="space-y-2">
               <h4 className="font-semibold">Supplier suggestions and external bookings · estimated {money(supplierTotal)}</h4>
               {plan.quoteItems.map((line, index) => <div key={index} className="rounded border bg-white p-3 text-sm">
                 <strong className="capitalize">{line.category}</strong> · {line.description} {line.provider && `· ${line.provider}`} · {money(line.estimatedAmountNgn)}
-                <p className="text-xs font-medium text-amber-800">{line.bookingStatus === "confirmed_externally" ? "Planner reports external confirmation; ask for provider details" : line.bookingStatus === "requested" ? "Requested, not confirmed" : line.bookingStatus === "unavailable" ? "Unavailable; an alternative is needed" : "Suggested, not booked"}</p>
+                <p className="text-xs font-medium text-amber-800">{line.bookingStatus === "confirmed_externally" ? "The planner reports external confirmation; ask for provider details." : line.bookingStatus === "requested" ? "Requested, not confirmed." : line.bookingStatus === "unavailable" ? "Unavailable; an alternative is needed." : "Suggested, not booked."}</p>
                 {asPlanner && ["quoted", "accepted", "completion_requested"].includes(plan.status) && <label className="mt-2 block text-xs">Update booking progress
                   <select className="ml-2 rounded border p-1" value={line.bookingStatus} disabled={busy} onChange={e => act(`/api/event-plans/${plan.id}/bookings/${index}`, { bookingStatus: e.target.value })}>
                     <option value="suggested">Suggested</option><option value="requested">Requested</option>

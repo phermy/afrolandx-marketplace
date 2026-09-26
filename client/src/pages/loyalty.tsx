@@ -140,7 +140,7 @@ export default function LoyaltyPage() {
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="container mx-auto py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Sign in to access the Loyalty Program</h1>
+          <h1 className="text-2xl font-bold mb-4">Sign in to view your loyalty rewards</h1>
           <p className="text-muted-foreground">Earn points, unlock rewards, and get exclusive benefits.</p>
         </div>
       </div>

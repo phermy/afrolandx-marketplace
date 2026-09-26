@@ -63,7 +63,7 @@ export default function VendorFinance() {
                     <SelectTrigger><SelectValue placeholder="Choose bank" /></SelectTrigger>
                     <SelectContent>{banks.map(bank => <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Input value={accountNumber} onChange={event => setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="10-digit account number" />
+                  <Input value={accountNumber} onChange={event => setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="Enter an account number with 10 digits" />
                   <Button disabled={!bankCode || accountNumber.length !== 10 || accountMutation.isPending} onClick={() => accountMutation.mutate()}>
                     {accountMutation.isPending ? "Verifying…" : "Verify account"}
                   </Button>

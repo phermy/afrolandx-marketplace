@@ -109,13 +109,13 @@ export default function ShoppingCart() {
                             if (parent) {
                               parent.style.background = 'linear-gradient(135deg, var(--nigerian-green), var(--nigerian-gold))';
                               parent.classList.add('flex', 'items-center', 'justify-center');
-                              parent.innerHTML = '<span class="text-white text-xs">No Image</span>';
+                              parent.innerHTML = '<span class="text-white text-xs">Image unavailable</span>';
                             }
                           }}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                          <span className="text-white text-xs">No Image</span>
+                          <span className="text-white text-xs">Image unavailable</span>
                         </div>
                       )}
                     </div>
@@ -187,7 +187,7 @@ export default function ShoppingCart() {
                     disabled={isClearingCart}
                     className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700"
                   >
-                    {isClearingCart ? 'Clearing...' : 'Clear Cart'}
+                    {isClearingCart ? 'Clearing…' : 'Clear cart'}
                   </Button>
                 </div>
               )}
@@ -204,7 +204,7 @@ export default function ShoppingCart() {
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Shipping cost will be calculated at checkout
+                  Shipping costs will be calculated at checkout.
                 </p>
               </div>
 
@@ -250,7 +250,7 @@ export default function ShoppingCart() {
                       <span className="text-gray-600">2 to 4 days</span>
                     </div>
                     <div className="pt-2 mt-2 border-t text-xs text-gray-600">
-                      <p className="font-semibold text-gray-800 mb-1">International partners (rate on request)</p>
+                      <p className="font-semibold text-gray-800 mb-1">International partners (rates available on request)</p>
                       <p>CargoNaija · Terminal Africa · Haulam · African Import Export Solutions · Hezelinks</p>
                     </div>
                   </div>

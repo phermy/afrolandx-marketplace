@@ -232,7 +232,7 @@ export default function EventPlannerPage() {
           <CardHeader>
             <CardTitle>Tell Us About Your Event</CardTitle>
             <CardDescription>
-              Select your event type and we'll show you curated outfit collections
+              Choose an event type to explore curated outfit collections.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -373,7 +373,7 @@ export default function EventPlannerPage() {
                     </div>
                     {collection.avgFitScore && (
                       <Badge className={getFitScoreColor(collection.avgFitScore)}>
-                        {Math.round(collection.avgFitScore)}% Fit Match
+                        Fit score: {Math.round(collection.avgFitScore)}%
                       </Badge>
                     )}
                   </div>

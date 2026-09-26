@@ -401,7 +401,7 @@ export default function VendorWorkshopPage() {
                         <SelectContent>
                           <SelectItem value="fabric">Fabric</SelectItem>
                           <SelectItem value="thread">Thread</SelectItem>
-                          <SelectItem value="beads">Beads/Accessories</SelectItem>
+                          <SelectItem value="beads">Beads and accessories</SelectItem>
                           <SelectItem value="buttons">Buttons</SelectItem>
                           <SelectItem value="zippers">Zippers</SelectItem>
                           <SelectItem value="other">Other</SelectItem>
@@ -532,7 +532,7 @@ export default function VendorWorkshopPage() {
                   Measurement Change Alerts
                 </CardTitle>
                 <CardDescription>
-                  Get notified when customer measurements change significantly between orders
+                  Get notified when a customer's measurements change significantly between orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>

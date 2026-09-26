@@ -135,7 +135,7 @@ export default function QuizPage() {
   if (!quizId) {
     return (
       <div className="container mx-auto py-12 text-center">
-        <p>Quiz not found. <Link href="/loyalty" className="text-primary underline">Go back to Loyalty page</Link></p>
+        <p>Quiz not found. <Link href="/loyalty" className="text-primary underline">Return to your loyalty page</Link></p>
       </div>
     );
   }
@@ -151,7 +151,7 @@ export default function QuizPage() {
   if (!quiz) {
     return (
       <div className="container mx-auto py-12 text-center">
-        <p>Quiz not found. <Link href="/loyalty" className="text-primary underline">Go back to Loyalty page</Link></p>
+        <p>Quiz not found. <Link href="/loyalty" className="text-primary underline">Return to your loyalty page</Link></p>
       </div>
     );
   }

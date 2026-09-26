@@ -50,7 +50,7 @@ function SessionKickoutGuard() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Signed out",
-        description: "You were signed in on another device, so this session has ended.",
+        description: "A new sign in on another device ended this session.",
         variant: "destructive",
         duration: 6000,
       });
@@ -102,7 +102,7 @@ function Router() {
       <Route path="/discover">
         <AdminProtectedRoute>
           <div className="bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-900" role="status">
-            Internal preview only. Discover is hidden from customers; new bookings and payments are disabled.
+            Internal preview only. Discover is hidden from customers, and new bookings and payments are disabled.
           </div>
           <DiscoverAfrica />
         </AdminProtectedRoute>

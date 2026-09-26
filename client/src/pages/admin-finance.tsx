@@ -84,7 +84,7 @@ export default function AdminFinance() {
               <div key={vendor.id} className="flex flex-wrap items-center justify-between gap-3 border rounded-lg p-3">
                 <div><p className="font-medium">{vendor.businessName}</p><p className="text-xs text-gray-500">CAC: {vendor.cacNumber || "Not supplied"} · Verification: {vendor.verificationStatus}</p></div>
                 <div className="flex gap-2">
-                  {vendor.verificationStatus !== "verified" && <Button size="sm" variant="outline" disabled={!vendor.cacNumber || verifyMutation.isPending} onClick={() => verifyMutation.mutate(vendor.id)}>Mark checks verified</Button>}
+                  {vendor.verificationStatus !== "verified" && <Button size="sm" variant="outline" disabled={!vendor.cacNumber || verifyMutation.isPending} onClick={() => verifyMutation.mutate(vendor.id)}>Mark checks as verified</Button>}
                   <Button size="sm" disabled={vendor.status !== "approved" || vendor.verificationStatus !== "verified" || settleMutation.isPending} onClick={() => settleMutation.mutate(vendor.id)}>Pay available balance</Button>
                 </div>
               </div>
@@ -96,7 +96,7 @@ export default function AdminFinance() {
           <CardContent className="grid md:grid-cols-2 gap-3">
             <Input value={orderId} onChange={event => setOrderId(event.target.value.replace(/\D/g, ""))} placeholder="Order ID" />
             <Input value={amount} onChange={event => setAmount(event.target.value)} type="number" min="0.01" step="0.01" placeholder="Merchandise amount in NGN" />
-            <Input value={chargebackReference} onChange={event => setChargebackReference(event.target.value)} placeholder="Chargeback reference (chargebacks only)" />
+            <Input value={chargebackReference} onChange={event => setChargebackReference(event.target.value)} placeholder="Chargeback reference (for chargebacks only)" />
             <Textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="Reason" />
             <div className="flex gap-2 md:col-span-2">
               <Button disabled={!orderId || !amount || reason.length < 5 || adjustmentMutation.isPending} onClick={() => adjustmentMutation.mutate("refund")}>Refund through Paystack</Button>

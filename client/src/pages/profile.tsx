@@ -30,7 +30,7 @@ export default function Profile() {
     if (!isLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        description: "You’ve been signed out. Redirecting you to sign in…",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -82,7 +82,7 @@ export default function Profile() {
       if (isUnauthorizedError(error as Error)) {
         toast({
           title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          description: "You’ve been signed out. Redirecting you to sign in…",
           variant: "destructive",
         });
         setTimeout(() => {
