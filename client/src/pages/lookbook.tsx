@@ -46,53 +46,19 @@ const EVENT_SIZES = [
   { value: "others", label: "Custom size" },
 ];
 
-// Country → currency mapping
-const LOCATION_CURRENCIES: Record<string, { code: string; symbol: string; name: string }> = {
-  NG: { code: "NGN", symbol: "₦", name: "Nigeria" },
-  GH: { code: "GHS", symbol: "₵", name: "Ghana" },
-  ZA: { code: "ZAR", symbol: "R", name: "South Africa" },
-  KE: { code: "KES", symbol: "KSh", name: "Kenya" },
-  ET: { code: "ETB", symbol: "Br", name: "Ethiopia" },
-  EG: { code: "EGP", symbol: "E£", name: "Egypt" },
-  MA: { code: "MAD", symbol: "MAD", name: "Morocco" },
-  TZ: { code: "TZS", symbol: "TSh", name: "Tanzania" },
-  UG: { code: "UGX", symbol: "UGX", name: "Uganda" },
-  SN: { code: "XOF", symbol: "CFA", name: "Senegal" },
-  CI: { code: "XOF", symbol: "CFA", name: "Côte d'Ivoire" },
-  CM: { code: "XAF", symbol: "CFA", name: "Cameroon" },
-  RW: { code: "RWF", symbol: "RF", name: "Rwanda" },
-  MW: { code: "MWK", symbol: "MK", name: "Malawi" },
-  ZM: { code: "ZMW", symbol: "ZK", name: "Zambia" },
-  ZW: { code: "USD", symbol: "$", name: "Zimbabwe" },
-  TG: { code: "XOF", symbol: "CFA", name: "Togo" },
-  BJ: { code: "XOF", symbol: "CFA", name: "Benin" },
-  BF: { code: "XOF", symbol: "CFA", name: "Burkina Faso" },
-  ML: { code: "XOF", symbol: "CFA", name: "Mali" },
-  NE: { code: "XOF", symbol: "CFA", name: "Niger" },
-  TD: { code: "XAF", symbol: "CFA", name: "Chad" },
-  SD: { code: "SDG", symbol: "SDG", name: "Sudan" },
-  SO: { code: "SOS", symbol: "Sh", name: "Somalia" },
-  LY: { code: "LYD", symbol: "LD", name: "Libya" },
-  TN: { code: "TND", symbol: "DT", name: "Tunisia" },
-  DZ: { code: "DZD", symbol: "DA", name: "Algeria" },
-  AO: { code: "AOA", symbol: "Kz", name: "Angola" },
-  MZ: { code: "MZN", symbol: "MT", name: "Mozambique" },
-  BW: { code: "BWP", symbol: "P", name: "Botswana" },
-  NA: { code: "NAD", symbol: "N$", name: "Namibia" },
-  LS: { code: "LSL", symbol: "L", name: "Lesotho" },
-  SZ: { code: "SZL", symbol: "E", name: "Eswatini" },
-  GB: { code: "GBP", symbol: "£", name: "United Kingdom" },
-  US: { code: "USD", symbol: "$", name: "United States" },
-  EU: { code: "EUR", symbol: "€", name: "Europe (EU)" },
-  CA: { code: "CAD", symbol: "CA$", name: "Canada" },
-  AU: { code: "AUD", symbol: "A$", name: "Australia" },
-  AE: { code: "AED", symbol: "AED", name: "UAE" },
-  SA: { code: "SAR", symbol: "SR", name: "Saudi Arabia" },
-  CN: { code: "CNY", symbol: "¥", name: "China" },
-  JP: { code: "JPY", symbol: "¥", name: "Japan" },
-  IN: { code: "INR", symbol: "₹", name: "India" },
-  BR: { code: "BRL", symbol: "R$", name: "Brazil" },
-  OTHER: { code: "USD", symbol: "$", name: "Other / International" },
+const EVENT_LOCATIONS: Record<string, string> = {
+  NG: "Nigeria", GH: "Ghana", ZA: "South Africa", KE: "Kenya",
+  ET: "Ethiopia", EG: "Egypt", MA: "Morocco", TZ: "Tanzania",
+  UG: "Uganda", SN: "Senegal", CI: "Côte d'Ivoire", CM: "Cameroon",
+  RW: "Rwanda", MW: "Malawi", ZM: "Zambia", ZW: "Zimbabwe",
+  TG: "Togo", BJ: "Benin", BF: "Burkina Faso", ML: "Mali",
+  NE: "Niger", TD: "Chad", SD: "Sudan", SO: "Somalia",
+  LY: "Libya", TN: "Tunisia", DZ: "Algeria", AO: "Angola",
+  MZ: "Mozambique", BW: "Botswana", NA: "Namibia", LS: "Lesotho",
+  SZ: "Eswatini", GB: "United Kingdom", US: "United States",
+  EU: "Europe (EU)", CA: "Canada", AU: "Australia", AE: "UAE",
+  SA: "Saudi Arabia", CN: "China", JP: "Japan", IN: "India",
+  BR: "Brazil", OTHER: "Other / International",
 };
 
 const STYLE_EXAMPLES = [
@@ -133,8 +99,6 @@ export default function LookbookPage() {
   const [stylePrompt, setStylePrompt] = useState("");
   const [placeholder] = useState(STYLE_EXAMPLES[Math.floor(Math.random() * STYLE_EXAMPLES.length)]);
 
-  const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
-
   const { data: lookbooks = [], isLoading: loadingLookbooks } = useQuery<Lookbook[]>({
     queryKey: ["/api/lookbooks"],
     enabled: !!user,
@@ -148,10 +112,9 @@ export default function LookbookPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lookbooks"] });
       toast({ title: "Lookbook ready!", description: "Your outfit, chosen by AI, is ready below." });
-      setStylePrompt("");
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to generate lookbook. Please try again.", variant: "destructive" });
+      toast({ title: "Lookbook unavailable", description: "We could not find a matching outfit right now. Try a different budget or try again shortly.", variant: "destructive" });
     },
   });
 
@@ -163,6 +126,9 @@ export default function LookbookPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lookbooks"] });
       toast({ title: "Saved!", description: "Lookbook saved to your collection." });
+    },
+    onError: () => {
+      toast({ title: "Could not save lookbook", description: "Please refresh your lookbooks and try again.", variant: "destructive" });
     },
   });
 
@@ -178,16 +144,16 @@ export default function LookbookPage() {
     const sizeParam = eventSize === "others" ? customSize : eventSize;
     generateMutation.mutate({
       eventType,
-      budget: budget ? parseFloat(budget) : undefined,
+      budget: budget ? Number(budget) : undefined,
       styleNotes: stylePrompt,
       familySize: sizeParam || undefined,
-      currency: currency.code,
+      eventLocation: EVENT_LOCATIONS[eventLocation],
     });
   };
 
-  const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({
+  const locationOptions = Object.entries(EVENT_LOCATIONS).map(([key, name]) => ({
     key,
-    label: `${val.name} (${val.symbol})`,
+    label: name,
   }));
 
   if (!user) {
@@ -266,12 +232,12 @@ export default function LookbookPage() {
                 </Select>
               </div>
 
-              {/* Event Size */}
+              {/* Group size gives styling context; the result remains one outfit */}
               <div className="space-y-2">
-                <Label>Event Size <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Label>Group size <span className="text-muted-foreground text-xs">(optional, one outfit is suggested)</span></Label>
                 <Select value={eventSize} onValueChange={setEventSize}>
                   <SelectTrigger>
-                    <SelectValue placeholder="How many outfits do you need?" />
+                    <SelectValue placeholder="How many people are in your group?" />
                   </SelectTrigger>
                   <SelectContent>
                     {EVENT_SIZES.map(s => (
@@ -290,11 +256,11 @@ export default function LookbookPage() {
                 )}
               </div>
 
-              {/* Event Location → currency */}
+              {/* Event location informs the outfit, not its price */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                  Event Location <span className="text-muted-foreground text-xs ml-1">(sets budget currency)</span>
+                  Event Location <span className="text-muted-foreground text-xs ml-1">(styling context)</span>
                 </Label>
                 <Select value={eventLocation} onValueChange={setEventLocation}>
                   <SelectTrigger>
@@ -308,25 +274,28 @@ export default function LookbookPage() {
                 </Select>
               </div>
 
-              {/* Budget with dynamic currency */}
+              {/* Product prices are stored in NGN */}
               <div className="space-y-2">
                 <Label htmlFor="budget">
-                  Budget per person ({currency.code}){" "}
+                  Budget for this outfit (NGN){" "}
                   <span className="text-muted-foreground text-xs">(optional)</span>
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm select-none">
-                    {currency.symbol}
+                    ₦
                   </span>
                   <Input
                     id="budget"
                     type="number"
+                    min="0.01"
+                    step="0.01"
                     placeholder="e.g. 50000"
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
                     className="pl-8"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">Prices stay in Nigerian naira regardless of event location.</p>
               </div>
             </div>
           </CardContent>
@@ -417,7 +386,7 @@ export default function LookbookPage() {
                             </div>
                             <p className="text-sm font-medium leading-tight line-clamp-1">{item.name}</p>
                             <p className="text-sm font-bold text-nigerian-green">
-                              {currency.symbol}{parseFloat(item.price || "0").toLocaleString()}
+                              ₦{parseFloat(item.price || "0").toLocaleString()}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">{item.reason}</p>
                             <Button
@@ -442,23 +411,14 @@ export default function LookbookPage() {
                         <div>
                           <span className="text-sm text-muted-foreground">Total estimate: </span>
                           <span className="text-xl font-bold">
-                            {currency.symbol}{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            ₦{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              const sizeParam = eventSize === "others" ? customSize : eventSize;
-                              generateMutation.mutate({
-                                eventType,
-                                budget: budget ? parseFloat(budget) : undefined,
-                                styleNotes: stylePrompt,
-                                familySize: sizeParam || undefined,
-                                currency: currency.code,
-                              });
-                            }}
+                             onClick={handleGenerate}
                             disabled={generateMutation.isPending}
                           >
                             <RefreshCw className="h-3 w-3 mr-1" />Regenerate

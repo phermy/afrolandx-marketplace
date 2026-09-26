@@ -10,6 +10,7 @@ import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
 import { registerEventPlanningRoutes } from "./event-planning";
 import { getChatbotService } from "./chatbot";
+import { buildLookbookItems } from "./lookbook-generation";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
@@ -4122,18 +4123,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-      
-      const { occasionId, eventType, budget, styleNotes } = req.body;
-      
-      // Get available products
-      const allProducts = await storage.getProducts({ status: 'approved' });
-      
-      // Use AI to generate adaptive outfit recommendations
-      const chatbotService = getChatbotService();
-      const productCatalog = allProducts.slice(0, 30).map(p => ({
+
+      const input = z.object({
+        occasionId: z.number().int().positive().optional(),
+        eventType: z.string().trim().max(100).optional(),
+        budget: z.number().positive().finite().max(1_000_000_000).optional(),
+        styleNotes: z.string().trim().max(1000).optional(),
+        familySize: z.string().trim().max(30).optional(),
+        eventLocation: z.string().trim().max(100).optional(),
+      }).safeParse(req.body);
+      if (!input.success || (!input.data.styleNotes && !input.data.eventType)) {
+        return res.status(400).json({ message: 'Describe your style or choose an event type.' });
+      }
+      const { occasionId, eventType, budget, styleNotes, familySize, eventLocation } = input.data;
+      if (occasionId) {
+        const occasion = await storage.getOccasion(occasionId);
+        if (!occasion || occasion.userId !== userId) {
+          return res.status(404).json({ message: 'Occasion not found' });
+        }
+      }
+
+      const [availableProducts, vendorsForCatalog] = await Promise.all([
+        storage.getProducts({ status: 'approved' }),
+        storage.getAllVendors(),
+      ]);
+      const approvedVendorIds = new Set(vendorsForCatalog.filter(v => v.status === 'approved').map(v => v.id));
+      const catalog = availableProducts
+        .filter(p => approvedVendorIds.has(p.vendorId) && Number.isFinite(Number(p.price)) &&
+          Number(p.price) >= 0 && (budget === undefined || Number(p.price) <= budget))
+        .slice(0, 30);
+      if (!catalog.length) {
+        return res.status(422).json({ message: 'No products match that budget right now.' });
+      }
+      const productCatalog = catalog.map(p => ({
         id: p.id,
         name: p.name,
-        price: `$${p.price}`,
+        priceNGN: p.price,
         categoryId: p.categoryId,
         description: p.description?.substring(0, 80) || '',
       }));
@@ -4143,51 +4168,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 USER REQUEST:
 ${styleNotes ? `"${styleNotes}"` : '(no description provided)'}
 Event Type: ${eventType || 'general'}
-Budget: ${budget ? `up to $${budget}` : 'no budget limit'}
+Event Location: ${eventLocation || 'not specified'}
+Group Size: ${familySize || 'not specified'} (recommend one outfit, not one per attendee)
+Budget for this outfit: ${budget ? `up to ₦${budget} NGN` : 'no budget limit'}
 
 AVAILABLE PRODUCTS:
 ${JSON.stringify(productCatalog)}
 
 INSTRUCTIONS:
-- Select 3-5 products that work together as a complete, cohesive outfit
+- Select 1-5 products from the available catalog that work together as a cohesive outfit
 - Prioritise products that best match the user's description and occasion
-- Stay within budget if specified
+- Prices are in Nigerian naira (NGN). Keep the TOTAL of the selected products within the NGN budget if specified
 - Write a specific, encouraging reason for each pick (mention colours, occasion fit, or cultural significance)
 - Return ONLY a valid JSON array, no other text:
 [{"productId": <number>, "reason": "<specific reason why this fits the request>"}]`;
-      
-      let bundleItems: any[] = [];
+
+      let items: ReturnType<typeof buildLookbookItems>;
       try {
-        const aiResponse = await chatbotService.generateResponse([{ role: 'user', content: prompt }]);
-        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          bundleItems = JSON.parse(jsonMatch[0]);
-        }
+        const aiResponse = await getChatbotService().generateResponse([{ role: 'user', content: prompt }]);
+        items = buildLookbookItems(aiResponse, catalog, budget);
       } catch (e) {
-        console.error('AI lookbook generation failed, using fallback:', e);
+        console.error('AI lookbook generation failed:', e);
+        return res.status(503).json({ message: 'Could not generate a matching lookbook right now. Please try again.' });
       }
 
-      // Fallback: pick first 4 products if AI returned nothing
-      if (bundleItems.length === 0) {
-        bundleItems = allProducts.slice(0, 4).map(p => ({ productId: p.id, reason: 'Recommended for you' }));
-      }
-      
-      // Enhance bundle items with product details
-      const enhancedItems = await Promise.all(bundleItems.map(async (item: any) => {
-        const product = await storage.getProduct(item.productId);
-        if (!product) return null;
-        const imageUrl = (Array.isArray(product.images) && product.images[0]) || product.imageUrl || null;
-        return { ...item, name: product.name, price: product.price, imageUrl };
-      }));
-      
-      const filteredItems = enhancedItems.filter(Boolean);
-      const totalPrice = filteredItems.reduce((sum, item: any) => sum + parseFloat(item.price || '0'), 0);
-      
       const lookbook = await storage.createLookbookRecommendation({
         userId,
         occasionId,
-        bundleItems: filteredItems,
-        totalPrice: totalPrice.toString(),
+        bundleItems: items.items,
+        totalPrice: items.totalPrice.toString(),
         status: 'generated',
       });
       
@@ -4213,8 +4222,13 @@ INSTRUCTIONS:
 
   app.post('/api/lookbooks/:id/accept', isAuthenticated, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      await storage.updateLookbookStatus(id, 'accepted');
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Invalid lookbook ID' });
+      if (!await storage.updateLookbookStatus(id, userId, 'accepted')) {
+        return res.status(404).json({ message: 'Lookbook not found' });
+      }
       res.json({ success: true });
     } catch (error) {
       console.error('Error accepting lookbook:', error);

@@ -228,7 +228,7 @@ export interface IStorage {
   getOccasion(id: number): Promise<OccasionProfile | undefined>;
   createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation>;
   getUserLookbooks(userId: string): Promise<LookbookRecommendation[]>;
-  updateLookbookStatus(id: number, status: string): Promise<void>;
+  updateLookbookStatus(id: number, userId: string, status: string): Promise<boolean>;
 
   // Fit metrics & feedback operations
   getProductFitMetrics(productId: number): Promise<ProductFitMetric | undefined>;
@@ -1418,8 +1418,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(lookbookRecommendations).where(eq(lookbookRecommendations.userId, userId)).orderBy(desc(lookbookRecommendations.createdAt));
   }
 
-  async updateLookbookStatus(id: number, status: string): Promise<void> {
-    await db.update(lookbookRecommendations).set({ status }).where(eq(lookbookRecommendations.id, id));
+  async updateLookbookStatus(id: number, userId: string, status: string): Promise<boolean> {
+    const [updated] = await db.update(lookbookRecommendations).set({ status })
+      .where(and(eq(lookbookRecommendations.id, id), eq(lookbookRecommendations.userId, userId)))
+      .returning({ id: lookbookRecommendations.id });
+    return !!updated;
   }
 
   // Fit metrics & feedback operations
