@@ -18,7 +18,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
@@ -1836,73 +1835,90 @@ export default function AdminDashboard() {
 
       {/* Vendor Review Modal */}
       <Dialog open={!!reviewVendor} onOpenChange={(open) => !open && setReviewVendor(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Avatar className="w-8 h-8">
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-xl bg-[#fbf8f2] p-0 text-left sm:max-h-[90dvh]">
+          <DialogHeader className="shrink-0 border-b border-stone-200 bg-white px-5 py-4 pr-12 text-left sm:px-6 sm:py-5">
+            <div className="flex items-start gap-3">
+              <Avatar className="h-10 w-10 shrink-0">
                 <AvatarImage src={reviewVendor?.user?.profileImageUrl} />
                 <AvatarFallback className="bg-nigerian-green text-white text-sm">{reviewVendor?.businessName?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
-              Vendor Profile Review
-            </DialogTitle>
-            <DialogDescription>Full details for <strong>{reviewVendor?.businessName}</strong></DialogDescription>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-semibold leading-tight text-[#193d32]">Vendor profile review</DialogTitle>
+                <DialogDescription className="mt-1 break-words text-sm">
+                  {reviewVendor?.businessName}
+                </DialogDescription>
+              </div>
+            </div>
+            {reviewVendor && (
+              <div className="flex flex-wrap items-center gap-2 pt-3 text-xs text-gray-500">
+                <span className="font-medium uppercase tracking-wide">Status</span>
+                {getStatusBadge(reviewVendor.status)}
+                <span className="ml-2 font-medium uppercase tracking-wide">Verification</span>
+                <Badge variant="outline" className={reviewVendor.verificationStatus === 'verified'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'}>
+                  {reviewVendor.verificationStatus || 'pending'}
+                </Badge>
+              </div>
+            )}
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 sm:py-6"
+            tabIndex={0} aria-label="Vendor review details">
             {reviewVendor && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">{getStatusBadge(reviewVendor.status)}<span className="text-sm text-gray-500">Current status</span></div>
-                <Separator />
+              <div className="space-y-6">
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><Package className="w-4 h-4" />Business Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><span className="text-xs text-gray-400 block">Business Name</span><span className="font-medium">{reviewVendor.businessName}</span></div>
-                    <div><span className="text-xs text-gray-400 block">Applied</span><span className="font-medium">{new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><Package className="h-4 w-4" />Business details</h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                    <div><span className="mb-1 block text-xs text-gray-500">Business name</span><span className="font-medium">{reviewVendor.businessName}</span></div>
+                    <div><span className="mb-1 block text-xs text-gray-500">Applied</span><span className="font-medium">{new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
                   </div>
                   <div className="mt-3">
-                    <span className="text-xs text-gray-400 block mb-1">Business Description</span>
+                    <span className="mb-1 block text-xs text-gray-500">Business description</span>
                     {reviewVendor.description
-                      ? <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{reviewVendor.description}</p>
-                      : <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">No description provided.</p>}
+                      ? <p className="rounded-lg border border-stone-200 bg-white p-3 text-sm leading-relaxed text-gray-700">{reviewVendor.description}</p>
+                      : <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No description provided.</p>}
                   </div>
                 </div>
                 <Separator />
                 {reviewVendor.user && (
                   <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2"><UserIcon className="w-4 h-4" />Account Owner</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><span className="text-xs text-gray-400 block">Full Name</span><span className="font-medium">{reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Email</span><span className="font-medium text-sm">{reviewVendor.user.email || 'N/A'}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Email Verified</span>
+                    <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><UserIcon className="h-4 w-4" />Account owner</h3>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                      <div><span className="mb-1 block text-xs text-gray-500">Full name</span><span className="font-medium">{reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}</span></div>
+                      <div className="min-w-0"><span className="mb-1 block text-xs text-gray-500">Email</span><span className="break-all text-sm font-medium">{reviewVendor.user.email || 'N/A'}</span></div>
+                      <div><span className="mb-1 block text-xs text-gray-500">Email verified</span>
                         <span className={`font-medium flex items-center gap-1 text-sm ${reviewVendor.user.emailVerified ? 'text-green-600' : 'text-red-500'}`}>
                           {reviewVendor.user.emailVerified ? <><ShieldCheck className="w-3 h-3" />Verified</> : <><XCircle className="w-3 h-3" />Not verified</>}
                         </span>
                       </div>
-                      <div><span className="text-xs text-gray-400 block">Account Created</span><span className="font-medium text-sm">{reviewVendor.user.createdAt ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</span></div>
+                      <div><span className="mb-1 block text-xs text-gray-500">Account created</span><span className="text-sm font-medium">{reviewVendor.user.createdAt ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</span></div>
                     </div>
                   </div>
                 )}
                 <Separator />
                 <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Business verification</h3>
-                  <p className="text-sm text-gray-600">CAC number: {reviewVendor.cacNumber || 'Not provided'} · Status: {reviewVendor.verificationStatus || 'pending'}</p>
+                  <h3 className="flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Business verification</h3>
+                  <p className="text-sm text-gray-600">CAC number: <span className="font-medium text-gray-800">{reviewVendor.cacNumber || 'Not provided'}</span></p>
                   {reviewVendor.verificationStatus !== 'verified' && (
                     <>
-                      <p className="text-sm text-amber-800">Check each item against independent evidence before recording verification. These checkboxes do not verify a registry automatically.</p>
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+                        Check each item against independent evidence before recording verification. These checkboxes do not verify a registry automatically.
+                      </p>
                       {([
                         { key: 'cacVerified', label: 'I checked the CAC registration' },
                         { key: 'identityVerified', label: 'I checked the owner identity' },
                         { key: 'businessVerified', label: 'I checked the business details' },
                       ] as const).map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 text-sm">
+                        <label key={key} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-3 text-sm">
                           <Checkbox checked={verificationChecks[key]} onCheckedChange={checked =>
                             setVerificationChecks(current => ({ ...current, [key]: checked === true }))
                           } />
                           {label}
                         </label>
                       ))}
-                      <label className="block text-sm">Review notes
-                        <textarea className="mt-1 w-full rounded border p-2" maxLength={3000}
+                      <label className="block text-sm font-medium">Review notes
+                        <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal" maxLength={3000}
                           value={verificationNotes} onChange={event => setVerificationNotes(event.target.value)} />
                       </label>
                       <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber || !Object.values(verificationChecks).every(Boolean)}
@@ -1914,8 +1930,8 @@ export default function AdminDashboard() {
                 </div>
                 <Separator />
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Compliance Checklist</h3>
-                  <div className="space-y-2">
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Compliance checklist</h3>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {[
                       { label: 'Business name provided', pass: !!reviewVendor.businessName },
                       { label: 'Business description (10+ chars)', pass: reviewVendor.description?.length > 10 },
@@ -1923,7 +1939,7 @@ export default function AdminDashboard() {
                       { label: 'Valid email address', pass: !!reviewVendor.user?.email },
                       { label: 'Email address verified', pass: !!reviewVendor.user?.emailVerified },
                     ].map(({ label, pass }) => (
-                      <div key={label} className={`flex items-center gap-2 p-2 rounded text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                      <div key={label} className={`flex items-center gap-2 rounded-lg p-2.5 text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                         {pass ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}{label}
                       </div>
                     ))}
@@ -1931,9 +1947,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="flex gap-2 pt-4 border-t">
+          <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-stone-200 bg-white px-5 py-4 sm:px-6">
             <Button variant="outline" onClick={() => setReviewVendor(null)}>Close</Button>
             {reviewVendor?.status === 'pending' && (
               <>
@@ -1941,7 +1957,10 @@ export default function AdminDashboard() {
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified'}
+                <Button className="bg-green-600 hover:bg-green-700 text-white"
+                  disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                    !hasRole(user, 'superadmin') || !user?.emailVerified}
+                  title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can approve vendors.' : undefined}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                   <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
                 </Button>
@@ -1954,7 +1973,10 @@ export default function AdminDashboard() {
               </Button>
             )}
             {reviewVendor?.status === 'suspended' && (
-              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified'}
+              <Button className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                  !hasRole(user, 'superadmin') || !user?.emailVerified}
+                title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can reactivate vendors.' : undefined}
                 onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                 <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
               </Button>
