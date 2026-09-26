@@ -30,6 +30,7 @@ export const getUserRoleDisplay = (user: User | null | undefined): string => {
   const roleLabels: { [key: string]: string } = {
     admin: 'Admin',
     vendor: 'Vendor',
+    event_planner: 'Event Planner',
     customer: 'Customer'
   };
   

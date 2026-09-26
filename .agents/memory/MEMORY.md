@@ -10,3 +10,4 @@
 - [Hyphen-free website copy](hyphen-free-copy.md) — rewrite visible phrases grammatically instead of just deleting hyphens; keep technical values and proper names intact
 - [File download handoff](file-download-handoff.md) — asset cards and file-tree downloads failed for this user; provide a verified browser download link instead
 - [Bot-check access](bot-check-access.md) — broken Turnstile locked out sign-in; only add an image challenge with a provider that supports it and verified hostnames
+- [Event planner commission](event-planner-commission.md) — user chose 8% of planner fee only; do not include outside supplier charges or enable fee collection without safe settlement

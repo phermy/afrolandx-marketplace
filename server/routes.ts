@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
+import { registerEventPlanningRoutes } from "./event-planning";
 import { getChatbotService } from "./chatbot";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
@@ -250,6 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+  registerEventPlanningRoutes(app);
 
   // Geo/currency detection — proxied server-side to avoid CORS
   app.get('/api/geo', async (req: any, res) => {

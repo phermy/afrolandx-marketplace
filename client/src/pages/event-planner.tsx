@@ -28,6 +28,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import Navbar from "@/components/navbar";
+import EventServices from "@/components/event-services";
 
 const eventTypes = [
   { value: "wedding", label: "Wedding / Traditional Marriage", icon: Heart },
@@ -132,7 +133,9 @@ export default function EventPlannerPage() {
   const [eventLocation, setEventLocation] = useState("NG");
   const [addedCollections, setAddedCollections] = useState<Set<number>>(new Set());
 
-  const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
+  // Product and planner-service prices are stored in NGN; location is not a
+  // currency converter and must not relabel an NGN price as a foreign price.
+  const currency = { code: "NGN", symbol: "₦" };
   const familySizeParam = eventSize === "others" ? customSize : eventSize;
 
   const { data: collections = [], isLoading } = useQuery<EventCollection[]>({
@@ -159,7 +162,7 @@ export default function EventPlannerPage() {
 
   const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({
     key,
-    label: `${val.name} (${val.symbol})`,
+    label: val.name,
   }));
 
   function handleAddAllToCart(collection: EventCollection) {
@@ -189,9 +192,9 @@ export default function EventPlannerPage() {
             </div>
             <span className="text-white/80 font-medium text-sm uppercase tracking-wider">AfrolandX Event Planner</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black mb-3">Event Outfit Planner</h1>
+          <h1 className="text-3xl md:text-4xl font-black mb-3">Events, planned your way</h1>
           <p className="text-white/80 max-w-2xl text-base leading-relaxed">
-            Planning a special African occasion? Select your event and we'll curate the perfect traditional outfit collections for everyone attending.
+            Work with an approved planner for your occasion, or explore traditional outfit collections for everyone attending.
           </p>
           <div className="flex flex-wrap gap-3 mt-6">
             {[
@@ -217,6 +220,8 @@ export default function EventPlannerPage() {
           </div>
         </div>
       </div>
+
+      <EventServices />
 
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="text-center mb-8 sr-only">
@@ -253,7 +258,7 @@ export default function EventPlannerPage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                  Event Location (sets budget currency)
+                  Event location
                 </Label>
                 <Select value={eventLocation} onValueChange={setEventLocation}>
                   <SelectTrigger>

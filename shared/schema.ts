@@ -509,6 +509,67 @@ export const eventCollections = pgTable("event_collections", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Event planning is separate from product sales. Supplier estimates and planner
+// fee quotations are not collected by the site until a settlement flow is ready.
+export const eventPlannerProfiles = pgTable("event_planner_profiles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  businessName: varchar("business_name", { length: 160 }).notNull(),
+  location: varchar("location", { length: 160 }).notNull(),
+  description: text("description").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const eventPlans = pgTable("event_plans", {
+  id: serial("id").primaryKey(),
+  customerId: varchar("customer_id").notNull().references(() => users.id),
+  plannerId: integer("planner_id").notNull().references(() => eventPlannerProfiles.id),
+  title: varchar("title", { length: 160 }).notNull(),
+  eventType: varchar("event_type", { length: 80 }).notNull(),
+  eventDate: varchar("event_date", { length: 10 }).notNull(),
+  location: varchar("location", { length: 160 }).notNull(),
+  guestCount: integer("guest_count").notNull(),
+  budgetNgn: integer("budget_ngn"),
+  needs: text("needs").notNull(),
+  status: varchar("status", { length: 32 }).notNull().default("requested"),
+  quoteItems: jsonb("quote_items").notNull().default([]),
+  quoteVersion: integer("quote_version").notNull().default(0),
+  plannerFeeNgn: integer("planner_fee_ngn"),
+  commissionNgn: integer("commission_ngn"),
+  plannerNetNgn: integer("planner_net_ngn"),
+  quoteValidUntil: timestamp("quote_valid_until"),
+  // Reserved for a future verified checkout and settlement workflow.
+  paymentReference: varchar("payment_reference", { length: 100 }).unique(),
+  paidAt: timestamp("paid_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, table => [
+  index("event_plans_customer_idx").on(table.customerId),
+  index("event_plans_planner_idx").on(table.plannerId),
+]);
+
+export const eventPlannerEarnings = pgTable("event_planner_earnings", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventPlans.id).unique(),
+  plannerId: integer("planner_id").notNull().references(() => eventPlannerProfiles.id),
+  grossNgn: integer("gross_ngn").notNull(),
+  commissionNgn: integer("commission_ngn").notNull(),
+  netNgn: integer("net_ngn").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("commission_due"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventPlanMessages = pgTable("event_plan_messages", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => eventPlans.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, table => [index("event_plan_messages_event_idx").on(table.eventId)]);
+
 // ============================================
 // FEATURE 6: Cultural Story Capsules
 // ============================================
