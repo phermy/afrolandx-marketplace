@@ -5,6 +5,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import Navbar from '@/components/navbar';
 import VirtualTryOnSheet from '@/components/virtual-try-on-sheet';
+import LiveArSheet from '@/components/live-ar-sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,6 +28,7 @@ export default function ProductDetail() {
   const [imgError, setImgError] = useState(false);
   const [sizeError, setSizeError] = useState(false);
   const [tryOnOpen, setTryOnOpen] = useState(false);
+  const [liveArOpen, setLiveArOpen] = useState(false);
 
   const productId = params?.id ? parseInt(params.id) : null;
 
@@ -44,6 +46,19 @@ export default function ProductDetail() {
     queryFn: async () => {
       const response = await fetch(`/api/products/${productId}/try-on-eligibility`);
       if (!response.ok) throw new Error('Virtual Try-On availability is unavailable');
+      return response.json();
+    },
+    enabled: !!productId,
+    retry: false,
+  });
+  const { data: liveArAvailability } = useQuery<{
+    eligible: boolean;
+    asset?: { url: string; anchor: 'glasses' | 'headwear' | 'earrings' };
+  }>({
+    queryKey: ['/api/products', productId, 'live-ar-eligibility'],
+    queryFn: async () => {
+      const response = await fetch(`/api/products/${productId}/live-ar-eligibility`);
+      if (!response.ok) throw new Error('Live camera availability is unavailable');
       return response.json();
     },
     enabled: !!productId,
@@ -178,6 +193,14 @@ export default function ProductDetail() {
                 onClick={() => isAuthenticated ? setTryOnOpen(true) : setLocation('/login')}>
                 <Sparkles className="mr-2 h-4 w-4" />
                 Try it on
+              </Button>
+            )}
+            {liveArAvailability?.eligible && liveArAvailability.asset && isAvailable && (
+              <Button variant="outline" size="lg"
+                className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
+                onClick={() => isAuthenticated ? setLiveArOpen(true) : setLocation('/login')}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Try live camera preview
               </Button>
             )}
           </div>
@@ -328,6 +351,16 @@ export default function ProductDetail() {
             open={tryOnOpen}
             onOpenChange={setTryOnOpen}
             onAddToCart={() => { setTryOnOpen(false); handleAddToCart(); }}
+          />
+        )}
+        {liveArAvailability?.eligible && liveArAvailability.asset && (
+          <LiveArSheet
+            productName={product.name}
+            assetUrl={liveArAvailability.asset.url}
+            anchor={liveArAvailability.asset.anchor}
+            open={liveArOpen}
+            onOpenChange={setLiveArOpen}
+            onAddToCart={() => { setLiveArOpen(false); handleAddToCart(); }}
           />
         )}
       </div>

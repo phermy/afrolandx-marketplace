@@ -12,6 +12,7 @@ import { registerEventPlanningRoutes } from "./event-planning";
 import { getChatbotService } from "./chatbot";
 import { buildLookbookItems } from "./lookbook-generation";
 import { registerVirtualTryOnRoutes } from "./virtual-try-on";
+import { registerLiveArRoutes } from "./live-ar";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
@@ -258,6 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   registerVirtualTryOnRoutes(app);
+  registerLiveArRoutes(app);
   registerEventPlanningRoutes(app);
 
   // Geo/currency detection — proxied server-side to avoid CORS

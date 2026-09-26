@@ -275,3 +275,7 @@ Preferred communication style: Simple, everyday language.
 - Graceful degradation when services unavailable
 - Centralized service management with initialization functions
 - Feature flags for optional integrations (cloud storage, payments)
+
+### Try-on launch controls
+
+Both try-on experiences are built but default to hidden. Photo-based clothing Try-On uses a paid Replicate prediction and requires a funded, successful real-image test before setting `VIRTUAL_TRY_ON_ENABLED=true`. Live accessory camera preview runs face landmarks locally in the browser, not through the paid prediction provider; it remains hidden until `LIVE_AR_ENABLED=true` **and** `LIVE_AR_ASSETS` is configured. The latter is a JSON object keyed by approved product ID, for example `{"123":{"url":"https://your-cdn.example/transparent-earrings.png","anchor":"earrings"}}`. Allowed anchors are `earrings`, `glasses`, and `headwear`; use a curated transparent PNG or WebP pair/accessory aligned for a front-facing face. The server validates product, vendor, category, stock, image URL, and flag before exposing a button. Test camera tracking on real devices and obtain suitable transparent assets before enabling it; it is a 2D visual overlay, not 3D fitting or a size guarantee. Neither try-on experience is ready to launch just because its flag can be set.
