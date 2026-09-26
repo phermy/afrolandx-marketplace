@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { users, vendors } from "../shared/schema";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
+import { hasManualCacReview } from "./cac-review";
 
 const managedRoles = ["customer", "vendor", "admin", "superadmin"] as const;
 type ManagedRole = (typeof managedRoles)[number];
@@ -98,10 +99,11 @@ export async function approveVendorWithRole(actorId: string, vendorId: number) {
     const { target } = await lockVerifiedSuperadminAndTarget(tx, actorId, record.userId);
     assertRoleTargetMutable(actorId, record.userId, target.email);
     const locked = await tx.execute(sql`
-      SELECT verification_status FROM vendors WHERE id = ${vendorId} FOR UPDATE
+      SELECT verification_status, verification_notes FROM vendors WHERE id = ${vendorId} FOR UPDATE
     `);
-    if (locked.rows[0]?.verification_status !== "verified") {
-      throw new RoleManagementError("CAC, identity, and business verification must be completed before approval.");
+    if (locked.rows[0]?.verification_status !== "verified" ||
+      !hasManualCacReview(locked.rows[0]?.verification_notes as string | null)) {
+      throw new RoleManagementError("Complete a documented review using CAC Public Search before approval.");
     }
     const [updated] = await tx.update(vendors).set({ status: "approved", updatedAt: new Date() })
       .where(eq(vendors.id, vendorId)).returning();

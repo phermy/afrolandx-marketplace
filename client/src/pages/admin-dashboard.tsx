@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
 import { trackEvent } from '@/lib/analytics';
+import { cacBusinessNamesMatch } from '@shared/cac-review';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -59,6 +60,10 @@ export default function AdminDashboard() {
   const [reviewVendor, setReviewVendor] = useState<any | null>(null);
   const [verificationChecks, setVerificationChecks] = useState({ cacVerified: false, identityVerified: false, businessVerified: false });
   const [verificationNotes, setVerificationNotes] = useState('');
+  const [cacRegisteredName, setCacRegisteredName] = useState('');
+  const [cacRegistryStatus, setCacRegistryStatus] = useState('');
+  const [relationshipConfirmed, setRelationshipConfirmed] = useState(false);
+  const [relationshipEvidence, setRelationshipEvidence] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
@@ -174,18 +179,25 @@ export default function AdminDashboard() {
   });
 
   const verifyVendorMutation = useMutation({
-    mutationFn: async (vendorId: number) => {
+    mutationFn: async ({ vendorId, decision }: { vendorId: number; decision: 'verified' | 'rejected' }) => {
       const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/verification`, {
-        ...verificationChecks,
+        ...(decision === 'verified' ? {
+          ...verificationChecks,
+          cacRegisteredName,
+          cacRegistryStatus,
+          relationshipConfirmed,
+          relationshipEvidence,
+        } : {}),
         notes: verificationNotes,
-        decision: 'verified',
+        decision,
       });
       return response.json();
     },
     onSuccess: (updated) => {
       setReviewVendor((current: any) => current?.id === updated.id ? { ...current, ...updated } : current);
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
-      toast({ title: 'Verification recorded', description: 'You can now approve this vendor.' });
+      toast({ title: updated.verificationStatus === 'verified' ? 'Verification recorded' : 'Verification rejected',
+        description: updated.verificationStatus === 'verified' ? 'You can now approve this vendor.' : 'The vendor cannot be approved until a new review passes.' });
     },
     onError: (error: Error) => toast({ title: 'Verification not recorded', description: error.message, variant: 'destructive' }),
   });
@@ -1370,6 +1382,10 @@ export default function AdminDashboard() {
                               setReviewVendor(vendor);
                               setVerificationChecks({ cacVerified: false, identityVerified: false, businessVerified: false });
                               setVerificationNotes('');
+                              setCacRegisteredName('');
+                              setCacRegistryStatus('');
+                              setRelationshipConfirmed(false);
+                              setRelationshipEvidence('');
                             }}>
                               <Eye className="w-3 h-3 mr-1" />Review
                             </Button>
@@ -1900,13 +1916,54 @@ export default function AdminDashboard() {
                 <div className="space-y-3">
                   <h3 className="flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Business verification</h3>
                   <p className="text-sm text-gray-600">CAC number: <span className="font-medium text-gray-800">{reviewVendor.cacNumber || 'Not provided'}</span></p>
-                  {reviewVendor.verificationStatus !== 'verified' && (
+                  <a href="https://icrp.cac.gov.ng/public-search/" target="_blank" rel="noopener noreferrer"
+                    className="inline-flex text-sm font-medium text-[#176847] underline underline-offset-2">
+                    Open official CAC Public Search <ArrowUpRight className="ml-1 h-4 w-4" />
+                  </a>
+                  <p className="text-sm text-gray-600">Search by RC number on CAC’s site. Compare the number, registered name, and listing status with this vendor. This is a manual review, not an automatic CAC lookup.</p>
+                  {reviewVendor.verificationNotes && (
+                    <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                      <p className="text-xs font-medium text-gray-600">Previous review record</p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-700">{reviewVendor.verificationNotes}</p>
+                    </div>
+                  )}
+                  {reviewVendor.verificationStatus === 'verified' && !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This vendor was verified before documented CAC public search checks were required. Review the listing again before approval or reactivation.</p>
+                  )}
+                  {(reviewVendor.verificationStatus !== 'verified' || !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1')) && (
                     <>
                       <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
-                        Check each item against independent evidence before recording verification. These checkboxes do not verify a registry automatically.
+                        Do not mark a vendor verified if the CAC number is missing, belongs to an unrelated business, or the listing is not active.
                       </p>
+                      <label className="block text-sm font-medium">Registered name shown on CAC
+                        <Input className="mt-1" value={cacRegisteredName} maxLength={160}
+                          onChange={event => setCacRegisteredName(event.target.value)} placeholder="Enter the exact registered name" />
+                      </label>
+                      <label className="block text-sm font-medium">Status shown on CAC
+                        <select className="mt-1 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm"
+                          value={cacRegistryStatus} onChange={event => setCacRegistryStatus(event.target.value)}>
+                          <option value="">Select the listing status</option>
+                          <option value="active">Active</option>
+                          <option value="not-active">Not active</option>
+                          <option value="not-found">Number not found</option>
+                        </select>
+                      </label>
+                      {cacRegisteredName.trim() && !cacBusinessNamesMatch(cacRegisteredName, reviewVendor.businessName) && (
+                        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm text-amber-900">The registered name differs from the vendor’s business name. Only continue if documents prove the registered business operates this shop; otherwise reject this review.</p>
+                          <label className="flex items-start gap-2 text-sm">
+                            <Checkbox checked={relationshipConfirmed} onCheckedChange={value => setRelationshipConfirmed(value === true)} />
+                            I checked documents linking the registered business to this vendor.
+                          </label>
+                          <label className="block text-sm font-medium">Evidence of the relationship
+                            <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal"
+                              maxLength={1000} value={relationshipEvidence} onChange={event => setRelationshipEvidence(event.target.value)}
+                              placeholder="Describe which document links this legal entity to the shop" />
+                          </label>
+                        </div>
+                      )}
                       {([
-                        { key: 'cacVerified', label: 'I checked the CAC registration' },
+                        { key: 'cacVerified', label: 'I compared this number and registered name on the official CAC search' },
                         { key: 'identityVerified', label: 'I checked the owner identity' },
                         { key: 'businessVerified', label: 'I checked the business details' },
                       ] as const).map(({ key, label }) => (
@@ -1917,16 +1974,28 @@ export default function AdminDashboard() {
                           {label}
                         </label>
                       ))}
-                      <label className="block text-sm font-medium">Review notes
-                        <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal" maxLength={3000}
-                          value={verificationNotes} onChange={event => setVerificationNotes(event.target.value)} />
-                      </label>
-                      <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber || !Object.values(verificationChecks).every(Boolean)}
-                        onClick={() => verifyVendorMutation.mutate(reviewVendor.id)}>
+                      <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber ||
+                        !Object.values(verificationChecks).every(Boolean) || cacRegisteredName.trim().length < 2 ||
+                        cacRegistryStatus !== 'active' || (!cacBusinessNamesMatch(cacRegisteredName, reviewVendor.businessName) &&
+                          (!relationshipConfirmed || relationshipEvidence.trim().length < 20))}
+                        onClick={() => verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'verified' })}>
                         {verifyVendorMutation.isPending ? 'Saving…' : 'Record verification'}
                       </Button>
                     </>
                   )}
+                  <label className="block text-sm font-medium">Review notes or reason for rejection
+                    <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal" maxLength={1500}
+                      value={verificationNotes} onChange={event => setVerificationNotes(event.target.value)}
+                      placeholder="If the number is wrong or the registered business does not match, explain what needs correcting." />
+                  </label>
+                  <Button size="sm" variant="destructive" disabled={verifyVendorMutation.isPending || verificationNotes.trim().length < 10}
+                    onClick={() => {
+                      if (reviewVendor.status === 'approved' &&
+                        !window.confirm('Rejecting this verification will suspend this vendor from selling. Continue?')) return;
+                      verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'rejected' });
+                    }}>
+                    {reviewVendor.verificationStatus === 'verified' ? 'Revoke verification' : 'Reject verification'}
+                  </Button>
                 </div>
                 <Separator />
                 <div>
@@ -1958,7 +2027,8 @@ export default function AdminDashboard() {
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
                 <Button className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                   disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                     !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
                     !hasRole(user, 'superadmin') || !user?.emailVerified}
                   title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can approve vendors.' : undefined}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
@@ -1974,7 +2044,8 @@ export default function AdminDashboard() {
             )}
             {reviewVendor?.status === 'suspended' && (
               <Button className="bg-green-600 hover:bg-green-700 text-white"
-                disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                 disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                   !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
                   !hasRole(user, 'superadmin') || !user?.emailVerified}
                 title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can reactivate vendors.' : undefined}
                 onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>

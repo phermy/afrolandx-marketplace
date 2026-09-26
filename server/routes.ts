@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
+import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
@@ -773,17 +774,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: z.string().trim().min(10).max(2000).optional(),
       }).parse(req.body);
       if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
-      if (profile.cacNumber !== undefined
-        && profile.cacNumber !== vendor.cacNumber
-        && vendor.verificationStatus === 'verified') {
-        return res.status(409).json({ message: 'A verified CAC number cannot be changed here. Contact support for a new verification review.' });
-      }
-      await storage.updateVendorProfile(vendor.id, profile);
-      const updated = await storage.getVendorByUserId(userId);
+      const updated = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT id FROM vendors WHERE id = ${vendor.id} FOR UPDATE`);
+        const [current] = await tx.select().from(vendors).where(eq(vendors.id, vendor.id));
+        if (!current) throw new RoleManagementError('Vendor not found', 404);
+        const registrationChanged = (profile.cacNumber !== undefined && profile.cacNumber !== current.cacNumber)
+          || (profile.businessName !== undefined && profile.businessName !== current.businessName);
+        if (registrationChanged && current.verificationStatus === 'verified') {
+          throw new RoleManagementError('A verified CAC number or business name cannot be changed here. Contact support for a new verification review.');
+        }
+        const [saved] = await tx.update(vendors).set({ ...profile, updatedAt: new Date() })
+          .where(eq(vendors.id, vendor.id)).returning();
+        return saved;
+      });
       res.json(updated);
     } catch (error) {
-      console.error('Error updating vendor profile:', error);
+      if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid vendor profile', errors: error.errors });
+      console.error('Error updating vendor profile:', error);
       res.status(500).json({ message: 'Failed to update vendor profile' });
     }
   });
@@ -936,8 +944,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const vendor = await storage.getVendor(vendorId);
       if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-      if (status === 'approved' && vendor.verificationStatus !== 'verified') {
-        return res.status(409).json({ message: 'CAC, identity, and business verification must be completed before approval' });
+      if (status === 'approved' && (vendor.verificationStatus !== 'verified' || !hasManualCacReview(vendor.verificationNotes))) {
+        return res.status(409).json({ message: 'Complete a documented review using CAC Public Search before approval' });
       }
       if (status === 'approved') {
         const updatedVendor = await approveVendorWithRole((req.user as any).id, vendorId);
@@ -957,28 +965,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/admin/vendors/:id/verification', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const vendorId = Number(req.params.id);
-      const vendor = await storage.getVendor(vendorId);
-      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-      const input = z.object({
-        cacVerified: z.boolean(),
-        identityVerified: z.boolean(),
-        businessVerified: z.boolean(),
-        notes: z.string().trim().max(3000).optional().default(''),
-        decision: z.enum(['verified', 'rejected']),
-      }).parse(req.body);
-      if (input.decision === 'verified' && (!vendor.cacNumber || !input.cacVerified || !input.identityVerified || !input.businessVerified)) {
-        return res.status(400).json({ message: 'A CAC number and all three verification checks are required' });
-      }
-      const [updated] = await db.update(vendors).set({
-        verificationStatus: input.decision,
-        cacVerifiedAt: input.cacVerified ? new Date() : null,
-        identityVerifiedAt: input.identityVerified ? new Date() : null,
-        businessVerifiedAt: input.businessVerified ? new Date() : null,
-        verificationNotes: input.notes || null,
-        updatedAt: new Date(),
-      }).where(eq(vendors.id, vendorId)).returning();
+      if (!Number.isSafeInteger(vendorId) || vendorId <= 0) return res.status(400).json({ message: 'Invalid vendor ID' });
+      const input = cacReviewSchema.parse(req.body);
+      const { updated, userId } = await db.transaction(async tx => {
+        await tx.execute(sql`SELECT id FROM vendors WHERE id = ${vendorId} FOR UPDATE`);
+        const [vendor] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
+        if (!vendor) throw new RoleManagementError('Vendor not found', 404);
+        const now = new Date();
+        let reviewNotes: string;
+        try {
+          reviewNotes = cacReviewNotes(vendor, input, (req.user as any).id, now);
+        } catch (error) {
+          throw new RoleManagementError(error instanceof Error ? error.message : 'Invalid CAC review', 400);
+        }
+        const verified = input.decision === 'verified';
+        const [updated] = await tx.update(vendors).set({
+          verificationStatus: input.decision,
+          cacVerifiedAt: verified ? now : null,
+          identityVerifiedAt: verified ? now : null,
+          businessVerifiedAt: verified ? now : null,
+          verificationNotes: [vendor.verificationNotes, reviewNotes].filter(Boolean).join('\n\n---\n\n'),
+          status: !verified && vendor.status === 'approved' ? 'suspended' : vendor.status,
+          updatedAt: now,
+        }).where(eq(vendors.id, vendorId)).returning();
+        return { updated, userId: vendor.userId };
+      });
       await storage.createNotification({
-        userId: vendor.userId,
+        userId,
         type: 'vendor_verification',
         title: input.decision === 'verified' ? 'Vendor verification completed' : 'Vendor verification needs attention',
         message: input.decision === 'verified'
@@ -987,6 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(updated);
     } catch (error) {
+      if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Complete the verification checklist' });
       console.error('Error reviewing vendor verification:', error);
       res.status(500).json({ message: 'Failed to update vendor verification' });

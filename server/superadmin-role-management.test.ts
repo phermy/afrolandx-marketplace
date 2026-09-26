@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
 import { users, vendors } from "../shared/schema";
+import { cacReviewNotes, cacReviewSchema } from "./cac-review";
 import {
   approveVendorWithRole, assertRoleTargetMutable, lockVerifiedSuperadminAndTarget,
   RoleManagementError, updateManagedRoles,
@@ -46,6 +47,17 @@ test("vendor approval grants the role atomically only while the actor is a super
       (error: unknown) => error instanceof RoleManagementError && error.status === 403);
     const [stillPending] = await db.select().from(vendors).where(eq(vendors.id, vendorId));
     assert.equal(stillPending.status, "pending");
+    await assert.rejects(approveVendorWithRole(ownerId, vendorId),
+      (error: unknown) => error instanceof RoleManagementError && /documented review/.test(error.message));
+    const reviewNotes = cacReviewNotes(
+      { cacNumber: "RC 123456", businessName: "Role approval test" },
+      cacReviewSchema.parse({
+        decision: "verified", cacVerified: true, identityVerified: true, businessVerified: true,
+        cacRegisteredName: "Role approval test", cacRegistryStatus: "active",
+      }),
+      ownerId, new Date(),
+    );
+    await db.update(vendors).set({ cacNumber: "RC 123456", verificationNotes: reviewNotes }).where(eq(vendors.id, vendorId));
     const approved = await approveVendorWithRole(ownerId, vendorId);
     assert.equal(approved.status, "approved");
     const [target] = await db.select().from(users).where(eq(users.id, targetId));
