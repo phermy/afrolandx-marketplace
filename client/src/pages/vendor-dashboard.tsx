@@ -32,6 +32,17 @@ type VariantDraft = {
   stock: string;
 };
 
+const PRODUCT_TYPES_BY_CATEGORY: Record<string, string[]> = {
+  footwear: [
+    'Leather shoes', 'Sandals', 'Slippers', 'School shoes',
+    'Safety boots', 'Sneakers', 'Corporate shoes',
+  ],
+  accessories: [
+    'Handbags', 'Backpacks', 'Wallets', 'Purses',
+    'Belts', 'Briefcases', 'Laptop bags', 'Travel bags',
+  ],
+};
+
 export default function VendorDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -39,6 +50,7 @@ export default function VendorDashboard() {
   const hasVendorRole = isVendor(user);
   const [isRegistering, setIsRegistering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedProductType, setSelectedProductType] = useState<string>('');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ contactName: '', businessName: '', phone: '', cacNumber: '', description: '' });
@@ -98,6 +110,9 @@ export default function VendorDashboard() {
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
+  const productTypeOptions = PRODUCT_TYPES_BY_CATEGORY[
+    categories.find(category => String(category.id) === selectedCategory)?.slug || ''
+  ] || [];
 
   // Fetch vendor's own products (all statuses)
   const { data: products = [] } = useQuery<Product[]>({
@@ -358,6 +373,7 @@ export default function VendorDashboard() {
     setAddFiles([]);
     setAddPreviews([]);
     setSelectedCategory('');
+    setSelectedProductType('');
     setSelectedGender('');
     setCustomCategoryName('');
     setAddImageMode('upload');
@@ -432,6 +448,7 @@ export default function VendorDashboard() {
         stock: current.stock || '1',
       }));
       setSelectedCategory(String(suggestion.categoryId));
+      setSelectedProductType('');
       trackEvent('ai_listing_generated', { source: 'vendor', category_id: suggestion.categoryId });
       toast({ title: 'Listing draft generated', description: 'Review the wording, then enter your price before saving.' });
     },
@@ -497,6 +514,10 @@ export default function VendorDashboard() {
       return;
     }
     const tags = addForm.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    const productType = productTypeOptions.includes(selectedProductType) ? selectedProductType : '';
+    if (productType && !tags.some(tag => tag.toLowerCase() === productType.toLowerCase())) {
+      tags.push(productType);
+    }
     if (tags.length > 30) {
       toast({ title: "Too many tags", description: "Use no more than 30 keywords.", variant: "destructive" });
       return;
@@ -515,8 +536,9 @@ export default function VendorDashboard() {
     fd.set('name', addForm.name.trim());
     fd.set('shortDescription', addForm.shortDescription.trim());
     fd.set('categoryId', catId);
-    fd.set('description', isOthersCategory && customCategoryName.trim()
-      ? `[Product type: ${customCategoryName.trim()}]\n\n${addForm.description.trim()}`
+    const typeLabel = isOthersCategory ? customCategoryName.trim() : productType;
+    fd.set('description', typeLabel
+      ? `[Product type: ${typeLabel}]\n\n${addForm.description.trim()}`
       : addForm.description.trim());
     fd.set('price', addForm.price);
     if (addForm.compareAtPrice.trim()) fd.set('compareAtPrice', addForm.compareAtPrice.trim());
@@ -1454,13 +1476,18 @@ export default function VendorDashboard() {
             {/* Category */}
             <div className="space-y-1.5">
               <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select value={selectedCategory} onValueChange={value => {
+                setSelectedCategory(value);
+                setSelectedProductType('');
+              }}>
                 <SelectTrigger className="input-nigerian">
                   <SelectValue placeholder="What type of product is this?" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.slug === 'footwear' ? 'Shoes & Footwear' : c.name}
+                    </SelectItem>
                   ))}
                   {!categories.some(c => c.name.toLowerCase() === 'others') && (
                     <SelectItem value="others">Others</SelectItem>
@@ -1476,6 +1503,26 @@ export default function VendorDashboard() {
                 />
               )}
             </div>
+
+            {productTypeOptions.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="vendor-product-type" className="font-semibold">Product type <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <p className="text-xs text-gray-500">
+                  {selectedCategory && categories.find(c => String(c.id) === selectedCategory)?.slug === 'footwear'
+                    ? 'Choose a shoe type, or leave blank for another kind of footwear.'
+                    : 'Choose a leather good, or leave blank for another accessory.'}
+                </p>
+                <select
+                  id="vendor-product-type"
+                  value={selectedProductType}
+                  onChange={event => setSelectedProductType(event.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                >
+                  <option value="">Select a product type</option>
+                  {productTypeOptions.map(type => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Gender / Audience */}
             <div className="space-y-1.5">
