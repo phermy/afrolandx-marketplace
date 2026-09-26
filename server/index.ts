@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializePaystack } from "./paystack";
 import { initializeCloudStorage } from "./cloudStorage";
 import { storage } from "./storage";
+import { bootstrappedAdminRoles } from "./admin-role-bootstrap";
 import { db } from "./db";
 import {
   users,
@@ -159,17 +160,21 @@ app.use((req, res, next) => {
     log(`Legacy demo storefront cleanup failed: ${error}`);
   }
   
-  // Ensure designated admin accounts have admin role on every boot
+  // Bootstrap only the designated, verified owner as superadmin. Never
+  // expose promotion through the ordinary admin role-management APIs.
   const adminEmails = ["femi.elegbeleye@afrolandx.com", "oluwaseun.alo@afrolandx.com"];
+  const superadminEmail = "femi.elegbeleye@afrolandx.com";
   for (const email of adminEmails) {
     try {
       const user = await storage.getUserByEmail(email);
       if (user) {
-        const roles: string[] = Array.isArray(user.roles) ? user.roles as string[] : ["customer"];
-        if (!roles.includes("admin")) {
-          roles.push("admin");
-          await db.update(users).set({ roles }).where(eq(users.email, email));
-          log(`Admin role granted to ${email}`);
+        const currentRoles: string[] = Array.isArray(user.roles)
+          ? user.roles.filter((role): role is string => typeof role === "string")
+          : [];
+        const roles = bootstrappedAdminRoles(user.roles, email === superadminEmail && user.emailVerified === true);
+        if (roles.length !== currentRoles.length || roles.some(role => !currentRoles.includes(role))) {
+          await db.update(users).set({ roles }).where(eq(users.id, user.id));
+          log("Designated account roles synchronized");
         }
       }
     } catch (e) {
