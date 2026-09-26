@@ -287,6 +287,18 @@ export default function VendorDashboard() {
     },
   });
 
+  const updatePendingCacMutation = useMutation({
+    mutationFn: async (cacNumber: string) => {
+      const res = await apiRequest("PATCH", "/api/vendors/me", { cacNumber });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] });
+      toast({ title: "Registration number saved", description: "An administrator must verify your details before your shop can be approved." });
+    },
+    onError: (error: Error) => toast({ title: "Could not save registration number", description: error.message, variant: "destructive" }),
+  });
+
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
       const res = await apiRequest("PATCH", `/api/products/${id}`, data);
@@ -638,7 +650,7 @@ export default function VendorDashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="cacNumber">Business registration / CAC number <span className="text-gray-500 font-normal">(Optional)</span></Label>
+                    <Label htmlFor="cacNumber">Business registration / CAC number <span className="text-gray-500 font-normal">(required before approval)</span></Label>
                     <Input
                       id="cacNumber"
                       name="cacNumber"
@@ -695,6 +707,20 @@ export default function VendorDashboard() {
                 Thank you for your vendor application! Our admin team is reviewing your submission. 
                 You'll receive an email notification once your application is approved.
               </p>
+              <p className="text-sm text-gray-600 mb-4">
+                A CAC registration number and administrator verification are required before you can upload products or sell.
+              </p>
+              <form className="mb-6 space-y-2 text-left" onSubmit={event => {
+                event.preventDefault();
+                const value = String(new FormData(event.currentTarget).get("cacNumber") || "").trim();
+                if (value) updatePendingCacMutation.mutate(value);
+              }}>
+                <Label htmlFor="pendingCacNumber">Business registration / CAC number</Label>
+                <Input id="pendingCacNumber" name="cacNumber" defaultValue={vendor.cacNumber || ""} minLength={3} maxLength={60} required />
+                <Button type="submit" variant="outline" disabled={updatePendingCacMutation.isPending}>
+                  {updatePendingCacMutation.isPending ? "Saving…" : "Save registration number"}
+                </Button>
+              </form>
               <Badge variant="secondary" className="badge-pending mb-6 block w-fit mx-auto">
                 Status: Pending Approval
               </Badge>
@@ -1359,13 +1385,13 @@ export default function VendorDashboard() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="editCacNumber">Business registration / CAC number <span className="text-gray-500 font-normal">(Optional)</span></Label>
+                        <Label htmlFor="editCacNumber">Business registration / CAC number</Label>
                       <Input
                         id="editCacNumber"
                         value={profileForm.cacNumber}
                         onChange={(e) => setProfileForm(f => ({ ...f, cacNumber: e.target.value }))}
                         className="input-nigerian"
-                        required
+                          disabled={vendor?.verificationStatus === "verified"}
                       />
                     </div>
                     <div>

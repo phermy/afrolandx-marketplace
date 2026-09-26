@@ -5,6 +5,7 @@
 - [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — every carrier requires a confirmed quote before payment, then locks into one server-priced order
 - [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
 - [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
+- [Product image durability](product-image-durability.md) — production uploads must not claim success by falling back to temporary local storage
 - [Vendor settlement accounting](vendor-settlement-accounting.md) — commission is 8% of merchandise only; immutable vendor ledger entries drive refunds, availability, and payouts
 - [Identity-preserving portraits](identity-preserving-portraits.md) — for real-person edits, keep original subject pixels; generative edits can redraw faces despite strict prompts
 - [Hyphen-free website copy](hyphen-free-copy.md) — rewrite visible phrases grammatically instead of just deleting hyphens; keep technical values and proper names intact

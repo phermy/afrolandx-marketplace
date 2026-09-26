@@ -703,6 +703,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: z.string().trim().min(10).max(2000).optional(),
       }).parse(req.body);
       if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
+      if (profile.cacNumber !== undefined
+        && profile.cacNumber !== vendor.cacNumber
+        && vendor.verificationStatus === 'verified') {
+        return res.status(409).json({ message: 'A verified CAC number cannot be changed here. Contact support for a new verification review.' });
+      }
       await storage.updateVendorProfile(vendor.id, profile);
       const updated = await storage.getVendorByUserId(userId);
       res.json(updated);
@@ -986,6 +991,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+      return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
+    }
     const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
     
     uploadHandler(req, res, async (err) => {
@@ -1046,6 +1054,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Saved ${imageUrls.length} image(s) locally via diskStorage`);
             }
           } catch (error: any) {
+            if (process.env.NODE_ENV === 'production') {
+              console.error('Product image upload failed; refusing temporary local storage:', error);
+              return res.status(503).json({ message: 'Product image storage is unavailable. Your product was not saved. Please try again later.' });
+            }
             console.error('Cloud storage failed, falling back to local storage:', error);
             
             // Check if it's an AWS credential issue and provide specific feedback
@@ -1339,6 +1351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Vendor: upload additional images to an existing product
   app.post('/api/products/:id/images', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+      return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
+    }
     const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
     uploadHandler(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });
@@ -1385,6 +1400,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } catch (uploadErr: any) {
+          if (process.env.NODE_ENV === 'production') {
+            console.error('Product image upload failed; refusing temporary local storage:', uploadErr);
+            return res.status(503).json({ message: 'Product image storage is unavailable. No images were added. Please try again later.' });
+          }
           // Fallback to local
           const fs = await import('fs');
           const path = await import('path');

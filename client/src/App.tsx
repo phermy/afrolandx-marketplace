@@ -134,6 +134,12 @@ function Router() {
       <Route path="/checkout">
         {isAuthenticated ? <Checkout /> : <AuthRedirect to="/login" />}
       </Route>
+      <Route path="/vendor/workshop">
+        {isAuthenticated ? <VendorWorkshop /> : <AuthRedirect to="/login" />}
+      </Route>
+      <Route path="/vendor">
+        {isAuthenticated ? <VendorDashboard /> : <AuthRedirect to="/login" />}
+      </Route>
 
       {/* Authenticated-only pages */}
       {isAuthenticated ? (
@@ -143,9 +149,7 @@ function Router() {
           <Route path="/measurements" component={Measurements} />
           <Route path="/messages" component={Messages} />
           <Route path="/loyalty" component={Loyalty} />
-          <Route path="/vendor/workshop" component={VendorWorkshop} />
           <Route path="/order-success" component={OrderSuccess} />
-          <Route path="/vendor" component={VendorDashboard} />
         </>
       ) : null}
 

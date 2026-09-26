@@ -19,7 +19,8 @@ export interface Vendor {
   phone?: string;
   cacNumber?: string;
   description?: string;
-  status: 'pending' | 'approved' | 'suspended';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  verificationStatus: 'pending' | 'submitted' | 'verified' | 'rejected';
   createdAt: string;
   updatedAt: string;
 }

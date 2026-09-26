@@ -48,6 +48,8 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
   const [reviewVendor, setReviewVendor] = useState<any | null>(null);
+  const [verificationChecks, setVerificationChecks] = useState({ cacVerified: false, identityVerified: false, businessVerified: false });
+  const [verificationNotes, setVerificationNotes] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
@@ -157,6 +159,23 @@ export default function AdminDashboard() {
       if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
       toast({ title: 'Error', description: 'Failed to update vendor.', variant: 'destructive' });
     },
+  });
+
+  const verifyVendorMutation = useMutation({
+    mutationFn: async (vendorId: number) => {
+      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/verification`, {
+        ...verificationChecks,
+        notes: verificationNotes,
+        decision: 'verified',
+      });
+      return response.json();
+    },
+    onSuccess: (updated) => {
+      setReviewVendor((current: any) => current?.id === updated.id ? { ...current, ...updated } : current);
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      toast({ title: 'Verification recorded', description: 'You can now approve this vendor.' });
+    },
+    onError: (error: Error) => toast({ title: 'Verification not recorded', description: error.message, variant: 'destructive' }),
   });
 
   const toggleFeaturedMutation = useMutation({
@@ -1274,12 +1293,16 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                            <Button size="sm" variant="outline" onClick={() => setReviewVendor(vendor)}>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setReviewVendor(vendor);
+                              setVerificationChecks({ cacVerified: false, identityVerified: false, businessVerified: false });
+                              setVerificationNotes('');
+                            }}>
                               <Eye className="w-3 h-3 mr-1" />Review
                             </Button>
                             {vendor.status === 'pending' && (
                               <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified'} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                   <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
                                 <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>
@@ -1291,7 +1314,7 @@ export default function AdminDashboard() {
                               <Button size="sm" variant="outline" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>Suspend</Button>
                             )}
                             {vendor.status === 'suspended' && (
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified'} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                 <CheckCircle className="w-3 h-3 mr-1" />Reactivate
                               </Button>
                             )}
@@ -1689,6 +1712,36 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <Separator />
+                <div className="space-y-3">
+                  <h3 className="font-semibold flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Business verification</h3>
+                  <p className="text-sm text-gray-600">CAC number: {reviewVendor.cacNumber || 'Not provided'} · Status: {reviewVendor.verificationStatus || 'pending'}</p>
+                  {reviewVendor.verificationStatus !== 'verified' && (
+                    <>
+                      <p className="text-sm text-amber-800">Check each item against independent evidence before recording verification. These checkboxes do not verify a registry automatically.</p>
+                      {([
+                        { key: 'cacVerified', label: 'I checked the CAC registration' },
+                        { key: 'identityVerified', label: 'I checked the owner identity' },
+                        { key: 'businessVerified', label: 'I checked the business details' },
+                      ] as const).map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={verificationChecks[key]} onCheckedChange={checked =>
+                            setVerificationChecks(current => ({ ...current, [key]: checked === true }))
+                          } />
+                          {label}
+                        </label>
+                      ))}
+                      <label className="block text-sm">Review notes
+                        <textarea className="mt-1 w-full rounded border p-2" maxLength={3000}
+                          value={verificationNotes} onChange={event => setVerificationNotes(event.target.value)} />
+                      </label>
+                      <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber || !Object.values(verificationChecks).every(Boolean)}
+                        onClick={() => verifyVendorMutation.mutate(reviewVendor.id)}>
+                        {verifyVendorMutation.isPending ? 'Saving…' : 'Record verification'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <Separator />
                 <div>
                   <h3 className="font-semibold mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Compliance Checklist</h3>
                   <div className="space-y-2">
@@ -1717,7 +1770,7 @@ export default function AdminDashboard() {
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+                <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified'}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                   <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
                 </Button>
@@ -1730,7 +1783,7 @@ export default function AdminDashboard() {
               </Button>
             )}
             {reviewVendor?.status === 'suspended' && (
-              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified'}
                 onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                 <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
               </Button>
