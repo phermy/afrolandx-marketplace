@@ -2,6 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
 import { lockApprovedProductReferences } from "./product-reference-lock";
@@ -1189,6 +1190,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(400).json({ message: 'Tags must be a valid list of up to 30 keywords' });
           }
         }
+        if (tags.some(tag => tag.startsWith(SUBCATEGORY_TAG_PREFIX))) {
+          return res.status(400).json({ message: 'Choose a subcategory using the subcategory field' });
+        }
+        if (req.body.subcategorySlug) {
+          const selected = findSubcategory(req.body.subcategorySlug);
+          const category = (await storage.getCategories()).find(item => item.id === Number(req.body.categoryId));
+          if (!selected || !category || selected.parentSlug !== category.slug) {
+            return res.status(400).json({ message: 'Select a subcategory within the chosen category' });
+          }
+          if (tags.length === 30) return res.status(400).json({ message: 'Use no more than 29 keywords with a subcategory' });
+          tags.push(subcategoryTag(selected.slug));
+        }
         let variants: Array<{ size?: string; color?: string; pattern?: string; sku?: string; stock: number }> = [];
         if (req.body.variants) {
           try {
@@ -1262,6 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const {
         categoryId, 
+        subcategory,
         vendorId, 
         featured, 
         search, 
@@ -1273,6 +1287,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const filters: any = { status: 'approved' };
       if (categoryId) filters.categoryId = parseInt(categoryId as string);
+      if (subcategory !== undefined) {
+        if (typeof subcategory !== 'string') return res.status(400).json({ message: 'Invalid subcategory' });
+        const selected = findSubcategory(subcategory);
+        if (!selected) return res.status(400).json({ message: 'Invalid subcategory' });
+        const parent = (await storage.getCategories()).find(item => item.slug === selected.parentSlug);
+        if (!parent || (categoryId && Number(categoryId) !== parent.id)) {
+          return res.status(400).json({ message: 'Subcategory does not match category' });
+        }
+        filters.categoryId = parent.id;
+        filters.subcategory = selected.slug;
+      }
       if (vendorId) filters.vendorId = parseInt(vendorId as string);
       if (featured) filters.featured = featured === 'true';
       if (search) filters.search = search as string;
@@ -1368,9 +1393,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (tags !== undefined) {
         try {
           updates.tags = z.array(z.string().trim().min(1).max(60)).max(30).parse(typeof tags === 'string' ? JSON.parse(tags) : tags);
+          if ((updates.tags as string[]).some(tag => tag.startsWith(SUBCATEGORY_TAG_PREFIX))) {
+            return res.status(400).json({ message: 'Choose a subcategory using the subcategory field' });
+          }
         } catch {
           return res.status(400).json({ message: 'Tags must be a valid list of up to 30 keywords' });
         }
+      }
+      if (req.body.subcategorySlug !== undefined || tags !== undefined) {
+        const slug = req.body.subcategorySlug;
+        const baseTags = ((updates.tags ?? product.tags) as string[] || []).filter(
+          tag => typeof tag === 'string' && !tag.startsWith(SUBCATEGORY_TAG_PREFIX)
+        );
+        if (slug !== undefined && slug !== '') {
+          const selected = typeof slug === 'string' ? findSubcategory(slug) : undefined;
+          const category = (await storage.getCategories()).find(item => item.id === product.categoryId);
+          if (!selected || !category || selected.parentSlug !== category.slug) {
+            return res.status(400).json({ message: 'Select a subcategory within the product category' });
+          }
+          baseTags.push(subcategoryTag(selected.slug));
+        } else if (slug === undefined) {
+          const existing = (product.tags as string[] || []).find(tag => typeof tag === 'string' && tag.startsWith(SUBCATEGORY_TAG_PREFIX));
+          if (existing) baseTags.push(existing);
+        }
+        if (baseTags.length > 30) return res.status(400).json({ message: 'Use no more than 30 tags' });
+        updates.tags = baseTags;
       }
       if (variants !== undefined) {
         try {

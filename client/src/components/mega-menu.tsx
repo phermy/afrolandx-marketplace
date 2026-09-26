@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { ChevronDown, X } from 'lucide-react';
+import { subcategoriesFor } from '@shared/product-subcategories';
 
 interface MenuLink { label: string; href: string; }
 interface MenuColumn { heading: string; links: MenuLink[]; }
@@ -18,6 +19,9 @@ const MENU: Record<string, MenuSection> = {
         heading: 'Traditional Dresses',
         links: [
           { label: "Shop all women's styles", href: '/products?gender=women' },
+          { label: 'African office wear', href: '/products?subcategory=office-wear' },
+          { label: 'Kimonos & outerwear', href: '/products?subcategory=kimonos-outerwear' },
+          { label: 'Matching family sets', href: '/products?subcategory=family-sets' },
           { label: 'Ankara Dress', href: '/products?search=ankara+dress&gender=women' },
           { label: 'Boubou & Kaftan', href: '/products?search=boubou+kaftan' },
           { label: 'Aso Oke Sets', href: '/products?search=aso+oke' },
@@ -144,6 +148,7 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'Baby & Toddler',
         links: [
+          { label: 'Kids & baby traditional wear', href: '/products?subcategory=kids-baby-wear' },
           { label: 'Shop all baby and toddler styles', href: '/products?search=baby' },
           { label: 'Baby Ankara', href: '/products?search=baby+ankara' },
           { label: 'Naming Ceremony Sets', href: '/products?search=naming+baby' },
@@ -196,6 +201,8 @@ const MENU: Record<string, MenuSection> = {
         heading: 'Bags & Footwear',
         links: [
           { label: 'Shop All Bags', href: '/products?search=bag' },
+          { label: 'Raffia bags', href: '/products?subcategory=raffia-bags' },
+          { label: 'Beaded bags', href: '/products?subcategory=beaded-bags' },
           { label: 'Clutch Bags', href: '/products?search=clutch' },
           { label: 'Ankara Bags', href: '/products?search=ankara+bag' },
           { label: 'Traditional Shoes', href: '/products?search=traditional+shoes' },
@@ -224,9 +231,12 @@ const MENU: Record<string, MenuSection> = {
         heading: 'West African',
         links: [
           { label: 'Ankara / Wax Print', href: '/products?search=ankara' },
+          { label: 'Bogolan & mudcloth', href: '/products?subcategory=bogolan-mudcloth' },
+          { label: 'Bazin', href: '/products?subcategory=bazin' },
+          { label: 'Ndop', href: '/products?subcategory=ndop' },
           { label: 'Aso Oke', href: '/products?search=aso+oke' },
           { label: 'George Fabric', href: '/products?search=george' },
-          { label: 'Adire (Tie Dye)', href: '/products?search=adire' },
+          { label: 'Adire (Tie Dye)', href: '/products?subcategory=adire' },
           { label: 'Kente (Ghana)', href: '/products?search=kente' },
           { label: 'Boubou & Bazin', href: '/products?search=boubou' },
         ],
@@ -234,7 +244,7 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'East & South African',
         links: [
-          { label: 'Kitenge', href: '/products?search=kitenge' },
+          { label: 'Kitenge', href: '/products?subcategory=kitenge' },
           { label: 'Kanga & Kikoi', href: '/products?search=kanga' },
           { label: 'Habesha (Ethiopia)', href: '/products?search=habesha' },
           { label: 'Shweshwe (S.Africa)', href: '/products?search=shweshwe' },
@@ -258,6 +268,21 @@ const MENU: Record<string, MenuSection> = {
           { label: 'Austrian Lace', href: '/products?search=austrian+lace' },
           { label: 'Sequin fabric', href: '/products?search=sequence' },
         ],
+      },
+    ],
+  },
+
+  'Home & Crafts': {
+    featured: [
+      { label: 'Explore all products', href: '/products' },
+    ],
+    columns: [
+      {
+        heading: 'Handmade for the home',
+        links: subcategoriesFor('home-crafts').map(item => ({
+          label: item.name,
+          href: `/products?subcategory=${item.slug}`,
+        })),
       },
     ],
   },
@@ -359,7 +384,7 @@ const MENU: Record<string, MenuSection> = {
   },
 };
 
-const TABS = ['Women', 'Men', 'Kids', 'Accessories', 'Fabrics', 'Occasions', 'By Country'];
+const TABS = ['Women', 'Men', 'Kids', 'Accessories', 'Fabrics', 'Home & Crafts', 'Occasions', 'By Country'];
 
 export default function MegaMenu() {
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -408,6 +433,11 @@ export default function MegaMenu() {
   const handleLinkClick = (href: string) => {
     setActiveTab(null);
     const url = new URL(href, window.location.origin);
+    // Wouter's location does not always notify a page when only its query changes.
+    if (window.location.pathname === url.pathname && window.location.search !== url.search) {
+      window.location.assign(url.pathname + url.search);
+      return;
+    }
     navigate(url.pathname + url.search);
   };
 

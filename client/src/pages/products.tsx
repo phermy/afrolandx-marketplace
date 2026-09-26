@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AFRICAN_COUNTRIES, getCountryFlag } from '@shared/africanFashion';
+import { findSubcategory, subcategoriesFor } from '@shared/product-subcategories';
 import type { Product, Category } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 
@@ -32,31 +33,40 @@ export default function Products() {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [sortBy, setSortBy] = useState('newest');
   const [genderTab, setGenderTab] = useState<GenderTab>('all');
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
 
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const search = urlParams.get('search');
     const category = urlParams.get('category');
     if (search) setSearchQuery(search);
-    if (category) setSelectedCategory(parseInt(category));
-  }, [location]);
-
-  const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['/api/categories'],
-  });
+    const subcategory = urlParams.get('subcategory') || '';
+    const match = findSubcategory(subcategory);
+    setSelectedSubcategory(match?.slug || '');
+    if (match) {
+      setSelectedCategory(categories.find(item => item.slug === match.parentSlug)?.id ?? null);
+    } else if (category) {
+      setSelectedCategory(parseInt(category));
+    }
+  }, [location, categories]);
 
   const { data: allProducts = [], isLoading, isError, refetch } = useQuery<Product[]>({
-    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max, genderTab, selectedCountry],
+    queryKey: ['/api/products', searchQuery, selectedCategory, selectedSubcategory, priceRange.min, priceRange.max, genderTab, selectedCountry],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('status', 'approved');
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
       if (selectedCategory) params.append('categoryId', selectedCategory.toString());
+      if (selectedSubcategory) params.append('subcategory', selectedSubcategory);
       if (priceRange.min) params.append('minPrice', priceRange.min);
       if (priceRange.max) params.append('maxPrice', priceRange.max);
       if (genderTab !== 'all') params.append('gender', genderTab);
@@ -94,13 +104,14 @@ export default function Products() {
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
+    setSelectedSubcategory('');
     setPriceRange({ min: '', max: '' });
     setSortBy('newest');
     setGenderTab('all');
     setSelectedCountry('');
   };
 
-  const hasActiveFilters = searchQuery || selectedCategory || priceRange.min || priceRange.max || genderTab !== 'all' || selectedCountry;
+  const hasActiveFilters = searchQuery || selectedCategory || selectedSubcategory || priceRange.min || priceRange.max || genderTab !== 'all' || selectedCountry;
 
   const GENDER_TABS: { value: GenderTab; label: string }[] = [
     { value: 'all',   label: 'All' },
@@ -199,6 +210,7 @@ export default function Products() {
                   <Select
                     value={selectedCategory?.toString() || 'all'}
                     onValueChange={(value) => {
+                      setSelectedSubcategory('');
                       if (value === 'all') { setSelectedCategory(null); return; }
                       setSelectedCategory(parseInt(value));
                     }}
@@ -216,6 +228,24 @@ export default function Products() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {selectedCategory !== null && subcategoriesFor(
+                  categories.find(item => item.id === selectedCategory)?.slug || ''
+                ).length > 0 && (
+                  <div>
+                    <label htmlFor="subcategory-filter" className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+                    <select
+                      id="subcategory-filter"
+                      value={selectedSubcategory}
+                      onChange={event => setSelectedSubcategory(event.target.value)}
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">All in this category</option>
+                      {subcategoriesFor(categories.find(item => item.id === selectedCategory)?.slug || '')
+                        .map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+                    </select>
+                  </div>
+                )}
 
                 <Separator />
 
@@ -284,21 +314,21 @@ export default function Products() {
                     <Badge
                       variant={selectedCategory === 1 ? "default" : "outline"}
                       className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 1 ? null : 1)}
+                      onClick={() => { setSelectedSubcategory(''); setSelectedCategory(selectedCategory === 1 ? null : 1); }}
                     >
                       Traditional Wear
                     </Badge>
                     <Badge
                       variant={selectedCategory === 2 ? "default" : "outline"}
                       className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 2 ? null : 2)}
+                      onClick={() => { setSelectedSubcategory(''); setSelectedCategory(selectedCategory === 2 ? null : 2); }}
                     >
                       Aso Oke
                     </Badge>
                     <Badge
                       variant={selectedCategory === 3 ? "default" : "outline"}
                       className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 3 ? null : 3)}
+                      onClick={() => { setSelectedSubcategory(''); setSelectedCategory(selectedCategory === 3 ? null : 3); }}
                     >
                       Beads &amp; Jewelry
                     </Badge>
@@ -366,7 +396,13 @@ export default function Products() {
                   {selectedCategory && (
                     <Badge variant="secondary" className="flex items-center gap-1">
                       {categories.find(c => c.id === selectedCategory)?.name}
-                      <button onClick={() => setSelectedCategory(null)} className="ml-1 hover:text-red-500">×</button>
+                      <button onClick={() => { setSelectedCategory(null); setSelectedSubcategory(''); }} className="ml-1 hover:text-red-500">×</button>
+                    </Badge>
+                  )}
+                  {selectedSubcategory && (
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      {findSubcategory(selectedSubcategory)?.name}
+                      <button onClick={() => setSelectedSubcategory('')} className="ml-1 hover:text-red-500" aria-label="Clear subcategory">×</button>
                     </Badge>
                   )}
                   {(priceRange.min || priceRange.max) && (

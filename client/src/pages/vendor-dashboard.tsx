@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
+import { selectedSubcategory, subcategoriesFor } from "@shared/product-subcategories";
 import Navbar from "@/components/navbar";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
@@ -50,11 +51,13 @@ export default function VendorDashboard() {
   const hasVendorRole = isVendor(user);
   const [isRegistering, setIsRegistering] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedSubcategorySlug, setSelectedSubcategorySlug] = useState('');
   const [selectedProductType, setSelectedProductType] = useState<string>('');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ contactName: '', businessName: '', phone: '', cacNumber: '', description: '' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editSubcategorySlug, setEditSubcategorySlug] = useState('');
   const [editForm, setEditForm] = useState({ name: '', description: '', price: '', stock: '', imageUrl: '', returnPolicy: 'standard_returns' as ReturnPolicyValue });
   const [editCurrentImages, setEditCurrentImages] = useState<string[]>([]);
   const [editRemovedImages, setEditRemovedImages] = useState<string[]>([]);
@@ -113,6 +116,9 @@ export default function VendorDashboard() {
   const productTypeOptions = PRODUCT_TYPES_BY_CATEGORY[
     categories.find(category => String(category.id) === selectedCategory)?.slug || ''
   ] || [];
+  const subcategoryOptions = subcategoriesFor(
+    categories.find(category => String(category.id) === selectedCategory)?.slug || ''
+  );
 
   // Fetch vendor's own products (all statuses)
   const { data: products = [] } = useQuery<Product[]>({
@@ -385,6 +391,7 @@ export default function VendorDashboard() {
     setAddFiles([]);
     setAddPreviews([]);
     setSelectedCategory('');
+    setSelectedSubcategorySlug('');
     setSelectedProductType('');
     setSelectedGender('');
     setCustomCategoryName('');
@@ -460,6 +467,7 @@ export default function VendorDashboard() {
         stock: current.stock || '1',
       }));
       setSelectedCategory(String(suggestion.categoryId));
+      setSelectedSubcategorySlug('');
       setSelectedProductType('');
       trackEvent('ai_listing_generated', { source: 'vendor', category_id: suggestion.categoryId });
       toast({ title: 'Listing draft generated', description: 'Review the wording, then enter your price before saving.' });
@@ -548,6 +556,7 @@ export default function VendorDashboard() {
     fd.set('name', addForm.name.trim());
     fd.set('shortDescription', addForm.shortDescription.trim());
     fd.set('categoryId', catId);
+    if (selectedSubcategorySlug) fd.set('subcategorySlug', selectedSubcategorySlug);
     const typeLabel = isOthersCategory ? customCategoryName.trim() : productType;
     fd.set('description', typeLabel
       ? `[Product type: ${typeLabel}]\n\n${addForm.description.trim()}`
@@ -1012,6 +1021,7 @@ export default function VendorDashboard() {
                               title="Edit product"
                               onClick={() => {
                                 setEditingProduct(product);
+                                setEditSubcategorySlug(selectedSubcategory(product.tags));
                                 setEditForm({
                                   name: product.name,
                                   description: product.description || '',
@@ -1504,6 +1514,7 @@ export default function VendorDashboard() {
               <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
               <Select value={selectedCategory} onValueChange={value => {
                 setSelectedCategory(value);
+                setSelectedSubcategorySlug('');
                 setSelectedProductType('');
               }}>
                 <SelectTrigger className="input-nigerian">
@@ -1529,6 +1540,22 @@ export default function VendorDashboard() {
                 />
               )}
             </div>
+
+            {subcategoryOptions.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="vendor-subcategory">Subcategory <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <p className="text-xs text-gray-500">Help shoppers find this item in its specific section.</p>
+                <select
+                  id="vendor-subcategory"
+                  value={selectedSubcategorySlug}
+                  onChange={event => setSelectedSubcategorySlug(event.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                >
+                  <option value="">No subcategory</option>
+                  {subcategoryOptions.map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+                </select>
+              </div>
+            )}
 
             {productTypeOptions.length > 0 && (
               <div className="space-y-1.5">
@@ -2060,6 +2087,23 @@ export default function VendorDashboard() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 pt-2">
+            {editingProduct && subcategoriesFor(
+              categories.find(category => category.id === editingProduct.categoryId)?.slug || ''
+            ).length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-product-subcategory">Subcategory</Label>
+                <select
+                  id="edit-product-subcategory"
+                  value={editSubcategorySlug}
+                  onChange={event => setEditSubcategorySlug(event.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                >
+                  <option value="">No subcategory</option>
+                  {subcategoriesFor(categories.find(category => category.id === editingProduct.categoryId)?.slug || '')
+                    .map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Name */}
             <div>
@@ -2299,6 +2343,7 @@ export default function VendorDashboard() {
                     id: editingProduct.id,
                     data: {
                       name: editForm.name,
+                      subcategorySlug: editSubcategorySlug,
                       description: editForm.description,
                       price: editForm.price,
                       stock: parseInt(editForm.stock) || 0,

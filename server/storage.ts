@@ -85,6 +85,7 @@ import {
 import { db } from "./db";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { lockApprovedProductReferences } from "./product-reference-lock";
+import { subcategoryTag } from "@shared/product-subcategories";
 import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt } from "drizzle-orm";
 
 export interface IStorage {
@@ -120,7 +121,7 @@ export interface IStorage {
   // Product operations
   createProduct(product: InsertProduct): Promise<Product>;
   getProduct(id: number): Promise<Product | undefined>;
-  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; gender?: string; originCountry?: string; }): Promise<Product[]>;
+  getProducts(filters?: { status?: string; categoryId?: number; subcategory?: string; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; gender?: string; originCountry?: string; }): Promise<Product[]>;
   updateProductStatus(id: number, status: string): Promise<void>;
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;
@@ -504,6 +505,7 @@ export class DatabaseStorage implements IStorage {
   async getProducts(filters?: { 
     status?: string; 
     categoryId?: number; 
+    subcategory?: string;
     vendorId?: number; 
     featured?: boolean;
     search?: string;
@@ -519,6 +521,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.categoryId) {
       conditions.push(eq(products.categoryId, filters.categoryId));
+    }
+    if (filters?.subcategory) {
+      conditions.push(sql`${products.tags} @> ${JSON.stringify([subcategoryTag(filters.subcategory)])}::jsonb`);
     }
     if (filters?.vendorId) {
       conditions.push(eq(products.vendorId, filters.vendorId));

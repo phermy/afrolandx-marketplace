@@ -17,3 +17,4 @@
 - [Superadmin delegation safety](superadmin-delegation.md) — approvals that write roles are privilege paths too; authorize under the same lock as the write
 - [Virtual try-on scope and privacy](virtual-try-on.md) — photo-based clothing previews are not live AR; avoid app-side photo storage and disclose provider retention
 - [Abort timeout tests](abort-timeout-tests.md) — Node timeout signals may not keep the test process alive; use a separate referenced timer in stalled-request tests
+- [Subcategory assignment](subcategory-assignment.md) — new shopping labels require explicit seller assignment, not guesses from old names or free-text keywords
