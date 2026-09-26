@@ -19,3 +19,4 @@
 - [Abort timeout tests](abort-timeout-tests.md) — Node timeout signals may not keep the test process alive; use a separate referenced timer in stalled-request tests
 - [Subcategory assignment](subcategory-assignment.md) — new shopping labels require explicit seller assignment, not guesses from old names or free-text keywords
 - [CAC vendor verification](cac-verification.md) — use official public search with documented admin review until authorized CAC VAS access exists
+- [Verified review provenance](verified-review-provenance.md) — historical feedback is not automatically trusted as a purchase review; verify and moderate before publication

@@ -443,8 +443,13 @@ export const orderFeedback = pgTable("order_feedback", {
   alterationDetails: text("alteration_details"),
   overallRating: integer("overall_rating"), // 1-5 scale
   comment: text("comment"),
+  moderationStatus: varchar("moderation_status", { length: 20 }).notNull().default("pending"),
+  moderatedAt: timestamp("moderated_at"),
+  moderatedBy: varchar("moderated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("order_feedback_order_product_unique").on(table.orderId, table.productId),
+]);
 
 // ============================================
 // FEATURE 3: Measurement Health Alerts

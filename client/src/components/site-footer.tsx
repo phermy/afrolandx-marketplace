@@ -49,6 +49,7 @@ export default function SiteFooter() {
         <div>
           <p className="site-footer__label">Company</p>
           <Link href="/products">Shop products</Link>
+          <Link href="/reviews">Customer reviews</Link>
           {isAuthenticated && isAdmin(user) && <Link href="/discover">Discover Africa</Link>}
           <Link href="/lookbook">Lookbook</Link>
         </div>

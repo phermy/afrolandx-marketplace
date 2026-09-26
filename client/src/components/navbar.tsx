@@ -98,6 +98,7 @@ export default function Navbar() {
             <div className="hidden md:ml-8 md:flex md:space-x-2">
               <Link href="/" className={navLinkClass('/')}>Home</Link>
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
+              <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
               {isAuthenticated && isAdmin(user) && <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>}
@@ -256,6 +257,9 @@ export default function Navbar() {
             </Link>
             <Link href="/products" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/products')}><Package className="w-5 h-5" /><span>Products</span></div>
+            </Link>
+            <Link href="/reviews" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/reviews')}><Star className="w-5 h-5" /><span>Reviews</span></div>
             </Link>
             <Link href="/events" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/events')}><Calendar className="w-5 h-5" /><span>Events</span></div>

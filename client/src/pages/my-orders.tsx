@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import Navbar from '@/components/navbar';
+import OrderReviewDialog from '@/components/order-review-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +90,7 @@ function OrderTimeline({ status }: { status: string }) {
 
 function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id: number) => void; cancelling: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<{ id: number; name: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isCancelled = order.orderStatus === 'cancelled';
@@ -327,6 +329,19 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-green-700">₦{parseFloat(item.priceAtTime).toLocaleString()}</p>
                       <p className="text-xs text-gray-400">×{item.quantity}</p>
+                      {isDelivered && order.paymentStatus === 'paid' && (
+                        item.reviewStatus ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {item.reviewStatus === 'approved' ? 'Review published' :
+                              item.reviewStatus === 'rejected' ? 'Review not approved' : 'Review awaiting approval'}
+                          </p>
+                        ) : (
+                          <Button size="sm" variant="outline" className="mt-2" onClick={() =>
+                            setReviewProduct({ id: item.productId, name: item.productName || 'this item' })}>
+                            Review item
+                          </Button>
+                        )
+                      )}
                     </div>
                   </div>
                 ))}
@@ -358,10 +373,10 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
               {cancelling ? 'Cancelling…' : 'Cancel Order'}
             </Button>
           )}
-          {isDelivered && (
+          {isDelivered && order.paymentStatus === 'paid' && order.items?.some((item: any) => !item.reviewStatus) && (
             <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50"
-              onClick={() => window.location.href = '/products'}>
-              Leave a Review
+              onClick={() => setExpanded(true)}>
+              Review your items
             </Button>
           )}
            {canBuyAgain && (
@@ -383,6 +398,10 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
             </Button>
           )}
         </div>
+        {reviewProduct && (
+          <OrderReviewDialog orderId={order.id} productId={reviewProduct.id}
+            productName={reviewProduct.name} onClose={() => setReviewProduct(null)} />
+        )}
       </CardContent>
     </Card>
   );

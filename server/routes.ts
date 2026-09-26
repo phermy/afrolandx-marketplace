@@ -15,6 +15,7 @@ import { getChatbotService } from "./chatbot";
 import { buildLookbookItems } from "./lookbook-generation";
 import { registerVirtualTryOnRoutes } from "./virtual-try-on";
 import { registerLiveArRoutes } from "./live-ar";
+import { getReviewStatusesForOrderItems, registerReviewRoutes } from "./reviews";
 import { initiateScan, getScanResults, getServiceStatus } from "./bodyscan";
 import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
@@ -260,6 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+  registerReviewRoutes(app);
   registerVirtualTryOnRoutes(app);
   registerLiveArRoutes(app);
   registerEventPlanningRoutes(app);
@@ -1342,6 +1344,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch products with details' });
+    }
+  });
+
+  app.get('/api/public/vendors/:id', async (req, res) => {
+    const idText = req.params.id;
+    if (!/^[1-9]\d*$/.test(idText)) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    const vendorId = Number(idText);
+    if (!Number.isSafeInteger(vendorId)) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    try {
+      const [vendor] = await db
+        .select({
+          id: vendors.id,
+          businessName: vendors.businessName,
+          description: vendors.description,
+        })
+        .from(vendors)
+        .where(and(
+          eq(vendors.id, vendorId),
+          eq(vendors.status, 'approved'),
+        ))
+        .limit(1);
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+      const approvedProducts = await db
+        .select({
+          id: products.id,
+          name: products.name,
+          imageUrl: products.imageUrl,
+          price: products.price,
+          originCountry: products.originCountry,
+        })
+        .from(products)
+        .where(and(eq(products.vendorId, vendorId), eq(products.status, 'approved')))
+        .orderBy(desc(products.id))
+        .limit(60);
+      res.json({
+        vendor: {
+          id: vendor.id,
+          businessName: vendor.businessName,
+          description: vendor.description,
+        },
+        products: approvedProducts.map(product => ({
+          id: product.id,
+          name: product.name,
+          imageUrl: product.imageUrl,
+          price: Number(product.price),
+          originCountry: product.originCountry,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch public vendor' });
     }
   });
 
@@ -2842,6 +2899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = (req.user as any)?.id;
       const orders = await storage.getOrdersForUser(userId);
+      const reviewStatuses = await getReviewStatusesForOrderItems(userId, orders.map((order: any) => order.id));
       // Enrich each order with items + product details
       const enriched = await Promise.all(orders.map(async (order) => {
         const rawItems = await storage.getOrderItemsWithProducts(order.id);
@@ -2850,6 +2908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const vendor = product ? await storage.getVendor(product.vendorId) : null;
           return {
             ...item,
+            reviewStatus: reviewStatuses.get(`${order.id}:${item.productId}`) ?? null,
             productName: product?.name || 'Product',
             productImage: (product?.images as string[])?.[0] || product?.imageUrl || null,
             vendorName: vendor?.businessName || 'Unknown Vendor',
@@ -4329,35 +4388,6 @@ INSTRUCTIONS:
     } catch (error) {
       console.error('Error calculating fit score:', error);
       res.status(500).json({ message: 'Failed to calculate fit score' });
-    }
-  });
-
-  app.post('/api/orders/:orderId/feedback', isAuthenticated, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-      
-      const orderId = parseInt(req.params.orderId);
-      const { productId, fitRating, alterationNeeded, alterationDetails, overallRating, comment } = req.body;
-      
-      const feedback = await storage.createOrderFeedback({
-        orderId,
-        productId,
-        userId,
-        fitRating,
-        alterationNeeded,
-        alterationDetails,
-        overallRating,
-        comment,
-      });
-      
-      // Award loyalty points for leaving a review
-      await storage.addLoyaltyPoints(userId, 50, 'review', 'Points for leaving a product review', orderId, 'order');
-      
-      res.status(201).json(feedback);
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      res.status(500).json({ message: 'Failed to submit feedback' });
     }
   });
 

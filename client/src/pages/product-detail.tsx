@@ -13,7 +13,7 @@ import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 import { RETURN_POLICY_OPTIONS } from '@shared/schema';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Star } from 'lucide-react';
 
 const FALLBACK_URL =
   'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=800&h=800&q=75';
@@ -40,6 +40,16 @@ export default function ProductDetail() {
       return res.json();
     },
     enabled: !!productId,
+  });
+  const { data: reviewSummary, isError: reviewSummaryError } = useQuery<{ count: number; average: number }>({
+    queryKey: ['/api/products', productId, 'review-summary'],
+    queryFn: async () => {
+      const response = await fetch(`/api/products/${productId}/review-summary`);
+      if (!response.ok) throw new Error('Product reviews unavailable');
+      return response.json();
+    },
+    enabled: !!productId,
+    retry: false,
   });
   const { data: tryOnAvailability } = useQuery<{ eligible: boolean }>({
     queryKey: ['/api/products', productId, 'try-on-eligibility'],
@@ -216,14 +226,17 @@ export default function ProductDetail() {
               </h1>
             </div>
 
-            {/* Rating placeholder */}
-            <div className="flex items-center gap-1 mb-4">
-              {[1, 2, 3, 4, 5].map(n => (
-                <svg key={n} className={`w-4 h-4 ${n <= 4 ? 'text-yellow-400' : 'text-gray-300'} fill-current`} viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-              ))}
-              <span className="text-sm text-gray-500 ml-1">4.8</span>
+            <div className="mb-4 flex items-center gap-2 text-sm">
+              {reviewSummaryError ? <span className="text-gray-500">Ratings unavailable</span> :
+                reviewSummary?.count ? (
+                  <>
+                    <Star aria-hidden="true" className="h-4 w-4 fill-amber-500 text-amber-500" />
+                    <span className="font-semibold text-gray-900">{reviewSummary.average.toFixed(1)}</span>
+                    <a href={`/reviews?productId=${product.id}`} className="text-gray-600 underline underline-offset-2 hover:text-green-800">
+                      {reviewSummary.count} verified {reviewSummary.count === 1 ? 'review' : 'reviews'}
+                    </a>
+                  </>
+                ) : <span className="text-gray-500">{reviewSummary ? 'No verified reviews yet' : 'Loading ratings…'}</span>}
             </div>
 
             {/* Price */}

@@ -52,6 +52,16 @@ type TestDeletionPreview = {
   fingerprint: string;
 };
 
+type PendingReview = {
+  id: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  product: { id: number; name: string };
+  vendor: { id: number; name: string };
+  reviewer: 'Verified buyer';
+};
+
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -123,6 +133,22 @@ export default function AdminDashboard() {
     enabled: isAuthenticated && isAdmin(user),
     retry: false,
   });
+  const {
+    data: pendingReviews = { reviews: [] },
+    isLoading: reviewsLoading,
+    isFetching: reviewsFetching,
+    error: reviewsError,
+    refetch: refetchReviews,
+  } = useQuery<{ reviews: PendingReview[] }>({
+    queryKey: ['/api/admin/reviews?status=pending&limit=50'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/admin/reviews?status=pending&limit=50');
+      return response.json();
+    },
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+  const reviews = pendingReviews.reviews || [];
 
   // ── Real-time order change detection ────────────────────────────────────
   useEffect(() => {
@@ -154,6 +180,27 @@ export default function AdminDashboard() {
   const dismissNotificationMutation = useMutation({
     mutationFn: async (id: number) => apiRequest('DELETE', `/api/notifications/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/notifications'] }),
+  });
+
+  const moderateReviewMutation = useMutation({
+    mutationFn: async ({ reviewId, decision }: { reviewId: number; decision: 'approved' | 'rejected' }) => {
+      await apiRequest('PATCH', `/api/admin/reviews/${reviewId}/moderation`, { decision });
+    },
+    onSuccess: (_result, { decision }) => {
+      toast({
+        title: decision === 'approved' ? 'Review approved' : 'Review rejected',
+        description: 'The moderation decision has been recorded.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/reviews?status=pending&limit=50'] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
+      toast({
+        title: 'Review moderation failed',
+        description: error.message || 'The review decision could not be saved. Please try again.',
+        variant: 'destructive',
+      });
+    },
   });
 
   const updateVendorStatusMutation = useMutation({
@@ -578,6 +625,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="analytics" className="space-y-6">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews {reviews.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{reviews.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="shipping-quotes">Shipping Quotes {shippingQuoteRequests.filter(q => q.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{shippingQuoteRequests.filter(q => q.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
@@ -588,6 +636,91 @@ export default function AdminDashboard() {
             <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
+
+          {/* ═══ REVIEW MODERATION TAB ═══════════════════════════════════════ */}
+          <TabsContent value="reviews">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2"><Star className="w-5 h-5" />Pending Reviews</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{reviews.length} pending</Badge>
+                    <Button variant="outline" size="sm" onClick={() => refetchReviews()} disabled={reviewsFetching}>
+                      <RefreshCw className={`w-3 h-3 mr-1 ${reviewsFetching ? 'animate-spin' : ''}`} />Refresh
+                    </Button>
+                  </div>
+                </CardTitle>
+                <CardDescription>Review customer feedback before it is published.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-12"><div className="spinner-nigerian"></div></div>
+                ) : reviewsError ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+                    <p className="font-medium">Pending reviews could not be loaded.</p>
+                    <p className="mt-1">{reviewsError instanceof Error ? reviewsError.message : 'Please try again.'}</p>
+                    <Button className="mt-3" size="sm" variant="outline" onClick={() => refetchReviews()}>Try again</Button>
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Star className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                    <p className="font-medium text-gray-700">No pending reviews.</p>
+                    <p className="text-sm text-gray-500">Reviews awaiting moderation will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map(review => (
+                      <article key={review.id} className="rounded-lg border p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold">{review.product.name}</h3>
+                              <Badge variant="outline">{review.reviewer}</Badge>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-600">Sold by {review.vendor.name}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                              <span className="inline-flex items-center gap-1 font-medium text-amber-700" aria-label={`${review.rating} out of 5 stars`}>
+                                <Star className="h-4 w-4 fill-current" />{review.rating} / 5
+                              </span>
+                              <span className="text-gray-400" aria-hidden="true">·</span>
+                              <time className="text-gray-500" dateTime={review.createdAt}>
+                                {new Date(review.createdAt).toLocaleString()}
+                              </time>
+                            </div>
+                            <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-700">
+                              {review.comment || 'No written comment provided.'}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 text-white hover:bg-green-700"
+                              disabled={moderateReviewMutation.isPending}
+                              onClick={() => moderateReviewMutation.mutate({ reviewId: review.id, decision: 'approved' })}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={moderateReviewMutation.isPending}
+                              onClick={() => {
+                                if (window.confirm('Reject this review? This moderation decision will be recorded.')) {
+                                  moderateReviewMutation.mutate({ reviewId: review.id, decision: 'rejected' });
+                                }
+                              }}
+                            >
+                              <XCircle className="mr-1 h-3 w-3" />Reject
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* ═══ ANALYTICS TAB ═══════════════════════════════════════════════ */}
           <TabsContent value="analytics">

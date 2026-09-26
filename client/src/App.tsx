@@ -12,6 +12,7 @@ import Policies from "@/pages/policies";
 import PolicyDetail from "@/pages/policy-detail";
 import Home from "@/pages/home";
 import Products from "@/pages/products";
+import Reviews from "@/pages/reviews";
 import Profile from "@/pages/profile";
 import MyOrders from "@/pages/my-orders";
 import OrderSuccess from "@/pages/order-success";
@@ -31,6 +32,7 @@ import EventPlanner from "@/pages/event-planner";
 import Quiz from "@/pages/quiz";
 import DiscoverAfrica from "@/pages/discover-africa";
 import ProductDetail from "@/pages/product-detail";
+import PublicVendor from "@/pages/public-vendor";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
@@ -96,6 +98,8 @@ function Router() {
       {/* Public pages */}
       <Route path="/products/:id" component={ProductDetail} />
       <Route path="/products" component={Products} />
+      <Route path="/vendors/:id" component={PublicVendor} />
+      <Route path="/reviews" component={Reviews} />
       <Route path="/collab-drops" component={CollabDrops} />
       <Route path="/collab-drops/:id" component={CollabDropDetail} />
       <Route path="/events" component={EventPlanner} />
