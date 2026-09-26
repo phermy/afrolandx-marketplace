@@ -9,7 +9,7 @@ import {
 } from "./product-subcategories";
 
 test("subcategory slugs are unique and grouped under existing category slugs", () => {
-  const parents = new Set(["accessories", "home-crafts", "traditional-wear", "ankara-kente"]);
+  const parents = new Set(["accessories", "beauty-wellness", "home-crafts", "traditional-wear", "ankara-kente"]);
   assert.equal(new Set(PRODUCT_SUBCATEGORIES.map(item => item.slug)).size, PRODUCT_SUBCATEGORIES.length);
   for (const item of PRODUCT_SUBCATEGORIES) {
     assert.ok(parents.has(item.parentSlug), item.parentSlug);

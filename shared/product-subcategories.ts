@@ -3,6 +3,7 @@
 export const PRODUCT_SUBCATEGORIES = [
   { slug: "raffia-bags", name: "Raffia bags", parentSlug: "accessories" },
   { slug: "beaded-bags", name: "Beaded bags", parentSlug: "accessories" },
+  { slug: "wigs", name: "Wigs", parentSlug: "beauty-wellness" },
   { slug: "woven-baskets", name: "Woven baskets", parentSlug: "home-crafts" },
   { slug: "home-textiles", name: "Cushions & home textiles", parentSlug: "home-crafts" },
   { slug: "handmade-mirrors", name: "Handmade mirrors", parentSlug: "home-crafts" },

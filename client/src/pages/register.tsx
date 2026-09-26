@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { AuthShell, authButtonClass, authInputClass } from "@/components/auth-shell";
+import { RegistrationTurnstile } from "@/components/registration-turnstile";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -32,6 +33,22 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileConfig, setTurnstileConfig] = useState<{ enabled: boolean; siteKey: string | null; testMode: boolean } | null>(null);
+  const [turnstileError, setTurnstileError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetNonce, setTurnstileResetNonce] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/turnstile-config", { cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) throw new Error("The security check is temporarily unavailable. Please try again later.");
+        return response.json();
+      })
+      .then(config => { if (active) setTurnstileConfig(config); })
+      .catch(() => { if (active) setTurnstileError("The security check is temporarily unavailable. Please refresh and try again."); });
+    return () => { active = false; };
+  }, []);
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -54,6 +71,10 @@ export default function RegisterPage() {
       setError("Your passwords do not match.");
       return;
     }
+    if (!turnstileConfig || turnstileError || (turnstileConfig.enabled && !turnstileToken)) {
+      setError("Complete the security check before creating your account.");
+      return;
+    }
     setError("");
     setIsLoading(true);
     try {
@@ -66,6 +87,7 @@ export default function RegisterPage() {
           lastName: names.slice(1).join(" "),
           email,
           password: form.password,
+          ...(turnstileConfig.enabled ? { turnstileToken } : {}),
         }),
         credentials: "include",
       });
@@ -82,6 +104,7 @@ export default function RegisterPage() {
       });
     } catch (submitError: any) {
       setError(submitError.message || "We couldn't create your account. Please try again.");
+      if (turnstileConfig.enabled) setTurnstileResetNonce(nonce => nonce + 1);
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +222,16 @@ export default function RegisterPage() {
             </button>
           </span>
         </label>
-        <button type="submit" disabled={isLoading} className={authButtonClass} data-testid="button-register">
+        {turnstileError && <p role="alert" className="text-sm text-red-700">{turnstileError}</p>}
+        {turnstileConfig?.enabled && turnstileConfig.siteKey && (
+          <>
+            <RegistrationTurnstile siteKey={turnstileConfig.siteKey} onToken={setTurnstileToken} resetNonce={turnstileResetNonce} />
+            {turnstileConfig.testMode && (
+              <p className="text-xs text-[#70706d]">Preview security check: test mode, not live bot protection.</p>
+            )}
+          </>
+        )}
+        <button type="submit" disabled={isLoading || !turnstileConfig || Boolean(turnstileError) || (turnstileConfig.enabled && !turnstileToken)} className={authButtonClass} data-testid="button-register">
           {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
         </button>
       </form>

@@ -115,3 +115,65 @@ test("registration handles a concurrent email uniqueness conflict", async () => 
   assert.equal(statusCode, 409);
   assert.equal(responseBody.hint, "SIGN_IN");
 });
+
+test("registration requires a valid security token before creating an account", async () => {
+  let inserted = false;
+  let verified = 0;
+  let statusCode = 200;
+  const handler = createRegisterHandler({
+    storage: {
+      getUserByEmail: async () => undefined,
+      upsertUser: async () => { inserted = true; },
+      getUser: async () => ({ id: "new-user" }),
+    } as any,
+    issueOtp: async () => {},
+    hashPassword: async () => "hash",
+    createId: () => "new-user",
+    isRateLimited: () => false,
+    verifyBotToken: async token => { verified++; return token === "valid-token"; },
+  });
+  const res = {
+    status(code: number) { statusCode = code; return this; },
+    json(_body: any) { return this; },
+  };
+  const req = { body: { email: "new@example.com", password: "secure-password" } };
+  await handler(req, res);
+  assert.equal(statusCode, 400);
+  assert.equal(verified, 0);
+  assert.equal(inserted, false);
+  statusCode = 200;
+  req.body = { ...req.body, turnstileToken: "bad-token" } as typeof req.body;
+  await handler(req, res);
+  assert.equal(statusCode, 400);
+  assert.equal(verified, 1);
+  assert.equal(inserted, false);
+  statusCode = 200;
+  req.body = { ...req.body, turnstileToken: "valid-token" };
+  await handler(req, res);
+  assert.equal(statusCode, 200);
+  assert.equal(verified, 2);
+  assert.equal(inserted, true);
+});
+
+test("registration does not create an account if Turnstile is unavailable", async () => {
+  let inserted = false;
+  let statusCode = 200;
+  const handler = createRegisterHandler({
+    storage: {
+      getUserByEmail: async () => undefined,
+      upsertUser: async () => { inserted = true; },
+      getUser: async () => undefined,
+    } as any,
+    issueOtp: async () => {},
+    hashPassword: async () => "hash",
+    createId: () => "new-user",
+    isRateLimited: () => false,
+    verifyBotToken: async () => { throw new Error("provider down"); },
+  });
+  await handler(
+    { body: { email: "new@example.com", password: "secure-password", turnstileToken: "token" } },
+    { status(code: number) { statusCode = code; return this; }, json(_body: any) { return this; } },
+  );
+  assert.equal(statusCode, 503);
+  assert.equal(inserted, false);
+});

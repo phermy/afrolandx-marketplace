@@ -36,6 +36,7 @@ const MENU: Record<string, MenuSection> = {
           { label: 'Shop All Accessories', href: '/products?search=accessories' },
           { label: 'Coral Beads', href: '/products?search=coral+beads' },
           { label: 'Headwear & Gele', href: '/products?search=gele' },
+          { label: 'Wigs', href: '/products?subcategory=wigs' },
           { label: 'Jewellery Sets', href: '/products?search=jewellery' },
           { label: 'Waist Beads', href: '/products?search=waist+beads' },
           { label: 'Handbags', href: '/products?search=bag' },
@@ -272,6 +273,18 @@ const MENU: Record<string, MenuSection> = {
     ],
   },
 
+  'Beauty & Wellness': {
+    featured: [{ label: 'Explore all products', href: '/products' }],
+    columns: [
+      {
+        heading: 'Hair',
+        links: subcategoriesFor('beauty-wellness').map(item => ({
+          label: item.name,
+          href: `/products?subcategory=${item.slug}`,
+        })),
+      },
+    ],
+  },
   'Home & Crafts': {
     featured: [
       { label: 'Explore all products', href: '/products' },
@@ -384,7 +397,7 @@ const MENU: Record<string, MenuSection> = {
   },
 };
 
-const TABS = ['Women', 'Men', 'Kids', 'Accessories', 'Fabrics', 'Home & Crafts', 'Occasions', 'By Country'];
+const TABS = ['Women', 'Men', 'Kids', 'Accessories', 'Fabrics', 'Beauty & Wellness', 'Home & Crafts', 'Occasions', 'By Country'];
 
 export default function MegaMenu() {
   const [activeTab, setActiveTab] = useState<string | null>(null);

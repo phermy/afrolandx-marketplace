@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
 import { pool } from "./db";
+import { registrationTurnstileConfig, verifyRegistrationTurnstile } from "./turnstile";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -81,6 +82,7 @@ type RegisterHandlerDependencies = {
   hashPassword: (password: string) => Promise<string>;
   createId: () => string;
   isRateLimited: (error: unknown) => boolean;
+  verifyBotToken?: (token: string) => Promise<boolean>;
 };
 
 export function createRegisterHandler(dependencies: RegisterHandlerDependencies) {
@@ -89,6 +91,20 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
     const { password, firstName, lastName } = req.body;
     if (!email || typeof password !== "string" || password.length < 8) {
       return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
+    }
+    if (dependencies.verifyBotToken) {
+      const token = req.body.turnstileToken;
+      if (typeof token !== "string" || !token || token.length > 2048) {
+        return res.status(400).json({ message: "Complete the security check before creating your account." });
+      }
+      try {
+        if (!await dependencies.verifyBotToken(token)) {
+          return res.status(400).json({ message: "The security check expired or could not be verified. Please try again." });
+        }
+      } catch (error) {
+        console.error("Registration security check unavailable:", error);
+        return res.status(503).json({ message: "The security check is temporarily unavailable. Please try again later." });
+      }
     }
     try {
       const existing = await dependencies.storage.getUserByEmail(email);
@@ -195,12 +211,22 @@ export async function setupAuth(app: Express) {
     }
   }
 
+  app.get("/api/auth/turnstile-config", (_req, res) => {
+    const config = registrationTurnstileConfig();
+    res.setHeader("Cache-Control", "no-store");
+    if (config.incomplete) return res.status(503).json({ message: "Registration security check is not configured correctly." });
+    res.json({ enabled: config.enabled, siteKey: config.siteKey, testMode: config.testMode });
+  });
+
   app.post("/api/register", createRegisterHandler({
     storage,
     issueOtp: (req, user) => issueOtp(req, user, "email"),
     hashPassword: (password) => bcrypt.hash(password, 10),
     createId: () => crypto.randomUUID(),
     isRateLimited: (error) => error instanceof OtpRateLimitError,
+    verifyBotToken: registrationTurnstileConfig().incomplete
+      ? async () => { throw new Error("Turnstile keys are incomplete"); }
+      : registrationTurnstileConfig().enabled ? verifyRegistrationTurnstile : undefined,
   }));
 
   app.post("/api/login", (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
