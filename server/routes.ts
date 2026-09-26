@@ -7,6 +7,10 @@ import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
 import { lockApprovedProductReferences } from "./product-reference-lock";
+import {
+  approveProduct, approveSelectedProducts, getPendingAdminProducts, getProductByClientImportKey,
+  parsePendingProductPagination, resolveClientImportRetry, validateProductIds,
+} from "./admin-product-bulk";
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
@@ -1090,6 +1094,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: err.message });
       }
 
+      const discardLocalUploads = (files: Express.Multer.File[]) => {
+        if (isCloudStorageEnabled()) return;
+        for (const file of files) {
+          const filePath = file.filename ? safeImagePath(file.filename) : null;
+          if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+      };
+      let files = (req.files || []) as Express.Multer.File[];
+      let imageUrls: string[] = [];
       try {
         // Validate required fields are present
         if (!req.body.name || !req.body.shortDescription || !req.body.description || req.body.price === undefined || req.body.stock === undefined || !req.body.categoryId) {
@@ -1099,8 +1112,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        const files = req.files as Express.Multer.File[];
-        let imageUrls: string[] = [];
+        let clientImportKey: string | undefined;
+        if (req.body.clientImportKey !== undefined) {
+          const parsedKey = z.string().uuid().safeParse(req.body.clientImportKey);
+          if (!parsedKey.success) {
+            discardLocalUploads(files);
+            return res.status(400).json({ message: 'clientImportKey must be a UUID' });
+          }
+          clientImportKey = parsedKey.data.toLowerCase();
+          const existing = await getProductByClientImportKey(clientImportKey);
+          const retry = resolveClientImportRetry(existing, req.vendor.id, req.body);
+          if (retry.kind !== 'new') {
+            discardLocalUploads(files);
+            if (retry.kind === 'different_vendor') {
+              return res.status(409).json({ message: 'clientImportKey belongs to another vendor', reason: 'idempotency_key_owned_by_another_vendor' });
+            }
+            if (retry.kind === 'payload_conflict') {
+              return res.status(409).json({ message: 'clientImportKey was already used with different product details', reason: 'idempotency_key_payload_conflict' });
+            }
+            return res.status(200).json(retry.product);
+          }
+        }
 
         // Process image uploads with robust fallback
         if (files && files.length > 0) {
@@ -1261,6 +1293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originCountry: req.body.originCountry && req.body.originCountry.trim() ? req.body.originCountry.trim() : null,
           traditionalName: req.body.traditionalName && req.body.traditionalName.trim() ? req.body.traditionalName.trim() : null,
           status: req.body.status === 'draft' ? 'draft' : 'pending',
+          ...(clientImportKey ? { clientImportKey } : {}),
         };
 
         const numericPrice = Number(productData.price);
@@ -1276,6 +1309,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const product = await storage.createProduct(validatedData);
         res.json(product);
       } catch (error) {
+        const databaseError = error as {
+          code?: string; constraint?: string; cause?: { code?: string; constraint?: string };
+        };
+        const importKeyConflict = (databaseError?.code === '23505' && databaseError.constraint === 'products_client_import_key_unique')
+          || (databaseError?.cause?.code === '23505' && databaseError.cause.constraint === 'products_client_import_key_unique');
+        if (importKeyConflict && req.body.clientImportKey) {
+          discardLocalUploads(files);
+          if (isCloudStorageEnabled()) {
+            await Promise.all(imageUrls.map(imageUrl => getCloudStorageService().deleteImage(imageUrl)));
+          }
+          const existing = await getProductByClientImportKey(String(req.body.clientImportKey).toLowerCase());
+          const retry = resolveClientImportRetry(existing, req.vendor.id, req.body);
+          if (retry.kind === 'same_vendor') return res.status(200).json(retry.product);
+          return res.status(409).json({
+            message: retry.kind === 'different_vendor'
+              ? 'clientImportKey belongs to another vendor'
+              : 'clientImportKey was already used with different product details',
+            reason: retry.kind === 'different_vendor' ? 'idempotency_key_owned_by_another_vendor' : 'idempotency_key_payload_conflict',
+          });
+        }
         if (error instanceof z.ZodError) {
           console.error('Validation error details:', error.errors);
           res.status(400).json({ message: 'Validation error', errors: error.errors });
@@ -1344,6 +1397,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch products with details' });
+    }
+  });
+
+  app.get('/api/admin/products/pending', isAuthenticated, isAdmin, async (req, res) => {
+    const pagination = parsePendingProductPagination(req.query.limit, req.query.offset);
+    if (!pagination) {
+      return res.status(400).json({ message: 'limit must be 1..50 and offset must be a nonnegative safe integer' });
+    }
+    try {
+      const result = await getPendingAdminProducts(pagination.limit, pagination.offset);
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to fetch pending admin products:', error);
+      res.status(500).json({ message: 'Failed to fetch pending products' });
+    }
+  });
+
+  app.post('/api/admin/products/bulk-approve', isAuthenticated, isAdmin, async (req, res) => {
+    const productIds = req.body?.productIds;
+    if (!validateProductIds(productIds)) {
+      return res.status(400).json({
+        message: 'productIds must contain 1 to 50 unique positive safe integers',
+      });
+    }
+
+    try {
+      const result = await approveSelectedProducts(productIds);
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to bulk approve products:', error);
+      res.status(500).json({ message: 'Failed to approve selected products' });
     }
   });
 
@@ -1682,8 +1766,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status } = req.body;
       if (!Number.isSafeInteger(productId)) return res.status(400).json({ message: 'Invalid product ID' });
       if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid product status' });
-      if (!await storage.getProduct(productId)) return res.status(404).json({ message: 'Product not found' });
-      await storage.updateProductStatus(productId, status);
+      if (status === 'approved') {
+        const result = await approveProduct(productId);
+        if (!result.approved) {
+          if (result.reason === 'not_found') return res.status(404).json({ message: 'Product not found', reason: result.reason });
+          return res.status(409).json({ message: 'Product is not eligible for approval', reason: result.reason });
+        }
+      } else {
+        if (!await storage.getProduct(productId)) return res.status(404).json({ message: 'Product not found' });
+        await storage.updateProductStatus(productId, status);
+      }
       res.json({ message: 'Product status updated' });
     } catch (error) {
       res.status(500).json({ message: 'Failed to update product status' });

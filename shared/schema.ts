@@ -139,6 +139,7 @@ export const products = pgTable("products", {
   imageUrl: text("image_url"), // single image URL for display
   images: jsonb("images").default([]), // array of image URLs for gallery
   sizes: jsonb("sizes").default([]), // string[] — available sizes e.g. ["S","M","L","XL"]
+  clientImportKey: varchar("client_import_key", { length: 36 }),
   status: varchar("status").default("pending"), // draft, pending, approved, rejected
   featured: boolean("featured").default(false),
   gender: varchar("gender"), // women, men, kids, or null = unisex/all
@@ -146,7 +147,9 @@ export const products = pgTable("products", {
   traditionalName: varchar("traditional_name"), // local name of the garment (e.g. Kente, Agbada, Habesha Kemis)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("products_client_import_key_unique").on(table.clientImportKey),
+]);
 
 // Shopping cart table
 export const cartItems = pgTable("cart_items", {
@@ -865,6 +868,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
 }).extend({
   stock: z.number().min(0).default(0),
   imageUrl: z.string().optional(),
+  clientImportKey: z.string().uuid().optional().nullable(),
   returnPolicy: returnPolicySchema.nullable().default("standard_returns"),
 });
 

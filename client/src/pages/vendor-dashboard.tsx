@@ -20,6 +20,7 @@ import { Link } from "wouter";
 import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
 import { selectedSubcategory, subcategoriesFor } from "@shared/product-subcategories";
 import Navbar from "@/components/navbar";
+import VendorBatchImport from "@/components/vendor-batch-import";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
 import { RETURN_POLICY_OPTIONS, type ReturnPolicyValue } from "@shared/schema";
@@ -64,6 +65,7 @@ export default function VendorDashboard() {
   const [editNewFiles, setEditNewFiles] = useState<File[]>([]);
   const [editNewPreviews, setEditNewPreviews] = useState<string[]>([]);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  const [isBatchImportOpen, setIsBatchImportOpen] = useState(false);
   const [selectedGender, setSelectedGender] = useState<string>('');
   const [editGender, setEditGender] = useState<string>('');
   const [selectedOriginCountry, setSelectedOriginCountry] = useState<string>('');
@@ -922,17 +924,23 @@ export default function VendorDashboard() {
           <TabsContent value="products">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <CardTitle>My Products</CardTitle>
                     <p className="text-sm text-gray-500 mt-1">
                       {products.length === 0 ? 'No products yet' : `${products.length} product${products.length !== 1 ? 's' : ''}; ${products.filter(p => p.status === 'approved').length} live in shop`}
                     </p>
                   </div>
-                  <Button className="btn-nigerian gap-2" onClick={() => setIsAddSheetOpen(true)}>
-                    <Plus className="w-4 h-4" />
-                    Add Product
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" className="gap-2" onClick={() => setIsBatchImportOpen(true)}>
+                      <Upload className="w-4 h-4" />
+                      Add in bulk
+                    </Button>
+                    <Button className="btn-nigerian gap-2" onClick={() => setIsAddSheetOpen(true)}>
+                      <Plus className="w-4 h-4" />
+                      Add Product
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1471,6 +1479,12 @@ export default function VendorDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <VendorBatchImport
+        open={isBatchImportOpen}
+        onOpenChange={setIsBatchImportOpen}
+        onComplete={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] })}
+      />
 
       {/* Add Product Sheet */}
       <Sheet open={isAddSheetOpen} onOpenChange={(open) => { if (!open) resetAddForm(); setIsAddSheetOpen(open); }}>

@@ -33,6 +33,7 @@ import {
 } from 'recharts';
 
 const MAX_FEATURED = 8;
+const PENDING_PRODUCTS_PAGE_SIZE = 50;
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   processing: 'bg-blue-100 text-blue-800',
@@ -62,6 +63,33 @@ type PendingReview = {
   reviewer: 'Verified buyer';
 };
 
+type PendingAdminProduct = {
+  id: number;
+  name: string;
+  description: string;
+  shortDescription?: string | null;
+  price: string;
+  stock: number;
+  images?: string[] | null;
+  imageUrl?: string | null;
+  categoryId: number | null;
+  status: string;
+  vendorId: number;
+  createdAt: string;
+  vendor: {
+    id: number;
+    businessName: string;
+    status: string;
+    verificationStatus: string;
+  };
+};
+
+type PendingAdminProductsResponse = {
+  products: PendingAdminProduct[];
+  total: number;
+  hasMore: boolean;
+};
+
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -75,6 +103,10 @@ export default function AdminDashboard() {
   const [relationshipConfirmed, setRelationshipConfirmed] = useState(false);
   const [relationshipEvidence, setRelationshipEvidence] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [selectedPendingProductIds, setSelectedPendingProductIds] = useState<number[]>([]);
+  const [bulkApproveConfirmationOpen, setBulkApproveConfirmationOpen] = useState(false);
+  const [bulkApproveSkipped, setBulkApproveSkipped] = useState<Array<{ id: number; reason: string }>>([]);
+  const [pendingProductsOffset, setPendingProductsOffset] = useState(0);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [showHistoricalOrders, setShowHistoricalOrders] = useState(false);
@@ -105,6 +137,34 @@ export default function AdminDashboard() {
   const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const {
+    data: pendingProductsResponse,
+    isLoading: pendingProductsLoading,
+    isFetching: pendingProductsFetching,
+    error: pendingProductsError,
+    refetch: refetchPendingProducts,
+  } = useQuery<PendingAdminProductsResponse>({
+    queryKey: ['/api/admin/products/pending', pendingProductsOffset],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/admin/products/pending?limit=${PENDING_PRODUCTS_PAGE_SIZE}&offset=${pendingProductsOffset}`,
+      );
+      return response.json();
+    },
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+  const pendingProducts = pendingProductsResponse?.products ?? [];
+  const pendingProductsTotal = pendingProductsResponse?.total ?? 0;
+  const pendingProductsHasMore = pendingProductsResponse?.hasMore ?? false;
+  const currentPendingPage = Math.floor(pendingProductsOffset / PENDING_PRODUCTS_PAGE_SIZE) + 1;
+  const totalPendingPages = Math.ceil(pendingProductsTotal / PENDING_PRODUCTS_PAGE_SIZE);
+  const changePendingProductsPage = (offset: number) => {
+    setSelectedPendingProductIds([]);
+    setBulkApproveSkipped([]);
+    setPendingProductsOffset(Math.max(0, offset));
+  };
   const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
     queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
@@ -264,11 +324,61 @@ export default function AdminDashboard() {
     mutationFn: async ({ productId, status }: { productId: number; status: string }) => {
       await apiRequest('PATCH', `/api/products/${productId}/status`, { status });
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      setSelectedPendingProductIds((selected) => selected.filter((id) => id !== variables.productId));
       toast({ title: 'Product status updated.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/products/pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] }),
+      ]);
+      if (variables.status === 'approved') {
+        const refreshed = await refetchPendingProducts();
+        if (pendingProductsOffset > 0 && refreshed.data?.products.length === 0) {
+          changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE);
+        }
+      }
     },
+    onError: (error: Error, variables) => {
+      const isApprovalConflict = variables.status === 'approved' && error.message.startsWith('409');
+      toast({
+        title: isApprovalConflict ? 'Product approval blocked' : 'Product status update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const bulkApproveProductsMutation = useMutation({
+    mutationFn: async (productIds: number[]) => {
+      const response = await apiRequest('POST', '/api/admin/products/bulk-approve', { productIds });
+      return response.json() as Promise<{ approved: number[]; skipped: Array<{ id: number; reason: string }> }>;
+    },
+    onSuccess: async (result) => {
+      setSelectedPendingProductIds((selected) => selected.filter((id) => !result.approved.includes(id)));
+      setBulkApproveSkipped(result.skipped);
+      setBulkApproveConfirmationOpen(false);
+      toast({
+        title: 'Bulk approval complete',
+        description: `${result.approved.length} approved${result.skipped.length ? `, ${result.skipped.length} skipped` : ''}.`,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/products/pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] }),
+      ]);
+      const refreshed = await refetchPendingProducts();
+      if (pendingProductsOffset > 0 && refreshed.data?.products.length === 0) {
+        changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE);
+      }
+    },
+    onError: (error: Error) => toast({
+      title: 'Bulk approval failed',
+      description: error.message,
+      variant: 'destructive',
+    }),
   });
 
   const updateOrderStatusMutation = useMutation({
@@ -461,13 +571,24 @@ export default function AdminDashboard() {
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const pendingProducts = allProducts.filter(p => p.status === 'pending');
   const approvedProducts = allProducts.filter(p => p.status === 'approved');
   const featuredProducts = approvedProducts.filter(p => p.featured);
   const liveVendors = (vendors as any[]).filter(v => !['Adunni Fashion', 'Test Vendor Co'].includes(v.businessName));
   const pendingVendors = liveVendors.filter(v => v.status === 'pending');
   const actualOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => !order.isHistoricalLegacy);
   const historicalOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => order.isHistoricalLegacy);
+  const selectedPendingSet = new Set(selectedPendingProductIds);
+  const selectVisiblePendingProducts = () => {
+    setSelectedPendingProductIds(pendingProducts.filter((product) => product.status === 'pending').slice(0, PENDING_PRODUCTS_PAGE_SIZE).map((product) => product.id));
+    setBulkApproveSkipped([]);
+  };
+  const togglePendingProductSelection = (productId: number, checked: boolean) => {
+    setSelectedPendingProductIds((selected) => {
+      if (checked) return selected.length >= PENDING_PRODUCTS_PAGE_SIZE || selected.includes(productId) ? selected : [...selected, productId];
+      return selected.filter((id) => id !== productId);
+    });
+    setBulkApproveSkipped([]);
+  };
 
   const filteredOrders = useMemo(() => {
     let list = (Array.isArray(adminOrders) ? adminOrders as any[] : [])
@@ -886,46 +1007,154 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Product Approval Queue</span>
-                  <Badge variant="secondary">{pendingProducts.length} pending</Badge>
+                  <Badge variant="secondary">
+                    {pendingProductsResponse
+                      ? `${pendingProductsTotal} pending`
+                      : pendingProductsLoading ? 'Loading…' : pendingProductsError ? 'Unavailable' : '0 pending'}
+                  </Badge>
                 </CardTitle>
                 <CardDescription>Review each product against quality standards before approving it for the storefront.</CardDescription>
               </CardHeader>
               <CardContent>
-                {pendingProducts.length === 0 ? (
+                <div className="mb-3 flex flex-col gap-3 rounded-lg border bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-gray-600" aria-live="polite">
+                    {selectedPendingProductIds.length} selected
+                    {selectedPendingProductIds.length >= PENDING_PRODUCTS_PAGE_SIZE && <span className="ml-1"> (maximum {PENDING_PRODUCTS_PAGE_SIZE} per approval)</span>}
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={selectVisiblePendingProducts}
+                      disabled={pendingProductsFetching || pendingProducts.length === 0}
+                    >
+                      Select this page’s products (up to 50)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setSelectedPendingProductIds([]); setBulkApproveSkipped([]); }}
+                      disabled={selectedPendingProductIds.length === 0}
+                    >
+                      Clear selection
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-green-700 hover:bg-green-800"
+                      onClick={() => setBulkApproveConfirmationOpen(true)}
+                      disabled={selectedPendingProductIds.length === 0 || bulkApproveProductsMutation.isPending}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />Approve selected ({selectedPendingProductIds.length})
+                    </Button>
+                  </div>
+                </div>
+                <div className="mb-4 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-gray-600" aria-live="polite">
+                    {pendingProductsFetching && !pendingProductsResponse
+                      ? 'Loading pending products…'
+                      : pendingProductsTotal === 0
+                        ? `Showing 0 of ${pendingProductsTotal} pending products`
+                        : pendingProducts.length === 0
+                          ? `Showing 0 on this page of ${pendingProductsTotal} pending products`
+                          : `Showing ${pendingProductsOffset + 1}–${Math.min(pendingProductsOffset + pendingProducts.length, pendingProductsTotal)} of ${pendingProductsTotal} pending products`}
+                    {pendingProductsResponse && (
+                      <span className="ml-2 text-gray-500">Page {totalPendingPages === 0 ? 0 : currentPendingPage} of {totalPendingPages}</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE)}
+                      disabled={pendingProductsOffset === 0 || pendingProductsFetching}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => changePendingProductsPage(pendingProductsOffset + PENDING_PRODUCTS_PAGE_SIZE)}
+                      disabled={!pendingProductsHasMore || pendingProductsFetching}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+                {bulkApproveSkipped.length > 0 && (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3" role="status">
+                    <h3 className="mb-2 text-sm font-semibold text-amber-900">Products skipped during bulk approval</h3>
+                    <ul className="space-y-1 text-sm text-amber-900">
+                      {bulkApproveSkipped.map(({ id, reason }) => <li key={id}>Product #{id}: {reason}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {pendingProductsLoading ? (
+                  <div className="py-12 text-center text-sm text-gray-500">Loading pending products…</div>
+                ) : pendingProductsError ? (
+                  <div className="py-10 text-center">
+                    <p className="mb-3 text-sm text-red-600">Pending products could not be loaded. {pendingProductsError instanceof Error ? pendingProductsError.message : ''}</p>
+                    <Button variant="outline" onClick={() => refetchPendingProducts()}>Retry</Button>
+                  </div>
+                ) : pendingProducts.length === 0 ? (
                   <div className="text-center py-12">
-                    <CheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
-                    <h3 className="font-semibold text-gray-700">All caught up!</h3>
-                    <p className="text-gray-500 text-sm">No products awaiting approval.</p>
+                    {pendingProductsTotal === 0 ? (
+                      <>
+                        <CheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
+                        <h3 className="font-semibold text-gray-700">All caught up!</h3>
+                        <p className="text-gray-500 text-sm">No products awaiting approval.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-semibold text-gray-700">No products on this page</h3>
+                        <p className="text-gray-500 text-sm">There are {pendingProductsTotal} pending products in the queue. Use Previous to view the preceding page.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingProducts.map((product) => (
+                    {pendingProducts.map((product) => {
+                      const productImages = product.images?.length ? product.images : product.imageUrl ? [product.imageUrl] : [];
+                      const categoryName = categories.find((category) => category.id === product.categoryId)?.name;
+                      const isSelected = selectedPendingSet.has(product.id);
+                      return (
                       <div key={product.id} className="border border-gray-200 rounded-lg overflow-hidden">
                         <div className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                              <div className="w-20 h-20 flex-shrink-0">
-                                {product.images?.[0] ? (
-                                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover rounded" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                              <Checkbox
+                                checked={isSelected}
+                                disabled={product.status !== 'pending' || (!isSelected && selectedPendingProductIds.length >= PENDING_PRODUCTS_PAGE_SIZE)}
+                                aria-label={`Select ${product.name} for bulk approval`}
+                                onCheckedChange={(checked) => togglePendingProductSelection(product.id, checked === true)}
+                                className="mt-1"
+                              />
+                              <div className="h-20 w-20 flex-shrink-0">
+                                {productImages[0] ? (
+                                  <img src={productImages[0]} alt={product.name} className="h-full w-full rounded object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
                                     <Package className="w-6 h-6 text-white" />
                                   </div>
                                 )}
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <h3 className="font-semibold mb-1">{product.name}</h3>
-                                <p className="text-gray-500 text-sm line-clamp-2 mb-2">{product.description}</p>
+                                <p className="text-gray-500 text-sm line-clamp-2 mb-2">{product.shortDescription || product.description}</p>
                                 <div className="flex flex-wrap gap-2 text-xs">
                                   <span className="text-green-700 font-semibold">{formatPrice(product.price)}</span>
                                   <span className="text-gray-500">Stock: {product.stock}</span>
                                   <span className="text-gray-500">by <strong>{product.vendor.businessName}</strong></span>
-                                  <Badge variant="outline" className="text-xs">{product.category.name}</Badge>
+                                  {categoryName && <Badge variant="outline" className="text-xs">{categoryName}</Badge>}
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <Button size="sm" variant="outline" onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
+                            <div className="flex flex-wrap gap-2 sm:shrink-0">
+                              <Button size="sm" variant="outline" aria-label={expandedProductId === product.id ? 'Hide product details' : 'Review product details'} onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
                                 <Eye className="w-3 h-3 mr-1" />{expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </Button>
                               <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateProductStatusMutation.isPending} onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}>
@@ -940,11 +1169,11 @@ export default function AdminDashboard() {
 
                         {expandedProductId === product.id && (
                           <div className="border-t bg-gray-50 p-4 space-y-4">
-                            {product.images && product.images.length > 0 && (
+                            {productImages.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold text-gray-600 mb-2">All Images ({product.images.length})</p>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Product Images ({productImages.length})</p>
                                 <div className="flex gap-2 overflow-x-auto pb-1">
-                                  {product.images.map((img, i) => (
+                                  {productImages.map((img, i) => (
                                     <img key={i} src={img} alt={`img ${i+1}`} className="w-28 h-28 object-cover rounded-lg flex-shrink-0 border" onError={(e) => { e.currentTarget.style.display='none'; }} />
                                   ))}
                                 </div>
@@ -958,12 +1187,13 @@ export default function AdminDashboard() {
                               <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1"><ShieldCheck className="w-3 h-3" />Quality Standards</p>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {[
-                                  { label: 'Has product images', pass: product.images && product.images.length > 0 },
-                                  { label: 'Description (20+ chars)', pass: product.description?.length > 20 },
-                                  { label: 'Price set (> $0)', pass: parseFloat(product.price) > 0 },
-                                  { label: 'In stock (> 0)', pass: product.stock > 0 },
-                                  { label: 'Category assigned', pass: !!product.category?.name },
+                                  { label: 'Has product images', pass: productImages.length > 0 },
+                                  { label: 'Description entered', pass: !!product.description?.trim() },
+                                  { label: 'Price set (> ₦0)', pass: parseFloat(product.price) > 0 },
+                                  { label: 'Stock valid (0 or more)', pass: Number.isInteger(product.stock) && product.stock >= 0 },
+                                  { label: 'Category assigned', pass: !!product.categoryId && !!categoryName },
                                   { label: 'Vendor approved', pass: product.vendor?.status === 'approved' },
+                                  { label: 'Vendor verified', pass: product.vendor?.verificationStatus === 'verified' },
                                 ].map(({ label, pass }) => (
                                   <div key={label} className={`flex items-center gap-1.5 p-2 rounded text-xs ${pass ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                     {pass ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}{label}
@@ -984,11 +1214,33 @@ export default function AdminDashboard() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
+            <Dialog open={bulkApproveConfirmationOpen} onOpenChange={setBulkApproveConfirmationOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirm bulk product approval</DialogTitle>
+                  <DialogDescription>
+                    Approve {selectedPendingProductIds.length} selected product{selectedPendingProductIds.length === 1 ? '' : 's'}? Review each selected listing before continuing. Products that are no longer eligible will be skipped and reported by ID.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setBulkApproveConfirmationOpen(false)} disabled={bulkApproveProductsMutation.isPending}>Cancel</Button>
+                  <Button
+                    type="button"
+                    className="bg-green-700 hover:bg-green-800"
+                    disabled={bulkApproveProductsMutation.isPending || selectedPendingProductIds.length === 0 || selectedPendingProductIds.length > PENDING_PRODUCTS_PAGE_SIZE}
+                    onClick={() => bulkApproveProductsMutation.mutate(selectedPendingProductIds)}
+                  >
+                    {bulkApproveProductsMutation.isPending ? 'Approving…' : `Confirm approval (${selectedPendingProductIds.length})`}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Dialog open={repProductOpen} onOpenChange={setRepProductOpen}>
               <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
