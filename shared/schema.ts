@@ -100,7 +100,9 @@ export const vendors = pgTable("vendors", {
   verificationNotes: text("verification_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("vendors_user_id_unique").on(table.userId),
+]);
 
 // Categories table
 export const categories = pgTable("categories", {

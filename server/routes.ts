@@ -665,6 +665,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ message: 'Validation error', errors: error.errors });
+      } else if ((error as any)?.code === '23505' && (error as any)?.constraint === 'vendors_user_id_unique') {
+        const vendor = await storage.getVendorByUserId((req.user as any)?.id);
+        res.status(409).json({
+          message: 'You are already registered as a vendor.',
+          vendor,
+          alreadyRegistered: true,
+        });
       } else {
         console.error('Error creating vendor:', error);
         res.status(500).json({ message: 'Failed to create vendor' });

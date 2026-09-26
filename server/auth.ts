@@ -121,7 +121,7 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
       return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
     } catch (error: any) {
       if (error?.code === "23505") {
-        return res.status(409).json({ message: "An account already exists for this email.", hint: "sign_in" });
+        return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
       }
       console.error("Registration error:", error);
       return res.status(500).json({ message: "Registration failed" });
