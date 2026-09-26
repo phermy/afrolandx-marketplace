@@ -6,6 +6,7 @@ import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
 import { isAdmin, hasRole } from '@/lib/roleUtils';
 import Navbar from '@/components/navbar';
+import EventPlannerAdmin from '@/components/event-planner-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -480,6 +481,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="featured">Featured Products</TabsTrigger>
             <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="event-planners">Event Planners</TabsTrigger>
             <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="overview">System Overview</TabsTrigger>
           </TabsList>
@@ -1377,6 +1379,10 @@ export default function AdminDashboard() {
           </TabsContent>
 
           {/* ═══ DISCOVER TAB ════════════════════════════════════════════════ */}
+          <TabsContent value="event-planners">
+            <EventPlannerAdmin />
+          </TabsContent>
+
           <TabsContent value="discover">
             <div className="space-y-6">
               {/* Summary cards */}

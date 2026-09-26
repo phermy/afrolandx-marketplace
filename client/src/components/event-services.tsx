@@ -15,7 +15,6 @@ type Plan = {
   quoteItems: QuoteLine[]; plannerFeeNgn: number | null; commissionNgn: number | null;
   plannerNetNgn: number | null; quoteVersion: number; quoteValidUntil: string | null;
 };
-type Earning = { id: number; eventId: number; grossNgn: number; commissionNgn: number; netNgn: number; status: string };
 type EventMessage = { id: number; eventId: number; senderId: string; body: string; createdAt: string };
 const money = (value: number) => `₦${value.toLocaleString("en-NG")}`;
 const categories = ["venue", "hotel", "food", "wear", "other"] as const;
@@ -134,15 +133,10 @@ export default function EventServices() {
   const planners = useQuery<Planner[]>({ queryKey: ["event-planners"], queryFn: () => request("/api/event-planners") });
   const mine = useQuery<Planner | null>({ queryKey: ["event-planner-me"], queryFn: () => request("/api/event-planners/me"), enabled: !!user });
   const plans = useQuery<Plan[]>({ queryKey: ["event-plans"], queryFn: () => request("/api/event-plans"), enabled: !!user });
-  const admin = !!user?.roles?.includes("admin");
-  const applicants = useQuery<Planner[]>({ queryKey: ["event-planner-applicants"], queryFn: () => request("/api/admin/event-planners"), enabled: admin });
-  const earnings = useQuery<Earning[]>({ queryKey: ["event-earnings"], queryFn: () => request("/api/admin/event-earnings"), enabled: admin });
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["event-plans"] });
     client.invalidateQueries({ queryKey: ["event-planners"] });
     client.invalidateQueries({ queryKey: ["event-planner-me"] });
-    client.invalidateQueries({ queryKey: ["event-planner-applicants"] });
-    client.invalidateQueries({ queryKey: ["event-earnings"] });
     client.invalidateQueries({ queryKey: ["/api/auth/user"] });
   };
   const act = async (url: string, data?: unknown) => {
@@ -250,23 +244,6 @@ export default function EventServices() {
             <Button disabled={busy}>Apply as event planner</Button>
           </form>}</CardContent>
       </Card>}
-      {admin && <Card className="mt-10"><CardHeader><CardTitle>Event planner administration</CardTitle><CardDescription>Review applicants before making them available to customers. The 8% service-fee commission is recorded as due when customers confirm completed events; this page does not collect or settle it.</CardDescription></CardHeader>
-        <CardContent className="space-y-3">{applicants.data?.map(planner => <div key={planner.id} className="rounded border p-3 text-sm">
-          <strong>{planner.businessName}</strong> · {planner.location} · {planner.status}
-          <p className="whitespace-pre-wrap py-2">{planner.description}</p>
-          <div className="flex gap-2">{(["approved", "suspended", "rejected"] as const).filter(status => status !== planner.status).map(status => <Button key={status} variant="outline" size="sm" disabled={busy} onClick={async () => {
-            setBusy(true); setError("");
-            try { await request(`/api/admin/event-planners/${planner.id}/status`, "PATCH", { status }); refresh(); }
-            catch (error) { setError((error as Error).message); }
-            finally { setBusy(false); }
-          }}>{status === "approved" ? "Approve" : status === "suspended" ? "Suspend" : "Reject"}</Button>)}</div>
-        </div>)}
-        {!applicants.isLoading && !applicants.data?.length && <p className="text-sm">No planner applications yet.</p>}
-        {applicants.isError && <p className="text-sm text-red-700">Applications could not be loaded.</p>}
-        <h4 className="pt-3 font-semibold">Completed event commission records</h4>
-        {earnings.data?.map(row => <p key={row.id} className="rounded border p-2 text-sm">Event #{row.eventId}: quoted fee {money(row.grossNgn)} · Afrolandx commission {money(row.commissionNgn)} · fee after commission {money(row.netNgn)} · {row.status.replaceAll("_", " ")}</p>)}
-        {earnings.isError && <p className="text-sm text-red-700">Earnings could not be loaded.</p>}
-        </CardContent></Card>}
     </section>
   );
 }
