@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
+import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { getPaystackService } from "./paystack";
 
 export class TestVendorDeletionError extends Error {
@@ -32,6 +33,15 @@ type Snapshot = {
   quotes: { id: number; buyerId: string; status: string; cartFingerprint: string }[];
   notificationIds: number[];
 };
+
+export function isEligibleTestDeletionAccount(row: {
+  email: unknown; vendor_id: unknown; vendor_status: unknown; roles: unknown;
+}): boolean {
+  return !isDesignatedOwnerEmail(typeof row.email === "string" ? row.email : null) &&
+    Boolean(row.vendor_id) && ["rejected", "suspended"].includes(String(row.vendor_status)) &&
+    Boolean(row.email) && Array.isArray(row.roles) &&
+    !row.roles.some((role: string) => role === "admin" || role === "superadmin");
+}
 
 // A test payment is still a database record. Only Paystack itself can confirm
 // that the reference belongs to its test domain; local status is not enough.
@@ -67,9 +77,7 @@ async function loadSnapshot(client: any, userId: string): Promise<Snapshot> {
   `);
   if (!account.rows.length) throw new TestVendorDeletionError("Account not found.", 404);
   const row = account.rows[0];
-  if (!row.vendor_id || !["rejected", "suspended"].includes(row.vendor_status) ||
-      !row.email || !Array.isArray(row.roles) ||
-      row.roles.some((role: string) => role === "admin" || role === "superadmin")) {
+  if (!isEligibleTestDeletionAccount(row)) {
     throw new TestVendorDeletionError("Only inactive, non-admin vendor accounts can use test-data deletion.");
   }
   const vendorId = Number(row.vendor_id);

@@ -9,9 +9,19 @@ import {
   users, vendorLedgerEntries, vendors,
 } from "../shared/schema";
 import {
-  deleteVerifiedTestVendor, isConfirmedTestPayment, previewTestVendorDeletion,
+  deleteVerifiedTestVendor, isConfirmedTestPayment, isEligibleTestDeletionAccount, previewTestVendorDeletion,
   TestVendorDeletionError,
 } from "./test-vendor-deletion";
+
+test("the designated owner is never eligible for test-data deletion", () => {
+  const inactiveVendor = { vendor_id: 10, vendor_status: "suspended", roles: ["customer", "vendor"] };
+  assert.equal(isEligibleTestDeletionAccount({
+    ...inactiveVendor, email: "FEMI.ELEGBELEYE@AFROLANDX.COM",
+  }), false);
+  assert.equal(isEligibleTestDeletionAccount({
+    ...inactiveVendor, email: "ordinary-vendor@example.test",
+  }), true);
+});
 
 test("only matching test-mode payments are eligible", () => {
   const order = {

@@ -310,6 +310,11 @@ export default function AdminDashboard() {
       else await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
     },
     onSuccess: () => { toast({ title: 'Role updated.' }); queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] }); },
+    onError: (error: any) => toast({
+      title: 'Could not change role',
+      description: error?.message || 'The role was not changed.',
+      variant: 'destructive',
+    }),
   });
 
   const deleteUserMutation = useMutation({
@@ -1371,7 +1376,11 @@ export default function AdminDashboard() {
                             </Button>
                             {vendor.status === 'pending' && (
                               <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified'} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified' ||
+                                    !hasRole(user, 'superadmin') || !user?.emailVerified}
+                                  title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can approve vendors.' : undefined}
+                                  onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                   <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
                                 <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>
@@ -1405,9 +1414,24 @@ export default function AdminDashboard() {
                   User Management
                   <Badge variant="outline">{allUsers.length} users</Badge>
                 </CardTitle>
-                <CardDescription>Assign and revoke platform roles.</CardDescription>
+                <CardDescription>
+                  {hasRole(user, 'superadmin') && user?.emailVerified
+                    ? 'Review every account and manage its platform roles.'
+                    : 'Only verified superadmins can change account roles.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
+                {hasRole(user, 'superadmin') && user?.emailVerified && (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <h3 className="flex items-center gap-2 font-semibold text-amber-950">
+                      <ShieldCheck className="h-4 w-4" /> Superadmin role management
+                    </h3>
+                    <p className="mt-1 text-sm text-amber-900">
+                      Check or uncheck roles for other users, including Admin. Granting Superadmin gives a verified user
+                      full admin access and the ability to manage roles. Your own roles and the designated owner’s roles are protected.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-3">
                   {allUsers.map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -1429,18 +1453,34 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4 flex-wrap justify-end">
-                        {['customer', 'vendor', 'admin'].map(role => {
+                        {hasRole(user, 'superadmin') && user?.emailVerified && ['customer', 'vendor', 'admin', 'superadmin'].map(role => {
                           const uHasRole = hasRole(u, role);
-                          const isSelf = u.id === user?.id && role === 'admin' && uHasRole;
-                          const isProtected = hasRole(u, 'superadmin');
+                          const isSelf = u.id === user?.id;
+                          const isProtected = u.roleManagementLocked;
+                          const cannotGrantSuperadmin = role === 'superadmin' && !uHasRole && !u.emailVerified;
+                          const adminRequired = role === 'admin' && uHasRole && hasRole(u, 'superadmin');
                           return (
                             <div key={role} className="flex items-center gap-1.5">
-                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole} disabled={isSelf || isProtected}
+                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole}
+                                disabled={isSelf || isProtected || cannotGrantSuperadmin || adminRequired || toggleUserRoleMutation.isPending}
                                 onCheckedChange={() => {
-                                  if (isSelf || isProtected) { toast({ title: 'This account’s roles cannot be changed here.', variant: 'destructive' }); return; }
+                                  if (isSelf || isProtected) {
+                                    toast({ title: 'This account’s roles cannot be changed here.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  if (role === 'superadmin') {
+                                    const label = u.email || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'this user';
+                                    const prompt = uHasRole
+                                      ? `Remove Superadmin from ${label}? They will keep their Admin role.`
+                                      : `Grant Superadmin to ${label}? This gives them full admin access and the ability to assign roles to others.`;
+                                    if (!window.confirm(prompt)) return;
+                                  }
                                   toggleUserRoleMutation.mutate({ userId: u.id, role, hasRole: uHasRole });
                                 }} />
-                              <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer">{role}</label>
+                              <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer"
+                                title={cannotGrantSuperadmin ? 'Verify this user’s email before granting Superadmin.' : undefined}>
+                                {role}
+                              </label>
                             </div>
                           );
                         })}
@@ -1460,7 +1500,8 @@ export default function AdminDashboard() {
                           size="sm"
                           variant="destructive"
                           className="gap-1"
-                           disabled={u.id === user?.id || hasRole(u, 'superadmin') || deleteUserMutation.isPending}
+                           disabled={u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') ||
+                             (hasRole(u, 'admin') && !hasRole(user, 'superadmin')) || deleteUserMutation.isPending}
                           onClick={() => {
                             if (u.id === user?.id) return;
                             const label = u.firstName || u.lastName
@@ -1533,7 +1574,7 @@ export default function AdminDashboard() {
 
           {/* ═══ DISCOVER TAB ════════════════════════════════════════════════ */}
           <TabsContent value="event-planners">
-            <EventPlannerAdmin />
+            <EventPlannerAdmin canManageRoles={hasRole(user, 'superadmin') && Boolean(user?.emailVerified)} />
           </TabsContent>
 
           <TabsContent value="discover">

@@ -1,5 +1,11 @@
-// Only an existing, email-verified designated owner can receive the
-// non-delegable superadmin role. Ordinary admin APIs never issue this role.
+// The designated owner is seeded on startup and cannot lose access through
+// role management. Verified superadmins may delegate the role to other users.
+export const DESIGNATED_OWNER_EMAIL = "femi.elegbeleye@afrolandx.com";
+
+export function isDesignatedOwnerEmail(email: string | null | undefined): boolean {
+  return email?.trim().toLowerCase() === DESIGNATED_OWNER_EMAIL;
+}
+
 export function bootstrappedAdminRoles(
   currentRoles: unknown,
   isVerifiedOwner: boolean,

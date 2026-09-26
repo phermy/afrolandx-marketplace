@@ -83,6 +83,7 @@ import {
   type InsertDropRsvp,
 } from "@shared/schema";
 import { db } from "./db";
+import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt } from "drizzle-orm";
 
@@ -96,7 +97,7 @@ export interface IStorage {
   removeUserRole(userId: string, role: string): Promise<void>;
   updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
-  deleteUser(userId: string): Promise<boolean>;
+  deleteUser(userId: string, actorId: string): Promise<boolean>;
   updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
@@ -339,26 +340,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addUserRole(userId: string, role: string): Promise<void> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user) {
-      const currentRoles = user.roles as string[] || [];
-      if (!currentRoles.includes(role)) {
-        const newRoles = [...currentRoles, role];
-        await this.updateUserRoles(userId, newRoles);
+    await db.transaction(async tx => {
+      const locked = await tx.execute(sql`SELECT roles FROM users WHERE id = ${userId} FOR UPDATE`);
+      if (!locked.rows.length) return;
+      const roles = Array.isArray(locked.rows[0].roles) ? locked.rows[0].roles as string[] : [];
+      if (!roles.includes(role)) {
+        await tx.update(users).set({ roles: [...roles, role], updatedAt: new Date() }).where(eq(users.id, userId));
       }
-    }
+    });
   }
 
   async removeUserRole(userId: string, role: string): Promise<void> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user) {
-      const currentRoles = user.roles as string[] || [];
-      const newRoles = currentRoles.filter(r => r !== role);
-      if (newRoles.length === 0) {
-        newRoles.push("customer"); // Always keep at least customer role
-      }
-      await this.updateUserRoles(userId, newRoles);
-    }
+    await db.transaction(async tx => {
+      const locked = await tx.execute(sql`SELECT roles FROM users WHERE id = ${userId} FOR UPDATE`);
+      if (!locked.rows.length) return;
+      const roles = Array.isArray(locked.rows[0].roles) ? locked.rows[0].roles as string[] : [];
+      const next = roles.filter(r => r !== role);
+      if (!next.length) next.push("customer");
+      await tx.update(users).set({ roles: next, updatedAt: new Date() }).where(eq(users.id, userId));
+    });
   }
 
   async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined> {
@@ -374,12 +374,28 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users).orderBy(desc(users.createdAt));
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
+  async deleteUser(userId: string, actorId: string): Promise<boolean> {
     return await db.transaction(async (tx) => {
       // Only unused accounts can be hard-deleted. Keep orders, payouts, catalog
       // and other linked history intact for a separate, reviewed closure flow.
-      const account = await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
-      if (account.rows.length === 0) return false;
+      const locked = await tx.execute(sql`
+        SELECT id, email, email_verified, roles FROM users
+        WHERE id IN (${userId}, ${actorId}) ORDER BY id FOR UPDATE
+      `);
+      const account = locked.rows.find(row => row.id === userId);
+      const actor = locked.rows.find(row => row.id === actorId);
+      if (!account) return false;
+      if (!actor || actorId === userId || !Array.isArray(actor.roles) || !actor.roles.includes("admin")) {
+        throw new Error("ACCOUNT_DELETION_FORBIDDEN");
+      }
+      if (isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
+        (Array.isArray(account.roles) && account.roles.includes("superadmin"))) {
+        throw new Error("PROTECTED_ACCOUNT");
+      }
+      if (Array.isArray(account.roles) && account.roles.includes("admin") &&
+        (!actor.email_verified || !actor.roles.includes("superadmin"))) {
+        throw new Error("SUPERADMIN_REQUIRED");
+      }
       const vendor = await tx.execute(sql`SELECT id FROM vendors WHERE user_id = ${userId} LIMIT 1`);
       const order = await tx.execute(sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`);
       if (vendor.rows.length || order.rows.length) {

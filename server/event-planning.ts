@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { isAuthenticated } from "./auth";
 import { storage } from "./storage";
+import { assertRoleTargetMutable, lockVerifiedSuperadminAndTarget, RoleManagementError } from "./superadmin-role-management";
 import { eventPlans, eventPlanMessages, eventPlannerEarnings, eventPlannerProfiles, users } from "@shared/schema";
 
 const profileSchema = z.object({
@@ -53,6 +54,7 @@ const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character] || character);
 const ngn = (value: number) => `₦${value.toLocaleString("en-NG")}`;
 const catchError = (res: any, error: unknown) => {
+  if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
   if (error instanceof z.ZodError) return res.status(400).json({ message: "Check the information entered", errors: error.flatten() });
   console.error("Event planning request failed", error);
   return res.status(500).json({ message: "Event request could not be completed" });
@@ -106,17 +108,19 @@ export function registerEventPlanningRoutes(app: Express) {
   app.patch("/api/admin/event-planners/:id/status", isAuthenticated, async (req, res) => {
     try {
       const user = await storage.getUser(userId(req));
-      if (!Array.isArray(user?.roles) || !user.roles.includes("admin")) return res.sendStatus(403);
+      if (!user?.emailVerified || !Array.isArray(user.roles) ||
+        !user.roles.includes("admin") || !user.roles.includes("superadmin")) {
+        return res.status(403).json({ message: "Verified superadmin access is required to change planner roles." });
+      }
       const id = eventId(req.params.id);
       if (!id) return res.sendStatus(400);
       const { status } = z.object({ status: z.enum(["approved", "suspended", "rejected"]) }).strict().parse(req.body);
       const profile = await db.transaction(async tx => {
         const [existing] = await tx.select().from(eventPlannerProfiles).where(eq(eventPlannerProfiles.id, id));
         if (!existing) return null;
-        await tx.execute(sql`SELECT id FROM users WHERE id = ${existing.userId} FOR UPDATE`);
-        const [account] = await tx.select().from(users).where(eq(users.id, existing.userId));
-        if (!account) return null;
-        const currentRoles = Array.isArray(account.roles) ? account.roles.filter((role): role is string => typeof role === "string") : ["customer"];
+        const { target } = await lockVerifiedSuperadminAndTarget(tx, userId(req), existing.userId);
+        assertRoleTargetMutable(userId(req), existing.userId, target.email);
+        const currentRoles = Array.isArray(target.roles) ? target.roles.filter((role): role is string => typeof role === "string") : ["customer"];
         const roles = status === "approved"
           ? Array.from(new Set([...currentRoles, "event_planner"]))
           : currentRoles.filter(role => role !== "event_planner");

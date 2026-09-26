@@ -19,7 +19,7 @@ async function request(url: string, method = "GET", data?: unknown) {
   return body;
 }
 
-export default function EventPlannerAdmin() {
+export default function EventPlannerAdmin({ canManageRoles }: { canManageRoles: boolean }) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -50,12 +50,15 @@ export default function EventPlannerAdmin() {
     <Card>
       <CardHeader><CardTitle>Event planner administration</CardTitle></CardHeader>
       <CardContent className="space-y-3">
+        {!canManageRoles && (
+          <p className="text-sm text-gray-600">Only verified superadmins can approve, suspend, or reject event planners.</p>
+        )}
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         {applicants.data?.map(planner => (
           <div key={planner.id} className="rounded border p-3 text-sm">
             <strong>{planner.businessName}</strong> · {planner.location} · {planner.status}
             <p className="whitespace-pre-wrap py-2">{planner.description}</p>
-            <div className="flex gap-2">
+            {canManageRoles && <div className="flex gap-2">
               {(["approved", "suspended", "rejected"] as const)
                 .filter(status => status !== planner.status)
                 .map(status => (
@@ -64,7 +67,7 @@ export default function EventPlannerAdmin() {
                     {status === "approved" ? "Approve" : status === "suspended" ? "Suspend" : "Reject"}
                   </Button>
                 ))}
-            </div>
+            </div>}
           </div>
         ))}
         {applicants.isLoading && <p className="text-sm">Loading applications…</p>}

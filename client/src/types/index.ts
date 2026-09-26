@@ -7,6 +7,8 @@ export interface User {
   lastName?: string;
   profileImageUrl?: string;
   roles: string[];
+  emailVerified?: boolean;
+  roleManagementLocked?: boolean;
   createdAt: string;
   updatedAt: string;
 }

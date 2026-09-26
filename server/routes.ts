@@ -2,6 +2,8 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
+import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
@@ -398,6 +400,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  const isSuperadmin = async (req: any, res: any, next: any) => {
+    try {
+      const current = await storage.getUser(req.user?.id);
+      if (!current || !current.emailVerified || !hasRole(current, 'admin') || !hasRole(current, 'superadmin')) {
+        return res.status(403).json({ message: 'Verified superadmin access is required.' });
+      }
+      next();
+    } catch (error) {
+      res.status(500).json({ message: 'Could not check superadmin access.' });
+    }
+  };
+
   // The client route alone is not an access boundary; deny direct page loads too.
   app.get('/discover', isAuthenticated, isAdmin, (_req, _res, next) => next());
 
@@ -483,7 +497,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      res.json(users.map(sanitizeUser));
+      res.json(users.map(account => ({
+        ...sanitizeUser(account),
+        roleManagementLocked: isDesignatedOwnerEmail(account.email),
+      })));
     } catch (error) {
       console.error('Error fetching users:', error);
       res.status(500).json({ message: 'Failed to fetch users' });
@@ -500,12 +517,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (userId === req.user.id) {
         return res.status(400).json({ message: 'You cannot delete your own admin account' });
       }
+      const target = await storage.getUser(userId);
+      const actor = await storage.getUser(req.user.id);
+      if (hasRole(target, 'admin') && !hasRole(actor, 'superadmin')) {
+        return res.status(403).json({ message: 'Only a superadmin can delete an admin account.' });
+      }
 
-      const deleted = await storage.deleteUser(userId);
+      const deleted = await storage.deleteUser(userId, req.user.id);
       if (!deleted) return res.status(404).json({ message: 'User not found' });
       res.json({ message: 'Unused account deleted successfully' });
     } catch (error: any) {
       console.error('Error deleting user:', error);
+      if (error?.message === 'PROTECTED_ACCOUNT' || error?.message === 'ACCOUNT_DELETION_FORBIDDEN') {
+        return res.status(403).json({ message: 'This protected account cannot be deleted.' });
+      }
+      if (error?.message === 'SUPERADMIN_REQUIRED') {
+        return res.status(403).json({ message: 'Only a verified superadmin can delete an admin account.' });
+      }
       if (error?.message === 'ACCOUNT_HAS_LINKED_RECORDS') {
         return res.status(409).json({
           message: 'This account has a vendor profile or orders. It cannot be permanently deleted here; no data was removed.',
@@ -562,72 +590,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update user roles (admin only)
-  app.patch('/api/admin/users/:userId/roles', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { roles } = req.body;
-      
-      if (!Array.isArray(roles) || !roles.every(role => ['customer', 'vendor', 'admin'].includes(role))) {
-        return res.status(400).json({ message: 'Invalid roles array' });
-      }
+  const handleRoleManagementError = (error: unknown, res: any) => {
+    if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
+    console.error('Role management failed:', error);
+    return res.status(500).json({ message: 'Could not update user roles.' });
+  };
 
-      await storage.updateUserRoles(userId, roles);
-      res.json({ message: 'User roles updated successfully' });
+  // Role management, including the legacy grant endpoint, belongs only to
+  // verified superadmins. The service checks privileges again under row locks.
+  app.patch('/api/admin/users/:userId/roles', isAuthenticated, isSuperadmin, async (req: any, res) => {
+    try {
+      const roles = await updateManagedRoles(req.user.id, req.params.userId, { roles: req.body?.roles });
+      res.json({ message: 'User roles updated successfully', roles });
     } catch (error) {
-      console.error('Error updating user roles:', error);
-      res.status(500).json({ message: 'Failed to update user roles' });
+      handleRoleManagementError(error, res);
     }
   });
 
-  // Add role to user (admin only)
-  app.post('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
+  app.post('/api/admin/users/:userId/roles/:role', isAuthenticated, isSuperadmin, async (req: any, res) => {
     try {
-      const { userId, role } = req.params;
-      
-      if (!['customer', 'vendor', 'admin'].includes(role)) {
-        return res.status(400).json({ message: 'Invalid role' });
-      }
-      
-      await storage.addUserRole(userId, role);
-      res.json({ message: 'Role added successfully' });
+      const roles = await updateManagedRoles(req.user.id, req.params.userId, { role: req.params.role, enabled: true });
+      res.json({ message: 'Role added successfully', roles });
     } catch (error) {
-      console.error('Error adding user role:', error);
-      res.status(500).json({ message: 'Failed to add user role' });
+      handleRoleManagementError(error, res);
     }
   });
 
-  // Remove role from user (admin only)
-  app.delete('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
+  app.delete('/api/admin/users/:userId/roles/:role', isAuthenticated, isSuperadmin, async (req: any, res) => {
     try {
-      const { userId, role } = req.params;
-      
-      if (!['customer', 'vendor', 'admin'].includes(role)) {
-        return res.status(400).json({ message: 'Invalid role' });
-      }
-      
-      await storage.removeUserRole(userId, role);
-      res.json({ message: 'Role removed successfully' });
+      const roles = await updateManagedRoles(req.user.id, req.params.userId, { role: req.params.role, enabled: false });
+      res.json({ message: 'Role removed successfully', roles });
     } catch (error) {
-      console.error('Error removing user role:', error);
-      res.status(500).json({ message: 'Failed to remove user role' });
+      handleRoleManagementError(error, res);
     }
   });
 
-  // Grant admin privileges to users
-  app.post('/api/admin/grant-admin', isAuthenticated, isAdmin, async (req, res) => {
+  app.post('/api/admin/grant-admin', isAuthenticated, isSuperadmin, async (req: any, res) => {
     try {
-      const { userId } = req.body;
-      
-      if (!userId) {
-        return res.status(400).json({ message: 'User ID is required' });
-      }
-
-      await storage.addUserRole(userId, 'admin');
-      res.json({ message: 'Admin privileges granted successfully' });
+      const roles = await updateManagedRoles(req.user.id, req.body?.userId, { role: 'admin', enabled: true });
+      res.json({ message: 'Admin privileges granted successfully', roles });
     } catch (error) {
-      console.error('Error granting admin privileges:', error);
-      res.status(500).json({ message: 'Failed to grant admin privileges' });
+      handleRoleManagementError(error, res);
     }
   });
 
@@ -930,14 +933,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'approved' && vendor.verificationStatus !== 'verified') {
         return res.status(409).json({ message: 'CAC, identity, and business verification must be completed before approval' });
       }
-      await storage.updateVendorStatus(vendorId, status);
       if (status === 'approved') {
-        // Keep the authorization role in sync for legacy/manual vendor records.
-        await storage.addUserRole(vendor.userId, 'vendor');
+        const updatedVendor = await approveVendorWithRole((req.user as any).id, vendorId);
+        return res.json({ message: 'Vendor status updated', vendor: updatedVendor });
       }
+      await storage.updateVendorStatus(vendorId, status);
       const updatedVendor = await storage.getVendor(vendorId);
       res.json({ message: 'Vendor status updated', vendor: updatedVendor });
     } catch (error) {
+      if (error instanceof RoleManagementError) {
+        return res.status(error.status).json({ message: error.message });
+      }
       res.status(500).json({ message: 'Failed to update vendor status' });
     }
   });
