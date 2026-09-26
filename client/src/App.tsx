@@ -99,7 +99,14 @@ function Router() {
       <Route path="/collab-drops" component={CollabDrops} />
       <Route path="/collab-drops/:id" component={CollabDropDetail} />
       <Route path="/events" component={EventPlanner} />
-      <Route path="/discover" component={DiscoverAfrica} />
+      <Route path="/discover">
+        <AdminProtectedRoute>
+          <div className="bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-900" role="status">
+            Internal preview only. Discover is hidden from customers; new bookings and payments are disabled.
+          </div>
+          <DiscoverAfrica />
+        </AdminProtectedRoute>
+      </Route>
       <Route path="/lookbook" component={Lookbook} />
       <Route path="/policies/:slug" component={PolicyDetail} />
       <Route path="/policies" component={Policies} />

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { FormEvent, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/lib/roleUtils";
 import { apiRequest } from "@/lib/queryClient";
 
 type Mood = "sad" | "indifferent" | "happy";
@@ -13,7 +14,7 @@ const moods: Array<{ value: Mood; face: string; label: string }> = [
 
 export default function SiteFooter() {
   const year = useMemo(() => new Date().getFullYear(), []);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [mood, setMood] = useState<Mood | null>(null);
   const [comment, setComment] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -48,7 +49,7 @@ export default function SiteFooter() {
         <div>
           <p className="site-footer__label">Company</p>
           <Link href="/products">Shop products</Link>
-          <Link href="/discover">Discover Africa</Link>
+          {isAuthenticated && isAdmin(user) && <Link href="/discover">Discover Africa</Link>}
           <Link href="/lookbook">Lookbook</Link>
         </div>
         <div>

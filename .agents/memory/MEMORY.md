@@ -11,3 +11,4 @@
 - [File download handoff](file-download-handoff.md) — asset cards and file-tree downloads failed for this user; provide a verified browser download link instead
 - [Bot-check access](bot-check-access.md) — broken Turnstile locked out sign-in; only add an image challenge with a provider that supports it and verified hostnames
 - [Event planner commission](event-planner-commission.md) — user chose 8% of planner fee only; do not include outside supplier charges or enable fee collection without safe settlement
+- [Discover release gate](discover-release-gate.md) — keep Discover admin-only until reservations and payments are implemented and ready for a public launch

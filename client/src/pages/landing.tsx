@@ -150,7 +150,7 @@ export default function Landing() {
               <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-products">Products</a>
               <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
               <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
-              <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>
+              {isAuthenticated && isAdmin(user) && <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>}
               <Link href="/policies" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">Policies</Link>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">About</a>
             </div>
@@ -193,10 +193,10 @@ export default function Landing() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-collab-drops">
                 <Zap className="w-5 h-5" /><span>Collab Drops</span>
               </a>
-              <a href="/discover" onClick={() => setIsMobileMenuOpen(false)}
+              {isAuthenticated && isAdmin(user) && <a href="/discover" onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-discover">
                 <MapPin className="w-5 h-5" /><span>Discover Africa</span>
-              </a>
+              </a>}
               <a href="#about" onClick={() => setIsMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>

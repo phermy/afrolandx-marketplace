@@ -396,6 +396,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // The client route alone is not an access boundary; deny direct page loads too.
+  app.get('/discover', isAuthenticated, isAdmin, (_req, _res, next) => next());
+
+  // Ordinary admin tools cannot remove the owner-level role (including by
+  // replacing all roles) or delete an account that holds it.
+  const protectSuperadmin = async (req: any, res: any, next: any) => {
+    try {
+      const target = await storage.getUser(req.params.userId);
+      if (hasRole(target, 'superadmin')) return res.status(403).json({ message: 'Superadmin accounts cannot be changed here' });
+      next();
+    } catch (error) {
+      console.error('Superadmin protection failed:', error);
+      res.status(500).json({ message: 'Could not check account privileges' });
+    }
+  };
+
   // Vendor check middleware
   const isVendor = async (req: any, res: any, next: any) => {
     try {
@@ -473,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Permanently delete a user/customer and their account-owned data (admin only).
-  app.delete('/api/admin/users/:userId', isAuthenticated, isAdmin, async (req: any, res) => {
+  app.delete('/api/admin/users/:userId', isAuthenticated, isAdmin, protectSuperadmin, async (req: any, res) => {
     try {
       const { userId } = req.params;
       if (!userId || typeof userId !== 'string') {
@@ -493,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user roles (admin only)
-  app.patch('/api/admin/users/:userId/roles', isAuthenticated, isAdmin, async (req, res) => {
+  app.patch('/api/admin/users/:userId/roles', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
     try {
       const { userId } = req.params;
       const { roles } = req.body;
@@ -511,7 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add role to user (admin only)
-  app.post('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, async (req, res) => {
+  app.post('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
     try {
       const { userId, role } = req.params;
       
@@ -528,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove role from user (admin only)
-  app.delete('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, async (req, res) => {
+  app.delete('/api/admin/users/:userId/roles/:role', isAuthenticated, isAdmin, protectSuperadmin, async (req, res) => {
     try {
       const { userId, role } = req.params;
       
@@ -5318,7 +5334,7 @@ Return ONLY valid JSON:
   }
 
   // Search for places across Africa using OpenStreetMap (Nominatim) — free, no API key
-  app.get('/api/places/search', async (req, res) => {
+  app.get('/api/places/search', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { query, type, lat, lng, radius = '10000', city = '', country = '' } = req.query;
 
@@ -5406,7 +5422,7 @@ Return ONLY valid JSON:
   });
 
   // Get place details by OSM ID (type/id) using Nominatim lookup
-  app.get('/api/places/:osmType/:osmId', async (req, res) => {
+  app.get('/api/places/:osmType/:osmId', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { osmType, osmId } = req.params;
       if (!['node', 'way', 'relation', 'nominatim'].includes(osmType)) {
@@ -5495,7 +5511,7 @@ Return ONLY valid JSON:
   });
 
   // Save any inquiry (guide registration, business claim, deal listing, destination feature)
-  app.post('/api/discover/inquiries', async (req, res) => {
+  app.post('/api/discover/inquiries', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { discoverInquiries } = await import('@shared/schema');
       const { db } = await import('./db');
@@ -5518,120 +5534,14 @@ Return ONLY valid JSON:
     }
   });
 
-  const discoverDeals = {
-    'Lagos Luxury Stay': { type: 'hotel', basePrice: 120000, discountPercent: 25 },
-    'Dinner for Two': { type: 'restaurant', basePrice: 35000, discountPercent: 30 },
-    'Cairo City Tour': { type: 'tour', basePrice: 45000, discountPercent: 20 },
-    'Cape Town Getaway': { type: 'hotel', basePrice: 180000, discountPercent: 35 },
-    'Nairobi Safari': { type: 'adventure', basePrice: 220000, discountPercent: 15 },
-    'Marrakech Medina Tour': { type: 'tour', basePrice: 55000, discountPercent: 40 },
-  } as const;
+  // Discover is an internal preview. Never initiate new customer charges
+  // until actual reservations, cancellations and refunds are supported.
+  app.post('/api/discover/bookings/initialize', isAuthenticated, isAdmin, (_req, res) =>
+    res.status(503).json({ message: 'Discover bookings are not available yet.' }));
+  app.post('/api/discover/premium/initialize', isAuthenticated, isAdmin, (_req, res) =>
+    res.status(503).json({ message: 'Discover premium is not available yet.' }));
 
-  // Initialize a deal booking + Paystack payment
-  app.post('/api/discover/bookings/initialize', async (req: any, res) => {
-    try {
-      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
-      const { discoverBookings } = await import('@shared/schema');
-      const { db } = await import('./db');
-      const input = z.object({
-        dealTitle: z.enum(Object.keys(discoverDeals) as [keyof typeof discoverDeals, ...(keyof typeof discoverDeals)[]]),
-        guestName: z.string().trim().min(2).max(255),
-        guestEmail: z.string().trim().email().max(255).transform(value => value.toLowerCase()),
-        guestCount: z.coerce.number().int().min(1).max(20),
-        bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      }).parse(req.body);
-      const bookingDay = new Date(`${input.bookingDate}T00:00:00.000Z`);
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
-      if (!Number.isFinite(bookingDay.getTime()) || bookingDay < today) {
-        return res.status(400).json({ message: 'Choose a current or future booking date' });
-      }
-      const deal = discoverDeals[input.dealTitle];
-      const perGuest = Math.round(deal.basePrice * (1 - deal.discountPercent / 100));
-      const totalAmountNgn = perGuest * input.guestCount;
-      const reference = `discover_booking_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-      const [booking] = await db.insert(discoverBookings).values({
-        userId: req.user?.id || null,
-        dealTitle: input.dealTitle,
-        dealType: deal.type,
-        guestName: input.guestName,
-        guestEmail: input.guestEmail,
-        guestCount: input.guestCount,
-        bookingDate: input.bookingDate,
-        totalAmountNgn,
-        paymentReference: reference, paymentStatus: 'pending',
-      }).returning();
-      const paystack = getPaystackService();
-      const callbackUrl = `${req.protocol}://${req.get('host')}/discover?booking_ref=${reference}`;
-      let txn;
-      try {
-        txn = await paystack.initializeTransaction(
-          input.guestEmail,
-          totalAmountNgn,
-          reference,
-          { bookingId: booking.id, dealTitle: input.dealTitle, guestEmail: input.guestEmail },
-          callbackUrl,
-          'NGN'
-        );
-      } catch (error) {
-        if (!(error instanceof PaystackRequestError) || !error.ambiguous) {
-          await db.delete(discoverBookings).where(eq(discoverBookings.id, booking.id));
-        }
-        throw error;
-      }
-      res.json({ success: true, bookingId: booking.id, authorizationUrl: txn.data.authorization_url, reference });
-    } catch (err) {
-      console.error('[discover/bookings/initialize]', err);
-      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Please check your booking details', errors: err.errors });
-      res.status(err instanceof PaystackRequestError ? 502 : 500).json({ message: 'Failed to initialize booking payment' });
-    }
-  });
-
-  // Initialize Premium subscription payment
-  app.post('/api/discover/premium/initialize', async (req: any, res) => {
-    try {
-      if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });
-      const { discoverPremium } = await import('@shared/schema');
-      const { db } = await import('./db');
-      const { email } = z.object({
-        email: z.string().trim().email().max(255).transform(value => value.toLowerCase()),
-      }).parse(req.body);
-      const reference = `discover_premium_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-      const [sub] = await db.insert(discoverPremium).values({
-        userId: req.user?.id || null,
-        guestEmail: email,
-        paymentReference: reference,
-        paymentStatus: 'pending',
-        subscriptionStart: null,
-        subscriptionEnd: null,
-      }).returning();
-      const paystack = getPaystackService();
-      const callbackUrl = `${req.protocol}://${req.get('host')}/discover?premium_ref=${reference}`;
-      let txn;
-      try {
-        txn = await paystack.initializeTransaction(
-          email,
-          2500,
-          reference,
-          { subscriptionId: sub.id, plan: 'Explorer Premium Monthly', guestEmail: email },
-          callbackUrl,
-          'NGN'
-        );
-      } catch (error) {
-        if (!(error instanceof PaystackRequestError) || !error.ambiguous) {
-          await db.delete(discoverPremium).where(eq(discoverPremium.id, sub.id));
-        }
-        throw error;
-      }
-      res.json({ success: true, subscriptionId: sub.id, authorizationUrl: txn.data.authorization_url, reference });
-    } catch (err) {
-      console.error('[discover/premium/initialize]', err);
-      if (err instanceof z.ZodError) return res.status(400).json({ message: 'Enter a valid email address' });
-      res.status(err instanceof PaystackRequestError ? 502 : 500).json({ message: 'Failed to initialize premium payment' });
-    }
-  });
-
-  // Verify discover payment (booking or premium)
+  // Retain verification for payments initialized before Discover was hidden.
   app.post('/api/discover/payment/verify', async (req, res) => {
     try {
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured.' });

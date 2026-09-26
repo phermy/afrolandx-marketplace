@@ -100,7 +100,7 @@ export default function Navbar() {
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
-              <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
+              {isAuthenticated && isAdmin(user) && <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>}
               <Link href="/policies" className={navLinkClass('/policies')}>Policies</Link>
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
@@ -263,9 +263,9 @@ export default function Navbar() {
             <Link href="/collab-drops" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/collab-drops')}><Zap className="w-5 h-5" /><span>Collab Drops</span></div>
             </Link>
-            <Link href="/discover" onClick={closeMobileMenu}>
+            {isAuthenticated && isAdmin(user) && <Link href="/discover" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
-            </Link>
+            </Link>}
             <Link href="/policies" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/policies')}><FileText className="w-5 h-5" /><span>Policies</span></div>
             </Link>

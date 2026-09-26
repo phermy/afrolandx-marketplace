@@ -1329,7 +1329,7 @@ export default function AdminDashboard() {
                           <p className="text-xs text-gray-500">{u.email}</p>
                           <div className="flex gap-1 mt-1">
                             {(u.roles as string[] || []).map(r => (
-                              <Badge key={r} variant={r === 'admin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
+                              <Badge key={r} variant={r === 'admin' || r === 'superadmin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
                             ))}
                           </div>
                         </div>
@@ -1338,11 +1338,12 @@ export default function AdminDashboard() {
                         {['customer', 'vendor', 'admin'].map(role => {
                           const uHasRole = hasRole(u, role);
                           const isSelf = u.id === user?.id && role === 'admin' && uHasRole;
+                          const isProtected = hasRole(u, 'superadmin');
                           return (
                             <div key={role} className="flex items-center gap-1.5">
-                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole} disabled={isSelf}
+                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole} disabled={isSelf || isProtected}
                                 onCheckedChange={() => {
-                                  if (isSelf) { toast({ title: 'Cannot remove your own admin role.', variant: 'destructive' }); return; }
+                                  if (isSelf || isProtected) { toast({ title: 'This account’s roles cannot be changed here.', variant: 'destructive' }); return; }
                                   toggleUserRoleMutation.mutate({ userId: u.id, role, hasRole: uHasRole });
                                 }} />
                               <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer">{role}</label>
@@ -1354,7 +1355,7 @@ export default function AdminDashboard() {
                           size="sm"
                           variant="destructive"
                           className="gap-1"
-                          disabled={u.id === user?.id || deleteUserMutation.isPending}
+                           disabled={u.id === user?.id || hasRole(u, 'superadmin') || deleteUserMutation.isPending}
                           onClick={() => {
                             if (u.id === user?.id) return;
                             const label = u.firstName || u.lastName
