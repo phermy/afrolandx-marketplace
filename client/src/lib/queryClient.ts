@@ -3,9 +3,6 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    if (res.status === 428 && text.includes("HUMAN_VERIFICATION_REQUIRED")) {
-      window.dispatchEvent(new Event("human-verification-required"));
-    }
     if (res.status === 401 && text.includes("SESSION_SUPERSEDED")) {
       window.dispatchEvent(new CustomEvent("session-superseded"));
       throw new Error("SESSION_SUPERSEDED");

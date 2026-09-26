@@ -9,4 +9,4 @@
 - [Identity-preserving portraits](identity-preserving-portraits.md) — for real-person edits, keep original subject pixels; generative edits can redraw faces despite strict prompts
 - [Hyphen-free website copy](hyphen-free-copy.md) — rewrite visible phrases grammatically instead of just deleting hyphens; keep technical values and proper names intact
 - [File download handoff](file-download-handoff.md) — asset cards and file-tree downloads failed for this user; provide a verified browser download link instead
-- [Occasional human checks](occasional-human-checks.md) — the user chose periodic site-wide verification, not checks limited to login and signup
+- [Bot-check access](bot-check-access.md) — broken Turnstile locked out sign-in; only add an image challenge with a provider that supports it and verified hostnames

@@ -1,0 +1,10 @@
+---
+name: Bot-check access
+description: Constraint for any future human verification in Afrolandx.
+---
+
+Do not reintroduce a site-wide challenge that can lock legitimate people out of sign-in. If bot checks are added again, use a provider that actually supports the image or sign selection the user requested; do not promise that Cloudflare Turnstile will show image challenges.
+
+**Why:** The Cloudflare hostname configuration caused verification to fail and prevented the user from logging in. The user explicitly preferred removing it over retaining a broken check.
+
+**How to apply:** Verify challenges on the exact preview and published hostnames before making them mandatory. Keep account email verification and existing rate limits independent from any optional bot-check provider.
