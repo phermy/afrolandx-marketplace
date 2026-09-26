@@ -83,6 +83,7 @@ import {
   type InsertDropRsvp,
 } from "@shared/schema";
 import { db } from "./db";
+import { lockApprovedProductReferences } from "./product-reference-lock";
 import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt } from "drizzle-orm";
 
 export interface IStorage {
@@ -1162,8 +1163,12 @@ export class DatabaseStorage implements IStorage {
 
   // Shipping quote request operations
   async createShippingQuoteRequest(request: InsertShippingQuoteRequest): Promise<ShippingQuoteRequest> {
-    const [created] = await db.insert(shippingQuoteRequests).values(request).returning();
-    return created;
+    return db.transaction(async tx => {
+      if (!Array.isArray(request.cartSnapshot)) throw new Error("Invalid shipping quote cart");
+      await lockApprovedProductReferences(tx, request.cartSnapshot.map((item: any) => item?.productId));
+      const [created] = await tx.insert(shippingQuoteRequests).values(request).returning();
+      return created;
+    });
   }
 
   async getShippingQuoteRequest(id: number): Promise<ShippingQuoteRequest | undefined> {
@@ -1385,8 +1390,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation> {
-    const [lookbook] = await db.insert(lookbookRecommendations).values(rec).returning();
-    return lookbook;
+    return db.transaction(async tx => {
+      if (!Array.isArray(rec.bundleItems)) throw new Error("Invalid lookbook products");
+      await lockApprovedProductReferences(tx, rec.bundleItems.map((item: any) => item?.productId));
+      const [lookbook] = await tx.insert(lookbookRecommendations).values(rec).returning();
+      return lookbook;
+    });
   }
 
   async getUserLookbooks(userId: string): Promise<LookbookRecommendation[]> {
@@ -1529,8 +1538,11 @@ export class DatabaseStorage implements IStorage {
 
   // Event collections operations
   async createEventCollection(collection: InsertEventCollection): Promise<EventCollection> {
-    const [newCollection] = await db.insert(eventCollections).values(collection).returning();
-    return newCollection;
+    return db.transaction(async tx => {
+      await lockApprovedProductReferences(tx, collection.productIds ?? []);
+      const [newCollection] = await tx.insert(eventCollections).values(collection).returning();
+      return newCollection;
+    });
   }
 
   async getEventCollections(eventType?: string): Promise<EventCollection[]> {
@@ -1701,8 +1713,11 @@ export class DatabaseStorage implements IStorage {
 
   // Collaboration drops operations
   async createCollabDrop(drop: InsertCollabDrop): Promise<CollabDrop> {
-    const [newDrop] = await db.insert(collabDrops).values(drop).returning();
-    return newDrop;
+    return db.transaction(async tx => {
+      await lockApprovedProductReferences(tx, drop.productIds ?? [], drop.designerId);
+      const [newDrop] = await tx.insert(collabDrops).values(drop).returning();
+      return newDrop;
+    });
   }
 
   async getCollabDrops(status?: string): Promise<CollabDrop[]> {

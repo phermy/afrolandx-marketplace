@@ -42,6 +42,16 @@ const STATUS_COLORS: Record<string, string> = {
 };
 const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'];
 
+type TestDeletionPreview = {
+  email: string;
+  products: number;
+  orders: number;
+  ledgerEntries: number;
+  quotes: number;
+  notifications: number;
+  fingerprint: string;
+};
+
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
@@ -55,6 +65,9 @@ export default function AdminDashboard() {
   const [orderSearch, setOrderSearch] = useState('');
   const [showHistoricalOrders, setShowHistoricalOrders] = useState(false);
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
+  const [testDeletion, setTestDeletion] = useState<{ userId: string; preview: TestDeletionPreview } | null>(null);
+  const [testDeletionEmail, setTestDeletionEmail] = useState('');
+  const [testPreviewPending, setTestPreviewPending] = useState<string | null>(null);
   const [repProductOpen, setRepProductOpen] = useState(false);
   const [repProduct, setRepProduct] = useState({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
   const [repProductImages, setRepProductImages] = useState<File[]>([]);
@@ -323,6 +336,53 @@ export default function AdminDashboard() {
         description: error?.message || 'The user could not be deleted.',
         variant: 'destructive',
       });
+    },
+  });
+
+  const previewTestDeletion = async (userId: string) => {
+    setTestPreviewPending(userId);
+    try {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/test-data-deletion-preview`, {
+        credentials: 'include',
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message || 'Could not verify the test data.');
+      setTestDeletion({ userId, preview: body as TestDeletionPreview });
+      setTestDeletionEmail('');
+    } catch (error: any) {
+      toast({ title: 'Test data cannot be deleted', description: error?.message, variant: 'destructive' });
+    } finally {
+      setTestPreviewPending(null);
+    }
+  };
+
+  const deleteTestDataMutation = useMutation({
+    mutationFn: async ({ userId, preview, confirmationEmail }: {
+      userId: string; preview: TestDeletionPreview; confirmationEmail: string;
+    }) => {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/test-data`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationEmail, fingerprint: preview.fingerprint }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message || 'Test-data deletion failed.');
+      return body;
+    },
+    onSuccess: () => {
+      setTestDeletion(null);
+      setTestDeletionEmail('');
+      toast({ title: 'Test account deleted', description: 'The account and its verified test data were permanently removed.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Nothing was deleted', description: error?.message || 'Review the account again.', variant: 'destructive' });
     },
   });
 
@@ -1383,6 +1443,17 @@ export default function AdminDashboard() {
                             </div>
                           );
                         })}
+                        {hasRole(u, 'vendor') && u.id !== user?.id && !hasRole(u, 'superadmin') && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={testPreviewPending !== null || deleteTestDataMutation.isPending}
+                            onClick={() => previewTestDeletion(u.id)}
+                          >
+                            {testPreviewPending === u.id ? 'Verifying tests…' : 'Delete test data'}
+                          </Button>
+                        )}
                         <Button
                           type="button"
                           size="sm"
@@ -1407,6 +1478,56 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+            <Dialog open={testDeletion !== null} onOpenChange={(open) => {
+              if (!open && !deleteTestDataMutation.isPending) {
+                setTestDeletion(null);
+                setTestDeletionEmail('');
+              }
+            }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Permanently delete verified test data?</DialogTitle>
+                  <DialogDescription>
+                    Paystack confirmed that every linked order is a test transaction. This action permanently removes
+                    this vendor account, {testDeletion?.preview.products ?? 0} products,
+                    {' '}{testDeletion?.preview.orders ?? 0} buyer test orders,
+                    {' '}{testDeletion?.preview.ledgerEntries ?? 0} sale ledger entries,
+                    {' '}{testDeletion?.preview.quotes ?? 0} shipping quote requests,
+                    and {testDeletion?.preview.notifications ?? 0} linked notifications.
+                    Buyers will lose these test orders from their history. This cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <label htmlFor="confirm-test-deletion" className="text-sm font-medium">
+                    Type {testDeletion?.preview.email} to confirm
+                  </label>
+                  <Input
+                    id="confirm-test-deletion"
+                    autoComplete="off"
+                    value={testDeletionEmail}
+                    onChange={(event) => setTestDeletionEmail(event.target.value)}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" disabled={deleteTestDataMutation.isPending}
+                    onClick={() => { setTestDeletion(null); setTestDeletionEmail(''); }}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive"
+                    disabled={!testDeletion || deleteTestDataMutation.isPending ||
+                      testDeletionEmail.trim().toLowerCase() !== testDeletion.preview.email.toLowerCase()}
+                    onClick={() => {
+                      if (testDeletion) deleteTestDataMutation.mutate({
+                        userId: testDeletion.userId,
+                        preview: testDeletion.preview,
+                        confirmationEmail: testDeletionEmail,
+                      });
+                    }}>
+                    {deleteTestDataMutation.isPending ? 'Rechecking and deleting…' : 'Permanently delete test data'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* ═══ DISCOVER TAB ════════════════════════════════════════════════ */}

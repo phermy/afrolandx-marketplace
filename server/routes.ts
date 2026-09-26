@@ -2,6 +2,8 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { lockApprovedProductReferences } from "./product-reference-lock";
+import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
 import { registerEventPlanningRoutes } from "./event-planning";
@@ -521,6 +523,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       res.status(500).json({ message: 'Account deletion failed. No account data was removed. Check the server logs for details.' });
+    }
+  });
+
+  const handleTestDeletionError = (error: any, res: any) => {
+    if (error instanceof TestVendorDeletionError) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    console.error('Test vendor deletion failed:', error);
+    if (error?.code === '23503' || error?.code === '23505') {
+      return res.status(409).json({
+        message: 'Another record still references this account or its test data. Nothing was deleted.',
+        blocker: typeof error.constraint === 'string' ? error.constraint : undefined,
+      });
+    }
+    return res.status(503).json({ message: 'Test-data deletion could not be completed. Nothing was deleted.' });
+  };
+
+  app.get('/api/admin/users/:userId/test-data-deletion-preview', isAuthenticated, isAdmin, protectSuperadmin, async (req: any, res) => {
+    if (req.params.userId === req.user.id) return res.status(400).json({ message: 'You cannot delete your own account.' });
+    try {
+      res.json(await previewTestVendorDeletion(req.params.userId));
+    } catch (error) {
+      handleTestDeletionError(error, res);
+    }
+  });
+
+  app.delete('/api/admin/users/:userId/test-data', isAuthenticated, isAdmin, protectSuperadmin, async (req: any, res) => {
+    if (req.params.userId === req.user.id) return res.status(400).json({ message: 'You cannot delete your own account.' });
+    if (typeof req.body?.confirmationEmail !== 'string' || typeof req.body?.fingerprint !== 'string') {
+      return res.status(400).json({ message: 'Preview the test records and type the account email to confirm deletion.' });
+    }
+    try {
+      const result = await deleteVerifiedTestVendor(req.params.userId, req.body.confirmationEmail, req.body.fingerprint);
+      res.json({ message: 'The vendor account and its verified test data were removed.', ...result });
+    } catch (error) {
+      handleTestDeletionError(error, res);
     }
   });
 
@@ -1969,6 +2007,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shippingAddress = shippingAddressSchema.parse(order.shippingAddress);
 
       const replacement = await db.transaction(async tx => {
+        if (!Array.isArray(originalRequest.cartSnapshot)) throw new Error('Invalid shipping quote cart');
+        await lockApprovedProductReferences(tx, originalRequest.cartSnapshot.map((item: any) => item?.productId));
         const [request] = await tx.insert(shippingQuoteRequests).values({
           userId,
           carrier: replacementOption.carrier,

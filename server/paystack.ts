@@ -146,6 +146,13 @@ export class PaystackService {
     return await this.makeRequest(`/transaction/verify/${reference}`);
   }
 
+  async listTransactionRefunds(reference: string): Promise<any[]> {
+    if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
+    const result = await this.makeRequest(`/refund?transaction=${encodeURIComponent(reference)}`);
+    if (!result?.status || !Array.isArray(result.data)) throw new Error('Could not verify refund history');
+    return result.data;
+  }
+
   async createRefund(reference: string, amount: number, merchantNote: string): Promise<any> {
     if (!/^[A-Za-z0-9._-]{3,100}$/.test(reference)) throw new Error('Invalid payment reference');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('Refund amount must be positive');

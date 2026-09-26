@@ -201,7 +201,7 @@ export const orders = pgTable("orders", {
   shippingAddress: jsonb("shipping_address").notNull(),
   paymentReference: varchar("payment_reference"),
   shippingMethod: varchar("shipping_method"), // ups, fedex, dhl
-  shippingQuoteRequestId: integer("shipping_quote_request_id").unique(),
+  shippingQuoteRequestId: integer("shipping_quote_request_id").references(() => shippingQuoteRequests.id).unique(),
   shippingPaymentStatus: varchar("shipping_payment_status", { length: 32 }).notNull().default("included"), // included, awaiting_quote, pending, paid, rejected
   shippingPaymentReference: varchar("shipping_payment_reference"),
   shippingPaymentUrl: text("shipping_payment_url"),
