@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import Navbar from '@/components/navbar';
+import VirtualTryOnSheet from '@/components/virtual-try-on-sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import LocalPrice from '@/components/LocalPrice';
 import type { Product } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 import { RETURN_POLICY_OPTIONS } from '@shared/schema';
+import { Sparkles } from 'lucide-react';
 
 const FALLBACK_URL =
   'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=800&h=800&q=75';
@@ -24,6 +26,7 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const [sizeError, setSizeError] = useState(false);
+  const [tryOnOpen, setTryOnOpen] = useState(false);
 
   const productId = params?.id ? parseInt(params.id) : null;
 
@@ -35,6 +38,16 @@ export default function ProductDetail() {
       return res.json();
     },
     enabled: !!productId,
+  });
+  const { data: tryOnAvailability } = useQuery<{ eligible: boolean }>({
+    queryKey: ['/api/products', productId, 'try-on-eligibility'],
+    queryFn: async () => {
+      const response = await fetch(`/api/products/${productId}/try-on-eligibility`);
+      if (!response.ok) throw new Error('Virtual Try-On availability is unavailable');
+      return response.json();
+    },
+    enabled: !!productId,
+    retry: false,
   });
   const returnPolicy = RETURN_POLICY_OPTIONS.find(option => option.value === product?.returnPolicy)
     ?? RETURN_POLICY_OPTIONS[0];
@@ -158,6 +171,14 @@ export default function ProductDetail() {
                   </button>
                 ))}
               </div>
+            )}
+            {tryOnAvailability?.eligible && isAvailable && (
+              <Button variant="outline" size="lg"
+                className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
+                onClick={() => isAuthenticated ? setTryOnOpen(true) : setLocation('/login')}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Try it on
+              </Button>
             )}
           </div>
 
@@ -301,6 +322,14 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+        {tryOnAvailability?.eligible && (
+          <VirtualTryOnSheet
+            product={{ id: product.id, name: product.name, images }}
+            open={tryOnOpen}
+            onOpenChange={setTryOnOpen}
+            onAddToCart={() => { setTryOnOpen(false); handleAddToCart(); }}
+          />
+        )}
       </div>
     </div>
   );
