@@ -12,3 +12,9 @@ Provider money-movement outcomes are never assumed from a timeout, rate limit, o
 **Why:** A provider may commit a refund or transfer before the application receives a response. Releasing local balances after an ambiguous response can duplicate refunds or payouts.
 
 **How to apply:** Create one sale entry per vendor only after verified payment, release it after delivery, allocate reversals proportionally by vendor merchandise value, reverse the associated commission, and settle only positive available entries to a verified Paystack recipient. Store only masked bank details locally. Reserve refunds before provider submission, finalize ledger reversals only after provider confirmation, and keep ambiguous operations unavailable for automatic retry.
+
+Do not hard-delete a vendor or account with sale ledger entries solely because its vendor status is rejected or its login is unverified. Account closure must preserve the financial history.
+
+**Why:** Vendor status and login eligibility do not erase prior sale, refund, or payout obligations; deleting ledger-linked records would destroy the audit trail.
+
+**How to apply:** Check financial links in the live environment before account deletion. For linked accounts, review outstanding balances and use a separate access-revocation and personal-data minimization workflow instead of cascading deletion.

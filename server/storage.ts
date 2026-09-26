@@ -375,38 +375,16 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(userId: string): Promise<boolean> {
     return await db.transaction(async (tx) => {
-      // Delete dependent records first because these tables intentionally use
-      // restrictive foreign keys. Vendor-owned catalog data is removed with
-      // the vendor account so no orphaned records remain.
+      // Only unused accounts can be hard-deleted. Keep orders, payouts, catalog
+      // and other linked history intact for a separate, reviewed closure flow.
+      const account = await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+      if (account.rows.length === 0) return false;
+      const vendor = await tx.execute(sql`SELECT id FROM vendors WHERE user_id = ${userId} LIMIT 1`);
+      const order = await tx.execute(sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`);
+      if (vendor.rows.length || order.rows.length) {
+        throw new Error('ACCOUNT_HAS_LINKED_RECORDS');
+      }
       await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
-      await tx.execute(sql`DELETE FROM order_production_steps WHERE order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR completed_by = ${userId}`);
-      await tx.execute(sql`DELETE FROM order_feedback WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM measurements WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM measurement_alerts WHERE user_id = ${userId} OR vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR acknowledged_by_vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM shipping_quote_requests WHERE user_id = ${userId} OR confirmed_by = ${userId}`);
-      await tx.execute(sql`DELETE FROM notifications WHERE user_id = ${userId} OR order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM messages WHERE sender_id = ${userId} OR recipient_id = ${userId}`);
-      await tx.execute(sql`UPDATE messages SET product_id = NULL WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM occasion_profiles WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM lookbook_recommendations WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM loyalty_events WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM loyalty_accounts WHERE user_id = ${userId}`);
-      await tx.execute(sql`UPDATE loyalty_accounts SET referred_by = NULL WHERE referred_by = ${userId}`);
-      await tx.execute(sql`DELETE FROM quiz_attempts WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM drop_rsvps WHERE user_id = ${userId} OR drop_id IN (SELECT id FROM collab_drops WHERE designer_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR artisan_id IN (SELECT id FROM vendors WHERE user_id = ${userId}))`);
-      await tx.execute(sql`DELETE FROM collab_drops WHERE designer_id IN (SELECT id FROM vendors WHERE user_id = ${userId}) OR artisan_id IN (SELECT id FROM vendors WHERE user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM discover_bookings WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM discover_premium WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM vendor_resources WHERE vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM product_fit_metrics WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM product_stories WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM fabric_assets WHERE product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM saved_delivery_addresses WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ${userId} OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = ${userId}) OR product_id IN (SELECT p.id FROM products p JOIN vendors v ON v.id = p.vendor_id WHERE v.user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM orders WHERE user_id = ${userId}`);
-      await tx.execute(sql`DELETE FROM products WHERE vendor_id IN (SELECT id FROM vendors WHERE user_id = ${userId})`);
-      await tx.execute(sql`DELETE FROM vendors WHERE user_id = ${userId}`);
       const result = await tx.execute(sql`DELETE FROM users WHERE id = ${userId} RETURNING id`);
       return result.rows.length > 0;
     });

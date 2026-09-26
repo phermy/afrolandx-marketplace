@@ -488,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Permanently delete a user/customer and their account-owned data (admin only).
+  // Only unlinked accounts may be permanently deleted (admin only).
   app.delete('/api/admin/users/:userId', isAuthenticated, isAdmin, protectSuperadmin, async (req: any, res) => {
     try {
       const { userId } = req.params;
@@ -501,10 +501,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const deleted = await storage.deleteUser(userId);
       if (!deleted) return res.status(404).json({ message: 'User not found' });
-      res.json({ message: 'User and associated account data deleted successfully' });
-    } catch (error) {
+      res.json({ message: 'Unused account deleted successfully' });
+    } catch (error: any) {
       console.error('Error deleting user:', error);
-      res.status(500).json({ message: 'Failed to delete user' });
+      if (error?.message === 'ACCOUNT_HAS_LINKED_RECORDS') {
+        return res.status(409).json({
+          message: 'This account has a vendor profile or orders. It cannot be permanently deleted here; no data was removed.',
+        });
+      }
+      if (error?.code === '23503') {
+        return res.status(409).json({
+          message: 'This account has linked records that prevent permanent deletion. No account data was removed.',
+          blocker: typeof error.constraint === 'string' ? error.constraint : undefined,
+        });
+      }
+      if (error?.code === '42P01' || error?.code === '42703') {
+        return res.status(503).json({
+          message: 'Account deletion is unavailable because the live database schema is out of date. No account data was removed.',
+        });
+      }
+      res.status(500).json({ message: 'Account deletion failed. No account data was removed. Check the server logs for details.' });
     }
   });
 

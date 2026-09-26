@@ -301,10 +301,18 @@ export default function AdminDashboard() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await apiRequest('DELETE', `/api/admin/users/${userId}`);
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.message || `Account deletion failed (${response.status}).`;
+        throw new Error(body?.blocker ? `${message} Database reference: ${body.blocker}` : message);
+      }
     },
     onSuccess: () => {
-      toast({ title: 'User deleted', description: 'The user and associated account data were permanently removed.' });
+      toast({ title: 'Account deleted', description: 'The unused account was permanently removed.' });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
@@ -1386,7 +1394,7 @@ export default function AdminDashboard() {
                             const label = u.firstName || u.lastName
                               ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                               : u.email || 'this user';
-                            if (window.confirm(`Permanently delete ${label}? This removes their account, vendor profile, products, orders, and personal data.`)) {
+                            if (window.confirm(`Permanently delete ${label}? Accounts with a vendor profile, orders, or other protected records cannot be deleted here. Saved addresses will be removed. This action cannot be undone.`)) {
                               deleteUserMutation.mutate(u.id);
                             }
                           }}
