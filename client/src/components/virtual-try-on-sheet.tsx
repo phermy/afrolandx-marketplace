@@ -286,7 +286,7 @@ export default function VirtualTryOnSheet({
                   className="mt-0.5 border-emerald-900/40 data-[state=checked]:bg-emerald-800 data-[state=checked]:text-white"
                 />
                 <span>
-                  I agree to send this photo to a third-party processing service to create my preview. It may retain the photo for up to one hour. AfrolandX does not store the photo on its app server.
+                  I agree to send my photo through Replit's connector to Replicate to create this preview. AfrolandX does not save it on its app server. Replicate says its API inputs and outputs are removed after one hour by default.
                 </span>
               </label>
               <div className="flex items-start gap-2 text-[11px] leading-relaxed text-[#75847c]">

@@ -16,3 +16,4 @@
 - [Discover release gate](discover-release-gate.md) — keep Discover admin-only until reservations and payments are implemented and ready for a public launch
 - [Superadmin delegation safety](superadmin-delegation.md) — approvals that write roles are privilege paths too; authorize under the same lock as the write
 - [Virtual try-on scope and privacy](virtual-try-on.md) — photo-based clothing previews are not live AR; avoid app-side photo storage and disclose provider retention
+- [Abort timeout tests](abort-timeout-tests.md) — Node timeout signals may not keep the test process alive; use a separate referenced timer in stalled-request tests

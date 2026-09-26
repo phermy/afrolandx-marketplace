@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import multer from "multer";
 import sharp from "sharp";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import type { Product } from "../shared/schema";
 import { isAuthenticated } from "./auth";
 import { storage } from "./storage";
@@ -16,6 +17,39 @@ const upload = multer({
 });
 
 const userRequests = new Map<string, { startedAt: number; count: number; busy: boolean }>();
+const connectors = new ReplitConnectors();
+const modelPath = "/v1/models/prunaai/p-image-try-on";
+type ProxyRequest = { method: string; headers?: Record<string, string>; body?: string };
+type PredictionProxy = (path: string, options: ProxyRequest) => Promise<Response>;
+const connectorFetch = connectors.createProxyFetch("replicate");
+export function createTimedPredictionProxy(
+  throughConnector: typeof fetch,
+  timeoutForMethod = (method: string) => method === "POST" ? 50_000 : 15_000,
+): PredictionProxy {
+  return (path, options) => throughConnector(path, {
+    ...options,
+    signal: AbortSignal.timeout(timeoutForMethod(options.method)),
+    redirect: "manual",
+  });
+}
+const defaultProxy = createTimedPredictionProxy(connectorFetch);
+let providerCache: { available: boolean; until: number } | null = null;
+
+async function providerAvailable(): Promise<boolean> {
+  // Keep the shopper-facing entry point hidden until a funded provider has
+  // passed a real preview test. Connecting a provider alone is not readiness.
+  if (process.env.VIRTUAL_TRY_ON_ENABLED !== "true") return false;
+  if (providerCache && providerCache.until > Date.now()) return providerCache.available;
+  let available = false;
+  try {
+    const response = await defaultProxy(modelPath, { method: "GET" });
+    available = response.ok;
+  } catch {
+    // Without a working connector, never advertise photo processing.
+  }
+  providerCache = { available, until: Date.now() + (available ? 300_000 : 60_000) };
+  return available;
+}
 
 function productImage(product: Product): string | null {
   const image = (Array.isArray(product.images) && product.images[0]) || product.imageUrl;
@@ -41,52 +75,69 @@ async function eligibleProduct(rawId: string) {
   if (!product) return null;
   const [vendor, categories] = await Promise.all([storage.getVendor(product.vendorId), storage.getCategories()]);
   const category = categories.find(item => item.id === product.categoryId);
-  if (!eligibleForTryOn(product, vendor?.status ?? "", category?.name ?? "", !!process.env.REPLICATE_API_TOKEN)) return null;
+  if (!eligibleForTryOn(product, vendor?.status ?? "", category?.name ?? "", true) || !await providerAvailable()) return null;
   return { product, garmentImage: productImage(product)! };
 }
 
 type Prediction = {
+  id?: string;
   status: string;
   output?: unknown;
   error?: unknown;
-  urls?: { get?: string };
 };
 
-async function predictionRequest(url: string, token: string, options: RequestInit, fetcher: typeof fetch): Promise<Prediction> {
-  const response = await fetcher(url, {
-    ...options,
-    headers: { Authorization: `Bearer ${token}`, ...options.headers },
-    signal: AbortSignal.timeout(65_000),
-  });
-  if (!response.ok) throw new Error(`Try-on provider returned HTTP ${response.status}`);
+class TryOnProviderError extends Error {
+  constructor(readonly status: number) {
+    super(`Try-on provider returned HTTP ${status}`);
+  }
+}
+
+async function predictionRequest(path: string, options: ProxyRequest, proxy: PredictionProxy): Promise<Prediction> {
+  const response = await proxy(path, options);
+  if (!response.ok) throw new TryOnProviderError(response.status);
   return response.json() as Promise<Prediction>;
 }
 
-export async function runVirtualTryOn(person: Buffer, garmentImage: string, token: string, fetcher: typeof fetch = fetch): Promise<Buffer> {
+// Connector file inputs use data URLs with a 256 KB limit, including base64 overhead.
+export async function prepareTryOnPhoto(buffer: Buffer): Promise<Buffer> {
+  for (const [width, height, quality] of [
+    [1024, 1280, 72], [880, 1100, 62], [768, 960, 55],
+    [640, 800, 46], [512, 640, 38],
+  ]) {
+    const image = await sharp(buffer).rotate().resize(width, height, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality }).toBuffer();
+    if (image.length <= 180 * 1024) return image;
+  }
+  throw new Error("Photo could not be prepared for the preview");
+}
+
+export async function runVirtualTryOn(
+  person: Buffer, garmentImage: string, proxy: PredictionProxy = defaultProxy, outputFetch: typeof fetch = fetch,
+): Promise<Buffer> {
+  const personDataUrl = `data:image/jpeg;base64,${person.toString("base64")}`;
+  if (personDataUrl.length > 256 * 1024) throw new Error("Photo exceeds the try-on provider input limit");
   const first = await predictionRequest(
-    "https://api.replicate.com/v1/models/prunaai/p-image-try-on/predictions",
-    token,
+    `${modelPath}/predictions`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "wait=60" },
+      headers: { "Content-Type": "application/json", Prefer: "wait=30" },
       body: JSON.stringify({
         input: {
-          person_image: `data:image/jpeg;base64,${person.toString("base64")}`,
+          person_image: personDataUrl,
           garment_images: [garmentImage],
         },
       }),
     },
-    fetcher,
+    proxy,
   );
   let prediction = first;
   const deadline = Date.now() + 75_000;
   while (prediction.status === "starting" || prediction.status === "processing") {
-    const nextUrl = prediction.urls?.get;
-    if (!nextUrl || !/^https:\/\/api\.replicate\.com\/v1\/predictions\/[A-Za-z0-9_-]+$/.test(nextUrl) || Date.now() >= deadline) {
+    if (!prediction.id || !/^[A-Za-z0-9_-]+$/.test(prediction.id) || Date.now() >= deadline) {
       throw new Error("Try-on processing timed out");
     }
     await new Promise(resolve => setTimeout(resolve, 2_000));
-    prediction = await predictionRequest(nextUrl, token, { method: "GET" }, fetcher);
+    prediction = await predictionRequest(`/v1/predictions/${prediction.id}`, { method: "GET" }, proxy);
   }
   if (prediction.status !== "succeeded") throw new Error("Try-on processing failed");
   const output = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
@@ -96,7 +147,7 @@ export async function runVirtualTryOn(person: Buffer, garmentImage: string, toke
     (imageUrl.hostname !== "replicate.delivery" && !imageUrl.hostname.endsWith(".replicate.delivery"))) {
     throw new Error("Try-on provider returned an unexpected image URL");
   }
-  const imageResponse = await fetcher(output, { signal: AbortSignal.timeout(15_000), redirect: "manual" });
+  const imageResponse = await outputFetch(output, { signal: AbortSignal.timeout(15_000), redirect: "manual" });
   const contentType = imageResponse.headers.get("content-type") ?? "";
   if (!imageResponse.ok || (!contentType.startsWith("image/") && contentType !== "application/octet-stream")) {
     throw new Error("Try-on image download failed");
@@ -186,11 +237,15 @@ export function registerVirtualTryOnRoutes(app: Express) {
         !metadata.width || !metadata.height || metadata.width < 640 || metadata.height < 640) {
         return res.status(400).json({ message: "Use a clearer photo of at least 640 × 640 pixels." });
       }
-      const person = await sharp(req.file.buffer).rotate().resize(1280, 1600, { fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 83 }).toBuffer();
-      const result = await runVirtualTryOn(person, eligible.garmentImage, process.env.REPLICATE_API_TOKEN!);
+      const person = await prepareTryOnPhoto(req.file.buffer);
+      const result = await runVirtualTryOn(person, eligible.garmentImage);
       res.type("image/jpeg").send(result);
     } catch (error) {
+      if (error instanceof TryOnProviderError && error.status === 402) {
+        // A metadata GET is still 200 without credit. Do not re-advertise until
+        // an operator funds and restarts the service after a real preview test.
+        providerCache = { available: false, until: Infinity };
+      }
       console.error("Virtual Try-On failed:", error instanceof Error ? error.message : "unknown error");
       if (!res.headersSent) res.status(503).json({ message: "We could not create a preview right now. Please try again later." });
     } finally {
