@@ -9,14 +9,12 @@ import LiveArSheet from '@/components/live-ar-sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import LocalPrice from '@/components/LocalPrice';
+import ProductPrice from '@/components/product-price';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { Product } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 import { RETURN_POLICY_OPTIONS } from '@shared/schema';
-import { Sparkles, Star } from 'lucide-react';
-
-const FALLBACK_URL =
-  'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=800&h=800&q=75';
+import { Expand, ImageOff, Sparkles, Star } from 'lucide-react';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/products/:id');
@@ -29,6 +27,7 @@ export default function ProductDetail() {
   const [sizeError, setSizeError] = useState(false);
   const [tryOnOpen, setTryOnOpen] = useState(false);
   const [liveArOpen, setLiveArOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   const productId = params?.id ? parseInt(params.id) : null;
 
@@ -133,9 +132,7 @@ export default function ProductDetail() {
   }
 
   const images = product.images && product.images.length > 0 ? product.images : [];
-  const displaySrc = imgError || images.length === 0
-    ? FALLBACK_URL
-    : images[selectedImage] || FALLBACK_URL;
+  const displaySrc = !imgError ? images[selectedImage] : undefined;
 
   const isOutOfStock = product.stock <= 0;
   const isAvailable = product.status === 'approved' && !isOutOfStock;
@@ -161,12 +158,30 @@ export default function ProductDetail() {
           {/* ── Image panel ── */}
           <div className="space-y-3">
             <div className="relative w-full aspect-square overflow-hidden rounded-xl bg-white shadow-md">
-              <img
-                src={displaySrc}
-                alt={product.name}
-                className="w-full h-full object-contain"
-                onError={() => setImgError(true)}
-              />
+              {displaySrc ? (
+                <img
+                  src={displaySrc}
+                  alt={product.name}
+                  className="w-full h-full object-contain"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 bg-stone-50 text-stone-500">
+                  <ImageOff className="h-12 w-12" aria-hidden="true" />
+                  <span>Product photo unavailable</span>
+                </div>
+              )}
+              {displaySrc && (
+                <button
+                  type="button"
+                  onClick={() => setPhotoOpen(true)}
+                  className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
+                  aria-label={`View larger photo of ${product.name}`}
+                >
+                  <Expand className="h-4 w-4" aria-hidden="true" />
+                  View larger
+                </button>
+              )}
               {isOutOfStock && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <Badge variant="destructive" className="text-base font-semibold px-4 py-1">
@@ -242,12 +257,7 @@ export default function ProductDetail() {
             {/* Price */}
             <Card className="mb-4">
               <CardContent className="p-4">
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-3xl font-bold text-nigerian-green">
-                    ₦{parseFloat(product.price).toLocaleString()}
-                  </span>
-                  <LocalPrice ngnAmount={parseFloat(product.price)} size="md" />
-                </div>
+                <ProductPrice ngnAmount={parseFloat(product.price)} large />
                 <p className="text-sm text-gray-500 mt-2">
                   {isOutOfStock
                     ? <span className="text-red-500 font-medium">Out of stock</span>
@@ -358,6 +368,18 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+        <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+          <DialogContent className="flex max-h-[95vh] max-w-5xl flex-col overflow-hidden bg-white p-4 sm:p-6">
+            <DialogTitle className="pr-8 text-base">{product.name} — photo {selectedImage + 1}</DialogTitle>
+            {displaySrc && (
+              <img
+                src={displaySrc}
+                alt={`${product.name}, larger view ${selectedImage + 1}`}
+                className="max-h-[78vh] w-full object-contain"
+              />
+            )}
+          </DialogContent>
+        </Dialog>
         {tryOnAvailability?.eligible && (
           <VirtualTryOnSheet
             product={{ id: product.id, name: product.name, images }}

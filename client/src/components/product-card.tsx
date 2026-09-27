@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getCountryFlag } from '@shared/africanFashion';
-import LocalPrice from '@/components/LocalPrice';
+import ProductPrice from '@/components/product-price';
 import type { Product } from '@/types';
+import { ImageOff } from 'lucide-react';
 
 const resolveImageUrl = (imagePath: string): string => {
   if (!imagePath) return '';
@@ -15,9 +16,6 @@ const resolveImageUrl = (imagePath: string): string => {
   if (imagePath.startsWith('/uploads/')) return imagePath.split('?')[0];
   return imagePath;
 };
-
-const FALLBACK_URL =
-  'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=400&h=400&q=75';
 
 interface ProductCardProps {
   product: Product;
@@ -43,8 +41,6 @@ export default function ProductCard({ product }: ProductCardProps) {
     }, 1500);
   };
 
-  const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
-
   const getStatusBadge = () => {
     if (product.status === 'approved') return null;
     const styles: Record<string, string> = {
@@ -66,8 +62,6 @@ export default function ProductCard({ product }: ProductCardProps) {
       ? resolveImageUrl(product.images[0])
       : null;
 
-  const displaySrc = imgError || !rawSrc ? FALLBACK_URL : rawSrc;
-
   const flag = product.originCountry ? getCountryFlag(product.originCountry) : null;
 
   return (
@@ -76,14 +70,21 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* ── Image container ─────────────────────────────────────────── */}
         <div className="relative w-full aspect-square overflow-hidden bg-white">
-          <img
-            src={displaySrc}
-            alt={product.name}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-            loading="eager"
-            decoding="async"
-            onError={() => setImgError(true)}
-          />
+          {rawSrc && !imgError ? (
+            <img
+              src={rawSrc}
+              alt={product.name}
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 bg-stone-50 text-stone-500">
+              <ImageOff className="h-9 w-9" aria-hidden="true" />
+              <span className="text-xs">Product photo unavailable</span>
+            </div>
+          )}
 
           <div className="absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
 
@@ -141,12 +142,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           {/* Price row */}
           <div className="flex items-start justify-between mb-1.5 sm:mb-2 gap-1">
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm sm:text-lg font-bold text-nigerian-green leading-none">
-                {formatPrice(product.price)}
-              </span>
-              <LocalPrice ngnAmount={parseFloat(product.price)} className="mt-0.5" />
-            </div>
+            <ProductPrice ngnAmount={parseFloat(product.price)} />
           </div>
 
           {/* Stock */}

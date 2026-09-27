@@ -10,7 +10,8 @@ All product and service prices are stored in **NGN (Nigerian Naira)**. Never tre
 
 ## How to apply
 - `formatPrice` anywhere should use ₦ symbol: `` `₦${parseFloat(price).toLocaleString()}` ``
-- `LocalPrice` component (useCurrency hook) should NOT be used for product prices — it treats input as USD and converts to local currency, giving wrong results for Naira prices
+- Local currency display is an **approximate** conversion from NGN via USD-pivot rates, never a payable amount. Keep the NGN amount and the fact that checkout charges NGN visible whenever the local estimate is prominent.
+- Current conversion logic accepts a Naira input; earlier versions treated input as USD, so verify the actual hook before reusing it.
 - Checkout `handleSubmit` sends `currency: 'NGN'` and `totalAmount` as the raw Naira sum (no multiplication)
 - `server/routes.ts` `/api/orders/initialize-payment`: `chargeCurrency = 'NGN'`, `chargeAmount = parseFloat(totalAmount)` — no currency conversion
 - Paystack's `initializeTransaction` multiplies by 100 for kobo internally — pass Naira amount directly

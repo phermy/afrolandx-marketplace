@@ -100,6 +100,10 @@ const TIMEZONE_CURRENCY: Record<string, string> = {
 
 const RATES_CACHE_KEY = "afrolandx_rates_v4";
 const RATES_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const GEO_CACHE_KEY = "afrolandx_geo_v2";
+const GEO_TTL = 24 * 60 * 60 * 1000;
+let geoRequest: Promise<{ currency?: string; local?: boolean } | null> | null = null;
+let ratesRequest: Promise<Record<string, number> | null> | null = null;
 
 function getCached<T>(key: string, ttl: number): T | null {
   try {
@@ -123,6 +127,44 @@ function detectCurrencyFromTimezone(): string | null {
   } catch { return null; }
 }
 
+async function detectCurrency(): Promise<string | null> {
+  const cached = getCached<{ currency?: string }>(GEO_CACHE_KEY, GEO_TTL);
+  if (cached?.currency && /^[A-Z]{3}$/.test(cached.currency)) return cached.currency;
+  if (!geoRequest) {
+    geoRequest = fetch("/api/geo")
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => {
+        if (data?.currency && /^[A-Z]{3}$/.test(data.currency)) {
+          setCache(GEO_CACHE_KEY, data);
+        }
+        return data;
+      })
+      .catch(() => null)
+      .finally(() => { geoRequest = null; });
+  }
+  const geo = await geoRequest;
+  return geo?.currency && /^[A-Z]{3}$/.test(geo.currency)
+    ? geo.currency
+    : detectCurrencyFromTimezone();
+}
+
+async function getRates(): Promise<Record<string, number> | null> {
+  const cached = getCached<Record<string, number>>(RATES_CACHE_KEY, RATES_TTL);
+  if (cached) return cached;
+  if (!ratesRequest) {
+    ratesRequest = fetch("/api/exchange-rates")
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data?.rates || typeof data.rates !== "object") return null;
+        setCache(RATES_CACHE_KEY, data.rates);
+        return data.rates as Record<string, number>;
+      })
+      .catch(() => null)
+      .finally(() => { ratesRequest = null; });
+  }
+  return ratesRequest;
+}
+
 export function useCurrency() {
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,8 +174,8 @@ export function useCurrency() {
 
     async function init() {
       try {
-        // Step 1 — detect currency from browser timezone (instant, no network)
-        const currencyCode = detectCurrencyFromTimezone();
+        // Prefer visitor location; timezone is a fallback when location is unavailable.
+        const currencyCode = await detectCurrency();
 
         // If already in Nigeria or detection failed, stay in NGN
         if (!currencyCode || currencyCode === "NGN") {
@@ -141,24 +183,14 @@ export function useCurrency() {
           return;
         }
 
-        // Step 2 — fetch USD-pivot exchange rates (cached 6 h)
-        let rates = getCached<Record<string, number>>(RATES_CACHE_KEY, RATES_TTL);
-        if (!rates) {
-          const res = await fetch("/api/exchange-rates");
-          if (res.ok) {
-            const data = await res.json();
-            if (data.rates) {
-              rates = data.rates;
-              setCache(RATES_CACHE_KEY, rates);
-            }
-          }
-        }
+        const rates = await getRates();
 
         // Rates are USD-based: rates["NGN"] ≈ 1600, rates["ZAR"] ≈ 18
         const ngnPerUsd   = rates?.["NGN"];
         const localPerUsd = rates?.[currencyCode];
 
-        if (!ngnPerUsd || !localPerUsd || cancelled) {
+        if (typeof ngnPerUsd !== "number" || !Number.isFinite(ngnPerUsd) || ngnPerUsd <= 0
+          || typeof localPerUsd !== "number" || !Number.isFinite(localPerUsd) || localPerUsd <= 0 || cancelled) {
           if (!cancelled) setIsLoading(false);
           return;
         }

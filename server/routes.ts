@@ -283,8 +283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Geo/currency detection — proxied server-side to avoid CORS
   app.get('/api/geo', async (req: any, res) => {
     try {
-      // Cache control — client can cache for 24h
-      res.set('Cache-Control', 'public, max-age=86400');
+      // The response depends on the visitor's IP; shared proxies must not reuse it.
+      res.set('Cache-Control', 'private, max-age=3600');
 
       // Get client IP (handles proxies)
       const forwarded = req.headers['x-forwarded-for'] as string;
