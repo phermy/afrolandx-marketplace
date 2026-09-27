@@ -113,21 +113,33 @@
 .heritage-card__copy { color: #536b62; font-size: .9rem; line-height: 1.6; margin: 0 0 1.2rem; }
 .heritage-card__source { color: #a45336; display: inline-flex; align-items: center; gap: .35rem; font-size: .7rem; line-height: 1.4; margin-top: auto; text-decoration: none; }
 .heritage-card__source:hover { text-decoration: underline; }
+/* Promotional page copy reads better left aligned than in justified columns. */
+.landing-page .reading-copy,
+.landing-page .heritage-editorial__lede,
+.landing-page .heritage-card__copy {
+  text-align: left;
+  text-justify: auto;
+}
+.landing-page .reading-copy { font-size: 1rem; line-height: 1.7; }
+.landing-page .heritage-card__copy { font-size: 1rem; color: #334f45; }
+.landing-page .heritage-card__source { font-size: .8rem; color: #833d26; }
+.landing-page .heritage-card__place { font-size: .78rem; color: #833d26; }
+.landing-page .heritage-notice { font-size: .95rem; color: #334f45; }
 @media (max-width: 700px) {
   .heritage-editorial__intro { display: block; }
   .heritage-editorial__lede { margin-top: 1.4rem; }
   .heritage-grid { grid-template-columns: 1fr; }
   .heritage-card__image-wrap { max-height: 15rem; }
   .heritage-card__body { padding: 1rem; }
-  .heritage-card__copy { font-size: .82rem; }
+  .landing-page .heritage-card__copy { font-size: 1rem; }
 }
 @media (max-width: 520px) {
   .heritage-card__image-wrap { max-height: 13rem; }
   .heritage-card__body {
     padding: 1.25rem;
   }
-  .heritage-card__copy {
-    font-size: .9rem;
+  .landing-page .heritage-card__copy {
+    font-size: 1rem;
   }
 }
 

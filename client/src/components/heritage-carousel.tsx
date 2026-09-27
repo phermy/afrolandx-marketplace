@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import panAfricanImg from "@assets/stock_images/pan_african_diversity.webp";
 import beadworkImg from "@assets/stock_images/nigerian_tribal_chie_11b29bb3.jpg";
 import textileImg from "@assets/stock_images/hausa_traditional_cr_fa5db11d.jpg";
@@ -43,7 +43,12 @@ const slides = [
 export default function HeritageCarousel() {
   const [carouselRef, carouselApi] = useEmblaCarousel({ loop: true });
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
 
   useEffect(() => {
     if (!carouselApi) return;
@@ -56,10 +61,17 @@ export default function HeritageCarousel() {
   }, [carouselApi]);
 
   useEffect(() => {
-    if (!carouselApi || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setPrefersReducedMotion(motionPreference.matches);
+    motionPreference.addEventListener("change", updateMotionPreference);
+    return () => motionPreference.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (!carouselApi || !autoPlayEnabled || isHovered || isFocused || prefersReducedMotion) return;
     const timer = window.setInterval(() => carouselApi.scrollNext(), 5000);
     return () => window.clearInterval(timer);
-  }, [carouselApi, paused]);
+  }, [carouselApi, autoPlayEnabled, isHovered, isFocused, prefersReducedMotion]);
 
   return (
     <div
@@ -67,11 +79,11 @@ export default function HeritageCarousel() {
       role="region"
       aria-roledescription="carousel"
       aria-label="African fashion and crafts"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocusCapture={() => setIsFocused(true)}
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsFocused(false);
       }}
     >
       <div ref={carouselRef} className="absolute inset-0 overflow-hidden">
@@ -91,10 +103,10 @@ export default function HeritageCarousel() {
                 className="absolute inset-0 h-full w-full object-cover"
                 loading={index === 0 ? "eager" : "lazy"}
               />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-              <div className="absolute bottom-9 left-4 right-4 pointer-events-none">
-                <h3 className="text-lg font-bold text-white drop-shadow-lg md:text-xl">{slide.title}</h3>
-                <p className="text-sm text-white/90 drop-shadow-md">{slide.description}</p>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10" />
+              <div className="pointer-events-none absolute bottom-14 left-4 right-4 max-w-[calc(100%-2rem)] rounded-lg bg-black/75 px-4 py-3 text-left shadow-lg backdrop-blur-sm">
+                <h3 className="text-lg font-bold text-white md:text-xl">{slide.title}</h3>
+                <p className="text-left text-sm text-white md:text-base">{slide.description}</p>
               </div>
             </div>
           ))}
@@ -105,7 +117,7 @@ export default function HeritageCarousel() {
           type="button"
           onClick={() => carouselApi?.scrollPrev()}
           aria-label="Previous African heritage image"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/75 text-white transition-colors hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -113,12 +125,30 @@ export default function HeritageCarousel() {
           type="button"
           onClick={() => carouselApi?.scrollNext()}
           aria-label="Next African heritage image"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/75 text-white transition-colors hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           <ChevronRight className="h-5 w-5" aria-hidden="true" />
         </button>
+        <button
+          type="button"
+          onClick={() => setAutoPlayEnabled((enabled) => !enabled)}
+          aria-label={
+            prefersReducedMotion
+              ? "Automatic slide advance disabled by reduced motion preference"
+              : `${autoPlayEnabled ? "Pause" : "Play"} automatic slide advance`
+          }
+          title={prefersReducedMotion ? "Disabled by reduced motion preference" : undefined}
+          disabled={prefersReducedMotion}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/75 text-white transition-colors hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {autoPlayEnabled ? (
+            <Pause className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <Play className="h-5 w-5" aria-hidden="true" />
+          )}
+        </button>
       </div>
-      <div className="absolute bottom-3 left-0 right-0 z-10 flex justify-center gap-2" aria-label="Choose a slide">
+      <div className="absolute bottom-1 left-0 right-0 z-10 flex justify-center gap-1 pr-8 sm:pr-0" role="group" aria-label="Choose a slide">
         {slides.map((slide, index) => (
           <button
             key={slide.title}
@@ -126,10 +156,17 @@ export default function HeritageCarousel() {
             onClick={() => carouselApi?.scrollTo(index)}
             aria-label={`Show ${slide.title}`}
             aria-current={index === selectedIndex ? "true" : undefined}
-            className={`h-2.5 w-2.5 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${index === selectedIndex ? "bg-white" : "bg-white/50 hover:bg-white/80"}`}
-          />
+            className="flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full transition-colors ${index === selectedIndex ? "bg-white" : "bg-white/70 hover:bg-white"}`}
+            />
+          </button>
         ))}
       </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        Slide {selectedIndex + 1} of {slides.length}: {slides[selectedIndex]?.title}
+      </p>
     </div>
   );
 }
