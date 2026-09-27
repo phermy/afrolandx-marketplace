@@ -100,7 +100,7 @@
 .catalog-quick-filters { display: flex; flex-wrap: wrap; gap: .4rem; }
 .catalog-quick-filters button { border: 1px solid #d9cebb; padding: .42rem .55rem; background: transparent; color: #6b746c; font-size: .64rem; cursor: pointer; transition: color .2s ease, border-color .2s ease, background .2s ease; }
 .catalog-quick-filters button:hover, .catalog-quick-filters button.is-active { border-color: var(--cat-forest); background: #e7eee7; color: var(--cat-forest); }
-.catalog-results { min-width: 0; }
+.catalog-results { min-width: 0; scroll-margin-top: 8rem; }
 .catalog-results-head { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin: 0 0 1.2rem; }
 .catalog-results-head h3 { margin: .3rem 0 0; color: var(--cat-ink); font: 600 1.25rem "Space Grotesk", sans-serif; letter-spacing: -.03em; }
 .catalog-result-count { color: #7c857c; font: 500 .66rem "Space Mono", monospace; white-space: nowrap; }

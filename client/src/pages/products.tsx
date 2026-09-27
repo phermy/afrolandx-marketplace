@@ -105,7 +105,11 @@ export default function Products() {
           onSelect={(id) => {
             setSelectedCategory(id);
             setSelectedSubcategory('');
-            document.getElementById('catalog-results')?.scrollIntoView({
+            setSearchQuery('');
+            setPriceRange({ min: '', max: '' });
+            setGenderTab('all');
+            setSelectedCountry('');
+            document.getElementById('catalog-results-list')?.scrollIntoView({
               behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
               block: 'start',
             });
@@ -235,7 +239,7 @@ export default function Products() {
               </div>
             </aside>
 
-            <div className="catalog-results">
+            <div className="catalog-results" id="catalog-results-list">
               <div className="catalog-results-head">
                 <div>
                   <p className="catalog-eyebrow">{searchQuery ? 'Search results' : 'Curated from across the continent'}</p>
