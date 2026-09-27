@@ -6,11 +6,12 @@ type AuthShellProps = {
   title: string;
   description: string;
   headerLink?: { href: string; label: string };
+  layout?: "left" | "center";
   children: ReactNode;
   footer?: ReactNode;
 };
 
-export function AuthShell({ title, description, headerLink, children, footer }: AuthShellProps) {
+export function AuthShell({ title, description, headerLink, layout = "left", children, footer }: AuthShellProps) {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#fbfbfa] pattern-bg">
       <header className="relative z-10 flex items-center justify-between px-6 py-6 sm:px-10 sm:py-7 lg:px-12">
@@ -28,9 +29,9 @@ export function AuthShell({ title, description, headerLink, children, footer }: 
         )}
       </header>
 
-      <main className="relative z-10 flex w-full flex-1 items-start justify-center px-6 pb-14 pt-10 sm:px-10 sm:pt-16 lg:justify-start lg:px-24 lg:pt-24 xl:px-28">
-        <section className="w-full max-w-[360px]" aria-labelledby="auth-title">
-          <div className="border border-[#ebeae7] bg-white px-7 py-8 shadow-[0_14px_36px_rgba(20,30,24,0.06)] sm:px-8 sm:py-9">
+      <main className={`relative z-10 flex w-full flex-1 justify-center px-6 pb-14 sm:px-10 ${layout === "center" ? "items-center pt-6 sm:pt-0" : "items-start pt-10 sm:pt-16 lg:justify-start lg:px-24 lg:pt-24 xl:px-28"}`}>
+        <section className={`w-full ${layout === "center" ? "max-w-[450px]" : "max-w-[360px]"}`} aria-labelledby="auth-title">
+          <div className={`border border-[#ebeae7] bg-white px-7 py-8 shadow-[0_14px_36px_rgba(20,30,24,0.06)] sm:px-8 sm:py-9 ${layout === "center" ? "rounded-xl" : ""}`}>
             <h1 id="auth-title" className="text-[21px] font-semibold tracking-[-0.02em] text-[#20201f] sm:text-[23px]">
               {title}
             </h1>

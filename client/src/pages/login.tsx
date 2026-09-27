@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, Mail } from "lucide-react";
 import { AuthShell, authButtonClass, authInputClass } from "@/components/auth-shell";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
@@ -20,7 +20,7 @@ async function readResponse(response: Response, fallback: string) {
 
 export default function LoginPage() {
   const { toast } = useToast();
-  const [mode, setMode] = useState<"password" | "code">("password");
+  const [mode, setMode] = useState<"choice" | "password" | "code">("choice");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -139,15 +139,47 @@ export default function LoginPage() {
     if (!codeEmail) setCodeEmail(email);
   }
 
+  function switchToChoice() {
+    setMode("choice");
+    setError("");
+    setCode("");
+  }
+
+  if (mode === "choice") {
+    return (
+      <AuthShell
+        title="Log in to Afrolandx"
+        description="Choose how you’d like to sign in."
+        layout="center"
+      >
+        <div className="space-y-3">
+          <button type="button" onClick={switchToPassword}
+            className="flex w-full items-center justify-center gap-3 rounded-md border border-[#dedbd4] bg-white px-4 py-3 text-sm font-medium text-[#20201f] transition hover:border-[#087f4f] hover:bg-[#f6faf7] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2">
+            <Mail className="h-5 w-5" aria-hidden="true" />
+            Continue with email and password
+          </button>
+          <button type="button" onClick={switchToCode}
+            className="flex w-full items-center justify-center gap-3 rounded-md border border-[#dedbd4] bg-white px-4 py-3 text-sm font-medium text-[#20201f] transition hover:border-[#087f4f] hover:bg-[#f6faf7] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2">
+            <KeyRound className="h-5 w-5" aria-hidden="true" />
+            Continue with an email code
+          </button>
+        </div>
+        <p className="mt-6 text-center text-sm text-[#6d6d69]">
+          New to Afrolandx? <Link href="/register" className="font-medium text-[#087f4f] hover:underline">Create an account</Link>
+        </p>
+      </AuthShell>
+    );
+  }
+
   if (mode === "code") {
     return (
       <AuthShell
         title={codeStep === "request" ? "Sign in with a code" : "Enter your code to sign in"}
         description={codeStep === "request" ? "We’ll email you a code that works once, so you won’t need a password." : `We sent a code to ${codeEmail}. Enter all six digits below.`}
-        headerLink={{ href: "/register", label: "Create account" }}
+        layout="center"
       >
-         <button type="button" onClick={switchToPassword} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
-          <ArrowLeft className="h-4 w-4" /> Back to sign in with a password
+         <button type="button" onClick={switchToChoice} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
+           <ArrowLeft className="h-4 w-4" /> Back to sign-in choices
         </button>
          {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
 
@@ -198,8 +230,11 @@ export default function LoginPage() {
     <AuthShell
        title="Log in to your account"
        description="Welcome back. Enter your details to continue."
-      headerLink={{ href: "/register", label: "Create account" }}
+       layout="center"
     >
+       <button type="button" onClick={switchToChoice} className="mb-5 inline-flex items-center gap-1 text-sm text-[#6d6d69] hover:text-[#20201f] focus:outline-none focus:underline">
+         <ArrowLeft className="h-4 w-4" /> Back to sign-in choices
+       </button>
        {error && <div className="mb-5 rounded-[3px] border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
       <form onSubmit={loginWithPassword} className="space-y-5">
         <label className="block text-sm font-medium text-[#3c3c39]">
