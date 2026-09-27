@@ -8,6 +8,7 @@ export interface User {
   profileImageUrl?: string;
   roles: string[];
   emailVerified?: boolean;
+  closedAt?: string | null;
   roleManagementLocked?: boolean;
   createdAt: string;
   updatedAt: string;

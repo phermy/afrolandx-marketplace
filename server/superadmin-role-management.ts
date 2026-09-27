@@ -22,7 +22,7 @@ function parseRoles(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((role): role is string => typeof role === "string") : [];
 }
 
-type LockedAccount = { id: string; email: string | null; email_verified: boolean; roles: unknown };
+type LockedAccount = { id: string; email: string | null; email_verified: boolean; roles: unknown; closed_at: Date | null };
 
 export async function lockVerifiedSuperadminAndTarget(
   tx: { execute: (query: any) => Promise<any> },
@@ -31,17 +31,18 @@ export async function lockVerifiedSuperadminAndTarget(
 ): Promise<{ actor: LockedAccount; target: LockedAccount }> {
   if (actorId === targetId) throw new RoleManagementError("You cannot change your own roles.", 403);
   const result = await tx.execute(sql`
-    SELECT id, email, email_verified, roles FROM users
+    SELECT id, email, email_verified, roles, closed_at FROM users
     WHERE id IN (${actorId}, ${targetId}) ORDER BY id FOR UPDATE
   `);
   const rows = result.rows as LockedAccount[];
   const actor = rows.find(row => row.id === actorId);
   const target = rows.find(row => row.id === targetId);
   const actorRoles = parseRoles(actor?.roles);
-  if (!actor || !actor.email_verified || !actorRoles.includes("admin") || !actorRoles.includes("superadmin")) {
+  if (!actor || actor.closed_at || !actor.email_verified || !actorRoles.includes("admin") || !actorRoles.includes("superadmin")) {
     throw new RoleManagementError("Verified superadmin access is required.", 403);
   }
   if (!target) throw new RoleManagementError("User not found.", 404);
+  if (target.closed_at) throw new RoleManagementError("This account is closed.", 409);
   return { actor, target };
 }
 

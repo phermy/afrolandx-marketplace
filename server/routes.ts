@@ -592,6 +592,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Close accounts without deleting linked orders, payments, catalog, or audit history.
+  app.post('/api/admin/users/:userId/close', isAuthenticated, isSuperadmin, async (req: any, res) => {
+    if (typeof req.body?.confirmation !== 'string') {
+      return res.status(400).json({ message: 'Type the account email to confirm closure.' });
+    }
+    try {
+      const closed = await storage.closeUser(req.params.userId, req.user.id, req.body.confirmation);
+      if (!closed) return res.status(404).json({ message: 'Account not found.' });
+      return res.json({ message: 'Account closed. Access is blocked and business records are retained.' });
+    } catch (error: any) {
+      if (error?.message === 'SUPERADMIN_REQUIRED' || error?.message === 'PROTECTED_ACCOUNT') {
+        return res.status(403).json({ message: 'This account cannot be closed by this Superadmin.' });
+      }
+      if (error?.message === 'ACCOUNT_CONFIRMATION_REQUIRED') {
+        return res.status(400).json({ message: 'The confirmation does not match the account email.' });
+      }
+      if (error?.message === 'ACCOUNT_ALREADY_CLOSED') {
+        return res.status(409).json({ message: 'This account is already closed.' });
+      }
+      console.error('Error closing account:', error);
+      return res.status(503).json({ message: 'Account closure failed. No changes were saved.' });
+    }
+  });
+
   // Only unlinked accounts may be permanently deleted (admin only).
   app.delete('/api/admin/users/:userId', isAuthenticated, isAdmin, protectSuperadmin, async (req: any, res) => {
     try {

@@ -75,6 +75,7 @@ export const users = pgTable(
     loginOtp: varchar("login_otp"), // keyed digest
     loginOtpExpiry: timestamp("login_otp_expiry"),
     activeSessionId: varchar("active_session_id"), // enforces single active session
+    closedAt: timestamp("closed_at"), // blocked account; keep linked orders, payouts, and audit history
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },

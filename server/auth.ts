@@ -60,6 +60,7 @@ export function sanitizeUser(user: any) {
   return {
     id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName,
     roles: user.roles, profileImageUrl: user.profileImageUrl, emailVerified: user.emailVerified,
+    closedAt: user.closedAt,
     createdAt: user.createdAt, updatedAt: user.updatedAt,
   };
 }
@@ -157,6 +158,7 @@ export async function setupAuth(app: Express) {
       if (!email || typeof password !== "string" || password.length < 8) return done(null, false, { message: "Invalid email or password" });
       const user = await storage.getUserByEmail(email);
       if (!user || !user.password || !await bcrypt.compare(password, user.password)) return done(null, false, { message: "Invalid email or password" });
+      if (user.closedAt) return done(null, false, { message: "This account has been closed. Contact support." });
       if (!user.emailVerified) {
         return done(
           null,
@@ -169,7 +171,10 @@ export async function setupAuth(app: Express) {
   }));
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: string, done) => {
-    try { done(null, await storage.getUser(id)); } catch (error) { done(error); }
+    try {
+      const user = await storage.getUser(id);
+      done(null, user?.closedAt ? false : user);
+    } catch (error) { done(error); }
   });
 
   async function finalizeLogin(req: any, res: any, user: any, onSuccess: () => void) {
@@ -179,9 +184,10 @@ export async function setupAuth(app: Express) {
         if (loginError) return res.status(500).json({ message: "Login failed" });
         try {
           await storage.updateActiveSession(user.id, req.sessionID);
-        } catch {
+        } catch (error) {
           return req.logout(() => {
-            req.session.destroy(() => res.status(500).json({ message: "Login failed" }));
+            req.session.destroy(() => res.status(error instanceof Error && error.message === "ACCOUNT_CLOSED" ? 403 : 500)
+              .json({ message: error instanceof Error && error.message === "ACCOUNT_CLOSED" ? "This account has been closed. Contact support." : "Login failed" }));
           });
         }
         onSuccess();
@@ -257,6 +263,7 @@ export async function setupAuth(app: Express) {
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(404).json({ message: "No account found with that email. Please create one first." });
+      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
       await issueOtp(req, user, "login");
       return res.json({ message: "Sign-in code sent to your email" });
     } catch (error) {
@@ -287,6 +294,7 @@ export async function setupAuth(app: Express) {
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(400).json({ message: "Invalid or expired sign-in code" });
+      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
       const result = await verifyOtp(req, user, req.body.otp, "login");
       if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Sign-in code has expired. Please request a new one." : "Invalid sign-in code", ...(result === "limited" ? { hint: "RATE_LIMITED" } : {}) });
       if (!user.emailVerified) await storage.verifyUserEmail(user.id);
@@ -300,6 +308,7 @@ export async function setupAuth(app: Express) {
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(404).json({ message: "Account not found" });
+      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
       if (user.emailVerified) return res.json({ message: "Email already verified" });
       const result = await verifyOtp(req, user, req.body.otp, "email");
       if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Verification code has expired. Please request a new one." : "Invalid verification code" });
@@ -314,6 +323,7 @@ export async function setupAuth(app: Express) {
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(404).json({ message: "Account not found" });
+      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
       if (user.emailVerified) return res.json({ message: "Email is already verified" });
       await issueOtp(req, user, "email");
       return res.json({ message: "Verification code sent to your email" });
@@ -337,7 +347,7 @@ export async function setupAuth(app: Express) {
 
     try {
       const user = await storage.getUserByEmail(email);
-      if (user) {
+      if (user && !user.closedAt) {
         try {
           await issueOtp(req, user, "reset");
         } catch (error) {
@@ -358,6 +368,7 @@ export async function setupAuth(app: Express) {
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
+      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
       const result = await verifyOtp(req, user, otp, "reset");
       if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Reset code has expired. Please request a new one." : "Invalid reset code" });
       await storage.updateUserPassword(user.id, await bcrypt.hash(newPassword, 10));
@@ -370,6 +381,10 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = (req, res, next) => {
   if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
   const user = req.user as any;
+  if (user.closedAt) {
+    req.logout(() => req.session?.destroy(() => {}));
+    return res.status(401).json({ message: "ACCOUNT_CLOSED" });
+  }
   if (user.activeSessionId !== req.sessionID) {
     req.logout(() => req.session?.destroy(() => {}));
     return res.status(401).json({ message: "SESSION_SUPERSEDED" });

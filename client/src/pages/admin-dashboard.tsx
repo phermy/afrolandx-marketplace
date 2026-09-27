@@ -114,6 +114,7 @@ export default function AdminDashboard() {
   const [testDeletion, setTestDeletion] = useState<{ userId: string; preview: TestDeletionPreview } | null>(null);
   const [testDeletionEmail, setTestDeletionEmail] = useState('');
   const [testPreviewPending, setTestPreviewPending] = useState<string | null>(null);
+  const [showClosedAccounts, setShowClosedAccounts] = useState(false);
   const [repProductOpen, setRepProductOpen] = useState(false);
   const [repProduct, setRepProduct] = useState({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
   const [repProductImages, setRepProductImages] = useState<File[]>([]);
@@ -510,6 +511,25 @@ export default function AdminDashboard() {
         variant: 'destructive',
       });
     },
+  });
+
+  const closeUserMutation = useMutation({
+    mutationFn: async ({ userId, confirmation }: { userId: string; confirmation: string }) => {
+      const response = await apiRequest('POST', `/api/admin/users/${encodeURIComponent(userId)}/close`, { confirmation });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Account closed', description: 'Access is blocked. Orders, payouts, and other business records remain.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not close account',
+      description: error?.message || 'No changes were saved.',
+      variant: 'destructive',
+    }),
   });
 
   const previewTestDeletion = async (userId: string) => {
@@ -1812,7 +1832,7 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   User Management
-                  <Badge variant="outline">{allUsers.length} users</Badge>
+                  <Badge variant="outline">{allUsers.filter(u => !u.closedAt).length} active users</Badge>
                 </CardTitle>
                 <CardDescription>
                   {hasRole(user, 'superadmin') && user?.emailVerified
@@ -1821,6 +1841,10 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <Button type="button" variant="outline" size="sm" className="mb-4"
+                  onClick={() => setShowClosedAccounts(value => !value)}>
+                  {showClosedAccounts ? 'Hide closed accounts' : `Show closed accounts (${allUsers.filter(u => u.closedAt).length})`}
+                </Button>
                 {hasRole(user, 'superadmin') && user?.emailVerified && (
                   <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
                     <h3 className="flex items-center gap-2 font-semibold text-amber-950">
@@ -1833,7 +1857,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <div className="space-y-3">
-                  {allUsers.map((u) => (
+                  {allUsers.filter(u => showClosedAccounts || !u.closedAt).map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -1849,6 +1873,7 @@ export default function AdminDashboard() {
                             {(u.roles as string[] || []).map(r => (
                               <Badge key={r} variant={r === 'admin' || r === 'superadmin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
                             ))}
+                            {u.closedAt && <Badge variant="outline" className="text-xs">Closed</Badge>}
                           </div>
                         </div>
                       </div>
@@ -1862,7 +1887,7 @@ export default function AdminDashboard() {
                           return (
                             <div key={role} className="flex items-center gap-1.5">
                               <Checkbox id={`${u.id}-${role}`} checked={uHasRole}
-                                disabled={isSelf || isProtected || cannotGrantSuperadmin || adminRequired || toggleUserRoleMutation.isPending}
+                                  disabled={isSelf || isProtected || Boolean(u.closedAt) || cannotGrantSuperadmin || adminRequired || toggleUserRoleMutation.isPending}
                                 onCheckedChange={() => {
                                   if (isSelf || isProtected) {
                                     toast({ title: 'This account’s roles cannot be changed here.', variant: 'destructive' });
@@ -1884,7 +1909,7 @@ export default function AdminDashboard() {
                             </div>
                           );
                         })}
-                        {hasRole(u, 'vendor') && u.id !== user?.id && !hasRole(u, 'superadmin') && (
+                        {hasRole(u, 'vendor') && !u.closedAt && u.id !== user?.id && !hasRole(u, 'superadmin') && (
                           <Button
                             type="button"
                             size="sm"
@@ -1895,12 +1920,22 @@ export default function AdminDashboard() {
                             {testPreviewPending === u.id ? 'Verifying tests…' : 'Delete test data'}
                           </Button>
                         )}
+                        {hasRole(user, 'superadmin') && user?.emailVerified && !u.closedAt && (
+                          <Button type="button" size="sm" variant="destructive"
+                            disabled={u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') || closeUserMutation.isPending}
+                            onClick={() => {
+                              const confirmation = window.prompt(`Close ${u.email || u.id}? This blocks sign-in immediately and suspends their vendor listings, but keeps orders, payouts, and other business records.\n\nType ${u.email || u.id} to confirm:`);
+                              if (confirmation !== null) closeUserMutation.mutate({ userId: u.id, confirmation });
+                            }}>
+                            Close account
+                          </Button>
+                        )}
                         <Button
                           type="button"
                           size="sm"
                           variant="destructive"
                           className="gap-1"
-                           disabled={u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') ||
+                            disabled={Boolean(u.closedAt) || u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') ||
                              (hasRole(u, 'admin') && !hasRole(user, 'superadmin')) || deleteUserMutation.isPending}
                           onClick={() => {
                             if (u.id === user?.id) return;
@@ -1912,7 +1947,7 @@ export default function AdminDashboard() {
                             }
                           }}
                         >
-                          <Trash2 className="w-3 h-3" />Delete
+                          <Trash2 className="w-3 h-3" />Delete unused
                         </Button>
                       </div>
                     </div>

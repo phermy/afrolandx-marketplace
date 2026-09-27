@@ -99,6 +99,7 @@ export interface IStorage {
   updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; profileImageUrl?: string | null }): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   deleteUser(userId: string, actorId: string): Promise<boolean>;
+  closeUser(userId: string, actorId: string, confirmation: string): Promise<boolean>;
   updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
@@ -380,7 +381,7 @@ export class DatabaseStorage implements IStorage {
       // Only unused accounts can be hard-deleted. Keep orders, payouts, catalog
       // and other linked history intact for a separate, reviewed closure flow.
       const locked = await tx.execute(sql`
-        SELECT id, email, email_verified, roles FROM users
+        SELECT id, email, email_verified, roles, closed_at FROM users
         WHERE id IN (${userId}, ${actorId}) ORDER BY id FOR UPDATE
       `);
       const account = locked.rows.find(row => row.id === userId);
@@ -389,7 +390,7 @@ export class DatabaseStorage implements IStorage {
       if (!actor || actorId === userId || !Array.isArray(actor.roles) || !actor.roles.includes("admin")) {
         throw new Error("ACCOUNT_DELETION_FORBIDDEN");
       }
-      if (isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
+      if (account.closed_at || isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
         (Array.isArray(account.roles) && account.roles.includes("superadmin"))) {
         throw new Error("PROTECTED_ACCOUNT");
       }
@@ -405,6 +406,47 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
       const result = await tx.execute(sql`DELETE FROM users WHERE id = ${userId} RETURNING id`);
       return result.rows.length > 0;
+    });
+  }
+
+  async closeUser(userId: string, actorId: string, confirmation: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      const locked = await tx.execute(sql`
+        SELECT id, email, email_verified, roles, closed_at FROM users
+        WHERE id IN (${userId}, ${actorId}) ORDER BY id FOR UPDATE
+      `);
+      const account = locked.rows.find(row => row.id === userId);
+      const actor = locked.rows.find(row => row.id === actorId);
+      if (!actor || !actor.email_verified || actor.closed_at ||
+        !Array.isArray(actor.roles) || !actor.roles.includes("admin") || !actor.roles.includes("superadmin")) {
+        throw new Error("SUPERADMIN_REQUIRED");
+      }
+      if (!account) return false;
+      if (userId === actorId || isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
+        (Array.isArray(account.roles) && account.roles.includes("superadmin"))) {
+        throw new Error("PROTECTED_ACCOUNT");
+      }
+      if (account.closed_at) throw new Error("ACCOUNT_ALREADY_CLOSED");
+      const expected = typeof account.email === "string" && account.email ? account.email : userId;
+      if (confirmation.trim().toLowerCase() !== expected.toLowerCase()) {
+        throw new Error("ACCOUNT_CONFIRMATION_REQUIRED");
+      }
+
+      const now = new Date();
+      await tx.update(users).set({
+        closedAt: now, activeSessionId: null, password: null,
+        emailOtp: null, emailOtpExpiry: null, loginOtp: null, loginOtpExpiry: null,
+        passwordResetOtp: null, passwordResetOtpExpiry: null, updatedAt: now,
+      }).where(eq(users.id, userId));
+      await tx.update(vendors).set({ status: "suspended", updatedAt: now })
+        .where(eq(vendors.userId, userId));
+      await tx.update(products).set({ status: "suspended", featured: false, updatedAt: now })
+        .where(and(
+          sql`${products.vendorId} IN (SELECT id FROM vendors WHERE user_id = ${userId})`,
+          eq(products.status, "approved"),
+        ));
+      await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
+      return true;
     });
   }
 
@@ -429,7 +471,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateActiveSession(userId: string, sessionId: string | null): Promise<void> {
-    await db.update(users).set({ activeSessionId: sessionId, updatedAt: new Date() }).where(eq(users.id, userId));
+    const updated = await db.update(users).set({ activeSessionId: sessionId, updatedAt: new Date() })
+      .where(and(eq(users.id, userId), sessionId ? isNull(users.closedAt) : undefined))
+      .returning({ id: users.id });
+    if (sessionId && !updated.length) throw new Error("ACCOUNT_CLOSED");
   }
 
   // Vendor operations
