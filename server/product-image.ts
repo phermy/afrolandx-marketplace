@@ -4,27 +4,28 @@ import crypto from "crypto";
 import sharp from "sharp";
 import OpenAI, { toFile } from "openai";
 import { getCloudStorageService, isCloudStorageEnabled } from "./cloudStorage";
+import { optimizeProductImage } from "./product-image-processing";
 
 export async function enhanceProductImage(buffer: Buffer): Promise<Buffer> {
-  return sharp(buffer)
-    .rotate()
-    .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
-    .normalize()
-    .sharpen({ sigma: 0.7 })
-    .jpeg({ quality: 90, progressive: true, mozjpeg: true })
-    .toBuffer();
+  return optimizeProductImage(buffer);
 }
 
 export async function storeProductImage(buffer: Buffer, folder = "products"): Promise<string> {
-  const enhanced = await enhanceProductImage(buffer);
   if (isCloudStorageEnabled()) {
-    return getCloudStorageService().uploadImage(enhanced, "image/jpeg", folder);
+    return getCloudStorageService().uploadImage(buffer, "image/jpeg", folder);
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Product image storage is unavailable");
   }
 
+  return storeLocalProductImage(buffer, folder);
+}
+
+export async function storeLocalProductImage(buffer: Buffer, folder = "products"): Promise<string> {
   const uploadDir = path.join(process.cwd(), "uploads", folder);
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   const filename = `product-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.jpg`;
-  fs.writeFileSync(path.join(uploadDir, filename), enhanced);
+  fs.writeFileSync(path.join(uploadDir, filename), await enhanceProductImage(buffer));
   return `/uploads/${folder}/${filename}`;
 }
 

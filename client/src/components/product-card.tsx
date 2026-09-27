@@ -3,12 +3,10 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getCountryFlag } from '@shared/africanFashion';
 import ProductPrice from '@/components/product-price';
 import type { Product } from '@/types';
-import { ImageOff } from 'lucide-react';
+import { ArrowUpRight, ImageOff, MapPin, ShoppingBag } from 'lucide-react';
 
 const resolveImageUrl = (imagePath: string): string => {
   if (!imagePath) return '';
@@ -35,167 +33,77 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
     addToCart(product.id, 1);
     setIsAddedToCart(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       openCart();
       setIsAddedToCart(false);
     }, 1500);
   };
 
-  const getStatusBadge = () => {
-    if (product.status === 'approved') return null;
-    const styles: Record<string, string> = {
-      pending: 'badge-pending',
-      rejected: 'badge-rejected',
-    };
-    return (
-      <Badge className={`absolute top-2 left-2 z-10 ${styles[product.status] ?? ''}`}>
-        {product.status}
-      </Badge>
-    );
-  };
-
+  const rawSrc = product.images?.length ? resolveImageUrl(product.images[0]) : product.imageUrl ? resolveImageUrl(product.imageUrl) : '';
   const isOutOfStock = product.stock <= 0;
   const isAvailable = product.status === 'approved' && !isOutOfStock;
 
-  const rawSrc =
-    product.images && product.images.length > 0
-      ? resolveImageUrl(product.images[0])
-      : null;
-
-  const flag = product.originCountry ? getCountryFlag(product.originCountry) : null;
-
   return (
-    <Card className="group cursor-pointer card-hover overflow-hidden flex flex-col">
-      <CardContent className="p-0 flex flex-col flex-1">
+    <article className="catalog-product-card group">
+      <button
+        type="button"
+        className="catalog-product-image"
+        onClick={() => setLocation(`/products/${product.id}`)}
+        aria-label={`View ${product.name}`}
+      >
+        {rawSrc && !imgError ? (
+          <img
+            src={rawSrc}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <span className="catalog-image-fallback">
+            <ImageOff size={30} strokeWidth={1.4} aria-hidden="true" />
+            <span>Photo unavailable</span>
+          </span>
+        )}
+        <span className="catalog-image-vignette" aria-hidden="true" />
+        {product.featured && <Badge className="catalog-featured-badge">Featured</Badge>}
+        {product.originCountry && (
+          <span className="catalog-origin-badge">
+            <MapPin size={12} aria-hidden="true" />
+            <span>{product.originCountry}</span>
+          </span>
+        )}
+        {isOutOfStock && <span className="catalog-stock-overlay">Currently unavailable</span>}
+        <span className="catalog-image-open" aria-hidden="true"><ArrowUpRight size={17} /></span>
+      </button>
 
-        {/* ── Image container ─────────────────────────────────────────── */}
-        <div className="relative w-full aspect-square overflow-hidden bg-white">
-          {rawSrc && !imgError ? (
-            <img
-              src={rawSrc}
-              alt={product.name}
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 bg-stone-50 text-stone-500">
-              <ImageOff className="h-9 w-9" aria-hidden="true" />
-              <span className="text-xs">Product photo unavailable</span>
-            </div>
-          )}
-
-          <div className="absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
-
-          {getStatusBadge()}
-
-          {product.featured && (
-            <Badge className="absolute top-2 right-2 z-10 bg-nigerian-gold text-white text-[10px] sm:text-xs px-1.5 py-0.5">
-              ⭐ Featured
-            </Badge>
-          )}
-
-          {/* Country origin badge — top left when no status badge */}
-          {!product.status || product.status === 'approved' ? (
-            product.originCountry && flag && (
-              <span className="absolute top-2 left-2 z-10 bg-black/60 text-white text-[10px] sm:text-xs px-2 py-0.5 rounded-full flex items-center gap-1 backdrop-blur-sm">
-                <span>{flag}</span>
-                <span className="hidden sm:inline">{product.originCountry}</span>
-              </span>
-            )
-          ) : null}
-
-          {isOutOfStock && (
-            <div className="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
-              <Badge variant="destructive" className="text-sm font-semibold">
-                Out of Stock
-              </Badge>
-            </div>
-          )}
+      <div className="catalog-product-info">
+        {product.traditionalName && <p className="catalog-traditional-name">{product.traditionalName}</p>}
+        <button type="button" className="catalog-product-title" onClick={() => setLocation(`/products/${product.id}`)}>
+          {product.name}
+        </button>
+        {product.description && <p className="catalog-product-description">{product.description}</p>}
+        <div className="catalog-product-bottom">
+          <ProductPrice ngnAmount={parseFloat(product.price)} />
+          <span className={`catalog-stock ${isOutOfStock ? 'is-out' : ''}`}>
+            {isOutOfStock ? 'Out of stock' : `${product.stock} available`}
+          </span>
         </div>
-
-        {/* ── Product details ──────────────────────────────────────── */}
-        <div className="p-2.5 sm:p-4 flex flex-col flex-1">
-
-          {/* Traditional name chip */}
-          {product.traditionalName && (
-            <span className="inline-block mb-1 text-[10px] font-semibold text-nigerian-green bg-nigerian-green/10 px-2 py-0.5 rounded-full w-fit">
-              {product.traditionalName}
-            </span>
-          )}
-
-          <h3 className="font-semibold text-xs sm:text-sm md:text-base text-gray-900 mb-1 line-clamp-2 group-hover:text-nigerian-green transition-colors leading-tight">
-            {product.name}
-          </h3>
-
-          <p className="text-gray-500 text-xs mb-1.5 line-clamp-2 hidden sm:block min-h-[2.5rem]">
-            {product.description}
-          </p>
-
-          {/* Country row (mobile-visible full version) */}
-          {product.originCountry && (
-            <p className="text-[10px] text-gray-400 mb-1 sm:hidden">
-              {flag} {product.originCountry}
-            </p>
-          )}
-
-          {/* Price row */}
-          <div className="flex items-start justify-between mb-1.5 sm:mb-2 gap-1">
-            <ProductPrice ngnAmount={parseFloat(product.price)} />
-          </div>
-
-          {/* Stock */}
-          <p className="text-[10px] sm:text-xs text-gray-400 mb-2 truncate">
-            {isOutOfStock ? 'Out of Stock' : `${product.stock} in stock`}
-            {product.weight && !isOutOfStock && (
-              <span className="hidden sm:inline"> · {parseFloat(product.weight)}kg</span>
-            )}
-          </p>
-
-          {/* Buttons */}
-          <div className="mt-auto space-y-1.5">
-            <Button
-              onClick={handleAddToCart}
-              disabled={!isAvailable || isAddingToCart || isAddedToCart}
-              size="sm"
-              className={`w-full text-xs sm:text-sm transition-all duration-200 ${
-                isAddedToCart ? 'bg-green-600 hover:bg-green-600' : 'btn-nigerian'
-              }`}
-              data-testid="button-add-to-cart"
-            >
-              {isAddingToCart ? (
-                <span className="flex items-center justify-center gap-1">
-                  <div className="spinner-nigerian w-3 h-3" />
-                  Adding…
-                </span>
-              ) : isAddedToCart ? (
-                <span className="flex items-center justify-center gap-1">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Added!
-                </span>
-              ) : !isAvailable ? (
-                isOutOfStock ? 'Out of Stock' : 'Unavailable'
-              ) : !isAuthenticated ? (
-                'Log in to buy'
-              ) : (
-                'Add to Cart'
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs sm:text-sm border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
-              onClick={() => setLocation(`/products/${product.id}`)}
-            >
-              View Details
-            </Button>
-          </div>
+        <div className="catalog-product-actions">
+          <Button
+            onClick={handleAddToCart}
+            disabled={!isAvailable || isAddingToCart || isAddedToCart}
+            className={`catalog-add-button ${isAddedToCart ? 'is-added' : ''}`}
+            data-testid="button-add-to-cart"
+          >
+            <ShoppingBag size={15} aria-hidden="true" />
+            {isAddingToCart ? 'Adding…' : isAddedToCart ? 'Added to bag' : !isAvailable ? (isOutOfStock ? 'Out of stock' : 'Unavailable') : !isAuthenticated ? 'Log in to buy' : 'Add to bag'}
+          </Button>
+          <button type="button" className="catalog-details-link" onClick={() => setLocation(`/products/${product.id}`)}>
+            Details <ArrowUpRight size={14} aria-hidden="true" />
+          </button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </article>
   );
 }

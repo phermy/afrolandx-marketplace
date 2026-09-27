@@ -52,7 +52,7 @@ import {
   recommendShippingCarriers,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
-import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import { retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
 import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, prepareProfileImage, PROFILE_IMAGE_TYPES } from "./profile-image";
 import { sendExperienceFeedbackNotification } from "./email";
 import {
@@ -158,23 +158,8 @@ const profileImageUpload = multer({
   },
 }).single("image");
 
-// Fallback local storage for when cloud storage is not available
-const localStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = 'uploads/products';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `product-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
-});
-
 const localUpload = multer({
-  storage: localStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp|gif|avif/;
@@ -1136,6 +1121,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/admin/vendors/:vendorId/products', isAuthenticated, isAdmin, upload.array('images', 5), async (req: any, res) => {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+      return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
+    }
     try {
       const vendorId = Number(req.params.vendorId);
       const vendor = await storage.getVendor(vendorId);
@@ -1150,7 +1138,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stock: z.coerce.number().int().min(0),
       }).parse(req.body);
       const files = (req.files as Express.Multer.File[]) || [];
-      const imageUrls = await Promise.all(files.map(file => storeProductImage(file.buffer, 'products')));
+      let imageUrls: string[];
+      try {
+        imageUrls = await Promise.all(files.map(file => storeProductImage(file.buffer, 'products')));
+      } catch (error) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error('Admin product image upload failed; refusing temporary local storage:', error);
+          return res.status(503).json({ message: 'Product image storage is unavailable. The product was not saved. Please try again later.' });
+        }
+        throw error;
+      }
       const product = await storage.createProduct(insertProductSchema.parse({
         vendorId,
         categoryId: input.categoryId,
@@ -1190,13 +1187,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: err.message });
       }
 
-      const discardLocalUploads = (files: Express.Multer.File[]) => {
-        if (isCloudStorageEnabled()) return;
-        for (const file of files) {
-          const filePath = file.filename ? safeImagePath(file.filename) : null;
-          if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
-      };
       let files = (req.files || []) as Express.Multer.File[];
       let imageUrls: string[] = [];
       try {
@@ -1212,14 +1202,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.clientImportKey !== undefined) {
           const parsedKey = z.string().uuid().safeParse(req.body.clientImportKey);
           if (!parsedKey.success) {
-            discardLocalUploads(files);
             return res.status(400).json({ message: 'clientImportKey must be a UUID' });
           }
           clientImportKey = parsedKey.data.toLowerCase();
           const existing = await getProductByClientImportKey(clientImportKey);
           const retry = resolveClientImportRetry(existing, req.vendor.id, req.body);
           if (retry.kind !== 'new') {
-            discardLocalUploads(files);
             if (retry.kind === 'different_vendor') {
               return res.status(409).json({ message: 'clientImportKey belongs to another vendor', reason: 'idempotency_key_owned_by_another_vendor' });
             }
@@ -1230,11 +1218,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Process image uploads with robust fallback
+        // Upload product images durably in production; local optimization is
+        // retained only for development when cloud storage is unavailable.
         if (files && files.length > 0) {
           try {
             if (isCloudStorageEnabled()) {
-              // Try cloud storage first
               const cloudStorage = getCloudStorageService();
               const uploadPromises = files.map(file => 
                 cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
@@ -1242,33 +1230,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               imageUrls = await Promise.all(uploadPromises);
               console.log('Successfully uploaded images to cloud storage');
             } else {
-              // Cloud storage disabled — localUpload (diskStorage) already saved files to disk.
-              // Just generate the serving URLs from the filenames multer assigned.
               for (const file of files) {
-                if (file.filename) {
-                  // diskStorage: file already saved at uploads/products/<filename>
-                  imageUrls.push(`/uploads/${file.filename}`);
-                } else if (file.buffer) {
-                  // memoryStorage fallback (safety net)
-                  const fsMod = await import('fs');
-                  const pathMod = await import('path');
-                  const sharpMod = await import('sharp');
-                  const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
-                  if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
-                  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-                  const filename = `product-${uniqueSuffix}.jpg`;
-                  const optimizedBuffer = await sharpMod.default(file.buffer)
-                    .rotate()
-                    .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-                    .normalize()
-                    .sharpen({ sigma: 0.7 })
-                    .jpeg({ quality: 90, progressive: true, mozjpeg: true })
-                    .toBuffer();
-                  fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimizedBuffer);
-                  imageUrls.push(`/uploads/${filename}`);
-                }
+                if (file.buffer) imageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
               }
-              console.log(`Saved ${imageUrls.length} image(s) locally via diskStorage`);
+              console.log(`Saved ${imageUrls.length} image(s) locally for development`);
             }
           } catch (error: any) {
             if (process.env.NODE_ENV === 'production') {
@@ -1284,42 +1249,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error('AWS credentials are invalid. Image will be saved locally until credentials are fixed.');
             }
             
-            // Fallback to local storage with optimization
-            const fs = await import('fs');
-            const path = await import('path');
-            const sharp = await import('sharp');
-            
             imageUrls = [];
             for (const file of files) {
-              const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-              if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-              }
-              
-              // Optimize image before saving locally
-              const optimizedBuffer = await sharp.default(file.buffer)
-                .rotate()
-                .resize(1600, 1600, {
-                  fit: 'inside', 
-                  withoutEnlargement: true 
-                })
-                .normalize()
-                .sharpen({ sigma: 0.7 })
-                .jpeg({
-                  quality: 90,
-                  progressive: true,
-                  mozjpeg: true,
-                })
-                .toBuffer();
-              
-              const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-              const filename = `product-${uniqueSuffix}.jpg`;
-              const filepath = path.join(uploadDir, filename);
-              
-              fs.writeFileSync(filepath, optimizedBuffer);
-              imageUrls.push(`/uploads/${filename}`);
+              if (file.buffer) imageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
             }
-            console.log('Successfully saved optimized images locally as fallback');
+            console.log('Saved product images locally for development');
           }
         }
 
@@ -1411,7 +1345,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const importKeyConflict = (databaseError?.code === '23505' && databaseError.constraint === 'products_client_import_key_unique')
           || (databaseError?.cause?.code === '23505' && databaseError.cause.constraint === 'products_client_import_key_unique');
         if (importKeyConflict && req.body.clientImportKey) {
-          discardLocalUploads(files);
           if (isCloudStorageEnabled()) {
             await Promise.all(imageUrls.map(imageUrl => getCloudStorageService().deleteImage(imageUrl)));
           }
@@ -1749,24 +1682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newImageUrls = await Promise.all(files.map(f => cloudStorage.uploadImage(f.buffer, f.mimetype, 'products')));
           } else {
             for (const file of files) {
-              if (file.filename) {
-                newImageUrls.push(`/uploads/${file.filename}`);
-              } else if (file.buffer) {
-                const fsMod = await import('fs');
-                const pathMod = await import('path');
-                const sharpMod = await import('sharp');
-                const uploadDir = pathMod.join(process.cwd(), 'uploads', 'products');
-                if (!fsMod.existsSync(uploadDir)) fsMod.mkdirSync(uploadDir, { recursive: true });
-                const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
-                const optimized = await sharpMod.default(file.buffer)
-                  .rotate()
-                  .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-                  .normalize()
-                  .sharpen({ sigma: 0.7 })
-                  .jpeg({ quality: 90, progressive: true, mozjpeg: true }).toBuffer();
-                fsMod.writeFileSync(pathMod.join(uploadDir, filename), optimized);
-                newImageUrls.push(`/uploads/${filename}`);
-              }
+              if (file.buffer) newImageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
             }
           }
         } catch (uploadErr: any) {
@@ -1775,22 +1691,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(503).json({ message: 'Product image storage is unavailable. No images were added. Please try again later.' });
           }
           // Fallback to local
-          const fs = await import('fs');
-          const path = await import('path');
-          const sharp = await import('sharp');
           newImageUrls = [];
           for (const file of files) {
-            const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-            const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
-            const optimized = await sharp.default(file.buffer || Buffer.alloc(0))
-              .rotate()
-              .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
-              .normalize()
-              .sharpen({ sigma: 0.7 })
-              .jpeg({ quality: 90, progressive: true, mozjpeg: true }).toBuffer();
-            fs.writeFileSync(path.join(uploadDir, filename), optimized);
-            newImageUrls.push(`/uploads/${filename}`);
+            if (file.buffer) newImageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
           }
         }
 
@@ -1808,6 +1711,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products/:id/images/ai-retouch', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+      return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
+    }
     try {
       const productId = Number(req.params.id);
       const userId = (req.user as any)?.id;

@@ -1,7 +1,8 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import sharp from 'sharp';
 import crypto from 'crypto';
+import sharp from 'sharp';
+import { optimizeProductImage } from './product-image-processing';
 
 interface CloudStorageConfig {
   accessKeyId: string;
@@ -37,21 +38,17 @@ class CloudStorageService {
 
   async uploadImage(buffer: Buffer, contentType: string, folder: string = 'products'): Promise<string> {
     try {
-      // Optimize image with sharp
-      const optimizedBuffer = await sharp(buffer)
-        .rotate()
-        .resize(1600, 1600, {
-          fit: 'inside', 
-          withoutEnlargement: true 
-        })
-        .normalize()
-        .sharpen({ sigma: 0.7 })
-        .jpeg({
-          quality: 90,
-          progressive: true,
-          mozjpeg: true,
-        })
-        .toBuffer();
+      // Product images retain detail up to 2400px; profile images keep their
+      // existing 1600px limit and independent upload policy.
+      const optimizedBuffer = folder === 'products'
+        ? await optimizeProductImage(buffer)
+        : await sharp(buffer)
+          .rotate()
+          .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+          .normalize()
+          .sharpen({ sigma: 0.7 })
+          .jpeg({ quality: 90, progressive: true, mozjpeg: true })
+          .toBuffer();
 
       // Generate unique filename
       const hash = crypto.randomBytes(16).toString('hex');

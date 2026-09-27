@@ -432,7 +432,7 @@ export default function VendorBatchImport({ open, onOpenChange, onComplete }: Pr
                     Select CSV
                   </button>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-[#78877e]">For photos, choose image files in this wizard and enter their exact filenames in <code className="rounded bg-[#edf1e9] px-1 py-0.5 text-[#42634f]">photoFile</code>. Separate multiple filenames with |.</p>
+                <p className="mt-3 text-xs leading-5 text-[#78877e]">For photos, choose image files in this wizard and enter their exact filenames in <code className="rounded bg-[#edf1e9] px-1 py-0.5 text-[#42634f]">photoFile</code>. Separate multiple filenames with |. Use clear original photos at least ~1600px on the long edge, with multiple angles; photos are not upscaled.</p>
                 {categories.length > 0 && <details className="mt-3 text-xs text-[#587066]">
                   <summary className="cursor-pointer font-semibold">Category IDs for your spreadsheet</summary>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -456,6 +456,7 @@ export default function VendorBatchImport({ open, onOpenChange, onComplete }: Pr
                   <div>
                     <h3 className="font-semibold text-[#23463b]">Start with product photos</h3>
                     <p className="mt-1 max-w-2xl text-sm leading-5 text-[#708279]">Select up to 10 photos. On your explicit request, Afrolandx will suggest listing wording and a category one image at a time. Price and stock remain yours to enter.</p>
+                    <p className="mt-1 max-w-2xl text-xs leading-5 text-[#78877e]">Upload clear original photos at least ~1600px on the long edge and show multiple angles. Photos are not upscaled.</p>
                   </div>
                 </div>
                 <input ref={photoInputRef} className="sr-only" type="file" accept="image/*" multiple aria-label="Choose up to ten product photos" disabled={saving || aiRunning}

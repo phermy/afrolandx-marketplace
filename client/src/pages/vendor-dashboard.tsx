@@ -2021,7 +2021,7 @@ export default function VendorDashboard() {
                     <span className="text-sm font-medium text-gray-600">
                       {addFiles.length > 0 ? `${addFiles.length} photo${addFiles.length > 1 ? 's' : ''} selected. Choose more photos` : 'Choose photos'}
                     </span>
-                    <span className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP. Up to 15 MB each</span>
+                    <span className="text-xs text-gray-400 mt-0.5">Use clear original photos at least ~1600px on the long edge; include multiple angles. No upscaling. JPG, PNG, WEBP, up to 15 MB each.</span>
                   </label>
                   <input
                     id="add-product-images"
@@ -2324,7 +2324,7 @@ export default function VendorDashboard() {
               >
                 <Upload className="w-5 h-5 text-gray-400 mb-1" />
                 <span className="text-sm text-gray-500 font-medium">Click to add more photos</span>
-                <span className="text-xs text-gray-400">JPG, PNG, WEBP. Up to 15 MB each</span>
+                <span className="text-xs text-gray-400">Use clear original photos at least ~1600px on the long edge; include multiple angles. No upscaling. JPG, PNG, WEBP, up to 15 MB each.</span>
               </label>
               <input
                 id="edit-images-upload"
