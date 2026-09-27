@@ -26,7 +26,7 @@ function BrandPanel() {
     <aside className="relative isolate flex min-h-[260px] flex-col overflow-hidden bg-[#183b35] px-6 py-7 text-[#f4eedf] sm:px-10 sm:py-9 lg:min-h-screen lg:w-[47%] lg:px-[clamp(2.5rem,6vw,6.5rem)] lg:py-10">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_17%_0%,rgba(217,157,75,.18),transparent_42%),linear-gradient(145deg,#183b35_0%,#12332f_58%,#102b29_100%)]" />
-        <svg className="absolute -bottom-20 -left-16 hidden h-[77%] min-h-[360px] w-[118%] opacity-95 lg:block" viewBox="0 0 820 620" fill="none" preserveAspectRatio="xMidYMax slice">
+        <svg className="absolute -bottom-44 -left-16 hidden h-[77%] min-h-[360px] w-[118%] opacity-95 lg:block" viewBox="0 0 820 620" fill="none" preserveAspectRatio="xMidYMax slice">
           <path d="M-40 598C106 501 204 487 276 382C361 258 356 149 470 134C580 120 595 235 851 254V650H-40V598Z" fill="#D98B55" />
           <path d="M-48 608C105 516 209 499 291 391C373 283 373 177 478 164C594 150 615 267 856 279V650H-48V608Z" fill="#E9B65E" />
           <path d="M-58 622C108 533 216 516 306 405C394 296 389 197 491 192C606 186 635 298 866 306V650H-58V622Z" fill="#C6533D" />
@@ -52,18 +52,18 @@ function BrandPanel() {
       </Link>
 
       <div className="relative z-10 mt-10 max-w-[36rem] pb-4 lg:mt-[clamp(4rem,13vh,9rem)]">
-        <p className="mb-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[.2em] text-[#e6bb72]">
+        <p className="mb-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-[.16em] text-[#f3ce91]">
           <span className="h-px w-8 bg-[#e6bb72]" /> Made of many stories
         </p>
         <h2 className="max-w-[34rem] font-['Space_Grotesk'] text-[clamp(2.15rem,4.4vw,4.25rem)] font-semibold leading-[1.04] tracking-[-.055em] text-[#fbf5e8]">
           African creativity,<br className="hidden lg:block" /> closer to you.
         </h2>
-        <p className="mt-5 max-w-[31rem] text-[.98rem] leading-7 text-[#d0d8cc] sm:text-[1.05rem] sm:leading-8">
+        <p className="mt-5 max-w-[31rem] text-[1.0625rem] leading-8 text-[#f5f2e9] sm:text-lg sm:leading-8">
           Discover authentic fashion, craftsmanship and the stories behind them. Join a marketplace connecting African makers with the world.
         </p>
       </div>
 
-      <div className="relative z-10 mt-auto hidden items-center justify-between border-t border-[#e8e3d3]/20 pt-5 text-[11px] tracking-[.13em] text-[#c0cdbf] lg:flex">
+      <div className="relative z-10 mt-auto hidden items-center justify-between border-t border-[#e8e3d3]/30 pt-5 text-xs tracking-[.08em] text-[#f5f2e9] lg:flex">
         <span>AN OPEN DOOR TO AFRICAN CRAFT</span>
         <span className="flex items-center gap-2">Explore with us <ArrowUpRight className="h-3.5 w-3.5 text-[#e6bb72]" /></span>
       </div>
@@ -205,11 +205,11 @@ export default function RegisterPage() {
     }
   }
 
-  const inputClass = "mt-2 h-[49px] w-full rounded-[4px] border border-[#d8ded8] bg-white px-3.5 text-[14px] text-[#1d2e28] outline-none transition placeholder:text-[#9ba59e] hover:border-[#9aa89d] focus:border-[#236c53] focus:ring-4 focus:ring-[#236c53]/10";
-  const buttonClass = "flex h-[50px] w-full items-center justify-center rounded-[4px] bg-[#d99b48] px-4 text-[14px] font-semibold text-[#172e27] transition-colors hover:bg-[#e5aa5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#236c53] disabled:cursor-not-allowed disabled:opacity-55";
+  const inputClass = "mt-2 h-[50px] w-full rounded-[4px] border border-[#cbd5cd] bg-white px-3.5 text-base text-[#1d2e28] outline-none transition placeholder:text-[#637269] hover:border-[#9aa89d] focus:border-[#236c53] focus:ring-4 focus:ring-[#236c53]/10";
+  const buttonClass = "flex h-[50px] w-full items-center justify-center rounded-[4px] bg-[#d99b48] px-4 text-base font-semibold text-[#172e27] transition-colors hover:bg-[#e5aa5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#236c53] disabled:cursor-not-allowed disabled:opacity-55";
 
   return (
-    <main className="min-h-[100dvh] overflow-x-hidden bg-[#f7f8f5] lg:flex">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[#f7f8f5] text-left lg:flex">
       <BrandPanel />
       <section className="flex min-w-0 flex-1 flex-col bg-[#fbfcfa]">
         <div className="mx-auto flex w-full max-w-[620px] flex-1 flex-col px-5 pb-8 pt-5 sm:px-9 sm:pb-10 sm:pt-8 lg:max-w-[670px] lg:justify-center lg:px-[clamp(2.5rem,6vw,6.5rem)] lg:py-12">
@@ -217,28 +217,28 @@ export default function RegisterPage() {
             <>
               <div className="mt-9 flex items-center justify-between gap-4 lg:mt-0">
                 <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-[#a06438]">Your next chapter</p>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[.14em] text-[#8b542d]">Your next chapter</p>
                   <h1 className="font-['Space_Grotesk'] text-[2rem] font-semibold leading-tight tracking-[-.045em] text-[#183b35] sm:text-[2.25rem]">Create your account</h1>
-                  <p className="mt-2 text-[14px] leading-6 text-[#68756e]">A world of considered African craft, just ahead.</p>
+                  <p className="mt-2 text-base leading-6 text-[#41564b]">A world of considered African craft, just ahead.</p>
                 </div>
-                <p className="hidden shrink-0 text-[13px] text-[#727c75] sm:block">
+                <p className="hidden shrink-0 text-sm text-[#46574c] sm:block">
                   Already have an account?{" "}
                   <Link href="/login" className="font-semibold text-[#236c53] underline decoration-[#236c53]/35 underline-offset-4 hover:decoration-[#236c53] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#236c53]">Log in</Link>
                 </p>
               </div>
 
               <div className="mt-7 border-t border-[#e7ebe5] pt-6 sm:mt-8 sm:pt-7">
-                {error && <div className="mb-5 rounded-[4px] border border-[#ecc7c0] bg-[#fff5f2] px-3.5 py-3 text-[13px] leading-5 text-[#a43e31]" role="alert">{error}</div>}
+                {error && <div className="mb-5 rounded-[4px] border border-[#ecc7c0] bg-[#fff5f2] px-3.5 py-3 text-sm leading-5 text-[#a43e31]" role="alert">{error}</div>}
                 <form onSubmit={createAccount} className="space-y-[17px]">
-                  <label className="block text-[13px] font-semibold text-[#33473e]">
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
                     Full name
                     <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={inputClass} autoFocus required data-testid="input-name" />
                   </label>
-                  <label className="block text-[13px] font-semibold text-[#33473e]">
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
                     Email address
                     <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={inputClass} required data-testid="input-email" />
                   </label>
-                  <label className="block text-[13px] font-semibold text-[#33473e]">
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
                     Password
                     <span className="relative block">
                       <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${inputClass} pr-12`} minLength={8} required data-testid="input-password" />
@@ -246,9 +246,9 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </span>
-                    <span className="mt-1.5 block text-[11px] font-normal text-[#89938c]">Use at least 8 characters.</span>
+                    <span className="mt-1.5 block text-[13px] font-normal text-[#53655a]">Use at least 8 characters.</span>
                   </label>
-                  <label className="block text-[13px] font-semibold text-[#33473e]">
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
                     Confirm password
                     <span className="relative block">
                       <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${inputClass} pr-12`} minLength={8} required data-testid="input-confirm-password" />
@@ -257,7 +257,7 @@ export default function RegisterPage() {
                       </button>
                     </span>
                   </label>
-                  {turnstileError && <p role="alert" className="text-[13px] text-[#a43e31]">{turnstileError}</p>}
+                  {turnstileError && <p role="alert" className="text-sm text-[#a43e31]">{turnstileError}</p>}
                   {turnstileConfig?.enabled && turnstileConfig.siteKey && (
                     <>
                       <RegistrationTurnstile siteKey={turnstileConfig.siteKey} onToken={setTurnstileToken} resetNonce={turnstileResetNonce} />
@@ -268,20 +268,20 @@ export default function RegisterPage() {
                     {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : "Create account"}
                   </button>
                 </form>
-                <p className="mt-5 text-center text-[12px] text-[#758078] sm:hidden">
+                <p className="mt-5 text-center text-sm text-[#46574c] sm:hidden">
                   Already have an account? <Link href="/login" className="font-semibold text-[#236c53] underline underline-offset-4">Log in</Link>
                 </p>
               </div>
-              <p className="mt-auto hidden pt-8 text-[11px] text-[#929b94] lg:block">By creating an account, you’ll be part of a community for makers and curious shoppers alike.</p>
+              <p className="mt-auto hidden pt-8 text-[13px] leading-5 text-[#53655a] lg:block">By creating an account, you’ll be part of a community for makers and curious shoppers alike.</p>
             </>
           ) : (
             <div className="mt-9 lg:mt-0">
               <button type="button" onClick={() => { setStep("form"); setError(""); }} className="mb-7 inline-flex items-center gap-2 text-[13px] font-medium text-[#68756e] transition-colors hover:text-[#183b35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#236c53]">
                 <ArrowLeft className="h-4 w-4" /> Use a different email
               </button>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-[#a06438]">One last step</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[.14em] text-[#8b542d]">One last step</p>
               <h1 className="font-['Space_Grotesk'] text-[2rem] font-semibold leading-tight tracking-[-.045em] text-[#183b35] sm:text-[2.25rem]">Check your email</h1>
-              <p className="mt-2 text-[14px] leading-6 text-[#68756e]">We sent a verification code to <strong className="break-all font-semibold text-[#33473e]">{registeredEmail}</strong>. Enter all six digits below.</p>
+              <p className="mt-2 text-base leading-6 text-[#41564b]">We sent a verification code to <strong className="break-all font-semibold text-[#33473e]">{registeredEmail}</strong>. Enter all six digits below.</p>
               <div className="mb-6 mt-6 flex items-start gap-3 rounded-[4px] border border-[#dce8dd] bg-[#f2f7f0] px-3.5 py-3 text-[13px] leading-5 text-[#42664c]">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#34734d]" />
                 <span>Verification keeps your account secure. The code expires in 15 minutes.</span>

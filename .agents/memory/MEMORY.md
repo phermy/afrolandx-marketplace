@@ -21,3 +21,4 @@
 - [CAC vendor verification](cac-verification.md) — use official public search with documented admin review until authorized CAC VAS access exists
 - [Verified review provenance](verified-review-provenance.md) — historical feedback is not automatically trusted as a purchase review; verify and moderate before publication
 - [Batch listing retry safety](batch-listing-retry-safety.md) — a lost import response can hide a successful create; retries must be server-idempotent and preserve draft versus submitted status
+- [Registration visual direction](registration-visual-direction.md) — user likes the editorial Afrolandx split layout; prioritize readable copy over decorative overlap
