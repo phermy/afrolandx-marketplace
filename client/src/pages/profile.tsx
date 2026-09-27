@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -13,12 +13,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { getUserRoleDisplay } from '@/lib/roleUtils';
-import { Loader2 } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
+import type { User } from '@/types';
+
+const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
+const PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export default function Profile() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -99,6 +104,65 @@ export default function Profile() {
     },
   });
 
+  const uploadPhotoMutation = useMutation<User, Error, File>({
+    mutationFn: async (file) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await fetch('/api/profile/image', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || 'Could not upload your photo. Please try again.');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['/api/auth/user'], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      toast({ title: 'Photo updated', description: 'Your profile photo is now visible on your account.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Photo not saved', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const removePhotoMutation = useMutation<User, Error>({
+    mutationFn: async () => {
+      const response = await fetch('/api/profile/image', { method: 'DELETE', credentials: 'include' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || 'Could not remove your photo. Please try again.');
+      }
+      return response.json();
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['/api/auth/user'], updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      toast({ title: 'Photo removed', description: 'Your initials will appear instead.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Photo not removed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!PROFILE_IMAGE_TYPES.has(file.type) || file.size > MAX_PROFILE_IMAGE_BYTES) {
+      toast({
+        title: 'Choose a different photo',
+        description: 'Use a JPEG, PNG, or WebP image that is 5 MB or smaller.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    uploadPhotoMutation.mutate(file);
+  };
+
   const handleSave = async () => {
     updateProfileMutation.mutate({
       firstName: formData.firstName,
@@ -160,11 +224,44 @@ export default function Profile() {
               <CardContent className="space-y-6">
                 <div className="flex flex-col items-center">
                   <Avatar className="h-24 w-24 mb-4">
-                    <AvatarImage src={user.profileImageUrl} alt={user.firstName || 'User'} />
+                    <AvatarImage src={user.profileImageUrl || undefined} alt={`${user.firstName || 'Your'} profile photo`} />
                     <AvatarFallback className="bg-nigerian-green text-white text-xl">
                       {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    aria-label="Choose a profile photo"
+                    onChange={handlePhotoChange}
+                    disabled={uploadPhotoMutation.isPending || removePhotoMutation.isPending}
+                  />
+                  <div className="mb-4 flex flex-wrap justify-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadPhotoMutation.isPending || removePhotoMutation.isPending}
+                    >
+                      {uploadPhotoMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
+                      {uploadPhotoMutation.isPending ? 'Uploading…' : user.profileImageUrl ? 'Change photo' : 'Add photo'}
+                    </Button>
+                    {user.profileImageUrl && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removePhotoMutation.mutate()}
+                        disabled={uploadPhotoMutation.isPending || removePhotoMutation.isPending}
+                      >
+                        {removePhotoMutation.isPending ? 'Removing…' : 'Remove photo'}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mb-4 text-center text-xs text-gray-600">JPEG, PNG, or WebP · 5 MB maximum</p>
                   <h3 className="text-lg font-semibold text-gray-900">
                     {user.firstName && user.lastName 
                       ? `${user.firstName} ${user.lastName}` 

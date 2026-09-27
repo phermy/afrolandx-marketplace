@@ -53,6 +53,7 @@ import {
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
 import { retouchProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, prepareProfileImage, PROFILE_IMAGE_TYPES } from "./profile-image";
 import { sendExperienceFeedbackNotification } from "./email";
 import {
   createFinanceReference,
@@ -147,6 +148,15 @@ const upload = multer({
     }
   }
 });
+
+const profileImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PROFILE_IMAGE_BYTES },
+  fileFilter: (_req, file, callback) => {
+    if (PROFILE_IMAGE_TYPES.has(file.mimetype)) callback(null, true);
+    else callback(new Error("Choose a JPEG, PNG, or WebP image."));
+  },
+}).single("image");
 
 // Fallback local storage for when cloud storage is not available
 const localStorage = multer.diskStorage({
@@ -388,6 +398,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.post('/api/profile/image', isAuthenticated, (req: any, res) => {
+    profileImageUpload(req, res, async (uploadError: any) => {
+      if (uploadError) {
+        return res.status(uploadError instanceof multer.MulterError && uploadError.code === "LIMIT_FILE_SIZE" ? 413 : 400)
+          .json({ message: uploadError instanceof multer.MulterError && uploadError.code === "LIMIT_FILE_SIZE"
+            ? "The image must be 5 MB or smaller."
+            : "Choose a JPEG, PNG, or WebP image up to 5 MB." });
+      }
+      if (!req.file) return res.status(400).json({ message: "Choose an image to upload." });
+      if (!isCloudStorageEnabled()) {
+        return res.status(503).json({ message: "Photo storage is unavailable right now. Please try again later." });
+      }
+
+      let uploadedUrl: string | undefined;
+      try {
+        const userId = req.user.id as string;
+        const previousUser = await storage.getUser(userId);
+        if (!previousUser) return res.status(404).json({ message: "Account not found." });
+
+        const image = await prepareProfileImage(req.file.buffer);
+        const cloud = getCloudStorageService();
+        uploadedUrl = await cloud.uploadImage(image, "image/jpeg", "profiles");
+        const updatedUser = await storage.updateUserProfile(userId, { profileImageUrl: uploadedUrl });
+        if (!updatedUser) {
+          await cloud.deleteImage(uploadedUrl);
+          return res.status(404).json({ message: "Account not found." });
+        }
+        uploadedUrl = undefined;
+        if (previousUser.profileImageUrl && isManagedProfileImage(previousUser.profileImageUrl)) {
+          await cloud.deleteImage(previousUser.profileImageUrl);
+        }
+        return res.json(sanitizeUser(updatedUser));
+      } catch (error) {
+        if (uploadedUrl) await getCloudStorageService().deleteImage(uploadedUrl);
+        if (error instanceof InvalidProfileImageError) {
+          return res.status(400).json({ message: error.message });
+        }
+        console.error("Error updating profile photo:", error);
+        return res.status(503).json({ message: "Could not save your photo. Please try again later." });
+      }
+    });
+  });
+
+  app.delete('/api/profile/image', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id as string;
+      const previousUser = await storage.getUser(userId);
+      if (!previousUser) return res.status(404).json({ message: "Account not found." });
+      if (!previousUser.profileImageUrl) return res.json(sanitizeUser(previousUser));
+
+      const updatedUser = await storage.updateUserProfile(userId, { profileImageUrl: null });
+      if (!updatedUser) return res.status(404).json({ message: "Account not found." });
+      if (isCloudStorageEnabled() && isManagedProfileImage(previousUser.profileImageUrl)) {
+        await getCloudStorageService().deleteImage(previousUser.profileImageUrl);
+      }
+      return res.json(sanitizeUser(updatedUser));
+    } catch (error) {
+      console.error("Error removing profile photo:", error);
+      return res.status(500).json({ message: "Could not remove your photo. Please try again." });
     }
   });
 
