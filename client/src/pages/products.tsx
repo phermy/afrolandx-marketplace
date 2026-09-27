@@ -102,7 +102,14 @@ export default function Products() {
         <CatalogCategoryStrip
           categories={categories}
           selectedCategory={selectedCategory}
-          onSelect={(id) => { setSelectedCategory(id); setSelectedSubcategory(''); }}
+          onSelect={(id) => {
+            setSelectedCategory(id);
+            setSelectedSubcategory('');
+            document.getElementById('catalog-results')?.scrollIntoView({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+              block: 'start',
+            });
+          }}
         />
 
         <section className="catalog-hero">
@@ -263,10 +270,12 @@ export default function Products() {
               ) : sortedProducts.length === 0 ? (
                 <div className="catalog-empty-state">
                   <div className="catalog-empty-weave" aria-hidden="true"><span /><span /><span /><span /><span /></div>
-                  <p className="catalog-eyebrow">{hasActiveFilters ? 'No match this time' : 'The shelf is being set'}</p>
-                  <h3>{hasActiveFilters ? 'Nothing in this edit just yet.' : 'The collection is taking shape.'}</h3>
-                  <p>{hasActiveFilters ? 'Try a broader search or clear a filter to explore the full collection.' : 'There are no approved pieces to browse right now. Check back as makers add their work.'}</p>
-                  {hasActiveFilters && <Button onClick={clearFilters}>Clear filters</Button>}
+                  <p className="catalog-eyebrow">{hasActiveFilters ? 'No pieces found' : 'The shelf is being set'}</p>
+                  <h3>{selectedCategory && !searchQuery && !selectedSubcategory && !priceRange.min && !priceRange.max && genderTab === 'all' && !selectedCountry
+                    ? `No ${categories.find(item => item.id === selectedCategory)?.name ?? 'category'} pieces yet.`
+                    : hasActiveFilters ? 'Nothing in this edit just yet.' : 'The collection is taking shape.'}</h3>
+                  <p>{hasActiveFilters ? 'There are no approved pieces matching this selection right now. Try another category or clear your filters.' : 'There are no approved pieces to browse right now. Check back as makers add their work.'}</p>
+                  {hasActiveFilters && <Button onClick={clearFilters}>Show all pieces</Button>}
                 </div>
               ) : (
                 <div className="catalog-product-grid">
