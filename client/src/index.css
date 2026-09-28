@@ -182,47 +182,24 @@
     hyphens: none;
   }
 
-  /* Keep reading copy consistent without stretching headings, navigation or controls. */
-  :where(p, article li, .reading-copy):not(:where(
-    header *, nav *, footer *, button *, [role="button"] *,
-    .text-center, .text-center *, .text-left, .text-left *,
-    .text-right, .text-right *
-  )) {
-    text-align: justify;
-    text-justify: inter-word;
-  }
 }
 
-/* Justify long-form copy on every screen without stretching short interface labels. */
+/* Narrow copy should not gain uneven gaps from forced justification. */
 .reading-copy,
 .heritage-editorial__lede,
 .heritage-card__copy,
 .policy-intro,
 .policy-article p {
-  text-align: justify;
-  text-justify: inter-word;
+  text-align: start;
   hyphens: none;
 }
 
-/* Narrow phone columns leave excessive gaps when words are forced to fill a line. */
-@layer base {
-  @media (max-width: 640px) {
-    :where(p, article li, .reading-copy):not(:where(
-      header *, nav *, footer *, button *, [role="button"] *,
-      .text-center, .text-center *, .text-left, .text-left *,
-      .text-right, .text-right *
-    )) {
-      text-align: start;
-    }
-  }
-}
-@media (max-width: 640px) {
+/* Reserve justified alignment for long, wide reading columns. */
+@media (min-width: 900px) {
   .reading-copy,
-  .heritage-editorial__lede,
-  .heritage-card__copy,
-  .policy-intro,
   .policy-article p {
-    text-align: start;
+    text-align: justify;
+    text-justify: inter-word;
   }
 }
 
@@ -301,6 +278,7 @@
 .policy-related a { color:#9a6036; font-weight:600; text-decoration:none; }
 @media (max-width: 1024px) { .site-footer__inner { grid-template-columns: 1.5fr repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .site-footer__inner, .policy-grid { grid-template-columns: 1fr; } .experience-feedback { grid-template-columns: 1fr; gap: 1rem; } .site-footer__bottom { display:block; }.site-footer__bottom a { margin-top: .6rem; }.policy-shell, .policy-detail { padding-top: 3rem; }.policy-layout { display:block; }.policy-toc { position:static; margin-bottom:2rem; }.policy-toc a { display:inline-block; margin-right:1rem; }.policy-related { display:block; }.policy-related a { display:block; margin:.6rem 0; } }
+@media (max-width: 640px) { .policy-group__heading { flex-direction: column; align-items: flex-start; gap: .4rem; } }
 @media (max-width: 440px) { .experience-feedback__moods { gap: .35rem; } .experience-feedback__mood { padding-right: .55rem; } .experience-feedback__mood > span:last-child { display: none; } .experience-feedback__entry { display: grid; grid-template-columns: 1fr; } }
 
 /* Nigerian cultural patterns */

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import Navbar from '@/components/navbar';
 import ProductCard from '@/components/product-card';
 import CatalogCategoryStrip from '@/components/catalog-category-strip';
@@ -19,6 +19,7 @@ type GenderTab = 'all' | 'women' | 'men' | 'kids';
 
 export default function Products() {
   const [location] = useLocation();
+  const queryString = useSearch();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
@@ -31,16 +32,23 @@ export default function Products() {
   const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'] });
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(queryString);
     const search = urlParams.get('search');
     const category = urlParams.get('category');
-    if (search) setSearchQuery(search);
+    const gender = urlParams.get('gender');
+    const originCountry = urlParams.get('originCountry');
+    setSearchQuery(search || '');
+    setGenderTab(gender === 'women' || gender === 'men' || gender === 'kids' ? gender : 'all');
+    setSelectedCountry(AFRICAN_COUNTRIES.some(country => country.name === originCountry) ? originCountry! : '');
     const subcategory = urlParams.get('subcategory') || '';
     const match = findSubcategory(subcategory);
     setSelectedSubcategory(match?.slug || '');
     if (match) setSelectedCategory(categories.find(item => item.slug === match.parentSlug)?.id ?? null);
-    else if (category) setSelectedCategory(parseInt(category));
-  }, [location, categories]);
+    else {
+      const categoryId = Number(category);
+      setSelectedCategory(category && Number.isSafeInteger(categoryId) && categories.some(item => item.id === categoryId) ? categoryId : null);
+    }
+  }, [location, queryString, categories]);
 
   const { data: allProducts = [], isLoading, isError, refetch } = useQuery<Product[]>({
     queryKey: ['/api/products', searchQuery, selectedCategory, selectedSubcategory, priceRange.min, priceRange.max, genderTab, selectedCountry],

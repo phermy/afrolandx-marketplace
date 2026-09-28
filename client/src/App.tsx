@@ -39,6 +39,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ShoppingCart from "@/components/shopping-cart";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
+import { isVendor } from "@/lib/roleUtils";
 import SessionTimeout from "@/components/session-timeout";
 import { useEffect } from "react";
 
@@ -72,7 +73,7 @@ function AuthRedirect({ to }: { to: string }) {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -133,13 +134,13 @@ function Router() {
         </AdminProtectedRoute>
       </Route>
       <Route path="/vendor/finance">
-        {isAuthenticated ? <VendorFinance /> : <AuthRedirect to="/login" />}
+        {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorFinance /> : <AuthRedirect to="/vendor" />}
       </Route>
       <Route path="/checkout">
         {isAuthenticated ? <Checkout /> : <AuthRedirect to="/login" />}
       </Route>
       <Route path="/vendor/workshop">
-        {isAuthenticated ? <VendorWorkshop /> : <AuthRedirect to="/login" />}
+        {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorWorkshop /> : <AuthRedirect to="/vendor" />}
       </Route>
       <Route path="/vendor">
         {isAuthenticated ? <VendorDashboard /> : <AuthRedirect to="/login" />}

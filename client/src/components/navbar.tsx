@@ -95,7 +95,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:ml-8 md:flex md:space-x-2">
+            <div className="hidden lg:ml-8 lg:flex lg:space-x-2">
               <Link href="/" className={navLinkClass('/')}>Home</Link>
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
               <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
@@ -118,7 +118,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8">
+          <div className="hidden lg:flex flex-1 max-w-lg mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
@@ -151,7 +151,7 @@ export default function Navbar() {
 
             {/* Desktop User Menu */}
             {isAuthenticated && user ? (
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -211,7 +211,7 @@ export default function Navbar() {
                 </DropdownMenu>
               </div>
             ) : (
-              <Button onClick={handleLogin} className="btn-nigerian hidden md:flex">
+              <Button onClick={handleLogin} className="btn-nigerian hidden lg:flex">
                 Sign In
               </Button>
             )}
@@ -220,7 +220,10 @@ export default function Navbar() {
             <Button
               variant="ghost"
               size="sm"
-              className="md:hidden"
+              className="lg:hidden"
+              aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation-menu"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -234,7 +237,7 @@ export default function Navbar() {
 
       {/* Mobile Menu - Full Screen Overlay */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+        <div id="mobile-navigation-menu" className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
           <div className="px-4 py-4 space-y-1 pb-24">
             {/* Mobile Search */}
             <form onSubmit={handleSearch} className="mb-4">
