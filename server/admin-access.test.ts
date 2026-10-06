@@ -52,8 +52,9 @@ test("management access separates Superadmin controls from customer and vendor s
       assert.equal(await getAdminUserDetails(storage, id, accounts.get("admin")), null);
     }
     assert.equal((await invoke("admin", "PATCH", "/orders/2/status")).status, 404);
-    assert.equal((await invoke("admin", "PATCH", "/vendors/2/verification")).status, 404);
-    assert.equal((await invoke("admin", "PATCH", "/vendors/2/status")).status, 404);
+    assert.equal((await invoke("admin", "PATCH", "/vendors/2/verification")).nextCalled, true);
+    assert.equal((await invoke("admin", "PATCH", "/vendors/2/status")).nextCalled, true);
+    assert.equal((await invoke("admin", "POST", "/vendors/2/products")).status, 404);
     assert.equal(canSeeManagedAccount(accounts.get("admin"), accounts.get("customer")), true);
     assert.equal(canSeeManagedAccount(accounts.get("admin"), accounts.get("staff-vendor")), false);
   });

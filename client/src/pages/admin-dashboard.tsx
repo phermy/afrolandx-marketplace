@@ -1804,7 +1804,8 @@ export default function AdminDashboard() {
                             </Avatar>
                             <div>
                               <h3 className="font-semibold mb-0.5">{vendor.businessName}</h3>
-                              {vendor.user && (
+                              {vendor.staffOwned && <p className="mb-1 text-xs text-gray-500">Admin-owned business · account details restricted</p>}
+                              {vendor.user && !vendor.staffOwned && (
                                 <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
                                   <UserIcon className="w-3 h-3" />
                                   {vendor.user.firstName} {vendor.user.lastName} — {vendor.user.email}
@@ -2394,7 +2395,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <Separator />
-                {reviewVendor.user && (
+                {reviewVendor.staffOwned && <p className="rounded-md bg-stone-100 p-3 text-sm text-stone-700">Admin-owned business. The owner's private account details are restricted. Email verification: {reviewVendor.applicantEmailVerified ? 'verified' : 'not verified'}.</p>}
+                {reviewVendor.user && !reviewVendor.staffOwned && (
                   <div>
                     <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><UserIcon className="h-4 w-4" />Account owner</h3>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
@@ -2501,10 +2503,10 @@ export default function AdminDashboard() {
                     {[
                       { label: 'Business name provided', pass: !!reviewVendor.businessName },
                       { label: 'Business description (10+ chars)', pass: reviewVendor.description?.length > 10 },
-                      { label: 'Owner name on file', pass: !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
-                      { label: 'Valid email address', pass: !!reviewVendor.user?.email },
-                      { label: 'Email address verified', pass: !!reviewVendor.user?.emailVerified },
-                    ].map(({ label, pass }) => (
+                      { label: 'Owner name on file', pass: reviewVendor.staffOwned ? null : !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
+                      { label: 'Valid email address', pass: reviewVendor.staffOwned ? null : !!reviewVendor.user?.email },
+                      { label: 'Email address verified', pass: reviewVendor.staffOwned ? reviewVendor.applicantEmailVerified : !!reviewVendor.user?.emailVerified },
+                    ].filter(({ pass }) => pass !== null).map(({ label, pass }) => (
                       <div key={label} className={`flex items-center gap-2 rounded-lg p-2.5 text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                         {pass ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}{label}
                       </div>
@@ -2525,7 +2527,7 @@ export default function AdminDashboard() {
                 </Button>
                 <Button className="bg-green-600 hover:bg-green-700 text-white"
                    disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
-                     !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
+                     !reviewVendor.cacReviewComplete ||
                     !isAdmin(user) || !user?.emailVerified}
                   title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>

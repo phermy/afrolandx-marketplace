@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { storage } from "./storage";
 import { hasFullManagementAccess, isSupportManagementRoute } from "../shared/admin-access";
 import { canSeeManagedAccount } from "./admin-access";
+import { canReviewVendorApplication } from "./vendor-application-access";
 
 export const managementGuard: RequestHandler = async (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
@@ -17,14 +18,17 @@ export const managementGuard: RequestHandler = async (req, res, next) => {
     }
     let targetId: string | undefined;
     const account = req.path.match(/^\/users\/([^/]+)$/);
-    const vendor = req.path.match(/^\/vendors\/(\d+)\/(?:verification|products|status)$/);
+    const vendorApplication = req.path.match(/^\/vendors\/(\d+)\/(?:verification|status)$/);
+    const vendorProduct = req.path.match(/^\/vendors\/(\d+)\/products$/);
     const order = req.path.match(/^\/orders\/(\d+)\/(?:status|tracking)$/);
     if (account) targetId = decodeURIComponent(account[1]);
-    if (vendor) targetId = (await storage.getVendor(Number(vendor[1])))?.userId;
+    if (vendorApplication || vendorProduct) targetId = (await storage.getVendor(Number((vendorApplication || vendorProduct)![1])))?.userId;
     if (order) targetId = (await storage.getOrder(Number(order[1])))?.userId;
-    if (account || vendor || order) {
+    if (account || vendorApplication || vendorProduct || order) {
       const target = targetId ? await storage.getUser(targetId) : undefined;
-      if (!canSeeManagedAccount(actor, target)) return void res.status(404).json({ message: "Record not found." });
+      if (vendorApplication ? !canReviewVendorApplication(actor, target) : !canSeeManagedAccount(actor, target)) {
+        return void res.status(404).json({ message: "Record not found." });
+      }
     }
     next();
   } catch {

@@ -110,8 +110,8 @@ export async function approveVendorWithRole(actorId: string, vendorId: number) {
     const { actor, target } = await lockVerifiedAdminAndTarget(tx, actorId, record.userId);
     assertRoleTargetMutable(actorId, record.userId, target.email);
     if (!target.email_verified) throw new RoleManagementError("The vendor must verify their email before approval.");
-    if (parseRoles(target.roles).some(role => role === "admin" || role === "superadmin") && !parseRoles(actor.roles).includes("superadmin")) {
-      throw new RoleManagementError("Only a verified superadmin can approve a vendor application belonging to an administrator.", 403);
+    if (parseRoles(target.roles).includes("superadmin") && !parseRoles(actor.roles).includes("superadmin")) {
+      throw new RoleManagementError("Only a verified superadmin can approve a vendor application belonging to a superadmin.", 403);
     }
     const locked = await tx.execute(sql`
       SELECT verification_status, verification_notes FROM vendors WHERE id = ${vendorId} FOR UPDATE

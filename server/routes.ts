@@ -6,6 +6,7 @@ import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
 import { vendorStatusHandler } from "./admin-vendor-status";
+import { canReviewVendorApplication, vendorApplicationForReviewer } from "./vendor-application-access";
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import {
@@ -18,6 +19,7 @@ import { getAdminUserDetails } from "./admin-user-details";
 import { productReviewHandlers } from "./admin-product-review";
 import { managementGuard } from "./admin-management-guard";
 import { canSeeManagedAccount, requireFullManagement } from "./admin-access";
+import { hasFullManagementAccess, hasSupportManagementAccess, isAdministratorAccount } from "../shared/admin-access";
 import { registerLogisticsRoutes } from "./logistics-routes";
 import { ensureOrderShipments } from "./logistics-service";
 import { normalizeAccountPhone } from "@shared/account-registration";
@@ -605,9 +607,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const actor = (req as any).managementActor;
       const accounts = await storage.getAllUsers();
-      const visibleIds = new Set(accounts.filter(account => canSeeManagedAccount(actor, account)).map(account => account.id));
+      const applicants = new Map(accounts.filter(account => canReviewVendorApplication(actor, account)).map(account => [account.id, account]));
       const allVendors = await storage.getAllVendors();
-      res.json(allVendors.filter(vendor => visibleIds.has(vendor.userId)));
+      res.json(allVendors.flatMap(vendor => {
+        const applicant = applicants.get(vendor.userId);
+        return applicant ? [vendorApplicationForReviewer(vendor, applicant, actor)] : [];
+      }));
     } catch { res.status(503).json({ message: 'Could not load vendor support records.' }); }
   });
   app.post('/api/admin/users/:userId/close', isAuthenticated, isSuperadmin, async (req: any, res) => {
@@ -913,7 +918,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(vendors.id, vendor.id)).returning();
         return saved;
       });
-      res.json(updated);
+      const applicant = await storage.getUser(userId);
+      const actor = (req as any).managementActor;
+      res.json(applicant && actor ? vendorApplicationForReviewer(updated, applicant, actor) : {
+        id: updated.id, status: updated.status, verificationStatus: updated.verificationStatus,
+      });
     } catch (error) {
       if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Invalid vendor profile', errors: error.errors });
@@ -1014,9 +1023,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin: list all vendors
   app.get('/api/vendors', isAuthenticated, isAdmin, async (req, res) => {
     try {
+      const actor = await storage.getUser((req.user as any)?.id);
+      if (!actor || !hasSupportManagementAccess(actor)) return res.status(403).json({ message: 'Verified Admin access is required.' });
       const vendors = await storage.getAllVendors();
       const enriched = await Promise.all(vendors.map(async (v) => {
         const user = await storage.getUser(v.userId);
+        if (!user || !canReviewVendorApplication(actor, user)) return null;
+        if (isAdministratorAccount(user) && !hasFullManagementAccess(actor)) {
+          return vendorApplicationForReviewer(v, user, actor);
+        }
         return {
           ...v,
           user: user ? {
@@ -1030,7 +1045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } : null,
         };
       }));
-      res.json(enriched);
+      res.json(enriched.filter(Boolean));
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch vendors' });
     }
@@ -1039,11 +1054,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin: get single vendor with details
   app.get('/api/vendors/:id', isAuthenticated, isAdmin, async (req, res) => {
     try {
+      const actor = await storage.getUser((req.user as any)?.id);
+      if (!actor || !hasSupportManagementAccess(actor)) return res.status(403).json({ message: 'Verified Admin access is required.' });
       const vendorId = parseInt(req.params.id);
       const allVendors = await storage.getAllVendors();
       const vendor = allVendors.find(v => v.id === vendorId);
       if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
       const user = await storage.getUser(vendor.userId);
+      if (!user || !canReviewVendorApplication(actor, user)) return res.status(404).json({ message: 'Vendor not found' });
+      if (isAdministratorAccount(user) && !hasFullManagementAccess(actor)) {
+        return res.json(vendorApplicationForReviewer(vendor, user, actor));
+      }
       const products = await storage.getProducts({ vendorId });
       res.json({
         ...vendor,

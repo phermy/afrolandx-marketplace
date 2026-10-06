@@ -36,7 +36,7 @@ test("vendor status uses fresh active verified Admin roles, not cached session c
     assert.deepEqual(result.writes, []);
   }
 });
-test("vendor approval retains CAC review and staff-profile restrictions", async () => {
+test("vendor approval retains CAC review and permits Admin-owned business records without exposing staff profiles", async () => {
   const actor = { roles: ["admin"], emailVerified: true };
   for (const changed of [{ ...vendor, verificationStatus: "pending" }, { ...vendor, verificationNotes: null }]) {
     const result = await invoke(actor, { vendor: changed });
@@ -45,9 +45,19 @@ test("vendor approval retains CAC review and staff-profile restrictions", async 
   }
   for (const status of ["approved", "rejected", "suspended"]) {
     const result = await invoke(actor, { status, applicant: { ...applicant, roles: ["customer", "admin"] } });
-    assert.equal(result.status, 404);
-    assert.deepEqual(result.approvals, []);
-    assert.deepEqual(result.writes, []);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.vendor.staffOwned, true);
+    assert.equal(result.body.vendor.userId, undefined);
+    assert.equal(result.body.vendor.verificationNotes, undefined);
+    assert.equal(result.body.vendor.cacReviewComplete, true);
+    assert.deepEqual(result.approvals, status === "approved" ? [["actor", 1]] : []);
+    assert.deepEqual(result.writes, status === "approved" ? [] : [[1, status]]);
+  }
+  for (const applicant of [
+    { ...vendor, roles: ["customer", "admin", "superadmin"], emailVerified: true },
+    { ...vendor, roles: ["customer", "admin"], email: "femi.elegbeleye@afrolandx.com", emailVerified: true },
+  ]) {
+    assert.equal((await invoke(actor, { applicant })).status, 404);
   }
 });
 test("vendor decisions reject malformed references and refreshable missing records", async () => {

@@ -62,9 +62,15 @@ test("verified admins approve reviewed vendors atomically without gaining genera
     await assert.rejects(approveVendorWithRole(adminId, vendorId),
       (error: unknown) => error instanceof RoleManagementError && error.status === 403);
     await db.update(users).set({ emailVerified: true }).where(eq(users.id, adminId));
-    await db.update(users).set({ roles: ["customer", "admin"] }).where(eq(users.id, targetId));
+    await db.update(users).set({ roles: ["customer", "admin", "superadmin"] }).where(eq(users.id, targetId));
     await assert.rejects(approveVendorWithRole(adminId, vendorId),
       (error: unknown) => error instanceof RoleManagementError && error.status === 403);
+    await db.update(users).set({ roles: ["customer", "admin"] }).where(eq(users.id, targetId));
+    const staffVendor = await approveVendorWithRole(adminId, vendorId);
+    assert.equal(staffVendor.status, "approved");
+    const [staffTarget] = await db.select().from(users).where(eq(users.id, targetId));
+    assert.deepEqual(new Set(staffTarget.roles as string[]), new Set(["customer", "admin", "vendor"]));
+    await db.update(vendors).set({ status: "pending" }).where(eq(vendors.id, vendorId));
     await db.update(users).set({ roles: ["customer"] }).where(eq(users.id, targetId));
     const approved = await approveVendorWithRole(adminId, vendorId);
     assert.equal(approved.status, "approved");

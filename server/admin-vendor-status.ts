@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import { storage } from "./storage";
-import { canSeeManagedAccount } from "./admin-access";
+import { canReviewVendorApplication, vendorApplicationForReviewer } from "./vendor-application-access";
 import { hasSupportManagementAccess } from "../shared/admin-access";
 import { hasManualCacReview } from "./cac-review";
 import { approveVendorWithRole, RoleManagementError } from "./superadmin-role-management";
@@ -25,7 +25,8 @@ export function createVendorStatusHandler(store: VendorStore, approve: typeof ap
         return void res.status(400).json({ message: "Invalid vendor status." });
       }
       const vendor = await store.getVendor(vendorId);
-      if (!vendor || !canSeeManagedAccount(actor, await store.getUser(vendor.userId))) {
+      const applicant = vendor ? await store.getUser(vendor.userId) : undefined;
+      if (!vendor || !applicant || !canReviewVendorApplication(actor, applicant)) {
         return void res.status(404).json({ message: "Vendor not found." });
       }
       if (status === "approved") {
@@ -35,10 +36,11 @@ export function createVendorStatusHandler(store: VendorStore, approve: typeof ap
         // Rechecks current roles, email verification and CAC evidence under
         // row locks; this is not a general-purpose role-management permission.
         const updatedVendor = await approve(actorId, vendorId);
-        return void res.json({ message: "Vendor status updated", vendor: updatedVendor });
+        return void res.json({ message: "Vendor status updated", vendor: vendorApplicationForReviewer(updatedVendor, applicant, actor!) });
       }
       await store.updateVendorStatus(vendorId, status);
-      res.json({ message: "Vendor status updated", vendor: await store.getVendor(vendorId) });
+      const updated = await store.getVendor(vendorId);
+      res.json({ message: "Vendor status updated", vendor: updated ? vendorApplicationForReviewer(updated, applicant, actor!) : null });
     } catch (error) {
       if (error instanceof RoleManagementError) {
         return void res.status(error.status).json({ message: error.message });
