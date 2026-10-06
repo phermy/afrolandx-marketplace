@@ -1,20 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { User } from "@/types";
+import type { AccountCommerceItem } from "@shared/account-commerce";
+import { AccountCommerceHistory } from "./account-commerce-history";
 
 type Details = {
   account: User;
   addresses: { id: number; label: string; firstName: string; lastName: string; address1: string; address2: string; city: string; state: string; postalCode: string; country: string; isDefault: boolean }[];
   orderCount: number;
   orders: { id: number; totalAmount: string; orderStatus: string; paymentStatus: string; createdAt: string }[];
-  vendor: { businessName: string; contactName: string; phone: string; cacNumber: string; status: string; verificationStatus: string } | null;
+  purchaseItems: AccountCommerceItem[];
+  salesItems: AccountCommerceItem[];
+  listedProducts: { id: number; name: string; price: string; stock: number; status: string }[];
+  vendor: { id: number; businessName: string; contactName: string; phone: string; cacNumber: string; status: string; verificationStatus: string } | null;
 };
 
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "Not recorded";
 
-export function AdminUserDetails({ userId, onClose }: { userId: string | null; onClose: () => void }) {
+export function AdminUserDetails({ userId, onClose, onReviewVendor }: { userId: string | null; onClose: () => void; onReviewVendor?: (vendorId: number) => void }) {
+  const [orderLimit, setOrderLimit] = useState(20);
+  const [productLimit, setProductLimit] = useState(20);
+  useEffect(() => { setOrderLimit(20); setProductLimit(20); }, [userId]);
   const { data, isLoading, error, refetch } = useQuery<Details>({
     queryKey: ["/api/admin/users", userId],
     queryFn: async () => (await apiRequest("GET", `/api/admin/users/${encodeURIComponent(userId!)}`)).json(),
@@ -28,7 +37,7 @@ export function AdminUserDetails({ userId, onClose }: { userId: string | null; o
       <DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Account details</DialogTitle>
-          <DialogDescription>Contact information, saved delivery addresses, and recent orders.</DialogDescription>
+          <DialogDescription>Contact information, purchases, products sold, and vendor application details.</DialogDescription>
         </DialogHeader>
         {isLoading && <p role="status">Loading account details…</p>}
         {error && <div role="alert"><p>Could not load account details.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>}
@@ -53,6 +62,7 @@ export function AdminUserDetails({ userId, onClose }: { userId: string | null; o
               <p>Business phone: {data.vendor.phone || "Not provided"}</p>
               <p>CAC: {data.vendor.cacNumber || "Not provided"}</p>
               <p>Status: {data.vendor.status} · Verification: {data.vendor.verificationStatus}</p>
+              {onReviewVendor && <Button className="mt-3" variant="outline" onClick={() => onReviewVendor(data.vendor!.id)}>Review vendor application</Button>}
             </section>}
             <section>
               <h3 className="mb-2 font-semibold">Saved delivery addresses</h3>
@@ -66,12 +76,26 @@ export function AdminUserDetails({ userId, onClose }: { userId: string | null; o
             <section>
               <h3 className="mb-2 font-semibold">Orders ({data.orderCount})</h3>
               {data.orderCount === 0 && <p className="text-sm text-gray-600">No orders yet.</p>}
-              {data.orderCount > 20 && <p className="mb-2 text-sm text-gray-600">Showing the 20 most recent orders.</p>}
-              <div className="space-y-2">{data.orders.map(order => <div key={order.id} className="rounded border p-3 text-sm">
+              {data.orderCount > orderLimit && <p className="mb-2 text-sm text-gray-600">Showing {orderLimit} of {data.orderCount} orders.</p>}
+              <div className="space-y-2">{data.orders.slice(0, orderLimit).map(order => <div key={order.id} className="rounded border p-3 text-sm">
                 <p className="font-semibold">Order #{order.id} · NGN {Number(order.totalAmount).toLocaleString()}</p>
                 <p>{date(order.createdAt)} · {order.orderStatus} · Payment: {order.paymentStatus}</p>
               </div>)}</div>
+              {data.orderCount > orderLimit && <Button className="mt-3" variant="outline" onClick={() => setOrderLimit(value => value + 20)}>Show more orders</Button>}
             </section>
+            <AccountCommerceHistory key={`purchases-${userId}`} title="Purchase history" items={data.purchaseItems} />
+            {data.vendor && <>
+              <AccountCommerceHistory key={`sales-${userId}`} title="Products sold (paid orders)" items={data.salesItems} />
+              <section>
+                <h3 className="mb-2 font-semibold">Products listed ({data.listedProducts.length})</h3>
+                {data.listedProducts.length === 0 && <p className="text-sm text-gray-600">No products listed.</p>}
+                <div className="space-y-2">{data.listedProducts.slice(0, productLimit).map(product => <div key={product.id} className="rounded border p-3 text-sm">
+                  <p className="break-words font-semibold">{product.name}</p>
+                  <p>₦{Number(product.price).toLocaleString()} · Stock: {product.stock} · {product.status}</p>
+                </div>)}</div>
+                {data.listedProducts.length > productLimit && <Button className="mt-3" variant="outline" onClick={() => setProductLimit(value => value + 20)}>Show more products</Button>}
+              </section>
+            </>}
           </div>
         )}
       </DialogContent>

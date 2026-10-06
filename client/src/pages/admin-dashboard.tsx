@@ -281,10 +281,11 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/vendors/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
-      toast({ title: 'Error', description: 'Failed to update vendor.', variant: 'destructive' });
+      toast({ title: 'Could not update vendor', description: error instanceof Error ? error.message : 'Failed to update vendor.', variant: 'destructive' });
     },
   });
 
@@ -1800,8 +1801,8 @@ export default function AdminDashboard() {
                               <>
                                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
                                   disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified' ||
-                                    !hasRole(user, 'superadmin') || !user?.emailVerified}
-                                  title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can approve vendors.' : undefined}
+                                     !isAdmin(user) || !user?.emailVerified}
+                                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
                                   onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                   <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
@@ -1830,7 +1831,21 @@ export default function AdminDashboard() {
 
           {/* ═══ USER MANAGEMENT TAB ════════════════════════════════════════ */}
           <TabsContent value="users">
-            <AdminUserDetails userId={detailUserId} onClose={() => setDetailUserId(null)} />
+            <AdminUserDetails userId={detailUserId} onClose={() => setDetailUserId(null)} onReviewVendor={vendorId => {
+              const vendor = vendors.find(item => item.id === vendorId);
+              if (!vendor) {
+                toast({ title: 'Vendor data is unavailable. Open the Vendors tab and refresh.', variant: 'destructive' });
+                return;
+              }
+              setDetailUserId(null);
+              setReviewVendor(vendor);
+              setVerificationChecks({ cacVerified: false, identityVerified: false, businessVerified: false });
+              setVerificationNotes('');
+              setCacRegisteredName('');
+              setCacRegistryStatus('');
+              setRelationshipConfirmed(false);
+              setRelationshipEvidence('');
+            }} />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -1870,7 +1885,9 @@ export default function AdminDashboard() {
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 break-words">
-                          <p className="font-semibold text-sm">{u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}</p>
+                          <button type="button" className="text-left font-semibold text-sm underline underline-offset-2 hover:text-nigerian-green" onClick={() => setDetailUserId(u.id)}>
+                            {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email}
+                          </button>
                           <p className="text-xs text-gray-500">{u.email}</p>
                           <p className="text-xs text-gray-500">{u.phone || 'Phone not recorded'}</p>
                           <div className="flex gap-1 mt-1">
@@ -2456,8 +2473,8 @@ export default function AdminDashboard() {
                 <Button className="bg-green-600 hover:bg-green-700 text-white"
                    disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
                      !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
-                    !hasRole(user, 'superadmin') || !user?.emailVerified}
-                  title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can approve vendors.' : undefined}
+                    !isAdmin(user) || !user?.emailVerified}
+                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                   <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
                 </Button>
@@ -2473,8 +2490,8 @@ export default function AdminDashboard() {
               <Button className="bg-green-600 hover:bg-green-700 text-white"
                  disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
                    !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
-                  !hasRole(user, 'superadmin') || !user?.emailVerified}
-                title={!hasRole(user, 'superadmin') ? 'Only a verified superadmin can reactivate vendors.' : undefined}
+                  !isAdmin(user) || !user?.emailVerified}
+                title={!user?.emailVerified ? 'Verify your admin email before reactivating vendors.' : undefined}
                 onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                 <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
               </Button>

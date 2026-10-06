@@ -9,6 +9,12 @@ The user requires a phone number when creating all accounts, especially vendors.
 
 **How to apply:** Require phone on both customer and vendor signup, while showing missing historical data honestly rather than inventing contact information.
 
+Admins should be able to click a user to view their email, name, products sold or bought, and purchase history, not just deletion controls.
+
+**Why:** The user repeated that managing users requires useful account and commerce information.
+
+**How to apply:** Keep account details accessible from user management, with product-level purchase and sales history, while excluding credentials and authentication challenges.
+
 Vendor signup must visibly lead into the business application, including after email verification or a later login. Choosing vendor signup is an application intent, not permission to sell.
 
 **Why:** The user reported that the vendor signup button simply created a customer account without a functioning vendor path. Existing approval and CAC safeguards must remain intact.

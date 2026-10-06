@@ -1,3 +1,4 @@
+import type { AccountCommerceItem } from "../shared/account-commerce";
 import {
   users,
   vendors,
@@ -166,6 +167,8 @@ export interface IStorage {
   getOrdersForUser(userId: string): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
   getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
+  getAccountPurchaseItems(userId: string): Promise<AccountCommerceItem[]>;
+  getAccountSalesItems(vendorId: number): Promise<AccountCommerceItem[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
   transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean>;
   markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean>;
@@ -1166,6 +1169,30 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(orderItems)
       .where(eq(orderItems.orderId, orderId));
+  }
+
+  async getAccountPurchaseItems(userId: string): Promise<AccountCommerceItem[]> {
+    return db.select({
+      orderId: orders.id, productId: orderItems.productId, productName: products.name,
+      quantity: orderItems.quantity, unitPrice: orderItems.priceAtTime,
+      paymentStatus: orders.paymentStatus, orderStatus: orders.orderStatus, createdAt: orders.createdAt,
+    }).from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(products.id, orderItems.productId))
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt), desc(orders.id));
+  }
+
+  async getAccountSalesItems(vendorId: number): Promise<AccountCommerceItem[]> {
+    return db.select({
+      orderId: orders.id, productId: orderItems.productId, productName: products.name,
+      quantity: orderItems.quantity, unitPrice: orderItems.priceAtTime,
+      paymentStatus: orders.paymentStatus, orderStatus: orders.orderStatus, createdAt: orders.createdAt,
+    }).from(products)
+      .innerJoin(orderItems, eq(orderItems.productId, products.id))
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .where(and(eq(products.vendorId, vendorId), eq(orders.paymentStatus, "paid")))
+      .orderBy(desc(orders.createdAt), desc(orders.id));
   }
 
   // Notification operations

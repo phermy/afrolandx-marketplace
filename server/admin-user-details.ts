@@ -2,7 +2,7 @@ import type { storage as appStorage } from "./storage";
 import { sanitizeUser } from "./auth";
 
 export async function getAdminUserDetails(
-  storage: Pick<typeof appStorage, "getUser" | "getSavedDeliveryAddresses" | "getOrdersForUser" | "getVendorByUserId">,
+  storage: Pick<typeof appStorage, "getUser" | "getSavedDeliveryAddresses" | "getOrdersForUser" | "getVendorByUserId" | "getAccountPurchaseItems" | "getAccountSalesItems" | "getProducts">,
   userId: string,
 ) {
   const account = await storage.getUser(userId);
@@ -12,6 +12,11 @@ export async function getAdminUserDetails(
     storage.getOrdersForUser(userId),
     storage.getVendorByUserId(userId),
   ]);
+  const [purchaseItems, salesItems, listedProducts] = await Promise.all([
+    storage.getAccountPurchaseItems(userId),
+    vendor ? storage.getAccountSalesItems(vendor.id) : Promise.resolve([]),
+    vendor ? storage.getProducts({ vendorId: vendor.id }) : Promise.resolve([]),
+  ]);
   return {
     account: sanitizeUser(account),
     addresses: addresses.map(address => ({
@@ -20,11 +25,17 @@ export async function getAdminUserDetails(
       postalCode: address.postalCode, country: address.country, isDefault: address.isDefault,
     })),
     orderCount: orders.length,
-    orders: orders.slice(0, 20).map(order => ({
+    orders: orders.map(order => ({
       id: order.id, totalAmount: order.totalAmount, paymentStatus: order.paymentStatus,
       orderStatus: order.orderStatus, createdAt: order.createdAt,
     })),
+    purchaseItems,
+    salesItems,
+    listedProducts: listedProducts.map(product => ({
+      id: product.id, name: product.name, price: product.price, stock: product.stock, status: product.status,
+    })),
     vendor: vendor ? {
+      id: vendor.id,
       businessName: vendor.businessName, contactName: vendor.contactName, phone: vendor.phone,
       cacNumber: vendor.cacNumber, status: vendor.status, verificationStatus: vendor.verificationStatus,
     } : null,

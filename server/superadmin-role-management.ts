@@ -29,6 +29,15 @@ export async function lockVerifiedSuperadminAndTarget(
   actorId: string,
   targetId: string,
 ): Promise<{ actor: LockedAccount; target: LockedAccount }> {
+  return lockVerifiedAdminAndTarget(tx, actorId, targetId, true);
+}
+
+export async function lockVerifiedAdminAndTarget(
+  tx: { execute: (query: any) => Promise<any> },
+  actorId: string,
+  targetId: string,
+  requireSuperadmin = false,
+): Promise<{ actor: LockedAccount; target: LockedAccount }> {
   if (actorId === targetId) throw new RoleManagementError("You cannot change your own roles.", 403);
   const result = await tx.execute(sql`
     SELECT id, email, email_verified, roles, closed_at FROM users
@@ -38,8 +47,9 @@ export async function lockVerifiedSuperadminAndTarget(
   const actor = rows.find(row => row.id === actorId);
   const target = rows.find(row => row.id === targetId);
   const actorRoles = parseRoles(actor?.roles);
-  if (!actor || actor.closed_at || !actor.email_verified || !actorRoles.includes("admin") || !actorRoles.includes("superadmin")) {
-    throw new RoleManagementError("Verified superadmin access is required.", 403);
+  if (!actor || actor.closed_at || !actor.email_verified || !actorRoles.includes("admin") ||
+    (requireSuperadmin && !actorRoles.includes("superadmin"))) {
+    throw new RoleManagementError(requireSuperadmin ? "Verified superadmin access is required." : "Verified admin access is required.", 403);
   }
   if (!target) throw new RoleManagementError("User not found.", 404);
   if (target.closed_at) throw new RoleManagementError("This account is closed.", 409);
@@ -97,8 +107,12 @@ export async function approveVendorWithRole(actorId: string, vendorId: number) {
   return db.transaction(async tx => {
     const [record] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
     if (!record) throw new RoleManagementError("Vendor not found.", 404);
-    const { target } = await lockVerifiedSuperadminAndTarget(tx, actorId, record.userId);
+    const { actor, target } = await lockVerifiedAdminAndTarget(tx, actorId, record.userId);
     assertRoleTargetMutable(actorId, record.userId, target.email);
+    if (!target.email_verified) throw new RoleManagementError("The vendor must verify their email before approval.");
+    if (parseRoles(target.roles).some(role => role === "admin" || role === "superadmin") && !parseRoles(actor.roles).includes("superadmin")) {
+      throw new RoleManagementError("Only a verified superadmin can approve a vendor application belonging to an administrator.", 403);
+    }
     const locked = await tx.execute(sql`
       SELECT verification_status, verification_notes FROM vendors WHERE id = ${vendorId} FOR UPDATE
     `);

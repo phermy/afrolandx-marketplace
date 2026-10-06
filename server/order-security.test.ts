@@ -12,6 +12,7 @@ import {
   paymentVerificationError,
   recommendShippingCarriers,
   shippingPaymentVerificationError,
+  getShippingQuote,
 } from "./order-security";
 
 const cart = [
@@ -38,6 +39,15 @@ test("cart item ownership never crosses users", () => {
 
 test("checkout computes the server-side NGN subtotal", () => {
   assert.equal(calculateCheckoutSubtotal(cart), 121000);
+});
+
+test("test shipping charges exactly one naira as a server-priced deposit, not a dispatch-ready carrier rate", () => {
+  assert.equal(calculateEstimatedShippingAmount(121000, "test shipping"), 1);
+  assert.equal(calculateEstimatedShippingAmount(100, "Test shipping"), 1);
+  assert.equal(getShippingQuote("test shipping")?.quoteRequired, true);
+  assert.equal(getShippingQuote("test shipping")?.price, null);
+  assert.throws(() => calculateCheckoutTotal(cart, "test shipping"), CheckoutValidationError);
+  assert.equal(recommendShippingCarriers({ country: "Nigeria" }).ranked.some(option => option.carrier === "Test shipping"), false);
 });
 
 test("checkout rejects insufficient stock and invalid sizes", () => {

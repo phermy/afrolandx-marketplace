@@ -20,7 +20,7 @@
     "test:test-vendor-deletion": "tsx --test server/test-vendor-deletion.test.ts",
     "test:events": "tsx --test server/event-planning.test.ts",
     "test:auth-email-e2e": "node scripts/auth-email-e2e.mjs",
-    "test:auth-email-safety": "tsx --test server/auth-delivery-failure.test.ts server/admin-role-bootstrap.test.ts server/account-registration.test.ts",
+    "test:auth-email-safety": "tsx --test server/auth-delivery-failure.test.ts server/admin-role-bootstrap.test.ts server/account-registration.test.ts server/admin-user-details.test.ts",
     "test:orders": "tsx --test server/order-security.test.ts server/order-processing.test.ts server/paystack.test.ts server/finance.test.ts server/product-return-policy.test.ts"
   },
   "dependencies": {

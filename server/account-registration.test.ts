@@ -78,6 +78,7 @@ test("admin details return contact, addresses, and orders without authentication
     getSavedDeliveryAddresses: async () => [{ id: 1, label: "Home", address1: "Sample street", country: "Nigeria" }],
     getOrdersForUser: async () => [{ id: 2, totalAmount: "5000", paymentReference: "secret-payment", paymentUrl: "secret-url" }],
     getVendorByUserId: async () => undefined,
+    getAccountPurchaseItems: async () => [],
   } as any, "customer");
   assert.equal(details?.account.phone, "+2348000000000");
   assert.equal(details?.orderCount, 1);

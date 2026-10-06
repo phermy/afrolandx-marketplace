@@ -19,7 +19,7 @@ test("role-changing workflows protect the owner and the acting superadmin", () =
   assert.doesNotThrow(() => assertRoleTargetMutable("actor", "other", "someone@example.com"));
 });
 
-test("vendor approval grants the role atomically only while the actor is a superadmin", async () => {
+test("verified admins approve reviewed vendors atomically without gaining general role-management permissions", async () => {
   if (process.env.NODE_ENV === "production") throw new Error("Role tests must not run against production.");
   const suffix = randomUUID();
   const ownerId = `role-vendor-owner-${suffix}`;
@@ -38,13 +38,13 @@ test("vendor approval grants the role atomically only while the actor is a super
     }).returning();
     vendorId = vendor.id;
     await assert.rejects(approveVendorWithRole(adminId, vendorId),
-      (error: unknown) => error instanceof RoleManagementError && error.status === 403);
+      (error: unknown) => error instanceof RoleManagementError && /documented review/.test(error.message));
     await updateManagedRoles(ownerId, adminId, { role: "superadmin", enabled: true });
     await updateManagedRoles(ownerId, adminId, { role: "superadmin", enabled: false });
     await assert.rejects(db.transaction(tx => lockVerifiedSuperadminAndTarget(tx, adminId, targetId)),
       (error: unknown) => error instanceof RoleManagementError && error.status === 403);
     await assert.rejects(approveVendorWithRole(adminId, vendorId),
-      (error: unknown) => error instanceof RoleManagementError && error.status === 403);
+      (error: unknown) => error instanceof RoleManagementError && /documented review/.test(error.message));
     const [stillPending] = await db.select().from(vendors).where(eq(vendors.id, vendorId));
     assert.equal(stillPending.status, "pending");
     await assert.rejects(approveVendorWithRole(ownerId, vendorId),
@@ -58,10 +58,22 @@ test("vendor approval grants the role atomically only while the actor is a super
       ownerId, new Date(),
     );
     await db.update(vendors).set({ cacNumber: "RC 123456", verificationNotes: reviewNotes }).where(eq(vendors.id, vendorId));
-    const approved = await approveVendorWithRole(ownerId, vendorId);
+    await db.update(users).set({ emailVerified: false }).where(eq(users.id, adminId));
+    await assert.rejects(approveVendorWithRole(adminId, vendorId),
+      (error: unknown) => error instanceof RoleManagementError && error.status === 403);
+    await db.update(users).set({ emailVerified: true }).where(eq(users.id, adminId));
+    await db.update(users).set({ roles: ["customer", "admin"] }).where(eq(users.id, targetId));
+    await assert.rejects(approveVendorWithRole(adminId, vendorId),
+      (error: unknown) => error instanceof RoleManagementError && error.status === 403);
+    await db.update(users).set({ roles: ["customer"] }).where(eq(users.id, targetId));
+    const approved = await approveVendorWithRole(adminId, vendorId);
     assert.equal(approved.status, "approved");
     const [target] = await db.select().from(users).where(eq(users.id, targetId));
     assert.ok((target.roles as string[]).includes("vendor"));
+    assert.deepEqual(new Set(target.roles as string[]), new Set(["customer", "vendor"]));
+    await db.update(users).set({ roles: ["customer"] }).where(eq(users.id, adminId));
+    await assert.rejects(approveVendorWithRole(adminId, vendorId),
+      (error: unknown) => error instanceof RoleManagementError && error.status === 403);
   } finally {
     if (vendorId !== undefined) await db.delete(vendors).where(eq(vendors.id, vendorId));
     await db.delete(users).where(inArray(users.id, ids));
