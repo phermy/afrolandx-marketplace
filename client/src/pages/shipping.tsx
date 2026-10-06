@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { isVendor } from "@/lib/roleUtils";
-import { hasFullManagementAccess } from "@shared/admin-access";
+import { hasShippingOperationsAccess } from "@shared/admin-access";
 import { useToast } from "@/hooks/use-toast";
 import SplitShipmentForm from "@/components/shipping/SplitShipmentForm";
 import { shipmentStatusLabels, shipmentStatuses, shipmentTransitions } from "@shared/logistics";
@@ -37,7 +37,7 @@ export default function Shipping() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const admin = hasFullManagementAccess(user);
+  const admin = hasShippingOperationsAccess(user);
   const vendor = isVendor(user);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");

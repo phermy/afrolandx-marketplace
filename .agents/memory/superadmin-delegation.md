@@ -11,11 +11,17 @@ Direct role controls require a verified Superadmin. Vendor approval is the user'
 
 **Why for the exception:** The user explicitly asked that Admins be allowed to approve vendors. Keep email verification and documented CAC review required.
 
-Full management is for verified Superadmins only. Ordinary Admins see customer and vendor support issues only, not other administrators' accounts or activity in User Management. Treat accounts with Admin or Superadmin roles as staff even when they also have customer or vendor roles. Ordinary Admins cannot inspect these profiles through direct links or use full platform, finance, agency-management, role-management, or account-deletion controls.
+Full platform management is for verified Superadmins only. Ordinary Admins see customer and vendor support issues and have full shipping-operations access, but do not see other administrators' accounts or activity in User Management. Treat accounts with Admin or Superadmin roles as staff even when they also have customer or vendor roles. Ordinary Admins cannot inspect these profiles through direct links or use full platform, finance administration, role-management, or account-deletion controls.
 
 **Why:** The user explicitly asked that only Superadmins see the full management dashboard and that Admins not see what other Admins do in User Management.
 
 **How to apply:** Keep customer/vendor support and reviewed non-staff vendor approvals available to Admins. Enforce staff privacy and full-management restrictions on the server, not just by hiding navigation. Keep protected owner identity safeguards even if their role array has not been seeded.
+
+All verified, active Admins have full shipping-operations access, including agency management, partner invitations, all shipment assignments, quote review, bookings, tracking, package splits, and records of agency payments. Shipping customer quotes are operational records even when the buyer is a staff member; expose only necessary contact and delivery information, not their private staff profile.
+
+**Why:** The user explicitly asked to "allow admin full to shippings operations" and to let Admins review vendor requests and approve them.
+
+**How to apply:** Recheck current verified roles at operational reads and locked writes. Do not require Superadmin for shipping, or expand unrelated finance and role permissions. Retain documented CAC review and verified applicant email for vendor approvals.
 
 All verified Admins may review and approve every submitted vendor product, including products whose vendor owner also has staff roles. That permits product and public business details, not access to the vendor owner's private staff profile.
 

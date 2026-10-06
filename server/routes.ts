@@ -4,7 +4,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
-import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
+import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
+import { vendorStatusHandler } from "./admin-vendor-status";
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import {
@@ -1059,33 +1060,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/vendors/:id/status', isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const vendorId = parseInt(req.params.id);
-      const { status } = req.body;
-      if (!Number.isSafeInteger(vendorId)) return res.status(400).json({ message: 'Invalid vendor ID' });
-      if (!['pending', 'approved', 'rejected', 'suspended'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid vendor status' });
-      }
-      const vendor = await storage.getVendor(vendorId);
-      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-      if (status === 'approved' && (vendor.verificationStatus !== 'verified' || !hasManualCacReview(vendor.verificationNotes))) {
-        return res.status(409).json({ message: 'Complete a documented review using CAC Public Search before approval' });
-      }
-      if (status === 'approved') {
-        const updatedVendor = await approveVendorWithRole((req.user as any).id, vendorId);
-        return res.json({ message: 'Vendor status updated', vendor: updatedVendor });
-      }
-      await storage.updateVendorStatus(vendorId, status);
-      const updatedVendor = await storage.getVendor(vendorId);
-      res.json({ message: 'Vendor status updated', vendor: updatedVendor });
-    } catch (error) {
-      if (error instanceof RoleManagementError) {
-        return res.status(error.status).json({ message: error.message });
-      }
-      res.status(500).json({ message: 'Failed to update vendor status' });
-    }
-  });
+  app.patch('/api/admin/vendors/:id/status', isAuthenticated, vendorStatusHandler);
+  app.patch('/api/vendors/:id/status', isAuthenticated, vendorStatusHandler);
 
   app.patch('/api/admin/vendors/:id/verification', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
@@ -2313,9 +2289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: request.status === 'quoted' && request.expiresAt && request.expiresAt <= new Date()
           ? 'expired'
           : request.status,
-        customer: sanitizeUser(await storage.getUser(request.userId)),
+        customer: await storage.getUser(request.userId).then(account => account ? {
+          id: account.id, firstName: account.firstName, lastName: account.lastName,
+          email: account.email, phone: account.phone,
+        } : null),
       })));
-      res.json(enriched.filter(request => canSeeManagedAccount((req as any).managementActor, request.customer)));
+      res.json(enriched);
     } catch (error) {
       console.error('Error fetching admin shipping quotes:', error);
       res.status(500).json({ message: 'Failed to fetch shipping quote requests' });

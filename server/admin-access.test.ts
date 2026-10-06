@@ -41,7 +41,8 @@ test("management access separates Superadmin controls from customer and vendor s
       ["GET", "/users"], ["GET", "/users/customer"], ["GET", "/users/vendor"], ["GET", "/vendors"],
       ["GET", "/orders"], ["GET", "/products/pending"], ["GET", "/reviews"],
       ["PATCH", "/orders/1/status"], ["PATCH", "/orders/1/tracking"],
-      ["PATCH", "/shipping-quote-requests/1"], ["PATCH", "/vendors/1/verification"],
+      ["PATCH", "/shipping-quote-requests/1"], ["PATCH", "/shipping-quote-requests/2"],
+      ["PATCH", "/vendors/1/verification"], ["PATCH", "/vendors/1/status"],
       ["POST", "/vendors/1/products"], ["POST", "/products/bulk-approve"],
     ]) assert.equal((await invoke("admin", method, path)).nextCalled, true, `${method} ${path}`);
   });
@@ -52,7 +53,7 @@ test("management access separates Superadmin controls from customer and vendor s
     }
     assert.equal((await invoke("admin", "PATCH", "/orders/2/status")).status, 404);
     assert.equal((await invoke("admin", "PATCH", "/vendors/2/verification")).status, 404);
-    assert.equal((await invoke("admin", "PATCH", "/shipping-quote-requests/2")).status, 404);
+    assert.equal((await invoke("admin", "PATCH", "/vendors/2/status")).status, 404);
     assert.equal(canSeeManagedAccount(accounts.get("admin"), accounts.get("customer")), true);
     assert.equal(canSeeManagedAccount(accounts.get("admin"), accounts.get("staff-vendor")), false);
   });
@@ -82,10 +83,17 @@ test("management access separates Superadmin controls from customer and vendor s
     assert.equal(isSupportManagementRoute("DELETE", "/users/vendor"), false);
     assert.equal(isSupportManagementRoute("GET", "/users/admin/test-data"), false);
   });
-  await t.test("ordinary Admins cannot use shipping administration or agency financial controls", async () => {
-    const tx: any = { execute: async () => {}, select: () => ({ from: () => ({ where: async () => [accounts.get("admin")] }) }) };
-    await assert.rejects(lockLogisticsActor(tx, "admin", true), /Superadmin access/);
-    assert.equal((await lockLogisticsActor(tx, "admin")).admin, false);
+  await t.test("verified Admins have shipping operations while inactive and non-Admin actors do not", async () => {
+    let current = accounts.get("admin");
+    const tx: any = { execute: async () => {}, select: () => ({ from: () => ({ where: async () => [current] }) }) };
+    for (const actor of ["admin", "super"]) {
+      current = accounts.get(actor);
+      assert.equal((await lockLogisticsActor(tx, actor, true)).admin, true);
+    }
+    for (const actor of ["unverified", "closed", "customer", "missing"]) {
+      current = accounts.get(actor);
+      await assert.rejects(lockLogisticsActor(tx, actor, true), /verified|Admin access/);
+    }
     // Reject before any shipment or partner query when an inactive actor requests access.
     await assert.rejects(getLogisticsAccess("unverified"), /verified/);
   });

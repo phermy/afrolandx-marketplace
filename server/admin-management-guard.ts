@@ -17,14 +17,12 @@ export const managementGuard: RequestHandler = async (req, res, next) => {
     }
     let targetId: string | undefined;
     const account = req.path.match(/^\/users\/([^/]+)$/);
-    const vendor = req.path.match(/^\/vendors\/(\d+)\/(?:verification|products)$/);
+    const vendor = req.path.match(/^\/vendors\/(\d+)\/(?:verification|products|status)$/);
     const order = req.path.match(/^\/orders\/(\d+)\/(?:status|tracking)$/);
-    const quote = req.path.match(/^\/shipping-quote-requests\/(\d+)$/);
     if (account) targetId = decodeURIComponent(account[1]);
     if (vendor) targetId = (await storage.getVendor(Number(vendor[1])))?.userId;
     if (order) targetId = (await storage.getOrder(Number(order[1])))?.userId;
-    if (quote) targetId = (await storage.getShippingQuoteRequest(Number(quote[1])))?.userId;
-    if (account || vendor || order || quote) {
+    if (account || vendor || order) {
       const target = targetId ? await storage.getUser(targetId) : undefined;
       if (!canSeeManagedAccount(actor, target)) return void res.status(404).json({ message: "Record not found." });
     }

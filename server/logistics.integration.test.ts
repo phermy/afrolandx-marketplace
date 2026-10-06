@@ -13,7 +13,7 @@ import { createSaleLedger } from "./finance";
 test("shipping operations persist scoped assignments, funding gates, package splits, and delivery accounting", async t => {
   if (process.env.NODE_ENV === "production") throw new Error("Shipping tests cannot run in production.");
   const suffix = randomUUID();
-  const identities = ["admin", "buyer", "seller1", "seller2", "partner1", "partner2", "outsider", "unverified"].map(role => `shipping-${role}-${suffix}`);
+  const identities = ["admin", "buyer", "seller1", "seller2", "partner1", "partner2", "outsider", "unverified", "superadmin"].map(role => `shipping-${role}-${suffix}`);
   const [admin, buyer, seller1, seller2, partner1, partner2, outsider, unverified] = identities;
   const vendorIds: number[] = [], productIds: number[] = [], orderIds: number[] = [], partnerIds: number[] = [];
   let categoryId: number | undefined;
@@ -22,8 +22,12 @@ test("shipping operations persist scoped assignments, funding gates, package spl
   try {
     await db.insert(users).values(identities.map((id, index) => ({
       id, email: `${id}@example.test`, firstName: "Shipping test", emailVerified: id !== unverified,
-      roles: index === 0 ? ["admin", "superadmin"] : id === unverified ? ["admin"] : index === 2 || index === 3 ? ["vendor", "customer"] : ["customer"],
+      roles: index === 8 ? ["admin", "superadmin"] : index === 0 || id === unverified ? ["admin"] : index === 2 || index === 3 ? ["vendor", "customer"] : ["customer"],
     })));
+    assert.equal((await getLogisticsAccess(admin)).admin, true);
+    assert.equal((await getLogisticsAccess(identities[8])).admin, true);
+    assert.equal((await getLogisticsAccess(buyer)).admin, false);
+    await assert.rejects(getLogisticsAccess(unverified), /verified/);
     const [category] = await db.insert(categories).values({ name: "Shipping test", slug: `shipping-${suffix}` }).returning();
     categoryId = category.id;
     const shops = await db.insert(vendors).values([
@@ -99,7 +103,7 @@ test("shipping operations persist scoped assignments, funding gates, package spl
       await reviewShipmentQuote(admin, quote.id, "approved", "Agency cost reviewed");
       await assert.rejects(acceptShipmentBooking(partner1, waiting, "WAITING-BOOKING"), /final customer shipping/);
       const quoteFirst = await submitShipmentQuote(partner1, first, { amount: 25, estimatedDelivery: "Two days" });
-      await assert.rejects(reviewShipmentQuote(partner1, quoteFirst.id, "approved", "I approve my own quote"), /Superadmin access/);
+      await assert.rejects(reviewShipmentQuote(partner1, quoteFirst.id, "approved", "I approve my own quote"), /Admin access/);
       await reviewShipmentQuote(admin, quoteFirst.id, "approved", "Confirmed agency cost");
       await assert.rejects(reviewShipmentQuote(admin, quoteFirst.id, "approved", "Duplicate review"), /already reviewed/);
       await assert.rejects(recordAgencyPayment(admin, first, { amount: 25, invoiceReference: "INV-FIRST", paymentReference: `first-${suffix}`, paidAt: new Date().toISOString(), note: "" }), /Accept the approved/);

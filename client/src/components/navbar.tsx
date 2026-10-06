@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
-import { hasFullManagementAccess } from '@shared/admin-access';
+import { hasFullManagementAccess, hasShippingOperationsAccess } from '@shared/admin-access';
 import { useCart } from '@/contexts/CartContext';
 import MegaMenu from '@/components/mega-menu';
 import { useQuery } from '@tanstack/react-query';
@@ -75,7 +75,7 @@ export default function Navbar() {
         : 'text-gray-700 hover:text-nigerian-green'
     }`;
   const fullManagement = hasFullManagementAccess(user);
-  const canAccessShipping = !!(isAuthenticated && user && (fullManagement || isVendor(user) || user.isShippingPartner));
+  const canAccessShipping = !!(isAuthenticated && user && (hasShippingOperationsAccess(user) || isVendor(user) || user.isShippingPartner));
 
   const mobileNavLinkClass = (path: string) =>
     `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -208,7 +208,7 @@ export default function Navbar() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
                         {fullManagement && <DropdownMenuItem><Link href="/admin/finance"><span className="cursor-pointer">Finance Administration</span></Link></DropdownMenuItem>}
-                        {fullManagement && <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>}
+                        {hasShippingOperationsAccess(user) && <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>}
                       </>
                     )}
                     <DropdownMenuSeparator />

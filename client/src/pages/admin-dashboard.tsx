@@ -289,7 +289,7 @@ export default function AdminDashboard() {
 
   const updateVendorStatusMutation = useMutation({
     mutationFn: async ({ vendorId, status }: { vendorId: number; status: string }) => {
-      const response = await apiRequest('PATCH', `/api/vendors/${vendorId}/status`, { status });
+      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/status`, { status });
       return response.json();
     },
     onSuccess: (result) => {
@@ -301,12 +301,13 @@ export default function AdminDashboard() {
       }
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/vendors/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
-      toast({ title: 'Could not update vendor', description: error instanceof Error ? error.message : 'Failed to update vendor.', variant: 'destructive' });
+      toast({ title: 'Could not update vendor', description: getApiErrorMessage(error, 'Failed to update vendor.'), variant: 'destructive' });
     },
   });
 
@@ -328,10 +329,11 @@ export default function AdminDashboard() {
     onSuccess: (updated) => {
       setReviewVendor((current: any) => current?.id === updated.id ? { ...current, ...updated } : current);
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
       toast({ title: updated.verificationStatus === 'verified' ? 'Verification recorded' : 'Verification rejected',
         description: updated.verificationStatus === 'verified' ? 'You can now approve this vendor.' : 'The vendor cannot be approved until a new review passes.' });
     },
-    onError: (error: Error) => toast({ title: 'Verification not recorded', description: error.message, variant: 'destructive' }),
+    onError: (error: Error) => toast({ title: 'Verification not recorded', description: getApiErrorMessage(error, 'The verification could not be recorded.'), variant: 'destructive' }),
   });
 
   const toggleFeaturedMutation = useMutation({
@@ -714,8 +716,8 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-red-600 font-nigerian">{fullManagement ? 'Superadmin Dashboard' : 'Customer and Vendor Support'}</h1>
-            <p className="text-gray-600 text-sm">{fullManagement ? 'AfrolandX Platform Control Centre' : 'Customer accounts, vendor applications, orders, and support issues only.'}</p>
+            <h1 className="text-3xl font-bold text-red-600 font-nigerian">{fullManagement ? 'Superadmin Dashboard' : 'Admin Dashboard'}</h1>
+            <p className="text-gray-600 text-sm">{fullManagement ? 'AfrolandX Platform Control Centre' : 'Customer accounts, vendor approvals, orders, shipping operations, and support.'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">Admin Access</Badge>
