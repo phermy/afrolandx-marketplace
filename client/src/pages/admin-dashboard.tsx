@@ -743,6 +743,11 @@ export default function AdminDashboard() {
         )}
 
         {/* KPI Cards */}
+        <div className="mb-5 flex justify-end">
+          <Button variant="outline" onClick={() => { window.location.href = '/shipping'; }}>
+            <Truck className="w-4 h-4 mr-2" /> Manual shipping operations
+          </Button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
              { label: 'Actual Sales Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} verified paid orders` : '' },

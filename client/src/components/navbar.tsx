@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText, CreditCard } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText, CreditCard, Truck } from 'lucide-react';
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
@@ -73,6 +73,7 @@ export default function Navbar() {
         ? 'text-nigerian-green border-b-2 border-nigerian-green'
         : 'text-gray-700 hover:text-nigerian-green'
     }`;
+  const canAccessShipping = !!(isAuthenticated && user && (isAdmin(user) || isVendor(user) || user.isShippingPartner));
 
   const mobileNavLinkClass = (path: string) =>
     `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -114,6 +115,7 @@ export default function Navbar() {
                   location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
                 }`}>Admin</Link>
               )}
+              {canAccessShipping && <Link href="/shipping" className={navLinkClass('/shipping')}>Shipping</Link>}
             </div>
           </div>
 
@@ -196,6 +198,7 @@ export default function Navbar() {
                         <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/finance"><span className="cursor-pointer">Finance & Statements</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>
                       </>
                     )}
                     {isAdmin(user) && (
@@ -203,6 +206,7 @@ export default function Navbar() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/admin/finance"><span className="cursor-pointer">Finance Administration</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>
                       </>
                     )}
                     <DropdownMenuSeparator />
@@ -276,6 +280,9 @@ export default function Navbar() {
             <Link href="/policies" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/policies')}><FileText className="w-5 h-5" /><span>Policies</span></div>
             </Link>
+            {canAccessShipping && <Link href="/shipping" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/shipping')}><Truck className="w-5 h-5" /><span>Shipping operations</span></div>
+            </Link>}
 
             {/* Account Section - only if logged in */}
             {isAuthenticated && user && (

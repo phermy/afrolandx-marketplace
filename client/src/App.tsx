@@ -20,6 +20,7 @@ import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminFinance from "@/pages/admin-finance";
 import VendorFinance from "@/pages/vendor-finance";
+import Shipping from "@/pages/shipping";
 import Checkout from "@/pages/checkout";
 import Measurements from "@/pages/measurements";
 import Messages from "@/pages/messages";
@@ -144,6 +145,9 @@ function Router() {
       </Route>
       <Route path="/vendor">
         {isAuthenticated ? <VendorDashboard /> : <AuthRedirect to="/register?as=vendor" />}
+      </Route>
+      <Route path="/shipping">
+        {isAuthenticated ? <Shipping /> : <AuthRedirect to="/login" />}
       </Route>
 
       {/* Authenticated-only pages */}

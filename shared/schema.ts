@@ -86,6 +86,25 @@ export const users = pgTable(
   ],
 );
 
+export const logisticsPartners = pgTable("logistics_partners", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  contactEmail: varchar("contact_email", { length: 254 }).notNull(),
+  phone: varchar("phone", { length: 30 }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export const logisticsPartnerMembers = pgTable("logistics_partner_members", {
+  id: serial("id").primaryKey(),
+  partnerId: integer("partner_id").notNull().references(() => logisticsPartners.id),
+  email: varchar("email", { length: 254 }).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  invitedBy: varchar("invited_by").notNull().references(() => users.id),
+  active: boolean("active").notNull().default(true),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => [uniqueIndex("logistics_partner_members_email_unique").on(table.partnerId, table.email)]);
+
 // Vendors table
 export const vendors = pgTable("vendors", {
   id: serial("id").primaryKey(),
@@ -214,6 +233,86 @@ export const orders = pgTable("orders", {
   trackingNumber: varchar("tracking_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shipments = pgTable("shipments", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  partnerId: integer("partner_id").references(() => logisticsPartners.id),
+  assignmentRevision: integer("assignment_revision").notNull().default(0),
+  initialPackage: boolean("initial_package").notNull().default(true),
+  splitRequestKey: varchar("split_request_key", { length: 36 }),
+  splitFromId: integer("split_from_id"),
+  status: varchar("status", { length: 32 }).notNull().default("preparing"),
+  items: jsonb("items").notNull(),
+  pickupAddress: jsonb("pickup_address"),
+  deliveryAddress: jsonb("delivery_address").notNull(),
+  weightKg: decimal("weight_kg", { precision: 10, scale: 3 }),
+  dimensions: varchar("dimensions", { length: 120 }),
+  readyAt: timestamp("ready_at"),
+  collectedAt: timestamp("collected_at"),
+  pickupScheduledAt: timestamp("pickup_scheduled_at"),
+  approvedQuoteId: integer("approved_quote_id"),
+  bookingReference: varchar("booking_reference", { length: 160 }),
+  bookingAcceptedAt: timestamp("booking_accepted_at"),
+  trackingNumber: varchar("tracking_number", { length: 120 }),
+  trackingUrl: text("tracking_url"),
+  deliveryEvidence: text("delivery_evidence"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, table => [
+  uniqueIndex("shipments_initial_vendor_unique").on(table.orderId, table.vendorId).where(sql`${table.initialPackage} = true`),
+  uniqueIndex("shipments_split_request_unique").on(table.splitRequestKey),
+  index("shipments_partner_idx").on(table.partnerId),
+]);
+export const shipmentQuotes = pgTable("shipment_quotes", {
+  id: serial("id").primaryKey(),
+  shipmentId: integer("shipment_id").notNull().references(() => shipments.id),
+  partnerId: integer("partner_id").notNull().references(() => logisticsPartners.id),
+  assignmentRevision: integer("assignment_revision").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  estimatedDelivery: varchar("estimated_delivery", { length: 150 }).notNull(),
+  notes: text("notes"),
+  status: varchar("status", { length: 20 }).notNull().default("submitted"),
+  submittedBy: varchar("submitted_by").notNull().references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewNote: text("review_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export const shipmentAgencyPayments = pgTable("shipment_agency_payments", {
+  id: serial("id").primaryKey(),
+  shipmentId: integer("shipment_id").notNull().references(() => shipments.id),
+  partnerId: integer("partner_id").notNull().references(() => logisticsPartners.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  invoiceReference: varchar("invoice_reference", { length: 160 }).notNull(),
+  paymentReference: varchar("payment_reference", { length: 160 }).notNull(),
+  paidAt: timestamp("paid_at").notNull(),
+  recordedBy: varchar("recorded_by").notNull().references(() => users.id),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, table => [uniqueIndex("shipment_agency_payments_shipment_unique").on(table.shipmentId), uniqueIndex("shipment_agency_payments_reference_unique").on(table.paymentReference)]);
+export const shipmentEvents = pgTable("shipment_events", {
+  id: serial("id").primaryKey(),
+  shipmentId: integer("shipment_id").notNull().references(() => shipments.id),
+  status: varchar("status", { length: 32 }).notNull(),
+  type: varchar("type", { length: 32 }).notNull(),
+  note: text("note").notNull(),
+  source: varchar("source", { length: 20 }).notNull(),
+  actorId: varchar("actor_id").references(() => users.id),
+  deliveryEvidence: text("delivery_evidence"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export const logisticsEmailOutbox = pgTable("logistics_email_outbox", {
+  id: serial("id").primaryKey(),
+  recipient: varchar("recipient", { length: 254 }).notNull(),
+  subject: varchar("subject", { length: 250 }).notNull(),
+  message: text("message").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  deliveredAt: timestamp("delivered_at"),
+  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Order items table

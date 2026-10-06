@@ -25,3 +25,4 @@
 - [Registration visual direction](registration-visual-direction.md) — user likes the editorial Afrolandx split layout; prioritize readable copy over decorative overlap
 - [Responsive copy alignment](responsive-copy-alignment.md) — avoid forced justification in narrow columns or short cards; reserve it for wide long-form reading
 - [Account signup requirements](account-signup-requirements.md) — require phones for new accounts; vendor signup leads to an application, not automatic selling permission
+- [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later

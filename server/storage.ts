@@ -403,7 +403,14 @@ export class DatabaseStorage implements IStorage {
       }
       const vendor = await tx.execute(sql`SELECT id FROM vendors WHERE user_id = ${userId} LIMIT 1`);
       const order = await tx.execute(sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`);
-      if (vendor.rows.length || order.rows.length) {
+      const shippingHistory = await tx.execute(sql`
+        SELECT 1 FROM logistics_partner_members WHERE user_id = ${userId} OR invited_by = ${userId}
+        UNION ALL SELECT 1 FROM shipment_events WHERE actor_id = ${userId}
+        UNION ALL SELECT 1 FROM shipment_quotes WHERE submitted_by = ${userId} OR reviewed_by = ${userId}
+        UNION ALL SELECT 1 FROM shipment_agency_payments WHERE recorded_by = ${userId}
+        LIMIT 1
+      `);
+      if (vendor.rows.length || order.rows.length || shippingHistory.rows.length) {
         throw new Error('ACCOUNT_HAS_LINKED_RECORDS');
       }
       await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
@@ -1052,41 +1059,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean> {
-    const updated = await db.update(orders)
-      .set({ orderStatus: status, updatedAt: new Date() })
-      .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus)))
-      .returning({ id: orders.id });
-    return updated.length > 0;
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: status, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus),
+          ['shipped', 'delivered'].includes(status) ? sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})` : undefined))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
   }
 
   async markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean> {
-    const updated = await db.update(orders)
-      .set({ orderStatus: 'shipped', trackingNumber, updatedAt: new Date() })
-      .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus)))
-      .returning({ id: orders.id });
-    return updated.length > 0;
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: 'shipped', trackingNumber, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus),
+          sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})`))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
   }
 
   async updateOrderTracking(id: number, trackingNumber: string): Promise<boolean> {
-    const result = await db.update(orders)
-      .set({ trackingNumber, updatedAt: new Date() })
-      .where(eq(orders.id, id))
-      .returning({ id: orders.id });
-    return result.length > 0;
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const result = await tx.update(orders)
+        .set({ trackingNumber, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})`))
+        .returning({ id: orders.id });
+      return result.length > 0;
+    });
   }
 
   async cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean> {
     const conditions = [
       eq(orders.id, id),
+      sql`NOT EXISTS (
+        SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id}
+        AND (s.booking_accepted_at IS NOT NULL OR s.collected_at IS NOT NULL OR s.status IN ('delivered', 'returned'))
+      )`,
       sql`${orders.paymentStatus} <> 'pending'`,
       or(sql`${orders.shippingPaymentStatus} <> 'pending'`, isNull(orders.shippingPaymentReference)),
     ];
     if (userId) conditions.push(eq(orders.userId, userId));
-    const updated = await db.update(orders)
-      .set({ orderStatus: 'cancelled', updatedAt: new Date() })
-      .where(and(...conditions))
-      .returning({ id: orders.id });
-    return updated.length > 0;
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: 'cancelled', updatedAt: new Date() })
+        .where(and(...conditions))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
   }
 
   async updatePaymentStatus(id: number, status: string, reference?: string): Promise<void> {

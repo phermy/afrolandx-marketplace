@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createVerifiedOrderCompleter } from "./order-processing";
+test("duplicate payment confirmation creates shipments idempotently without resetting an already shipped order", async () => {
+  const updates: string[] = [];
+  const shipCalls: number[] = [];
+  const storage = {
+    async markOrderPaid() { return false; },
+    async getOrder() { return { paymentStatus: "paid", paymentReference: "paid-existing", orderStatus: "shipped" }; },
+    async updateOrderStatus(_id: number, status: string) { updates.push(status); },
+    async reserveOrderStock() { return true; }, async clearCart() {},
+    async getOrderItemsWithProducts() { return [{ productId: 1, quantity: 1 }]; },
+    async addLoyaltyPoints() {}, async getProduct() { return { vendorId: 1 }; },
+    async getVendor() { return { userId: "seller", status: "approved" }; },
+    async getAdminUsers() { return []; }, async createNotification() {},
+  };
+  const complete = createVerifiedOrderCompleter(storage, async () => {}, async id => { shipCalls.push(id); });
+  assert.equal(await complete({ id: 99, userId: "buyer", totalAmount: "100", shippingPaymentStatus: "included" }, "paid-existing"), false);
+  assert.deepEqual(updates, []);
+  assert.deepEqual(shipCalls, [99]);
+});
 
 test("duplicate callbacks and webhooks award points, clear carts, and decrement stock once", async () => {
   let pending = true;

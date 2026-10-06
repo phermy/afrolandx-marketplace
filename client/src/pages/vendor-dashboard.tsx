@@ -793,6 +793,9 @@ export default function VendorDashboard() {
               Shop as buyer
               <span aria-hidden="true" className="ml-1">→</span>
             </Link>
+            <Link href="/shipping" className="inline-flex items-center mt-3 ml-4 text-sm font-semibold text-nigerian-green hover:text-green-700 transition-colors">
+              <Truck className="w-4 h-4 mr-1" /> Pickup operations
+            </Link>
           </div>
           <Button
             className="btn-nigerian gap-2 text-base px-5 py-2.5 h-auto shadow-md"

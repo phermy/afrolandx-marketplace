@@ -21,6 +21,7 @@ type PaymentCompletionStorage = {
 export function createVerifiedOrderCompleter(
   storage: PaymentCompletionStorage,
   createFinanceLedger: (orderId: number) => Promise<void> = async () => {},
+  createShipments: (orderId: number) => Promise<unknown> = async () => {},
 ) {
   return async function completeVerifiedOrder(order: any, reference: string): Promise<boolean> {
     const transitioned = await storage.markOrderPaid(order.id, reference);
@@ -83,7 +84,10 @@ export function createVerifiedOrderCompleter(
     }
     const shippingResolved = !awaitingShipping && ['included', 'paid'].includes(order.shippingPaymentStatus);
     if (allStockReserved && allVendorsApproved && shippingResolved) {
-      await storage.updateOrderStatus(order.id, 'processing');
+      const latest = await storage.getOrder(order.id) as { orderStatus?: string } | undefined;
+      if (!latest?.orderStatus || ['pending', 'awaiting_shipping_quote', 'processing'].includes(latest.orderStatus)) {
+        await storage.updateOrderStatus(order.id, 'processing');
+      }
     }
 
     const admins = transitioned ? await storage.getAdminUsers() : [];
@@ -98,6 +102,7 @@ export function createVerifiedOrderCompleter(
         orderId: order.id,
       }).catch(error => console.error('Failed to notify admin:', error));
     }
+    await createShipments(order.id);
     return transitioned;
   };
 }

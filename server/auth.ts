@@ -10,6 +10,7 @@ import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEma
 import { pool } from "./db";
 import { registrationTurnstileConfig, verifyRegistrationTurnstile } from "./turnstile";
 import { normalizeAccountPhone } from "@shared/account-registration";
+import { getLogisticsAccess } from "./logistics-access";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -265,7 +266,15 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/auth/user", isAuthenticated, (req, res) => res.json(sanitizeUser(req.user)));
+  app.get("/api/auth/user", isAuthenticated, async (req, res) => {
+    try {
+      const access = await getLogisticsAccess((req.user as any).id);
+      res.json({ ...sanitizeUser(req.user), isShippingPartner: access.partnerIds.length > 0 || access.invitations.length > 0 });
+    } catch (error) {
+      if (!((req.user as any)?.emailVerified)) return res.json(sanitizeUser(req.user));
+      res.status(503).json({ message: "Could not load account access. Please retry." });
+    }
+  });
 
   app.post("/api/send-login-otp", async (req, res) => {
     const email = canonicalEmail(req.body.email);

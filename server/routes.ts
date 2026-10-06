@@ -14,6 +14,8 @@ import {
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getAdminUserDetails } from "./admin-user-details";
+import { registerLogisticsRoutes } from "./logistics-routes";
+import { ensureOrderShipments } from "./logistics-service";
 import { normalizeAccountPhone } from "@shared/account-registration";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
 import { registerEventPlanningRoutes } from "./event-planning";
@@ -27,7 +29,7 @@ import {
   insertVendorSchema, insertProductSchema, insertCartItemSchema, insertMeasurementSchema,
   insertMessageSchema, insertProductionStepSchema, insertVendorResourceSchema,
   insertProductStorySchema, insertFabricAssetSchema, insertCollabDropSchema, orders, orderItems, products, vendors,
-  vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests,
+  vendorLedgerEntries, vendorPayoutAccounts, vendorSettlements, orderFinancialAdjustments, shippingQuoteRequests, shipments,
   experienceFeedback, insertExperienceFeedbackSchema, returnPolicySchema,
   insertSavedDeliveryAddressSchema,
 } from "@shared/schema";
@@ -262,6 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+  registerLogisticsRoutes(app);
   registerReviewRoutes(app);
   registerVirtualTryOnRoutes(app);
   registerLiveArRoutes(app);
@@ -518,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  const completeVerifiedOrder = createVerifiedOrderCompleter(storage, createSaleLedger);
+  const completeVerifiedOrder = createVerifiedOrderCompleter(storage, createSaleLedger, ensureOrderShipments);
   const canAutomaticallyProcessOrder = async (orderId: number): Promise<boolean> => {
     const current = await storage.getOrder(orderId);
     if (!current
@@ -2904,6 +2907,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
       }
+      const [managedShipment] = await db.select({ id: shipments.id }).from(shipments).where(eq(shipments.orderId, orderId)).limit(1);
+      if (managedShipment && ['shipped', 'delivered'].includes(status)) {
+        return res.status(409).json({ message: 'Use Shipping to mark your package ready. Only the assigned partner or an admin can confirm collection and delivery.' });
+      }
 
       const orderItems = await storage.getOrderItemsWithProducts(orderId);
       const vendor = await storage.getVendorByUserId(userId);
@@ -3865,10 +3872,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trackingNumber = z.string().trim().min(3).max(120).parse(req.body.trackingNumber);
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
+      const [managedShipment] = await db.select({ id: shipments.id }).from(shipments).where(eq(shipments.orderId, orderId)).limit(1);
+      if (managedShipment) return res.status(409).json({ message: 'Update tracking on the individual shipment in Shipping operations so its timeline stays accurate.' });
       if (!['shipped', 'delivered'].includes(order.orderStatus || '')) {
         return res.status(409).json({ message: 'Tracking can be added once an order is shipped' });
       }
-      await storage.updateOrderTracking(orderId, trackingNumber);
+      if (!await storage.updateOrderTracking(orderId, trackingNumber)) {
+        return res.status(409).json({ message: 'Use the individual shipment timeline to update managed tracking.' });
+      }
       await storage.createNotification({
         userId: order.userId,
         title: 'Tracking information updated',
@@ -3957,6 +3968,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
+      const [managedShipment] = await db.select({ id: shipments.id }).from(shipments).where(eq(shipments.orderId, orderId)).limit(1);
+      if (managedShipment && ['shipped', 'delivered'].includes(status)) {
+        return res.status(409).json({ message: 'Update the individual shipments in Shipping operations. The order status follows their combined progress.' });
+      }
       if (status !== 'cancelled' && !['included', 'paid'].includes(order.shippingPaymentStatus)) {
         return res.status(409).json({ message: 'Shipping must be quoted and paid before fulfillment can begin' });
       }
@@ -3972,6 +3987,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (status === 'shipped') {
           if (!await storage.markOrderShipped(orderId, 'processing', trackingNumber!)) {
             return res.status(409).json({ message: 'Only a processing order can be marked shipped. Refresh and try again.' });
+          }
+        } else if (status === 'delivered') {
+          if (!await storage.transitionOrderStatus(orderId, 'shipped', 'delivered')) {
+            return res.status(409).json({ message: 'Only an unmanaged shipped order can be marked delivered here. Use Shipping for individual shipments.' });
           }
         } else {
           if (!await storage.transitionOrderStatus(orderId, order.orderStatus || '', status)) {

@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import Navbar from '@/components/navbar';
 import OrderReviewDialog from '@/components/order-review-dialog';
+import ShipmentTimeline from '@/components/shipping/ShipmentTimeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -210,6 +211,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
       <CardContent className="space-y-4">
         {/* Timeline */}
         <OrderTimeline status={order.orderStatus} />
+        <ShipmentTimeline orderId={Number(order.id)} />
 
         {order.paymentStatus === 'paid' && (order.shippingPaymentStatus === 'awaiting_quote' || order.orderStatus === 'awaiting_shipping_quote' && order.shippingPaymentStatus === 'included') && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-3">
@@ -286,7 +288,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
             <div>
-              <p className="font-medium text-green-800 text-sm">Order delivered successfully! 🎉</p>
+          <p className="font-medium text-green-800 text-sm">Order delivered successfully.</p>
               <p className="text-xs text-green-600">Thank you for shopping with AfrolandX.</p>
             </div>
           </div>
@@ -427,7 +429,7 @@ export default function MyOrders() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('payment') === 'success' && urlParams.get('orderId')) {
       toast({
-        title: '🎉 Payment Successful!',
+        title: 'Payment Successful',
         description: `Your order #${urlParams.get('orderId')} has been confirmed.`,
       });
       window.history.replaceState({}, '', '/my-orders');
@@ -455,10 +457,10 @@ export default function MyOrders() {
       const old = prev[order.id];
       if (old && old !== order.orderStatus) {
         const messages: Record<string, string> = {
-          processing: `Order #${order.id} is now being processed! 🔄`,
-          shipped: `Order #${order.id} has shipped! 🚚`,
-          delivered: `Order #${order.id} has been delivered! ✅`,
-          cancelled: `Order #${order.id} was cancelled. ❌`,
+          processing: `Order #${order.id} is now being processed.`,
+          shipped: `Order #${order.id} has shipped.`,
+          delivered: `Order #${order.id} has been delivered.`,
+          cancelled: `Order #${order.id} was cancelled.`,
         };
         if (messages[order.orderStatus]) {
           toast({ title: 'Order Update', description: messages[order.orderStatus] });
