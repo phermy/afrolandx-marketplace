@@ -3,13 +3,14 @@ import { FormEvent, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
 import { apiRequest } from "@/lib/queryClient";
+import { Frown, Meh, Smile, type LucideIcon } from "lucide-react";
 
 type Mood = "sad" | "indifferent" | "happy";
 
-const moods: Array<{ value: Mood; face: string; label: string }> = [
-  { value: "sad", face: "😢", label: "Sad" },
-  { value: "indifferent", face: "😐", label: "Indifferent" },
-  { value: "happy", face: "😊", label: "Happy" },
+const moods: Array<{ value: Mood; icon: LucideIcon; label: string }> = [
+  { value: "sad", icon: Frown, label: "Sad" },
+  { value: "indifferent", icon: Meh, label: "Indifferent" },
+  { value: "happy", icon: Smile, label: "Happy" },
 ];
 
 export default function SiteFooter() {
@@ -110,13 +111,14 @@ export default function SiteFooter() {
                     type="radio"
                     name="experience-mood"
                     value={item.value}
+                    aria-label={item.label}
                     checked={mood === item.value}
                     onChange={() => {
                       setMood(item.value);
                       if (status !== "idle") setStatus("idle");
                     }}
                   />
-                  <span aria-hidden="true" className="experience-feedback__face">{item.face}</span>
+                  <item.icon aria-hidden="true" className="experience-feedback__face" />
                   <span>{item.label}</span>
                 </label>
               ))}

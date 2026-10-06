@@ -235,7 +235,7 @@
 .experience-feedback__mood:has(input:focus-visible) { outline: 2px solid #e2b45c; outline-offset: 3px; }
 .experience-feedback__mood.is-selected { background: #e2b45c; border-color: #e2b45c; color: #172d29; }
 .experience-feedback__mood input { position: absolute; opacity: 0; pointer-events: none; }
-.experience-feedback__face { font-family: "DM Sans", sans-serif; font-size: 1.25rem; line-height: .9; }
+.experience-feedback__face { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
 .experience-feedback__entry { display: flex; gap: .55rem; margin-top: .8rem; }
 .experience-feedback__entry input { min-width: 0; flex: 1; border: 1px solid #496157; border-radius: .25rem; background: #203a34; color: #f7f0df; padding: .7rem .8rem; font: inherit; font-size: .8rem; }
 .experience-feedback__entry input::placeholder { color: #91a99c; }
