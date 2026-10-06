@@ -655,6 +655,7 @@ export default function VendorDashboard() {
                       id="phone"
                       name="phone"
                       type="tel"
+                      defaultValue={user?.phone || ""}
                       placeholder="+234 800 000 0000"
                       required
                       className="input-nigerian"

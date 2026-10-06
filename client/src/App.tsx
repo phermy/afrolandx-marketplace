@@ -87,10 +87,10 @@ function Router() {
     <Switch>
       {/* Auth pages — always accessible, redirect home if already logged in */}
       <Route path="/login">
-        {isAuthenticated ? <AuthRedirect to="/" /> : <Login />}
+        {isAuthenticated ? <AuthRedirect to={user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Login />}
       </Route>
       <Route path="/register">
-        {isAuthenticated ? <AuthRedirect to="/" /> : <Register />}
+        {isAuthenticated ? <AuthRedirect to={new URLSearchParams(window.location.search).get("as") === "vendor" || user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Register />}
       </Route>
       <Route path="/forgot-password">
         <ForgotPassword />
@@ -143,7 +143,7 @@ function Router() {
         {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorWorkshop /> : <AuthRedirect to="/vendor" />}
       </Route>
       <Route path="/vendor">
-        {isAuthenticated ? <VendorDashboard /> : <AuthRedirect to="/login" />}
+        {isAuthenticated ? <VendorDashboard /> : <AuthRedirect to="/register?as=vendor" />}
       </Route>
 
       {/* Authenticated-only pages */}

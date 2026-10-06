@@ -65,6 +65,8 @@ export const users = pgTable(
     password: varchar("password"), // hashed password for email/password auth
     firstName: varchar("first_name"),
     lastName: varchar("last_name"),
+    phone: varchar("phone", { length: 30 }),
+    signupIntent: varchar("signup_intent", { length: 16 }).default("customer"),
     profileImageUrl: varchar("profile_image_url"),
     roles: jsonb("roles").default(["customer"]), // array of roles: customer, vendor, admin
     emailVerified: boolean("email_verified").default(false),

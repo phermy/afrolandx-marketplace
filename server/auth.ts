@@ -9,6 +9,7 @@ import { storage } from "./storage";
 import { generateOtp, otpExpiryTime, sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "./email";
 import { pool } from "./db";
 import { registrationTurnstileConfig, verifyRegistrationTurnstile } from "./turnstile";
+import { normalizeAccountPhone } from "@shared/account-registration";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -60,6 +61,7 @@ export function sanitizeUser(user: any) {
   return {
     id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName,
     roles: user.roles, profileImageUrl: user.profileImageUrl, emailVerified: user.emailVerified,
+    phone: user.phone, signupIntent: user.signupIntent,
     closedAt: user.closedAt,
     createdAt: user.createdAt, updatedAt: user.updatedAt,
   };
@@ -93,6 +95,12 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
     if (!email || typeof password !== "string" || password.length < 8) {
       return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
     }
+    const phone = normalizeAccountPhone(req.body.phone);
+    if (!phone) return res.status(400).json({ message: "Enter a valid phone number with 7 to 15 digits." });
+    const signupIntent = req.body.signupIntent ?? "customer";
+    if (signupIntent !== "customer" && signupIntent !== "vendor") {
+      return res.status(400).json({ message: "Choose customer or vendor signup." });
+    }
     if (dependencies.verifyBotToken) {
       const token = req.body.turnstileToken;
       if (typeof token !== "string" || !token || token.length > 2048) {
@@ -119,6 +127,8 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
         password: await dependencies.hashPassword(password),
         firstName: firstName || null,
         lastName: lastName || null,
+        phone,
+        signupIntent,
       });
       const user = await dependencies.storage.getUser(id);
       if (!user) return res.status(500).json({ message: "User creation failed" });

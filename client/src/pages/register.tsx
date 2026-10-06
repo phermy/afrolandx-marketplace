@@ -6,6 +6,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { ArrowLeft, ArrowUpRight, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { RegistrationTurnstile } from "@/components/registration-turnstile";
 import logoImage from "@assets/Group 1000002646_1749631956471.png";
+import { normalizeAccountPhone } from "@shared/account-registration";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -19,7 +20,7 @@ async function responseMessage(response: Response, fallback: string) {
   }
 }
 
-type FormState = { name: string; email: string; password: string; confirmPassword: string };
+type FormState = { name: string; email: string; phone: string; password: string; confirmPassword: string };
 
 function BrandPanel() {
   return (
@@ -73,7 +74,10 @@ function BrandPanel() {
 
 export default function RegisterPage() {
   const { toast } = useToast();
-  const [form, setForm] = useState<FormState>({ name: "", email: "", password: "", confirmPassword: "" });
+  const [form, setForm] = useState<FormState>({ name: "", email: "", phone: "", password: "", confirmPassword: "" });
+  const [signupIntent, setSignupIntent] = useState<"customer" | "vendor">(
+    new URLSearchParams(window.location.search).get("as") === "vendor" ? "vendor" : "customer",
+  );
   const [step, setStep] = useState<"form" | "verify">("form");
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [code, setCode] = useState("");
@@ -108,6 +112,11 @@ export default function RegisterPage() {
     event.preventDefault();
     const name = form.name.trim();
     const email = normalizeEmail(form.email);
+    const phone = normalizeAccountPhone(form.phone);
+    if (!phone) {
+      setError("Enter a valid phone number with 7 to 15 digits.");
+      return;
+    }
     if (!name || !email || !form.password || !form.confirmPassword) {
       setError("Complete all fields to create your account.");
       return;
@@ -135,6 +144,8 @@ export default function RegisterPage() {
           firstName: names[0],
           lastName: names.slice(1).join(" "),
           email,
+          phone,
+          signupIntent,
           password: form.password,
           ...(turnstileConfig.enabled ? { turnstileToken } : {}),
         }),
@@ -175,9 +186,10 @@ export default function RegisterPage() {
         credentials: "include",
       });
       if (!response.ok) throw new Error(await responseMessage(response, "That code is invalid or expired."));
+      const result = await response.json();
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Email verified", description: "Your account is ready." });
-      window.location.href = "/";
+      window.location.href = (result.user?.signupIntent ?? signupIntent) === "vendor" ? "/vendor" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "That code is invalid or expired.");
     } finally {
@@ -218,8 +230,8 @@ export default function RegisterPage() {
               <div className="mt-9 flex items-center justify-between gap-4 lg:mt-0">
                 <div>
                   <p className="mb-2 text-xs font-bold uppercase tracking-[.14em] text-[#8b542d]">Your next chapter</p>
-                  <h1 className="font-['Space_Grotesk'] text-[2rem] font-semibold leading-tight tracking-[-.045em] text-[#183b35] sm:text-[2.25rem]">Create your account</h1>
-                  <p className="mt-2 text-base leading-6 text-[#41564b]">A world of considered African craft, just ahead.</p>
+                  <h1 className="font-['Space_Grotesk'] text-[2rem] font-semibold leading-tight tracking-[-.045em] text-[#183b35] sm:text-[2.25rem]">{signupIntent === "vendor" ? "Create your vendor account" : "Create your account"}</h1>
+                  <p className="mt-2 text-base leading-6 text-[#41564b]">{signupIntent === "vendor" ? "Verify your email, then complete your business application. Selling requires admin approval." : "A world of considered African craft, just ahead."}</p>
                 </div>
                 <p className="hidden shrink-0 text-sm text-[#46574c] sm:block">
                   Already have an account?{" "}
@@ -231,12 +243,24 @@ export default function RegisterPage() {
                 {error && <div className="mb-5 rounded-[4px] border border-[#ecc7c0] bg-[#fff5f2] px-3.5 py-3 text-sm leading-5 text-[#a43e31]" role="alert">{error}</div>}
                 <form onSubmit={createAccount} className="space-y-[17px]">
                   <label className="block text-[15px] font-semibold text-[#33473e]">
+                    I want to
+                    <select className={inputClass} value={signupIntent} onChange={event => setSignupIntent(event.target.value as "customer" | "vendor")} data-testid="select-signup-intent">
+                      <option value="customer">Shop as a customer</option>
+                      <option value="vendor">Sell as a vendor</option>
+                    </select>
+                  </label>
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
                     Full name
                     <input value={form.name} onChange={(event) => updateField("name", event.target.value)} type="text" autoComplete="name" placeholder="Your name" className={inputClass} autoFocus required data-testid="input-name" />
                   </label>
                   <label className="block text-[15px] font-semibold text-[#33473e]">
                     Email address
                     <input value={form.email} onChange={(event) => updateField("email", event.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={inputClass} required data-testid="input-email" />
+                  </label>
+                  <label className="block text-[15px] font-semibold text-[#33473e]">
+                    Phone number
+                    <input value={form.phone} onChange={event => updateField("phone", event.target.value)} type="tel" autoComplete="tel" placeholder="+234 800 000 0000" maxLength={30} className={inputClass} required data-testid="input-phone" />
+                    <span className="mt-1.5 block text-[13px] font-normal text-[#53655a]">Include your country code for an international number.</span>
                   </label>
                   <label className="block text-[15px] font-semibold text-[#33473e]">
                     Password

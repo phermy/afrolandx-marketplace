@@ -704,7 +704,7 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mt-6 space-y-3">
-                <Button onClick={() => window.location.href = "/register"} className="w-full btn-nigerian">
+                <Button onClick={() => window.location.href = "/register?as=vendor"} className="w-full btn-nigerian">
                   Get Started as Vendor
                 </Button>
                 <Button 

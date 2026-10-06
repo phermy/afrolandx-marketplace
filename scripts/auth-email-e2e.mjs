@@ -85,6 +85,7 @@ const registration = await post("/api/register", {
   lastName: "Test",
   email: testEmail,
   password: initialPassword,
+  phone: "+2348000000000",
 });
 assert(registration.status === 200 && registration.body.emailVerificationSent === true, "Registration did not confirm verification email delivery.");
 assert(!registration.cookie, "Registration issued a session cookie before verification.");

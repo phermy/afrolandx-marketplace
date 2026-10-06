@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
 import { trackEvent } from '@/lib/analytics';
+import { AdminUserDetails } from '@/components/admin-user-details';
 import { cacBusinessNamesMatch } from '@shared/cac-review';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -171,6 +172,7 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
   });
   const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
   const { data: shippingQuoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
     queryKey: ['/api/admin/shipping-quote-requests'],
@@ -1828,6 +1830,7 @@ export default function AdminDashboard() {
 
           {/* ═══ USER MANAGEMENT TAB ════════════════════════════════════════ */}
           <TabsContent value="users">
+            <AdminUserDetails userId={detailUserId} onClose={() => setDetailUserId(null)} />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -1858,7 +1861,7 @@ export default function AdminDashboard() {
                 )}
                 <div className="space-y-3">
                   {allUsers.filter(u => showClosedAccounts || !u.closedAt).map((u) => (
-                    <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={u.id} className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={u.profileImageUrl} />
@@ -1866,9 +1869,10 @@ export default function AdminDashboard() {
                             {u.firstName?.[0]}{u.lastName?.[0] || u.email?.[0] || 'U'}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
+                        <div className="min-w-0 break-words">
                           <p className="font-semibold text-sm">{u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}</p>
                           <p className="text-xs text-gray-500">{u.email}</p>
+                          <p className="text-xs text-gray-500">{u.phone || 'Phone not recorded'}</p>
                           <div className="flex gap-1 mt-1">
                             {(u.roles as string[] || []).map(r => (
                               <Badge key={r} variant={r === 'admin' || r === 'superadmin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
@@ -1878,6 +1882,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4 flex-wrap justify-end">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setDetailUserId(u.id)}>
+                          <Eye className="mr-1 h-3 w-3" /> View details
+                        </Button>
                         {hasRole(user, 'superadmin') && user?.emailVerified && ['customer', 'vendor', 'admin', 'superadmin'].map(role => {
                           const uHasRole = hasRole(u, role);
                           const isSelf = u.id === user?.id;

@@ -106,9 +106,9 @@ export default function Navbar() {
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
               )}
-              {isAuthenticated && isVendor(user) && (
-                <Link href="/vendor" className={navLinkClass('/vendor')}>Vendor</Link>
-              )}
+              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} className={navLinkClass('/vendor')}>
+                {isAuthenticated && isVendor(user) ? "Vendor" : "Become a Vendor"}
+              </Link>
               {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
                   location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
@@ -311,6 +311,11 @@ export default function Navbar() {
             )}
 
             {/* Vendor Section */}
+            {!isVendor(user) && (
+              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} onClick={closeMobileMenu}>
+                <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Become a Vendor</span></div>
+              </Link>
+            )}
             {isAuthenticated && isVendor(user) && (
               <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Vendor</p>

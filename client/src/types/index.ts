@@ -1,6 +1,8 @@
 // Type definitions for the Nigerian Fashion E-commerce Platform
 
 export interface User {
+  phone?: string | null;
+  signupIntent?: "customer" | "vendor" | null;
   id: string;
   email?: string;
   firstName?: string;

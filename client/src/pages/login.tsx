@@ -60,7 +60,8 @@ export default function LoginPage() {
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome back!", description: "You are now signed in." });
-      window.location.href = "/";
+      const result = await response.json();
+      window.location.href = result.user?.signupIntent === "vendor" ? "/vendor" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "We couldn't sign you in. Please try again.");
     } finally {
@@ -117,7 +118,8 @@ export default function LoginPage() {
       if (!response.ok) throw new Error((await readResponse(response, "That code is invalid or expired.")).message);
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome!", description: "You are now signed in." });
-      window.location.href = "/";
+      const result = await response.json();
+      window.location.href = result.user?.signupIntent === "vendor" ? "/vendor" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "That code is invalid or expired.");
     } finally {

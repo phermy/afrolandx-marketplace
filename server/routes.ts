@@ -13,6 +13,8 @@ import {
 } from "./admin-product-bulk";
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
+import { getAdminUserDetails } from "./admin-user-details";
+import { normalizeAccountPhone } from "@shared/account-registration";
 import { getPaystackService, isPaystackInitialized, PaystackRequestError } from "./paystack";
 import { registerEventPlanningRoutes } from "./event-planning";
 import { getChatbotService } from "./chatbot";
@@ -564,6 +566,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Admin user management routes
+  app.get('/api/admin/users/:userId', isAuthenticated, isAdmin, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      const details = await getAdminUserDetails(storage, req.params.userId);
+      if (!details) return res.status(404).json({ message: 'Account not found.' });
+      res.json(details);
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      res.status(500).json({ message: 'Failed to fetch account details.' });
+    }
+  });
+
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
@@ -797,7 +811,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorInput = z.object({
         contactName: z.string().trim().min(2).max(120),
         businessName: z.string().trim().min(2).max(160),
-        phone: z.string().trim().min(7).max(30),
+        phone: z.string().transform((value, ctx) => {
+          const phone = normalizeAccountPhone(value);
+          if (!phone) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid phone number with 7 to 15 digits." });
+            return z.NEVER;
+          }
+          return phone;
+        }),
         cacNumber: z.preprocess(
           (value) => typeof value === 'string' && value.trim() === '' ? null : value,
           z.string().trim().min(3).max(60).nullable().optional(),
