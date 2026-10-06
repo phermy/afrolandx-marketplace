@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
+import { getApiErrorMessage } from '@/lib/api-error-message';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
 import { isAdmin, hasRole } from '@/lib/roleUtils';
@@ -153,7 +155,7 @@ export default function AdminDashboard() {
     error: pendingProductsError,
     refetch: refetchPendingProducts,
   } = useQuery<PendingAdminProductsResponse>({
-    queryKey: ['/api/admin/products/pending', pendingProductsOffset],
+    queryKey: ['/api/admin/products/pending', user?.id, fullManagement, pendingProductsOffset],
     queryFn: async () => {
       const response = await apiRequest(
         'GET',
@@ -178,7 +180,12 @@ export default function AdminDashboard() {
   const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
     queryKey: ['/api/admin/orders', user?.id, fullManagement], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
   });
-  const { data: allUsers = [] } = useQuery<User[]>({
+  const {
+    data: allUsers = [],
+    isLoading: usersLoading,
+    error: usersError,
+    refetch: refetchUsers,
+  } = useQuery<User[]>({
     queryKey: ['/api/admin/users', user?.id, fullManagement],
     queryFn: async () => {
       const accounts: User[] = await (await apiRequest('GET', '/api/admin/users')).json();
@@ -340,7 +347,7 @@ export default function AdminDashboard() {
 
   const updateProductStatusMutation = useMutation({
     mutationFn: async ({ productId, status }: { productId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/products/${productId}/status`, { status });
+      await apiRequest('PATCH', `/api/admin/products/${productId}/status`, { status });
     },
     onSuccess: async (_data, variables) => {
       setSelectedPendingProductIds((selected) => selected.filter((id) => id !== variables.productId));
@@ -362,7 +369,7 @@ export default function AdminDashboard() {
       const isApprovalConflict = variables.status === 'approved' && error.message.startsWith('409');
       toast({
         title: isApprovalConflict ? 'Product approval blocked' : 'Product status update failed',
-        description: error.message,
+        description: getApiErrorMessage(error, 'The product status could not be updated. Please try again.'),
         variant: 'destructive',
       });
     },
@@ -786,7 +793,11 @@ export default function AdminDashboard() {
 
         {/* Main Tabs */}
         </>}
-        <Tabs key={fullManagement ? 'full' : 'support'} defaultValue={fullManagement ? 'analytics' : 'vendors'} className="space-y-6">
+        <Tabs key={fullManagement ? 'full' : 'support'} defaultValue={
+          new URLSearchParams(window.location.search).get('tab') === 'products'
+            ? 'products'
+            : fullManagement ? 'analytics' : 'vendors'
+        } className="space-y-6">
           <TabsList className="flex w-full flex-wrap h-auto justify-start gap-1">
             {fullManagement && <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews {reviews.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{reviews.length}</Badge>}</TabsTrigger>
@@ -1197,6 +1208,9 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2 sm:shrink-0">
+                              <Link href={`/admin/products/${product.id}`} className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <Eye className="mr-1 h-3 w-3" />View product
+                              </Link>
                               <Button size="sm" variant="outline" aria-label={expandedProductId === product.id ? 'Hide product details' : 'Review product details'} onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
                                 <Eye className="w-3 h-3 mr-1" />{expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </Button>
@@ -1895,7 +1909,24 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <div className="space-y-3">
-                  {allUsers.filter(u => showClosedAccounts || !u.closedAt).map((u) => (
+                  {usersLoading ? (
+                    <div className="space-y-3" role="status" aria-label="Loading accounts">
+                      {[0, 1, 2].map(item => <div key={item} className="h-24 animate-pulse rounded-lg border bg-gray-50" />)}
+                    </div>
+                  ) : usersError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-center" role="alert">
+                      <p className="mb-3 text-sm text-red-800">
+                        Could not load customer and vendor accounts. {usersError instanceof Error ? usersError.message : ''}
+                      </p>
+                      <Button type="button" variant="outline" onClick={() => refetchUsers()}>Retry</Button>
+                    </div>
+                  ) : allUsers.filter(u => showClosedAccounts || !u.closedAt).length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-8 text-center">
+                      <Users className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                      <p className="font-medium text-gray-700">{showClosedAccounts ? 'No accounts to show' : 'No active customer or vendor accounts'}</p>
+                      <p className="mt-1 text-sm text-gray-500">{!showClosedAccounts && allUsers.some(u => u.closedAt) ? 'Closed accounts are hidden. Show closed accounts to review their retained commerce records.' : 'Accounts will appear here when customers or vendors register.'}</p>
+                    </div>
+                  ) : allUsers.filter(u => showClosedAccounts || !u.closedAt).map((u) => (
                     <div key={u.id} className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">

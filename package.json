@@ -13,7 +13,7 @@
     "test:shipping": "tsx --test server/logistics-policy.test.ts server/logistics.integration.test.ts",
     "test:account-closure": "tsx --test server/account-closure.test.ts",
     "test:profile-images": "tsx --test server/profile-image.test.ts",
-    "test:admin-products": "tsx --test server/admin-product-bulk.test.ts",
+    "test:admin-products": "tsx --test server/admin-product-bulk.test.ts server/admin-product-review.test.ts client/src/lib/api-error-message.test.ts",
     "test:reviews": "tsx --test server/reviews.test.ts",
     "test:lookbook": "tsx --test server/lookbook-generation.test.ts",
     "test:try-on": "tsx --test server/virtual-try-on.test.ts server/live-ar.test.ts",

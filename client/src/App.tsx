@@ -18,6 +18,7 @@ import MyOrders from "@/pages/my-orders";
 import OrderSuccess from "@/pages/order-success";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminProductReview from "@/pages/admin-product-review";
 import AdminFinance from "@/pages/admin-finance";
 import { hasFullManagementAccess } from "@shared/admin-access";
 import VendorFinance from "@/pages/vendor-finance";
@@ -129,6 +130,11 @@ function Router() {
         {hasFullManagementAccess(user) ? <AdminProtectedRoute>
           <AdminFinance />
         </AdminProtectedRoute> : <AuthRedirect to={isAuthenticated ? "/admin" : "/login"} />}
+      </Route>
+      <Route path="/admin/products/:id">
+        <AdminProtectedRoute>
+          <AdminProductReview />
+        </AdminProtectedRoute>
       </Route>
       <Route path="/admin">
         <AdminProtectedRoute>

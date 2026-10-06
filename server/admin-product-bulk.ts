@@ -1,6 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { categories, products, vendors } from "@shared/schema";
 import { db } from "./db";
+import { getProductApprovalIssues } from "../shared/product-approval";
 
 export type ProductApprovalSkip = { id: number; reason: string };
 
@@ -103,25 +104,6 @@ export async function getPendingAdminProducts(limit = 50, offset = 0) {
   };
 }
 
-function hasProductImage(images: unknown, imageUrl: unknown): boolean {
-  return (Array.isArray(images) && images.some(image => typeof image === "string" && image.trim().length > 0))
-    || (typeof imageUrl === "string" && imageUrl.trim().length > 0);
-}
-
-function productQualityIssue(product: typeof products.$inferSelect, vendor: typeof vendors.$inferSelect, categoryExists: boolean) {
-  if (product.status !== "pending") return "not_pending";
-  if (vendor.status !== "approved") return "vendor_not_approved";
-  if (vendor.verificationStatus !== "verified") return "vendor_not_verified";
-  if (typeof product.name !== "string" || !product.name.trim()) return "missing_name";
-  if (typeof product.description !== "string" || !product.description.trim()) return "missing_description";
-  const price = Number(product.price);
-  if (!Number.isFinite(price) || price <= 0) return "invalid_price";
-  if (!Number.isInteger(product.stock) || product.stock < 0) return "invalid_stock";
-  if (!categoryExists) return "invalid_category";
-  if (!hasProductImage(product.images, product.imageUrl)) return "missing_image";
-  return undefined;
-}
-
 export async function approveProduct(id: number): Promise<{ approved: true } | { approved: false; reason: string }> {
   return db.transaction(async tx => {
     // Lock in a consistent product-then-vendor order. Concurrent product/vendor
@@ -134,7 +116,7 @@ export async function approveProduct(id: number): Promise<{ approved: true } | {
     if (!vendor) return { approved: false, reason: "vendor_not_found" };
     const [category] = await tx.select({ id: categories.id }).from(categories)
       .where(eq(categories.id, product.categoryId)).limit(1);
-    const issue = productQualityIssue(product, vendor, Boolean(category));
+    const issue = getProductApprovalIssues(product, vendor, Boolean(category))[0]?.code;
     if (issue) return { approved: false, reason: issue };
 
     const [updated] = await tx.update(products)

@@ -16,3 +16,9 @@ Full management is for verified Superadmins only. Ordinary Admins see customer a
 **Why:** The user explicitly asked that only Superadmins see the full management dashboard and that Admins not see what other Admins do in User Management.
 
 **How to apply:** Keep customer/vendor support and reviewed non-staff vendor approvals available to Admins. Enforce staff privacy and full-management restrictions on the server, not just by hiding navigation. Keep protected owner identity safeguards even if their role array has not been seeded.
+
+All verified Admins may review and approve every submitted vendor product, including products whose vendor owner also has staff roles. That permits product and public business details, not access to the vendor owner's private staff profile.
+
+**Why:** The user explicitly asked for all Admins to approve all products submitted by vendors and to click through customer/vendor contact information, purchase history and products sold. Staff-profile privacy and Superadmin-only full management remain separate restrictions.
+
+**How to apply:** Apply listing-quality and approved/verified-vendor requirements consistently to every reviewer. Keep unapproved products hidden publicly; use authenticated staff previews rather than opening pending products to shoppers. Show the actual reason when a listing fails approval instead of a generic error.

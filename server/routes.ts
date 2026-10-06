@@ -8,12 +8,13 @@ import { approveVendorWithRole, RoleManagementError, updateManagedRoles } from "
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import {
-  approveProduct, approveSelectedProducts, getPendingAdminProducts, getProductByClientImportKey,
+  approveSelectedProducts, getPendingAdminProducts, getProductByClientImportKey,
   parsePendingProductPagination, resolveClientImportRetry, validateProductIds,
 } from "./admin-product-bulk";
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getAdminUserDetails } from "./admin-user-details";
+import { productReviewHandlers } from "./admin-product-review";
 import { managementGuard } from "./admin-management-guard";
 import { canSeeManagedAccount, requireFullManagement } from "./admin-access";
 import { registerLogisticsRoutes } from "./logistics-routes";
@@ -1799,27 +1800,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/products/:id/status', isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const productId = parseInt(req.params.id);
-      const { status } = req.body;
-      if (!Number.isSafeInteger(productId)) return res.status(400).json({ message: 'Invalid product ID' });
-      if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid product status' });
-      if (status === 'approved') {
-        const result = await approveProduct(productId);
-        if (!result.approved) {
-          if (result.reason === 'not_found') return res.status(404).json({ message: 'Product not found', reason: result.reason });
-          return res.status(409).json({ message: 'Product is not eligible for approval', reason: result.reason });
-        }
-      } else {
-        if (!await storage.getProduct(productId)) return res.status(404).json({ message: 'Product not found' });
-        await storage.updateProductStatus(productId, status);
-      }
-      res.json({ message: 'Product status updated' });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to update product status' });
-    }
-  });
+  app.get('/api/admin/products/:id', isAuthenticated, productReviewHandlers.getDetails);
+  app.patch('/api/admin/products/:id/status', isAuthenticated, productReviewHandlers.updateStatus);
+  // Preserve existing clients while applying the same live reviewer permissions
+  // and listing-quality checks as the canonical admin route.
+  app.patch('/api/products/:id/status', isAuthenticated, productReviewHandlers.updateStatus);
 
   app.post('/api/products/:id/submit', isAuthenticated, async (req: any, res) => {
     try {

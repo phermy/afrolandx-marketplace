@@ -44,7 +44,16 @@ export function AdminUserDetails({ userId, onClose, onReviewVendor }: { userId: 
           <DialogDescription>Contact information, purchases, products sold, and vendor application details.</DialogDescription>
         </DialogHeader>
         {isLoading && <p role="status">Loading account details…</p>}
-        {error && <div role="alert"><p>Could not load account details.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>}
+        {error && <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4">
+          <p className="font-medium text-red-900">
+            {error instanceof Error && error.message.startsWith("404")
+              ? "This account record is unavailable. It may have been removed or is no longer accessible."
+              : "Account details could not be loaded. This may be a temporary problem."}
+          </p>
+          {!(error instanceof Error && error.message.startsWith("404")) && (
+            <Button className="mt-3" variant="outline" onClick={() => refetch()}>Try again</Button>
+          )}
+        </div>}
         {data && (fullManagement || isCustomerOrVendorAccount(data.account)) && (
           <div className="space-y-6">
             <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">

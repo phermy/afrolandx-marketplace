@@ -17,9 +17,9 @@ export function isCustomerOrVendorAccount(account: ManagementAccount | null | un
     (account.roles.includes("customer") || account.roles.includes("vendor")));
 }
 const supportRoutes: Record<string, RegExp[]> = {
-  GET: [/^\/users(?:\/[^/]+)?$/, /^\/vendors$/, /^\/products\/pending$/, /^\/orders$/, /^\/shipping-quote-requests$/, /^\/reviews$/],
+  GET: [/^\/users(?:\/[^/]+)?$/, /^\/vendors$/, /^\/products\/(?:pending|\d+)$/, /^\/orders$/, /^\/shipping-quote-requests$/, /^\/reviews$/],
   POST: [/^\/products\/bulk-approve$/, /^\/vendors\/\d+\/products$/],
-  PATCH: [/^\/vendors\/\d+\/verification$/, /^\/orders\/\d+\/(?:status|tracking)$/, /^\/shipping-quote-requests\/\d+$/, /^\/reviews\/\d+\/moderation$/],
+  PATCH: [/^\/products\/\d+\/status$/, /^\/vendors\/\d+\/verification$/, /^\/orders\/\d+\/(?:status|tracking)$/, /^\/shipping-quote-requests\/\d+$/, /^\/reviews\/\d+\/moderation$/],
 };
 export function isSupportManagementRoute(method: string, path: string): boolean {
   return supportRoutes[method.toUpperCase()]?.some(pattern => pattern.test(path.replace(/\/$/, "") || "/")) || false;
