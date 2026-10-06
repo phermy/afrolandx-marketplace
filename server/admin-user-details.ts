@@ -1,12 +1,15 @@
 import type { storage as appStorage } from "./storage";
 import { sanitizeUser } from "./auth";
+import { canSeeManagedAccount } from "./admin-access";
+import type { ManagementAccount } from "../shared/admin-access";
 
 export async function getAdminUserDetails(
   storage: Pick<typeof appStorage, "getUser" | "getSavedDeliveryAddresses" | "getOrdersForUser" | "getVendorByUserId" | "getAccountPurchaseItems" | "getAccountSalesItems" | "getProducts">,
   userId: string,
+  actor?: ManagementAccount,
 ) {
   const account = await storage.getUser(userId);
-  if (!account) return null;
+  if (!account || (actor && !canSeeManagedAccount(actor, account))) return null;
   const [addresses, orders, vendor] = await Promise.all([
     storage.getSavedDeliveryAddresses(userId),
     storage.getOrdersForUser(userId),

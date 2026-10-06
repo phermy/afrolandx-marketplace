@@ -17,7 +17,7 @@
     "test:reviews": "tsx --test server/reviews.test.ts",
     "test:lookbook": "tsx --test server/lookbook-generation.test.ts",
     "test:try-on": "tsx --test server/virtual-try-on.test.ts server/live-ar.test.ts",
-    "test:roles": "tsx --test server/superadmin-role-management.test.ts",
+    "test:roles": "tsx --test server/superadmin-role-management.test.ts server/admin-access.test.ts",
     "test:test-vendor-deletion": "tsx --test server/test-vendor-deletion.test.ts",
     "test:events": "tsx --test server/event-planning.test.ts",
     "test:auth-email-e2e": "node scripts/auth-email-e2e.mjs",

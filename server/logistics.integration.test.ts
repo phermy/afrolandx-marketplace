@@ -22,7 +22,7 @@ test("shipping operations persist scoped assignments, funding gates, package spl
   try {
     await db.insert(users).values(identities.map((id, index) => ({
       id, email: `${id}@example.test`, firstName: "Shipping test", emailVerified: id !== unverified,
-      roles: index === 0 || id === unverified ? ["admin"] : index === 2 || index === 3 ? ["vendor", "customer"] : ["customer"],
+      roles: index === 0 ? ["admin", "superadmin"] : id === unverified ? ["admin"] : index === 2 || index === 3 ? ["vendor", "customer"] : ["customer"],
     })));
     const [category] = await db.insert(categories).values({ name: "Shipping test", slug: `shipping-${suffix}` }).returning();
     categoryId = category.id;
@@ -99,7 +99,7 @@ test("shipping operations persist scoped assignments, funding gates, package spl
       await reviewShipmentQuote(admin, quote.id, "approved", "Agency cost reviewed");
       await assert.rejects(acceptShipmentBooking(partner1, waiting, "WAITING-BOOKING"), /final customer shipping/);
       const quoteFirst = await submitShipmentQuote(partner1, first, { amount: 25, estimatedDelivery: "Two days" });
-      await assert.rejects(reviewShipmentQuote(partner1, quoteFirst.id, "approved", "I approve my own quote"), /admin access/);
+      await assert.rejects(reviewShipmentQuote(partner1, quoteFirst.id, "approved", "I approve my own quote"), /Superadmin access/);
       await reviewShipmentQuote(admin, quoteFirst.id, "approved", "Confirmed agency cost");
       await assert.rejects(reviewShipmentQuote(admin, quoteFirst.id, "approved", "Duplicate review"), /already reviewed/);
       await assert.rejects(recordAgencyPayment(admin, first, { amount: 25, invoiceReference: "INV-FIRST", paymentReference: `first-${suffix}`, paidAt: new Date().toISOString(), note: "" }), /Accept the approved/);

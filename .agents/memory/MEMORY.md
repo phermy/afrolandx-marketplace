@@ -14,7 +14,7 @@
 - [Bot-check access](bot-check-access.md) — broken Turnstile locked out sign-in; only add an image challenge with a provider that supports it and verified hostnames
 - [Event planner commission](event-planner-commission.md) — user chose 8% of planner fee only; do not include outside supplier charges or enable fee collection without safe settlement
 - [Discover release gate](discover-release-gate.md) — keep Discover admin-only until reservations and payments are implemented and ready for a public launch
-- [Superadmin delegation safety](superadmin-delegation.md) — approvals that write roles are privilege paths too; authorize under the same lock as the write
+- [Admin scope and delegation](superadmin-delegation.md) — full management is Superadmin-only; Admins support non-staff customers/vendors; role writes require locked authorization
 - [Account closure semantics](account-closure.md) — close access for accounts with business records; keep historical orders, payouts, and catalog intact
 - [Virtual try-on scope and privacy](virtual-try-on.md) — photo-based clothing previews are not live AR; avoid app-side photo storage and disclose provider retention
 - [Abort timeout tests](abort-timeout-tests.md) — Node timeout signals may not keep the test process alive; use a separate referenced timer in stalled-request tests

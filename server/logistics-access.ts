@@ -3,6 +3,7 @@ import { db } from "./db";
 import { logisticsPartnerMembers, logisticsPartners, users, vendors } from "../shared/schema";
 import type { LogisticsAccess } from "../shared/logistics";
 import { LogisticsError } from "./logistics-policy";
+import { hasFullManagementAccess } from "../shared/admin-access";
 export type LogisticsTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function getLogisticsAccess(userId: string): Promise<LogisticsAccess> {
@@ -13,7 +14,7 @@ export async function getLogisticsAccess(userId: string): Promise<LogisticsAcces
     .from(logisticsPartnerMembers).innerJoin(logisticsPartners, eq(logisticsPartners.id, logisticsPartnerMembers.partnerId))
     .where(and(eq(logisticsPartnerMembers.email, user.email || ""), eq(logisticsPartnerMembers.active, true), eq(logisticsPartners.active, true)));
   return {
-    admin: Array.isArray(user.roles) && user.roles.includes("admin"),
+    admin: hasFullManagementAccess(user),
     vendorId: Array.isArray(user.roles) && user.roles.includes("vendor") ? vendor?.id || null : null,
     partnerIds: members.filter(member => member.userId === userId).map(member => member.partnerId),
     invitations: members.filter(member => !member.userId).map(member => ({ id: member.id, partnerName: member.partnerName })),
@@ -23,8 +24,8 @@ export async function lockLogisticsActor(tx: LogisticsTx, userId: string, requir
   await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR SHARE`);
   const [user] = await tx.select().from(users).where(eq(users.id, userId));
   if (!user || user.closedAt || !user.emailVerified) throw new LogisticsError("A verified, active account is required.", 403);
-  const admin = Array.isArray(user.roles) && user.roles.includes("admin");
-  if (requireAdmin && !admin) throw new LogisticsError("Verified admin access is required.", 403);
+  const admin = hasFullManagementAccess(user);
+  if (requireAdmin && !admin) throw new LogisticsError("Verified Superadmin access is required.", 403);
   return { user, admin };
 }
 export async function lockPartnerMembership(tx: LogisticsTx, userId: string, partnerId: number) {

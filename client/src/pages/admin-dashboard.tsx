@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminScopeTab as TabsContent } from '@/components/admin-scope-tab';
+import { hasFullManagementAccess, hasSupportManagementAccess, isCustomerOrVendorAccount } from '@shared/admin-access';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -93,6 +95,7 @@ type PendingAdminProductsResponse = {
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const fullManagement = hasFullManagementAccess(user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -129,15 +132,19 @@ export default function AdminDashboard() {
   const prevOrderStatusRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !isAdmin(user))) {
+    if (!isLoading && (!isAuthenticated || !hasSupportManagementAccess(user))) {
       toast({ title: 'Admin Access Required', description: 'You need admin privileges.', variant: 'destructive' });
       setTimeout(() => { window.location.href = '/login'; }, 500);
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && fullManagement, retry: false });
+  const { data: vendors = [] } = useQuery<Vendor[]>({
+    queryKey: ['/api/admin/vendors', user?.id, fullManagement],
+    queryFn: async () => (await apiRequest('GET', '/api/admin/vendors')).json(),
+    enabled: isAuthenticated && isAdmin(user), retry: false,
+  });
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const {
     data: pendingProductsResponse,
@@ -169,31 +176,38 @@ export default function AdminDashboard() {
   };
   const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
-    queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
+    queryKey: ['/api/admin/orders', user?.id, fullManagement], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
   });
-  const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ['/api/admin/users', user?.id, fullManagement],
+    queryFn: async () => {
+      const accounts: User[] = await (await apiRequest('GET', '/api/admin/users')).json();
+      return fullManagement ? accounts : accounts.filter(isCustomerOrVendorAccount);
+    },
+    enabled: isAuthenticated && isAdmin(user), retry: false, staleTime: 0,
+  });
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
-  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
+  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications', user?.id], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
   const { data: shippingQuoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
-    queryKey: ['/api/admin/shipping-quote-requests'],
+    queryKey: ['/api/admin/shipping-quote-requests', user?.id, fullManagement],
     enabled: isAuthenticated && isAdmin(user),
     retry: false,
     refetchInterval: 15000,
   });
   const { data: analytics, isLoading: analyticsLoading } = useQuery<any>({
     queryKey: ['/api/admin/analytics', analyticsRefresh],
-    enabled: isAuthenticated && isAdmin(user),
+    enabled: isAuthenticated && fullManagement,
     retry: false,
     refetchInterval: 60000,
   });
   const { data: discoverInquiries = [], refetch: refetchInquiries } = useQuery<any[]>({
     queryKey: ['/api/discover/inquiries'],
-    enabled: isAuthenticated && isAdmin(user),
+    enabled: isAuthenticated && fullManagement,
     retry: false,
   });
   const { data: discoverPremium = [] } = useQuery<any[]>({
     queryKey: ['/api/discover/premium'],
-    enabled: isAuthenticated && isAdmin(user),
+    enabled: isAuthenticated && fullManagement,
     retry: false,
   });
   const {
@@ -682,7 +696,7 @@ export default function AdminDashboard() {
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner-nigerian"></div></div>;
-  if (!isAuthenticated || !isAdmin(user)) return null;
+  if (!isAuthenticated || !hasSupportManagementAccess(user)) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -693,8 +707,8 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-red-600 font-nigerian">🛡️ Admin Dashboard</h1>
-            <p className="text-gray-600 text-sm">AfrolandX Platform Control Centre</p>
+            <h1 className="text-3xl font-bold text-red-600 font-nigerian">{fullManagement ? 'Superadmin Dashboard' : 'Customer and Vendor Support'}</h1>
+            <p className="text-gray-600 text-sm">{fullManagement ? 'AfrolandX Platform Control Centre' : 'Customer accounts, vendor applications, orders, and support issues only.'}</p>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="destructive">Admin Access</Badge>
@@ -703,9 +717,9 @@ export default function AdminDashboard() {
                 <AlertTriangle className="w-3 h-3" />{lowStockProducts.length} Low Stock
               </Badge>
             )}
-            <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
+            {fullManagement && <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
               {initCategoriesMutation.isPending ? 'Initialising…' : 'Initialise categories'}
-            </Button>
+            </Button>}
           </div>
         </div>
 
@@ -743,7 +757,7 @@ export default function AdminDashboard() {
         )}
 
         {/* KPI Cards */}
-        <div className="mb-5 flex justify-end">
+        {fullManagement && <><div className="mb-5 flex justify-end">
           <Button variant="outline" onClick={() => { window.location.href = '/shipping'; }}>
             <Truck className="w-4 h-4 mr-2" /> Manual shipping operations
           </Button>
@@ -771,19 +785,20 @@ export default function AdminDashboard() {
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6">
+        </>}
+        <Tabs key={fullManagement ? 'full' : 'support'} defaultValue={fullManagement ? 'analytics' : 'vendors'} className="space-y-6">
           <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>
+            {fullManagement && <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews {reviews.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{reviews.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="shipping-quotes">Shipping Quotes {shippingQuoteRequests.filter(q => q.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{shippingQuoteRequests.filter(q => q.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="featured">Featured Products</TabsTrigger>
+            {fullManagement && <TabsTrigger value="featured">Featured Products</TabsTrigger>}
             <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="event-planners">Event Planners</TabsTrigger>
-            <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="overview">System Overview</TabsTrigger>
+            <TabsTrigger value="users">{fullManagement ? 'Users' : 'Customers and vendors'}</TabsTrigger>
+            {fullManagement && <TabsTrigger value="event-planners">Event Planners</TabsTrigger>}
+            {fullManagement && <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>}
+            {fullManagement && <TabsTrigger value="overview">System Overview</TabsTrigger>}
           </TabsList>
 
           {/* ═══ REVIEW MODERATION TAB ═══════════════════════════════════════ */}
@@ -1860,7 +1875,7 @@ export default function AdminDashboard() {
                 <CardDescription>
                   {hasRole(user, 'superadmin') && user?.emailVerified
                     ? 'Review every account and manage its platform roles.'
-                    : 'Only verified superadmins can change account roles.'}
+                    : 'Customer and vendor support accounts only. Administrator accounts and platform management are restricted to Superadmins.'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1938,7 +1953,7 @@ export default function AdminDashboard() {
                             </div>
                           );
                         })}
-                        {hasRole(u, 'vendor') && !u.closedAt && u.id !== user?.id && !hasRole(u, 'superadmin') && (
+                        {fullManagement && hasRole(u, 'vendor') && !u.closedAt && u.id !== user?.id && !hasRole(u, 'superadmin') && (
                           <Button
                             type="button"
                             size="sm"
@@ -1959,7 +1974,7 @@ export default function AdminDashboard() {
                             Close account
                           </Button>
                         )}
-                        <Button
+                        {fullManagement && <Button
                           type="button"
                           size="sm"
                           variant="destructive"
@@ -1977,7 +1992,7 @@ export default function AdminDashboard() {
                           }}
                         >
                           <Trash2 className="w-3 h-3" />Delete unused
-                        </Button>
+                        </Button>}
                       </div>
                     </div>
                   ))}

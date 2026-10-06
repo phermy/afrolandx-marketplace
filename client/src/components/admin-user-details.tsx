@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import type { User } from "@/types";
 import type { AccountCommerceItem } from "@shared/account-commerce";
 import { AccountCommerceHistory } from "./account-commerce-history";
+import { useAuth } from "@/hooks/useAuth";
+import { hasFullManagementAccess, isCustomerOrVendorAccount } from "@shared/admin-access";
 
 type Details = {
   account: User;
@@ -21,11 +23,13 @@ type Details = {
 const date = (value?: string | null) => value ? new Date(value).toLocaleDateString() : "Not recorded";
 
 export function AdminUserDetails({ userId, onClose, onReviewVendor }: { userId: string | null; onClose: () => void; onReviewVendor?: (vendorId: number) => void }) {
+  const { user } = useAuth();
+  const fullManagement = hasFullManagementAccess(user);
   const [orderLimit, setOrderLimit] = useState(20);
   const [productLimit, setProductLimit] = useState(20);
   useEffect(() => { setOrderLimit(20); setProductLimit(20); }, [userId]);
   const { data, isLoading, error, refetch } = useQuery<Details>({
-    queryKey: ["/api/admin/users", userId],
+    queryKey: ["/api/admin/users", userId, user?.id, fullManagement],
     queryFn: async () => (await apiRequest("GET", `/api/admin/users/${encodeURIComponent(userId!)}`)).json(),
     enabled: Boolean(userId),
     retry: false,
@@ -41,7 +45,7 @@ export function AdminUserDetails({ userId, onClose, onReviewVendor }: { userId: 
         </DialogHeader>
         {isLoading && <p role="status">Loading account details…</p>}
         {error && <div role="alert"><p>Could not load account details.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>}
-        {data && (
+        {data && (fullManagement || isCustomerOrVendorAccount(data.account)) && (
           <div className="space-y-6">
             <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               {[

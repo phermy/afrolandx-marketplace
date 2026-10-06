@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { isAdmin, isVendor } from "@/lib/roleUtils";
+import { isVendor } from "@/lib/roleUtils";
+import { hasFullManagementAccess } from "@shared/admin-access";
 import { useToast } from "@/hooks/use-toast";
 import SplitShipmentForm from "@/components/shipping/SplitShipmentForm";
 import { shipmentStatusLabels, shipmentStatuses, shipmentTransitions } from "@shared/logistics";
@@ -36,27 +37,27 @@ export default function Shipping() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const admin = isAdmin(user);
+  const admin = hasFullManagementAccess(user);
   const vendor = isVendor(user);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [busyShipment, setBusyShipment] = useState<number | null>(null);
 
   const accessQuery = useQuery<LogisticsAccess>({
-    queryKey: ["/api/logistics/access"],
+    queryKey: ["/api/logistics/access", user?.id, admin],
     staleTime: 0,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
   });
   const access = accessQuery.data;
   const shipmentsQuery = useQuery<ShipmentsResponse>({
-    queryKey: ["/api/logistics/shipments"],
+    queryKey: ["/api/logistics/shipments", user?.id, admin],
     enabled: !!access && (access.admin || !!access.vendorId || access.partnerIds.length > 0),
     refetchInterval: 30000,
     staleTime: 0,
   });
   const partnersQuery = useQuery<LogisticsPartnerView[]>({
-    queryKey: ["/api/logistics/partners"],
+    queryKey: ["/api/logistics/partners", user?.id, admin],
     enabled: !!access?.admin,
     staleTime: 0,
   });

@@ -19,6 +19,7 @@ import OrderSuccess from "@/pages/order-success";
 import VendorDashboard from "@/pages/vendor-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminFinance from "@/pages/admin-finance";
+import { hasFullManagementAccess } from "@shared/admin-access";
 import VendorFinance from "@/pages/vendor-finance";
 import Shipping from "@/pages/shipping";
 import Checkout from "@/pages/checkout";
@@ -125,9 +126,9 @@ function Router() {
 
       {/* Admin — available to both, protected internally */}
       <Route path="/admin/finance">
-        <AdminProtectedRoute>
+        {hasFullManagementAccess(user) ? <AdminProtectedRoute>
           <AdminFinance />
-        </AdminProtectedRoute>
+        </AdminProtectedRoute> : <AuthRedirect to={isAuthenticated ? "/admin" : "/login"} />}
       </Route>
       <Route path="/admin">
         <AdminProtectedRoute>

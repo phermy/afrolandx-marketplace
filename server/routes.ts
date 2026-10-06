@@ -14,6 +14,8 @@ import {
 import { deleteVerifiedTestVendor, previewTestVendorDeletion, TestVendorDeletionError } from "./test-vendor-deletion";
 import { setupAuth, isAuthenticated, sanitizeUser } from "./auth";
 import { getAdminUserDetails } from "./admin-user-details";
+import { managementGuard } from "./admin-management-guard";
+import { canSeeManagedAccount, requireFullManagement } from "./admin-access";
 import { registerLogisticsRoutes } from "./logistics-routes";
 import { ensureOrderShipments } from "./logistics-service";
 import { normalizeAccountPhone } from "@shared/account-registration";
@@ -264,6 +266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+  app.use('/api/admin', isAuthenticated, managementGuard);
+  app.use(['/api/categories/init', '/api/discover/inquiries', '/api/discover/premium', '/api/places'], isAuthenticated, requireFullManagement);
   registerLogisticsRoutes(app);
   registerReviewRoutes(app);
   registerVirtualTryOnRoutes(app);
@@ -572,7 +576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users/:userId', isAuthenticated, isAdmin, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     try {
-      const details = await getAdminUserDetails(storage, req.params.userId);
+      const details = await getAdminUserDetails(storage, req.params.userId, (req as any).managementActor);
       if (!details) return res.status(404).json({ message: 'Account not found.' });
       res.json(details);
     } catch (error) {
@@ -584,7 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      res.json(users.map(account => ({
+      res.json(users.filter(account => canSeeManagedAccount((req as any).managementActor, account)).map(account => ({
         ...sanitizeUser(account),
         roleManagementLocked: isDesignatedOwnerEmail(account.email),
       })));
@@ -595,6 +599,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Close accounts without deleting linked orders, payments, catalog, or audit history.
+  app.get('/api/admin/vendors', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const actor = (req as any).managementActor;
+      const accounts = await storage.getAllUsers();
+      const visibleIds = new Set(accounts.filter(account => canSeeManagedAccount(actor, account)).map(account => account.id));
+      const allVendors = await storage.getAllVendors();
+      res.json(allVendors.filter(vendor => visibleIds.has(vendor.userId)));
+    } catch { res.status(503).json({ message: 'Could not load vendor support records.' }); }
+  });
   app.post('/api/admin/users/:userId/close', isAuthenticated, isSuperadmin, async (req: any, res) => {
     if (typeof req.body?.confirmation !== 'string') {
       return res.status(400).json({ message: 'Type the account email to confirm closure.' });
@@ -1830,7 +1843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/products/:id/featured', isAuthenticated, isAdmin, async (req, res) => {
+  app.patch('/api/products/:id/featured', isAuthenticated, requireFullManagement, async (req, res) => {
     try {
       const productId = parseInt(req.params.id);
       const { featured } = req.body;
@@ -2307,7 +2320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin: review all requests and confirm or reject rates.
-  app.get('/api/admin/shipping-quote-requests', isAuthenticated, isAdmin, async (_req, res) => {
+  app.get('/api/admin/shipping-quote-requests', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const requests = await storage.getAllShippingQuoteRequests();
       const enriched = await Promise.all(requests.map(async request => ({
@@ -2317,7 +2330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : request.status,
         customer: sanitizeUser(await storage.getUser(request.userId)),
       })));
-      res.json(enriched);
+      res.json(enriched.filter(request => canSeeManagedAccount((req as any).managementActor, request.customer)));
     } catch (error) {
       console.error('Error fetching admin shipping quotes:', error);
       res.status(500).json({ message: 'Failed to fetch shipping quote requests' });
@@ -3446,9 +3459,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get all orders using storage method
       const allOrders = await storage.getAllOrders();
+      const visibleBuyerIds = new Set((await storage.getAllUsers())
+        .filter(account => canSeeManagedAccount((req as any).managementActor, account)).map(account => account.id));
       
       const ordersWithDetails = await Promise.all(
-        allOrders.map(async (order) => {
+        allOrders.filter(order => visibleBuyerIds.has(order.userId)).map(async (order) => {
           const items = await storage.getOrderItemsWithProducts(order.id);
           const customer = await storage.getUser(order.userId);
 
