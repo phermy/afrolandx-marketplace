@@ -669,7 +669,7 @@ export default function Checkout() {
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <Label htmlFor="firstName">First Name</Label>
                       <Input
@@ -713,7 +713,7 @@ export default function Checkout() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <Label htmlFor="city">City</Label>
                       <Input
@@ -907,9 +907,9 @@ export default function Checkout() {
                             }`}
                           >
                             <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={!canSelect} className="mt-1" />
-                            <Label htmlFor={quote.carrier} className={`flex-1 ${canSelect ? 'cursor-pointer' : 'cursor-default'}`}>
-                              <div className="flex justify-between items-center">
-                                <div>
+                            <Label htmlFor={quote.carrier} className={`min-w-0 flex-1 ${canSelect ? 'cursor-pointer' : 'cursor-default'}`}>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
                                   <p className="font-semibold">{quote.service}</p>
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
                                   {quote.routes && <p className="text-xs text-gray-500 mt-1">{quote.routes}</p>}
@@ -932,8 +932,8 @@ export default function Checkout() {
                                     </p>
                                   )}
                                 </div>
-                                <div className="text-right">
-                                  <span className={`font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
+                                <div className="shrink-0 text-left sm:text-right">
+                                  <span className={`break-words font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
                                     {quote.price === null ? 'Estimate at payment' : `${estimated || awaitingQuote ? 'Est. ' : ''}${formatPrice(quote.price)}`}
                                   </span>
                                 </div>
@@ -1083,7 +1083,7 @@ export default function Checkout() {
 
                   {/* Trust Badges */}
                   <div className="text-center pt-4">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-1 gap-2 text-xs min-[375px]:grid-cols-3">
                       <Badge variant="outline" className="flex items-center justify-center py-2">
                         <span className="mr-1">🔒</span>
                         SSL Secure

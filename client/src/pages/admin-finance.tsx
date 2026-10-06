@@ -82,8 +82,8 @@ export default function AdminFinance() {
           <CardContent className="space-y-3">
             {vendors.map(vendor => (
               <div key={vendor.id} className="flex flex-wrap items-center justify-between gap-3 border rounded-lg p-3">
-                <div><p className="font-medium">{vendor.businessName}</p><p className="text-xs text-gray-500">CAC: {vendor.cacNumber || "Not supplied"} · Verification: {vendor.verificationStatus}</p></div>
-                <div className="flex gap-2">
+                <div className="min-w-0 flex-1 break-words"><p className="font-medium">{vendor.businessName}</p><p className="text-xs text-gray-500 break-words">CAC: {vendor.cacNumber || "Not supplied"} · Verification: {vendor.verificationStatus}</p></div>
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                   {vendor.verificationStatus !== "verified" && <Button size="sm" variant="outline" disabled={!vendor.cacNumber || verifyMutation.isPending} onClick={() => verifyMutation.mutate(vendor.id)}>Mark checks as verified</Button>}
                   <Button size="sm" disabled={vendor.status !== "approved" || vendor.verificationStatus !== "verified" || settleMutation.isPending} onClick={() => settleMutation.mutate(vendor.id)}>Pay available balance</Button>
                 </div>
@@ -98,7 +98,7 @@ export default function AdminFinance() {
             <Input value={amount} onChange={event => setAmount(event.target.value)} type="number" min="0.01" step="0.01" placeholder="Merchandise amount in NGN" />
             <Input value={chargebackReference} onChange={event => setChargebackReference(event.target.value)} placeholder="Chargeback reference (for chargebacks only)" />
             <Textarea value={reason} onChange={event => setReason(event.target.value)} placeholder="Reason" />
-            <div className="flex gap-2 md:col-span-2">
+            <div className="flex flex-wrap gap-2 md:col-span-2">
               <Button disabled={!orderId || !amount || reason.length < 5 || adjustmentMutation.isPending} onClick={() => adjustmentMutation.mutate("refund")}>Refund through Paystack</Button>
               <Button variant="destructive" disabled={!orderId || !amount || reason.length < 5 || !chargebackReference || adjustmentMutation.isPending} onClick={() => adjustmentMutation.mutate("chargeback")}>Record chargeback</Button>
             </div>
@@ -107,7 +107,7 @@ export default function AdminFinance() {
         <Card>
           <CardHeader><CardTitle>Settlement history</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full text-sm"><thead><tr className="border-b text-left"><th className="py-2">Vendor</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+            <table className="w-full min-w-max text-sm"><thead><tr className="border-b text-left"><th className="py-2">Vendor</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
               <tbody>{(finance?.settlements || []).map((settlement: any) => <tr key={settlement.id} className="border-b"><td className="py-2">{settlement.vendorName}</td><td>{ngn(settlement.grossAmount)}</td><td>{ngn(settlement.commissionAmount)}</td><td>{ngn(settlement.netAmount)}</td><td className="capitalize">{settlement.status}</td><td>{new Date(settlement.createdAt).toLocaleDateString("en-GB")}</td><td><div className="flex gap-2 items-center">{settlement.providerReference && settlement.status === "processing" && <Button size="sm" variant="outline" disabled={reconcileMutation.isPending} onClick={() => reconcileMutation.mutate(settlement.id)}>Check Paystack</Button>}{settlement.status === "processing" && String(settlement.failureReason || "").toLowerCase().includes("otp") && <><Input className="w-24 h-8" value={settlementOtps[settlement.id] || ""} onChange={event => setSettlementOtps(current => ({ ...current, [settlement.id]: event.target.value.replace(/\D/g, "").slice(0, 6) }))} placeholder="Six digits" /><Button size="sm" disabled={(settlementOtps[settlement.id] || "").length !== 6 || otpMutation.isPending} onClick={() => otpMutation.mutate(settlement.id)}>Submit OTP</Button></>}</div></td></tr>)}</tbody>
             </table>
           </CardContent>

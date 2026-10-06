@@ -847,7 +847,7 @@ export default function VendorDashboard() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -918,7 +918,7 @@ export default function VendorDashboard() {
         </div>
 
         <Tabs defaultValue="products" className="space-y-6">
-          <TabsList>
+          <TabsList className="flex w-full flex-wrap h-auto justify-start">
             <TabsTrigger value="products">My Products</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="measurements">Measurements</TabsTrigger>
@@ -1098,13 +1098,13 @@ export default function VendorDashboard() {
                   <div className="space-y-4">
                     {Array.isArray(vendorOrders) && vendorOrders.map((order: any) => (
                       <div key={order.id} className="border border-gray-200 rounded-lg p-6">
-                        <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                           <div>
                             <h3 className="font-semibold text-lg">Order #{order.id}</h3>
                             <p className="text-gray-600 text-sm">
                               Customer: {order.customer?.firstName} {order.customer?.lastName}
                             </p>
-                            <p className="text-gray-600 text-sm">
+                            <p className="break-all text-gray-600 text-sm">
                               Email: {order.customer?.email}
                             </p>
                           </div>
@@ -1126,12 +1126,12 @@ export default function VendorDashboard() {
                           <h4 className="font-medium mb-2">Your Items in this Order:</h4>
                           <div className="space-y-2">
                             {order.items?.map((item: any) => (
-                              <div key={item.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
-                                <div>
+                              <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 p-3 rounded">
+                                <div className="min-w-0 flex-1 break-words">
                                   <span className="font-medium">{item.productName}</span>
                                   <span className="text-gray-600 ml-2">x{item.quantity}</span>
                                 </div>
-                                <span className="font-semibold">
+                                <span className="shrink-0 font-semibold">
                                   ₦{(parseFloat(item.priceAtTime) * item.quantity).toLocaleString()}
                                 </span>
                               </div>
@@ -1140,7 +1140,7 @@ export default function VendorDashboard() {
                         </div>
                         
                         <div className="border-t pt-4 mt-4">
-                          <div className="flex justify-between items-start">
+                          <div className="flex flex-wrap justify-between items-start gap-3">
                             <div className="text-sm text-gray-600">
                               <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
                               <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}>
@@ -1150,7 +1150,7 @@ export default function VendorDashboard() {
                             
                             {/* Order Status Management */}
                             {order.paymentStatus === 'paid' && (
-                              <div className="flex flex-col gap-2">
+                              <div className="flex min-w-0 flex-col gap-2">
                                 <p className="text-sm font-medium text-gray-700 mb-2">Update Order Status:</p>
                                 <div className="flex gap-2 flex-wrap">
                                   {order.orderStatus === 'pending' && (
@@ -1176,7 +1176,7 @@ export default function VendorDashboard() {
                                           [order.id]: event.target.value,
                                         }))}
                                         placeholder="Enter carrier tracking number"
-                                        className="h-9 min-w-56"
+                                        className="h-9 w-full max-w-full min-w-0"
                                       />
                                       <Button
                                         size="sm"
@@ -1233,7 +1233,7 @@ export default function VendorDashboard() {
                   <div className="space-y-4">
                     {Array.isArray(vendorMeasurements) && vendorMeasurements.map((measurement: any) => (
                       <div key={measurement.id} className="border border-gray-200 rounded-lg p-6" data-testid={`vendor-measurement-${measurement.id}`}>
-                        <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
                           <div>
                             <h3 className="font-semibold text-lg">Measurement #{measurement.id}</h3>
                             <p className="text-gray-600 text-sm">
@@ -1598,7 +1598,7 @@ export default function VendorDashboard() {
             {/* Gender / Audience */}
             <div className="space-y-1.5">
               <Label className="font-semibold">Who is this for?</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { value: '',       label: 'All / Unisex' },
                   { value: 'women',  label: '👩 Women' },
@@ -1772,7 +1772,7 @@ export default function VendorDashboard() {
              </div>
 
              {/* Price, sale price, and stock */}
-            <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="font-semibold">Price (₦) <span className="text-red-500">*</span></Label>
                 <Input
@@ -1838,7 +1838,7 @@ export default function VendorDashboard() {
                            Remove
                          </button>
                        </div>
-                       <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 min-[375px]:grid-cols-2">
                          {(['size', 'color', 'pattern', 'sku'] as const).map(field => (
                            <Input
                              key={field}
@@ -2075,7 +2075,7 @@ export default function VendorDashboard() {
             </div>
 
             {/* Save or submit */}
-            <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-1 gap-3 pt-1 min-[400px]:grid-cols-2">
               <Button type="submit" name="submissionStatus" value="draft" variant="outline" className="h-11" disabled={addProductMutation.isPending}>
                 <Save className="w-4 h-4 mr-1" /> Save Draft
               </Button>
@@ -2138,7 +2138,7 @@ export default function VendorDashboard() {
             {/* Gender / Audience */}
             <div>
               <Label className="font-medium">Who is this for?</Label>
-              <div className="grid grid-cols-4 gap-2 mt-1">
+              <div className="grid grid-cols-2 gap-2 mt-1 sm:grid-cols-4">
                 {[
                   { value: '',       label: 'All / Unisex' },
                   { value: 'women',  label: '👩 Women' },
@@ -2238,7 +2238,7 @@ export default function VendorDashboard() {
             </div>
 
             {/* Price + Stock */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="edit-price" className="font-medium">Price (₦)</Label>
                 <Input
@@ -2351,7 +2351,7 @@ export default function VendorDashboard() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t">
+              <div className="flex flex-col gap-2 pt-2 border-t sm:flex-row">
               <Button
                 className="btn-nigerian flex-1"
                 disabled={!editForm.name.trim() || updateProductMutation.isPending}

@@ -37,12 +37,12 @@ export default function ShipmentTimeline({ orderId }: { orderId: number }) {
     staleTime: 0,
   });
   if (isLoading) return <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/50 p-4"><div className="h-4 w-40 animate-pulse rounded bg-teal-100" /><div className="mt-3 h-3 w-full animate-pulse rounded bg-teal-100" /></div>;
-  if (isError) return <div className="mt-4 flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><span>Shipment details are temporarily unavailable.</span><button onClick={() => refetch()} className="underline">Retry</button></div>;
+  if (isError) return <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><span>Shipment details are temporarily unavailable.</span><button onClick={() => refetch()} className="underline">Retry</button></div>;
   const shipments = data?.shipments || [];
   if (!shipments.length) return <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">Shipment tracking will appear here when fulfillment begins.</div>;
 
   return <section className="mt-4 space-y-3 rounded-xl border border-teal-100 bg-[#f5fbf9] p-4" aria-label={`Shipment timeline for order ${orderId}`}>
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold text-slate-900">Shipment timeline</h3>
       <span className="text-[11px] text-slate-500">Manual updates · refreshes every 30 seconds</span>
     </div>

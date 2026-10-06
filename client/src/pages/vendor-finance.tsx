@@ -40,7 +40,7 @@ export default function VendorFinance() {
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Vendor finance</h1>
+          <h1 className="text-3xl font-bold break-words">Vendor finance</h1>
           <p className="text-gray-500">8% commission applies to merchandise only. Shipping is excluded.</p>
         </div>
         {isLoading ? <p>Loading finance records…</p> : (
@@ -54,16 +54,16 @@ export default function VendorFinance() {
               <CardHeader><CardTitle>Payout account</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 {finance?.payoutAccount && (
-                  <p className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
+                  <p className="break-words rounded-lg bg-green-50 p-3 text-sm text-green-800">
                     Verified: {finance.payoutAccount.accountName} · {finance.payoutAccount.bankName} · •••• {finance.payoutAccount.accountLast4}
                   </p>
                 )}
-                <div className="grid md:grid-cols-[1fr_1fr_auto] gap-3">
+                <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <Select value={bankCode} onValueChange={setBankCode}>
-                    <SelectTrigger><SelectValue placeholder="Choose bank" /></SelectTrigger>
+                    <SelectTrigger className="min-w-0"><SelectValue placeholder="Choose bank" /></SelectTrigger>
                     <SelectContent>{banks.map(bank => <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Input value={accountNumber} onChange={event => setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="Enter an account number with 10 digits" />
+                  <Input className="min-w-0" value={accountNumber} onChange={event => setAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="Enter an account number with 10 digits" />
                   <Button disabled={!bankCode || accountNumber.length !== 10 || accountMutation.isPending} onClick={() => accountMutation.mutate()}>
                     {accountMutation.isPending ? "Verifying…" : "Verify account"}
                   </Button>
@@ -73,7 +73,7 @@ export default function VendorFinance() {
             <Card>
               <CardHeader><CardTitle>Statement</CardTitle></CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-max text-sm">
                   <thead><tr className="border-b text-left"><th className="py-2">Date</th><th>Order</th><th>Type</th><th>Gross</th><th>Commission</th><th>Net</th><th>Status</th></tr></thead>
                   <tbody>{(finance?.entries || []).map((entry: any) => (
                     <tr key={entry.id} className="border-b">

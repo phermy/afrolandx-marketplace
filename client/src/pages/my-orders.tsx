@@ -179,7 +179,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
     <Card className={`overflow-hidden transition-shadow hover:shadow-md ${isCancelled ? 'border-red-200 opacity-80' : isDelivered ? 'border-green-200' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-base">Order #{order.id}</CardTitle>
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize
@@ -199,7 +199,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
               {order.shippingMethod && ` · ${order.shippingMethod.toUpperCase()}`}
             </p>
           </div>
-          <div className="text-right">
+          <div className="min-w-0 text-left sm:text-right">
             <p className="text-xl font-bold text-green-700">₦{displayedTotal.toLocaleString()}</p>
             {!isCancelled && (
               <p className="text-xs text-gray-400">Est. delivery: {getEstimatedDelivery(order.shippingMethod, order.createdAt)}</p>
@@ -328,7 +328,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                          <p className="text-xs text-gray-500 mt-0.5">Size: {item.selectedSize}</p>
                        )}
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="min-w-0 shrink-0 text-left sm:text-right">
                       <p className="text-sm font-bold text-green-700">₦{parseFloat(item.priceAtTime).toLocaleString()}</p>
                       <p className="text-xs text-gray-400">×{item.quantity}</p>
                       {isDelivered && order.paymentStatus === 'paid' && (
@@ -512,7 +512,7 @@ export default function MyOrders() {
               {isFetching && <RefreshCw className="inline w-3 h-3 ml-1 animate-spin text-green-500" />}
             </p>
           </div>
-          <div className="text-right text-xs text-gray-400 flex items-center gap-1">
+          <div className="min-w-0 break-words text-left text-xs text-gray-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />Last updated: {lastUpdated}
           </div>
         </div>

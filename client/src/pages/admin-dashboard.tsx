@@ -710,7 +710,7 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold text-red-600 font-nigerian">{fullManagement ? 'Superadmin Dashboard' : 'Customer and Vendor Support'}</h1>
             <p className="text-gray-600 text-sm">{fullManagement ? 'AfrolandX Platform Control Centre' : 'Customer accounts, vendor applications, orders, and support issues only.'}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">Admin Access</Badge>
             {lowStockProducts.length > 0 && (
               <Badge variant="outline" className="border-orange-400 text-orange-600 gap-1">
@@ -787,7 +787,7 @@ export default function AdminDashboard() {
         {/* Main Tabs */}
         </>}
         <Tabs key={fullManagement ? 'full' : 'support'} defaultValue={fullManagement ? 'analytics' : 'vendors'} className="space-y-6">
-          <TabsList className="flex-wrap h-auto gap-1">
+          <TabsList className="flex w-full flex-wrap h-auto justify-start gap-1">
             {fullManagement && <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>}
             <TabsTrigger value="reviews">Reviews {reviews.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{reviews.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
@@ -805,7 +805,7 @@ export default function AdminDashboard() {
           <TabsContent value="reviews">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-3">
+                <CardTitle className="flex flex-wrap items-center justify-between gap-3">
                   <span className="flex items-center gap-2"><Star className="w-5 h-5" />Pending Reviews</span>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{reviews.length} pending</Badge>
@@ -889,7 +889,7 @@ export default function AdminDashboard() {
           {/* ═══ ANALYTICS TAB ═══════════════════════════════════════════════ */}
           <TabsContent value="analytics">
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold">Live Platform Analytics</h2>
                 <Button variant="outline" size="sm" onClick={() => setAnalyticsRefresh(r => r + 1)} disabled={analyticsLoading}>
                   <RefreshCw className={`w-3 h-3 mr-1 ${analyticsLoading ? 'animate-spin' : ''}`} />Refresh
@@ -998,7 +998,7 @@ export default function AdminDashboard() {
                     <Card>
                       <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Customer Insights</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                           {[
                             { label: 'Total Customers', value: analytics.totalCustomers, icon: '👤' },
                             { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: '✨' },
@@ -1342,7 +1342,7 @@ export default function AdminDashboard() {
           <TabsContent value="shipping-quotes">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-3">
+                <CardTitle className="flex flex-wrap items-center justify-between gap-3">
                   <span className="flex items-center gap-2"><Truck className="w-5 h-5" />International Shipping Quotes</span>
                   <Badge variant="secondary">{shippingQuoteRequests.filter(q => q.status === 'pending').length} pending</Badge>
                 </CardTitle>
@@ -1516,7 +1516,7 @@ export default function AdminDashboard() {
               )}
 
               {/* Summary row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 {[
                    { label: 'Actual Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
                    { label: 'Actual Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
