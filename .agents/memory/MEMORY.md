@@ -26,3 +26,4 @@
 - [Responsive copy alignment](responsive-copy-alignment.md) — avoid forced justification in narrow columns or short cards; reserve it for wide long-form reading
 - [Account signup requirements](account-signup-requirements.md) — require phones for new accounts; vendor signup leads to an application, not automatic selling permission
 - [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later
+- [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
