@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { PAYMENT_EMAIL } from '@shared/payment-contact';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
@@ -971,6 +972,7 @@ export default function Checkout() {
                       <div>
                         <p className="font-semibold">Paystack</p>
                         <p className="text-sm text-gray-600">Secure payment with cards, bank transfer, or mobile money</p>
+                        <p className="mt-2 text-sm text-gray-600">Payment questions? <a className="underline break-all" href={`mailto:${PAYMENT_EMAIL}`}>{PAYMENT_EMAIL}</a></p>
                       </div>
                     </div>
                   </div>

@@ -27,3 +27,4 @@
 - [Account signup requirements](account-signup-requirements.md) — require phones for new accounts; vendor signup leads to an application, not automatic selling permission
 - [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later
 - [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
+- [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement } from "./payment-emails";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
@@ -70,8 +71,8 @@ import {
   createSaleLedger,
   createSettlement,
   claimNegativeAdjustment,
-  failNegativeAdjustment,
-  finalizeNegativeAdjustment,
+  failNegativeAdjustment as failNegativeAdjustmentRecord,
+  finalizeNegativeAdjustment as finalizeNegativeAdjustmentRecord,
   getVendorFinance,
   recordNegativeAdjustment,
   releaseOrderEarnings,
@@ -185,6 +186,14 @@ const localUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const finalizeNegativeAdjustment = async (reference: string, status: string) => {
+    await finalizeNegativeAdjustmentRecord(reference, status);
+    await notifyFinancialAdjustment(reference);
+  };
+  const failNegativeAdjustment = async (reference: string, reason: string) => {
+    await failNegativeAdjustmentRecord(reference, reason);
+    await notifyFinancialAdjustment(reference);
+  };
   app.get('/downloads/femi-elegbeleye-profile.jpg', (_req, res) => {
     const publicRoot = app.get('env') === 'development' ? 'client/public' : 'dist/public';
     const photoPath = path.resolve(process.cwd(), publicRoot, 'downloads/femi-elegbeleye-profile.jpg');
@@ -529,7 +538,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  const completeVerifiedOrder = createVerifiedOrderCompleter(storage, createSaleLedger, ensureOrderShipments);
+  const completeVerifiedOrder = createVerifiedOrderCompleter(storage, async orderId => {
+    await createSaleLedger(orderId);
+    await notifyOrderPayment(orderId);
+  }, ensureOrderShipments);
   const canAutomaticallyProcessOrder = async (orderId: number): Promise<boolean> => {
     const current = await storage.getOrder(orderId);
     if (!current
@@ -558,7 +570,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const mismatch = shippingPaymentVerificationError(order, verification, reference);
     if (mismatch) return false;
     const transitioned = await storage.markShippingPaid(order.id, reference);
-    if (!transitioned) return (await storage.getOrder(order.id))?.shippingPaymentStatus === 'paid';
+    if (!transitioned) {
+      await notifyOrderPayment(order.id, 'shipping');
+      return (await storage.getOrder(order.id))?.shippingPaymentStatus === 'paid';
+    }
     if (order.shippingQuoteRequestId) {
       await storage.updateShippingQuoteRequest(order.shippingQuoteRequestId, { status: 'used' });
     }
@@ -573,6 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       type: 'shipping_quote',
       orderId: order.id,
     }).catch(error => console.error('Failed to notify buyer about shipping payment:', error));
+    await notifyOrderPayment(order.id, 'shipping');
     return true;
   };
 
@@ -2397,6 +2413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               refundStatus = String(existingRefund.status || 'pending');
               await storage.completeShippingRefundClaim(linkedOrder.id, refundStatus);
+              await notifyOrderPayment(linkedOrder.id, 'shipping-refund');
             } else {
               refundStatus = current.shippingRefundStatus;
             }
@@ -2415,6 +2432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             refundStatus = String(refund.data?.status || 'pending');
             await storage.completeShippingRefundClaim(linkedOrder.id, refundStatus);
+            await notifyOrderPayment(linkedOrder.id, 'shipping-refund');
           }
         }
       }
@@ -3380,6 +3398,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed') {
+        const [settlement] = await db.select().from(vendorSettlements).where(eq(vendorSettlements.providerReference, data.reference));
+        if (settlement) await notifyVendorSettlement(settlement.id);
+      }
       res.status(200).json({ message: 'Webhook received' });
     } catch (error) {
       console.error('Webhook error:', error);
@@ -3541,6 +3563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refundStatus = String(refund.data?.status || 'pending');
       if (['processed', 'success', 'successful'].includes(refundStatus.toLowerCase())) {
         await finalizeNegativeAdjustment(adjustmentReference, refundStatus);
+      } else {
+        await notifyFinancialAdjustment(adjustmentReference);
       }
       res.json({ message: 'Refund submitted', status: refundStatus, amount: input.amount });
     } catch (error) {
@@ -3627,6 +3651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(vendorLedgerEntries).set({ status: 'settled' })
           .where(eq(vendorLedgerEntries.settlementId, settlementId));
       }
+      await notifyVendorSettlement(settlementId);
       res.json(updated);
     } catch (error) {
       console.error('Error creating vendor settlement:', error);
@@ -3653,6 +3678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(vendorLedgerEntries.settlementId, settlementId!));
           }).catch(releaseError => console.error('Could not release failed settlement entries:', releaseError));
         }
+        await notifyVendorSettlement(settlementId);
       }
       res.status(409).json({ message: error instanceof Error ? error.message : 'Failed to create vendor settlement' });
     }
@@ -3701,6 +3727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const [updated] = await db.select().from(vendorSettlements)
         .where(eq(vendorSettlements.id, settlementId));
+      await notifyVendorSettlement(settlementId);
       res.json(updated);
     } catch (error) {
       console.error('Error reconciling settlement:', error);

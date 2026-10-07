@@ -11,6 +11,7 @@ import { LogisticsError } from "./logistics-policy";
 import { drainLogisticsEmails, queueLogisticsNotification } from "./logistics-notifications";
 import { logisticsNoteSchema, partnerQuoteSchema } from "../shared/logistics";
 import { normalizeAccountPhone } from "../shared/account-registration";
+import { notifyAgencyPayment } from "./payment-emails";
 
 const id = (value: unknown) => z.coerce.number().int().positive().parse(value);
 const route = (handler: (req: any, res: Response) => Promise<unknown>) => async (req: Request, res: Response) => {
@@ -119,7 +120,9 @@ export function registerLogisticsRoutes(app: Express) {
       paidAt: z.string().datetime({ offset: true }).refine(value => new Date(value).getTime() <= Date.now() + 60_000, "Payment date cannot be in the future."),
       note: z.string().trim().max(2000).default(""),
     }).parse(req.body);
-    res.json(await recordAgencyPayment(req.user.id, id(req.params.id), input));
+    const payment = await recordAgencyPayment(req.user.id, id(req.params.id), input);
+    await notifyAgencyPayment(payment);
+    res.json(payment);
   }));
   app.post("/api/logistics/shipments/:id/status", isAuthenticated, route(async (req, res) => res.json(await updateShipmentStatus(req.user.id, id(req.params.id), req.body))));
   app.post("/api/logistics/shipments/:id/issues", isAuthenticated, route(async (req, res) => {

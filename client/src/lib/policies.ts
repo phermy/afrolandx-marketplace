@@ -1,3 +1,5 @@
+import { PAYMENT_EMAIL } from "@shared/payment-contact";
+
 export type Policy = {
   slug: string;
   title: string;
@@ -161,13 +163,19 @@ const additionalSections: Record<string, { heading: string; body: string }[]> = 
     { heading: "Evidence and decisions", body: "Respond to a claim within 2 business days or a shorter urgent-safety period, preserve records and provide listing, dispatch, serial-number, packaging or authenticity evidence. Afrolandx may decide using available evidence if the vendor does not respond. Request review within 14 calendar days." },
     { heading: "Fees and commercial schedule", body: "The dashboard or signed schedule states commission, payment-processing, verification, logistics, storage, advertising and other applicable charges. Afrolandx will not introduce a new material fee retrospectively for completed orders. Vendors remain responsible for applicable taxes, registrations and invoices." },
     { heading: "Settlement and deductions", body: "The dashboard or signed schedule will state any settlement timing and conditions; this policy does not promise a cadence or hold period. Afrolandx may deduct agreed fees, refunds, chargebacks, allocated delivery or return costs, taxes and other sums properly due, and may apply a reasonable reserve for fraud, disputes or unusual returns. If an amount was already settled, it may be deducted from future amounts or repayment requested." },
-    { heading: "Settlement queries", body: "Raise a statement query within 30 calendar days with the order number and disputed entry. Afrolandx may correct errors and will give advance notice of material fee changes. Contact info@afrolandx.com." },
+    { heading: "Settlement queries", body: `Raise a statement query within 30 calendar days with the order number and disputed entry. Afrolandx may correct errors and will give advance notice of material fee changes. Contact ${PAYMENT_EMAIL}.` },
   ],
 };
 
 export const policies: Policy[] = basePolicies.map((policy) => ({
   ...policy,
-  sections: [...policy.sections, ...(additionalSections[policy.slug] || [])],
+  sections: [
+    ...policy.sections,
+    ...(additionalSections[policy.slug] || []),
+    ...(["marketplace-terms", "return-policy", "vendor-orders-shipping-returns-and-settlement"].includes(policy.slug)
+      ? [{ heading: "Payment support", body: `For payment, refund and payout questions, contact ${PAYMENT_EMAIL}. Include the order or transaction reference. Never email your password, card security code or full bank account details.` }]
+      : []),
+  ],
 }));
 
 export const policyDate = dates;

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { PAYMENT_EMAIL } from "../shared/payment-contact";
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
 // Replies must reach an existing Titan mailbox, even when the sender is no-reply.
@@ -24,24 +25,38 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export function emailPayload(to: string, subject: string, html: string, payment = false) {
+  return {
+    from: `${APP_NAME} <${payment ? PAYMENT_EMAIL : FROM_EMAIL}>`,
+    to: [to],
+    reply_to: payment ? PAYMENT_EMAIL : SUPPORT_EMAIL,
+    ...(payment && to.toLowerCase() !== PAYMENT_EMAIL ? { bcc: [PAYMENT_EMAIL] } : {}),
+    subject,
+    html,
+  };
+}
+
+async function sendEmail(to: string, subject: string, html: string, payment = false, eventKey?: string): Promise<void> {
   const { ReplitConnectors } = await import("@replit/connectors-sdk");
   const connectors = new ReplitConnectors();
   const response = await connectors.proxy("resend", "/emails", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: `${APP_NAME} <${FROM_EMAIL}>`,
-      to: [to],
-      reply_to: SUPPORT_EMAIL,
-      subject,
-      html,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      ...(eventKey ? { "Idempotency-Key": `payment/${crypto.createHash("sha256").update(eventKey).digest("hex")}` } : {}),
+    },
+    body: JSON.stringify(emailPayload(to, subject, html, payment)),
   });
 
   if (response.ok) return;
   const providerMessage = await response.text().catch(() => "");
   throw new Error(`Email delivery failed (${response.status})${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`);
+}
+
+export async function sendPaymentEmail(email: string | null | undefined, subject: string, message: string, eventKey: string): Promise<void> {
+  await sendEmail(email || PAYMENT_EMAIL, subject,
+    `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px"><h2>${escapeHtml(subject)}</h2><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p>For payment questions, contact <a href="mailto:${PAYMENT_EMAIL}">${PAYMENT_EMAIL}</a>. Check your Afrolandx account for the latest transaction status.</p></div>`,
+    true, eventKey);
 }
 
 function otpEmailHtml(title: string, greeting: string, description: string, codeLabel: string, otp: string, accent: string): string {
