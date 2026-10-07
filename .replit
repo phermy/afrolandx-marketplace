@@ -46,7 +46,7 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 FROM_EMAIL = "management@afrolandx.com"
 
 [userenv.development]
-TURNSTILE_REGISTER_ENABLED = "true"
+TURNSTILE_REGISTER_ENABLED = "false"
 
 [postMerge]
 path = "scripts/post-merge.sh"

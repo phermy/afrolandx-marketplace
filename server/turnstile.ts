@@ -4,6 +4,11 @@ const TEST_SITE_KEY = "1x00000000000000000000AA";
 const TEST_SECRET_KEY = "1x0000000000000000000000000000000AA";
 
 export function registrationTurnstileConfig() {
+  // Explicit opt-out allows automated Preview tests without a Cloudflare widget.
+  // An unset development flag still uses the normal Cloudflare test widget.
+  if (process.env.NODE_ENV !== "production" && process.env.TURNSTILE_REGISTER_ENABLED === "false") {
+    return { enabled: false, incomplete: false, siteKey: null, testMode: false };
+  }
   if (process.env.TURNSTILE_REGISTER_ENABLED !== "true") {
     if (process.env.NODE_ENV !== "production") {
       return { enabled: true, incomplete: false, siteKey: TEST_SITE_KEY, testMode: true };
