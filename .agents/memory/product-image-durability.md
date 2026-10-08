@@ -21,6 +21,12 @@ Cloudflare's agent connection and application connector have separate authorizat
 
 **How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair credentials only through the existing integration's secure settings, never through chat.
 
+Cloudflare token verification errors 6003 with nested 6111 indicate a malformed Authorization header, not a bucket permission failure.
+
+**Why:** An existing, publicly enabled R2 bucket could be inspected through the agent connection while the application connector failed at token verification before bucket authorization.
+
+**How to apply:** Confirm the credential's kind and formatting before further bucket changes or reconnect attempts. Ask only which kind of credential was saved, never its value; do not assume the user supplied the wrong key when the connector's header configuration could also be responsible.
+
 The R2 rollout is for new product photos in development, not a replacement for all AWS storage.
 
 **Why:** The user approved development setup while preserving existing AWS images and keeping private documents separate. Enabling a development photo bucket does not authorize migration of existing records or a production rollout.
