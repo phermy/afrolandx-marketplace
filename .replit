@@ -48,6 +48,10 @@ FROM_EMAIL = "management@afrolandx.com"
 TURNSTILE_REGISTER_ENABLED = "true"
 
 [userenv.development]
+PRODUCT_PHOTO_STORAGE = "r2"
+R2_PHOTO_ACCOUNT_ID = "e2729ea679122ca02cbe4cc3ee84fc6e"
+R2_PHOTO_BUCKET = "afrolandx"
+R2_PHOTO_PUBLIC_URL = "https://pub-5c56f26363f24893aada0fe313f61f45.r2.dev"
 
 [postMerge]
 path = "scripts/post-merge.sh"

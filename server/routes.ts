@@ -71,7 +71,8 @@ import {
   recommendShippingCarriers,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
-import { retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import { deleteStoredProductImage, isProductImageStorageEnabled, requiresDurableProductImageStorage, retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
+import { getR2ProductPhotoStatus, R2PhotoStorageError } from "./r2-product-photos";
 import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, prepareProfileImage, PROFILE_IMAGE_TYPES } from "./profile-image";
 import { sendExperienceFeedbackNotification } from "./email";
 import {
@@ -1196,7 +1197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/admin/vendors/:vendorId/products', isAuthenticated, isAdmin, upload.array('images', 5), async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
     try {
@@ -1217,7 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         imageUrls = await Promise.all(files.map(file => storeProductImage(file.buffer, 'products')));
       } catch (error) {
-        if (process.env.NODE_ENV === 'production') {
+        if (requiresDurableProductImageStorage()) {
           console.error('Admin product image upload failed; refusing temporary local storage:', error);
           return res.status(503).json({ message: 'Product image storage is unavailable. The product was not saved. Please try again later.' });
         }
@@ -1252,10 +1253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
-    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
+    const uploadHandler = isProductImageStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
     
     uploadHandler(req, res, async (err) => {
       if (err) {
@@ -1297,10 +1298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // retained only for development when cloud storage is unavailable.
         if (files && files.length > 0) {
           try {
-            if (isCloudStorageEnabled()) {
-              const cloudStorage = getCloudStorageService();
+            if (isProductImageStorageEnabled()) {
               const uploadPromises = files.map(file => 
-                cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
+                storeProductImage(file.buffer, 'products')
               );
               imageUrls = await Promise.all(uploadPromises);
               console.log('Successfully uploaded images to cloud storage');
@@ -1311,7 +1311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Saved ${imageUrls.length} image(s) locally for development`);
             }
           } catch (error: any) {
-            if (process.env.NODE_ENV === 'production') {
+            if (requiresDurableProductImageStorage()) {
               console.error('Product image upload failed; refusing temporary local storage:', error);
               return res.status(503).json({ message: 'Product image storage is unavailable. Your product was not saved. Please try again later.' });
             }
@@ -1420,8 +1420,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const importKeyConflict = (databaseError?.code === '23505' && databaseError.constraint === 'products_client_import_key_unique')
           || (databaseError?.cause?.code === '23505' && databaseError.cause.constraint === 'products_client_import_key_unique');
         if (importKeyConflict && req.body.clientImportKey) {
-          if (isCloudStorageEnabled()) {
-            await Promise.all(imageUrls.map(imageUrl => getCloudStorageService().deleteImage(imageUrl)));
+          if (isProductImageStorageEnabled()) {
+            await Promise.all(imageUrls.map(imageUrl => deleteStoredProductImage(imageUrl).catch(() => {
+              console.error("Could not clean up an unused product photo.");
+            })));
           }
           const existing = await getProductByClientImportKey(String(req.body.clientImportKey).toLowerCase());
           const retry = resolveClientImportRetry(existing, req.vendor.id, req.body);
@@ -1711,10 +1713,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Vendor: upload additional images to an existing product
   app.post('/api/products/:id/images', isAuthenticated, async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
-    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
+    const uploadHandler = isProductImageStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
     uploadHandler(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });
       try {
@@ -1734,16 +1736,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let newImageUrls: string[] = [];
         try {
-          if (isCloudStorageEnabled()) {
-            const cloudStorage = getCloudStorageService();
-            newImageUrls = await Promise.all(files.map(f => cloudStorage.uploadImage(f.buffer, f.mimetype, 'products')));
+          if (isProductImageStorageEnabled()) {
+            newImageUrls = await Promise.all(files.map(f => storeProductImage(f.buffer, 'products')));
           } else {
             for (const file of files) {
               if (file.buffer) newImageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
             }
           }
         } catch (uploadErr: any) {
-          if (process.env.NODE_ENV === 'production') {
+          if (requiresDurableProductImageStorage()) {
             console.error('Product image upload failed; refusing temporary local storage:', uploadErr);
             return res.status(503).json({ message: 'Product image storage is unavailable. No images were added. Please try again later.' });
           }
@@ -1768,7 +1769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products/:id/images/ai-retouch', isAuthenticated, upload.single('image'), async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
     try {
@@ -1794,6 +1795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('AI product image enhancement failed:', error);
+      if (error instanceof R2PhotoStorageError) {
+        return res.status(503).json({ message: 'Product image storage is unavailable. Your product was not changed. Please try again later.' });
+      }
       const unavailable = String(error?.message || '').includes('not configured');
       res.status(unavailable ? 503 : 502).json({
         message: unavailable ? 'AI image enhancement is not configured' : 'AI could not enhance this image. Your product was not changed.',
@@ -4240,6 +4244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: 'Cloud storage reinitialization completed',
         cloudStorageEnabled: isEnabled,
         ...connection,
+        productPhotoStorage: await getR2ProductPhotoStatus(),
       });
     } catch (error) {
       console.error('Error reinitializing cloud storage:', error);
@@ -4258,6 +4263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasCredentials,
         hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
         ...connection,
+        productPhotoStorage: await getR2ProductPhotoStatus(),
       });
     } catch (error) {
       console.error('Error checking cloud storage status:', error);

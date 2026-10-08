@@ -20,3 +20,9 @@ Cloudflare's agent connection and application connector have separate authorizat
 **Why:** An agent connection with account and user read scopes could list R2 buckets, but bucket creation remained denied after reconnection. The separate application connector also rejected its supplied credential; an attached connection is not proof of authenticated API access.
 
 **How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair credentials only through the existing integration's secure settings, never through chat.
+
+The R2 rollout is for new product photos in development, not a replacement for all AWS storage.
+
+**Why:** The user approved development setup while preserving existing AWS images and keeping private documents separate. Enabling a development photo bucket does not authorize migration of existing records or a production rollout.
+
+**How to apply:** Keep non-product uploads on their existing storage, preserve historical image URLs, and require separate approval and production-grade delivery configuration before enabling R2 in production.
