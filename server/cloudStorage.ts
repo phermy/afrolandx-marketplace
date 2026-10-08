@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
 import sharp from 'sharp';
@@ -12,9 +12,10 @@ interface CloudStorageConfig {
   endpoint?: string;
 }
 
-class CloudStorageService {
+export class CloudStorageService {
   private s3Client: S3Client;
   private bucketName: string;
+  private region: string;
 
   constructor(config: CloudStorageConfig & { sessionToken?: string }) {
     const credentials: any = {
@@ -34,6 +35,20 @@ class CloudStorageService {
       forcePathStyle: true, // Required for some S3-compatible services
     });
     this.bucketName = config.bucketName;
+    this.region = config.region;
+  }
+
+  async checkConnection(): Promise<{ connectionReady: boolean; status: string }> {
+    try {
+      // Read-only check. This does not claim that uploads or public reads passed.
+      await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName, MaxKeys: 0 }));
+      return { connectionReady: true, status: "Storage connection verified. Upload and image delivery still need testing." };
+    } catch (error: any) {
+      const credentialsInvalid = ["InvalidToken", "ExpiredToken", "InvalidAccessKeyId", "SignatureDoesNotMatch"].includes(error?.name);
+      return { connectionReady: false, status: credentialsInvalid
+        ? "Storage credentials are invalid or expired. Update the matching access key, secret key and session token securely."
+        : "Could not verify storage access. Check the bucket, region and permissions." };
+    }
   }
 
   async uploadImage(buffer: Buffer, contentType: string, folder: string = 'products'): Promise<string> {
@@ -66,14 +81,14 @@ class CloudStorageService {
       await this.s3Client.send(command);
 
       // Return the public URL
-      return `https://${this.bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${filename}`;
+      return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${filename}`;
     } catch (error: any) {
-      console.error('Error uploading image:', error);
+      console.error('Product image upload failed. Check the storage connection and credentials.');
       
       // Check if it's a token expiration error
-      if ((error as any).name === 'ExpiredToken' || (error as any).Code === 'ExpiredToken') {
-        console.error('AWS credentials have expired. Please refresh your AWS session token.');
-        throw new Error('AWS credentials expired - please refresh your session token');
+      if (['ExpiredToken', 'InvalidToken'].includes(error?.name)) {
+        console.error('AWS session credentials are invalid or expired. Update the matching credential set securely.');
+        throw new Error('Storage credentials are invalid or expired. Please contact support.');
       }
       
       // Check for other credential issues
@@ -124,25 +139,28 @@ let cloudStorageService: CloudStorageService | null = null;
 
 export function initializeCloudStorage(): void {
   const config = {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-    region: process.env.AWS_REGION || 'us-east-1',
-    bucketName: process.env.AWS_S3_BUCKET || '',
-    sessionToken: process.env.AWS_SESSION_TOKEN,
-    endpoint: process.env.AWS_S3_ENDPOINT,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID?.trim() || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY?.trim() || '',
+    region: process.env.AWS_REGION?.trim() || 'us-east-1',
+    bucketName: process.env.AWS_S3_BUCKET?.trim() || '',
+    sessionToken: process.env.AWS_SESSION_TOKEN?.trim(),
+    endpoint: process.env.AWS_S3_ENDPOINT?.trim(),
   };
 
   if (!config.accessKeyId || !config.secretAccessKey || !config.bucketName) {
-    console.log('Cloud storage credentials not provided. Using local storage fallback.');
+    cloudStorageService = null;
+    console.log(process.env.NODE_ENV === 'production'
+      ? 'Cloud storage is not configured. Production image uploads are disabled.'
+      : 'Cloud storage is not configured. Local image storage is available in development only.');
     return;
   }
 
   try {
     cloudStorageService = new CloudStorageService(config);
-    console.log('Cloud storage service initialized successfully');
+    console.log('Cloud storage client configured. Connection has not yet been verified.');
   } catch (error) {
-    console.warn('Failed to initialize cloud storage:', error);
-    console.log('Falling back to local storage');
+    console.warn('Failed to configure cloud storage.');
+    console.log(process.env.NODE_ENV === 'production' ? 'Production image uploads are disabled.' : 'Local storage is available in development only.');
     cloudStorageService = null;
   }
 }

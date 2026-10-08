@@ -86,7 +86,7 @@ test("registration rejects an existing email before creating another account", a
     isRateLimited: () => false,
   });
   await handler(
-    { body: { email: "  EXISTING@example.com  ", password: "strong-password", phone: "+2348000000000" } },
+    { body: { email: "  EXISTING@example.com  ", password: "strong-password", firstName: "Test", phone: "+2348000000000" } },
     { status(code: number) { statusCode = code; return this; }, json(body: any) { responseBody = body; return this; } },
   );
   assert.equal(lookedUpEmail, "existing@example.com");
@@ -110,7 +110,7 @@ test("registration handles a concurrent email uniqueness conflict", async () => 
     isRateLimited: () => false,
   });
   await handler(
-    { body: { email: "existing@example.com", password: "strong-password", phone: "+2348000000000" } },
+    { body: { email: "existing@example.com", password: "strong-password", firstName: "Test", phone: "+2348000000000" } },
     { status(code: number) { statusCode = code; return this; }, json(body: any) { responseBody = body; return this; } },
   );
   assert.equal(statusCode, 409);
@@ -137,7 +137,7 @@ test("registration requires a valid security token before creating an account", 
     status(code: number) { statusCode = code; return this; },
     json(_body: any) { return this; },
   };
-  const req = { body: { email: "new@example.com", password: "secure-password", phone: "+2348000000000" } };
+  const req = { body: { email: "new@example.com", password: "secure-password", firstName: "Test", phone: "+2348000000000" } };
   await handler(req, res);
   assert.equal(statusCode, 400);
   assert.equal(verified, 0);
@@ -172,7 +172,7 @@ test("registration does not create an account if Turnstile is unavailable", asyn
     verifyBotToken: async () => { throw new Error("provider down"); },
   });
   await handler(
-    { body: { email: "new@example.com", password: "secure-password", phone: "+2348000000000", turnstileToken: "token" } },
+    { body: { email: "new@example.com", password: "secure-password", firstName: "Test", phone: "+2348000000000", turnstileToken: "token" } },
     { status(code: number) { statusCode = code; return this; }, json(_body: any) { return this; } },
   );
   assert.equal(statusCode, 503);

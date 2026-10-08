@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { getApiErrorMessage } from '@/lib/api-error-message';
+import { orderPaidTotal } from '@shared/order-totals';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
 import { isAdmin, hasRole } from '@/lib/roleUtils';
@@ -288,8 +289,12 @@ export default function AdminDashboard() {
   });
 
   const updateVendorStatusMutation = useMutation({
-    mutationFn: async ({ vendorId, status }: { vendorId: number; status: string }) => {
-      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/status`, { status });
+    mutationFn: async ({ vendorId, status, reason }: { vendorId: number; status: string; reason?: string }) => {
+      if (!window.confirm(`Confirm changing this vendor's status to ${status}?`)) throw new Error('No change was made.');
+      const decisionReason = reason?.trim() || (['rejected', 'suspended'].includes(status)
+        ? window.prompt('Enter the reason. This will be emailed to the vendor.')?.trim() : '');
+      if (['rejected', 'suspended'].includes(status) && !decisionReason) throw new Error('Enter a reason before rejecting or suspending a vendor.');
+      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/status`, { status, reason: decisionReason });
       return response.json();
     },
     onSuccess: (result) => {
@@ -1611,7 +1616,7 @@ export default function AdminDashboard() {
                               </p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-green-700 text-lg">₦{parseFloat(order.totalAmount || 0).toLocaleString()}</span>
+                              <span className="font-bold text-green-700 text-lg">₦{orderPaidTotal(order).toLocaleString()}</span>
                               <Select
                                 value={order.orderStatus}
                                 onValueChange={(status) => {
@@ -1843,7 +1848,7 @@ export default function AdminDashboard() {
                                   onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                   <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
-                                <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>
+                                <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'rejected' })}>
                                   <XCircle className="w-3 h-3 mr-1" />Reject
                                 </Button>
                               </>
@@ -2522,7 +2527,7 @@ export default function AdminDashboard() {
             {reviewVendor?.status === 'pending' && (
               <>
                 <Button variant="destructive" disabled={updateVendorStatusMutation.isPending}
-                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
+                                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'rejected', reason: verificationNotes }); setReviewVendor(null); }}>
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
                 <Button className="bg-green-600 hover:bg-green-700 text-white"

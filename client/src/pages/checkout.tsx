@@ -179,7 +179,6 @@ function detectCountryFromGeo(): string {
 const isShippingAddressComplete = (address: ShippingAddress) =>
   Boolean(
     address.firstName.trim()
-    && address.lastName.trim()
     && address.address1.trim().length >= 3
     && address.city.trim()
     && address.state.trim()
@@ -682,7 +681,7 @@ export default function Checkout() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">Last Name (optional)</Label>
                       <Input
                         id="lastName"
                         value={shippingAddress.lastName}

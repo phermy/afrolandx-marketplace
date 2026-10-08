@@ -19,8 +19,11 @@ import {
   dropRsvps,
 } from "@shared/schema";
 import { and, eq, inArray, lt } from "drizzle-orm";
+import { securityHeaders } from "./security-headers";
 
 const app = express();
+app.disable("x-powered-by");
+app.use(securityHeaders);
 app.use(express.json({
   verify: (req: any, _res, buffer) => {
     if (req.path === "/api/webhooks/paystack") req.rawBody = Buffer.from(buffer);
@@ -298,9 +301,13 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
 
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ message: "API endpoint not found" });
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const status = Number(err.status || err.statusCode || 500);
+    const message = status === 400 ? "Invalid request body" : "The request could not be completed";
 
     if (res.headersSent) return;
     res.status(status).json({ message });

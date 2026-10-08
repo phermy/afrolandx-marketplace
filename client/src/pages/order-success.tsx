@@ -5,6 +5,7 @@ import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { trackEvent, valueBand } from '@/lib/analytics';
+import { fetchPaymentConfirmation, PaymentConfirmationError } from '@/lib/payment-confirmation';
 
 
 export default function OrderSuccess() {
@@ -12,21 +13,15 @@ export default function OrderSuccess() {
   const processedOrderRef = useRef<number | null>(null);
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('order_id');
-  const reference = params.get('reference');
-  const { data: order, isLoading, isError } = useQuery<any>({
-    queryKey: ['/api/orders', orderId],
+  const reference = params.get('reference') || params.get('trxref');
+  const { data: order, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ['/api/orders', orderId, reference],
     queryFn: async () => {
-      if (!orderId || !reference) throw new Error('Missing payment confirmation');
-      const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Order confirmation unavailable');
-      const result = await response.json();
-      if (result.paymentStatus !== 'paid' || result.paymentReference !== reference) {
-        throw new Error('Payment is not confirmed');
-      }
-      return result;
+      return fetchPaymentConfirmation(orderId || '', reference || '');
     },
     enabled: Boolean(orderId && reference),
-    retry: 1,
+    retry: (count, error) => count < 12 && (error instanceof PaymentConfirmationError ? error.pending : true),
+    retryDelay: 2000,
   });
 
   useEffect(() => {
@@ -47,12 +42,13 @@ export default function OrderSuccess() {
     });
   }, [clearCart, order]);
 
-  if (isLoading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="min-h-[60vh] flex items-center justify-center"><div className="spinner-nigerian" /></div></div>;
+  if (isLoading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="min-h-[60vh] flex flex-col gap-4 items-center justify-center" role="status"><div className="spinner-nigerian" /><p>Confirming your payment. Please do not pay again.</p></div></div>;
   if (isError || !order) return (
     <div className="min-h-screen bg-gray-50"><Navbar /><div className="max-w-xl mx-auto px-4 py-20 text-center">
       <h1 className="text-2xl font-bold mb-3">Payment confirmation unavailable</h1>
-      <p className="text-gray-600 mb-6">We could not confirm a paid order from this link. Check My Orders before trying payment again.</p>
+      <p className="text-gray-600 mb-6">We could not confirm a paid order from this link yet. Do not pay again. Check My Orders or contact payments@afrolandx.com with your payment reference.</p>
       <Button onClick={() => window.location.href = '/my-orders'}>View My Orders</Button>
+      <Button className="ml-3" variant="outline" onClick={() => refetch()}>Check confirmation again</Button>
     </div></div>
   );
 

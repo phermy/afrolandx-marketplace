@@ -45,7 +45,7 @@ export async function drainLogisticsEmails() {
       const row = result.rows[0] as { id: number; recipient: string; subject: string; message: string } | undefined;
       if (!row) break;
       try {
-        await sendLogisticsEmail(row.recipient, row.subject, row.message);
+        await sendLogisticsEmail(row.recipient, row.subject, row.message, `account-logistics:${row.id}`);
         await db.update(logisticsEmailOutbox).set({ deliveredAt: new Date(), lastError: null }).where(eq(logisticsEmailOutbox.id, row.id));
       } catch {
         // Do not store provider responses, which may contain credentials or personal data.

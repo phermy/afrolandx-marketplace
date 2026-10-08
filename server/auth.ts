@@ -11,6 +11,9 @@ import { pool } from "./db";
 import { registrationTurnstileConfig, verifyRegistrationTurnstile } from "./turnstile";
 import { normalizeAccountPhone } from "@shared/account-registration";
 import { getLogisticsAccess } from "./logistics-access";
+import { requestRateLimit } from "./request-rate-limit";
+import { accountNameProblem, passwordProblem } from "../shared/account-security";
+import { queueAccountEmail } from "./account-notifications";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -54,8 +57,7 @@ function permitted(limit: Map<string, number[]>, key: string, max: number): bool
 }
 
 function clientIp(req: any): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  return typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.ip || "unknown";
+  return req.ip || req.socket?.remoteAddress || "unknown";
 }
 
 export function sanitizeUser(user: any) {
@@ -91,10 +93,18 @@ type RegisterHandlerDependencies = {
 
 export function createRegisterHandler(dependencies: RegisterHandlerDependencies) {
   return async (req: any, res: any) => {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({ message: "Enter valid account details." });
+    }
     const email = canonicalEmail(req.body.email);
     const { password, firstName, lastName } = req.body;
-    if (!email || typeof password !== "string" || password.length < 8) {
-      return res.status(400).json({ message: "A valid email and a password of at least 8 characters are required" });
+    const passwordError = passwordProblem(password, email || undefined);
+    if (!email || passwordError) {
+      return res.status(400).json({ message: passwordError || "Enter a valid email address." });
+    }
+    const nameError = accountNameProblem(firstName, lastName);
+    if (nameError) {
+      return res.status(400).json({ message: nameError });
     }
     const phone = normalizeAccountPhone(req.body.phone);
     if (!phone) return res.status(400).json({ message: "Enter a valid phone number with 7 to 15 digits." });
@@ -126,8 +136,8 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
         id,
         email,
         password: await dependencies.hashPassword(password),
-        firstName: firstName || null,
-        lastName: lastName || null,
+        firstName: firstName.trim(),
+        lastName: lastName?.trim() || null,
         phone,
         signupIntent,
       });
@@ -201,6 +211,9 @@ export async function setupAuth(app: Express) {
               .json({ message: error instanceof Error && error.message === "ACCOUNT_CLOSED" ? "This account has been closed. Contact support." : "Login failed" }));
           });
         }
+        await queueAccountEmail(user.email, "New sign-in to your Afrolandx account",
+          "A sign-in to your Afrolandx account was completed. If this was not you, reset your password to end the other session and contact support@afrolandx.com. Never send your password or verification code by email."
+        ).catch(() => console.error("Sign-in notice could not be queued."));
         onSuccess();
       });
     });
@@ -235,7 +248,7 @@ export async function setupAuth(app: Express) {
     res.json({ enabled: config.enabled, siteKey: config.siteKey, testMode: config.testMode });
   });
 
-  app.post("/api/register", createRegisterHandler({
+  app.post("/api/register", requestRateLimit("register", 6, 900), createRegisterHandler({
     storage,
     issueOtp: (req, user) => issueOtp(req, user, "email"),
     hashPassword: (password) => bcrypt.hash(password, 10),
@@ -246,7 +259,7 @@ export async function setupAuth(app: Express) {
       : registrationTurnstileConfig().enabled ? verifyRegistrationTurnstile : undefined,
   }));
 
-  app.post("/api/login", (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
+  app.post("/api/login", requestRateLimit("password-login", 10, 900), (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
     if (err) return res.status(500).json({ message: "Authentication error" });
     if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials", ...(info?.hint ? { hint: info.hint } : {}) });
     finalizeLogin(req, res, user, () => res.json({ user: sanitizeUser(user) }));
@@ -383,7 +396,8 @@ export async function setupAuth(app: Express) {
   app.post("/api/reset-password", async (req, res) => {
     const email = canonicalEmail(req.body.email);
     const { otp, newPassword } = req.body;
-    if (!email || !OTP_RE.test(otp || "") || typeof newPassword !== "string" || newPassword.length < 8) return res.status(400).json({ message: "A valid email, six-digit code, and password of at least 8 characters are required" });
+    const passwordError = passwordProblem(newPassword, email || undefined);
+    if (!email || !OTP_RE.test(otp || "") || passwordError) return res.status(400).json({ message: passwordError || "A valid email and six-digit code are required" });
     try {
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
@@ -392,6 +406,9 @@ export async function setupAuth(app: Express) {
       if (result !== "valid") return res.status(result === "limited" ? 429 : 400).json({ message: result === "expired" ? "Reset code has expired. Please request a new one." : "Invalid reset code" });
       await storage.updateUserPassword(user.id, await bcrypt.hash(newPassword, 10));
       await storage.updateActiveSession(user.id, null);
+      await queueAccountEmail(user.email, "Your Afrolandx password was changed",
+        "Your password was changed successfully, and previous signed-in sessions have been ended. If you did not make this change, request a password reset and contact support@afrolandx.com immediately. Never send your password or verification code by email."
+      ).catch(() => console.error("Password change notice could not be queued."));
       return res.json({ message: "Password reset successfully. You can now sign in." });
     } catch { return res.status(500).json({ message: "Failed to reset password" }); }
   });

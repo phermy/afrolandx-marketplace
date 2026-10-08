@@ -83,8 +83,8 @@ function otpEmailHtml(title: string, greeting: string, description: string, code
   `;
 }
 
-export async function sendLogisticsEmail(email: string, subject: string, message: string): Promise<void> {
-  await sendEmail(email, subject, `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px"><h2>${escapeHtml(subject)}</h2><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p>Sign in to Afrolandx and open Shipping or My Orders for details.</p></div>`);
+export async function sendLogisticsEmail(email: string, subject: string, message: string, eventKey?: string): Promise<void> {
+  await sendEmail(email, subject, `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px"><h2>${escapeHtml(subject)}</h2><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p>Sign in to your Afrolandx account for details. For help, contact support@afrolandx.com.</p></div>`, false, eventKey);
 }
 
 export async function sendVerificationEmail(email: string, firstName: string, otp: string): Promise<void> {

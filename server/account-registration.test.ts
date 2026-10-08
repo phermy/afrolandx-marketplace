@@ -20,7 +20,7 @@ function registration(body: Record<string, unknown>) {
     isRateLimited: () => false,
   });
   return {
-    run: () => handler({ body: { email: "test@example.com", password: "valid-password", ...body } }, {
+    run: () => handler({ body: { email: "test@example.com", password: "valid-password", firstName: "Test", ...body } }, {
       status(value: number) { code = value; return this; },
       json(value: any) { result = value; return this; },
     }),

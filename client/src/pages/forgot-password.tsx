@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { AuthShell, authInputClass } from "@/components/auth-shell";
+import { passwordProblem } from "@shared/account-security";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -60,8 +61,9 @@ export default function ForgotPasswordPage() {
       setError("Enter all six digits from the code in your email.");
       return;
     }
-    if (newPassword.length < 8) {
-      setError("Your new password must be at least 8 characters.");
+    const passwordError = passwordProblem(newPassword, email);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -149,11 +151,11 @@ export default function ForgotPasswordPage() {
           </div>
           <label className="block text-sm font-medium text-gray-700">
             New password
-            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" className={authInputClass} minLength={8} required />
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="At least 12 characters" className={authInputClass} minLength={12} required />
           </label>
           <label className="block text-sm font-medium text-gray-700">
             Confirm new password
-            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="Enter it again" className={authInputClass} minLength={8} required />
+            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="Enter it again" className={authInputClass} minLength={12} required />
           </label>
           <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
             {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating password...</> : "Update password"}

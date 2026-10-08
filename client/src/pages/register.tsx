@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowUpRight, Eye, EyeOff, Loader2, ShieldCheck } from "luci
 import { RegistrationTurnstile } from "@/components/registration-turnstile";
 import logoImage from "@assets/Group 1000002646_1749631956471.png";
 import { normalizeAccountPhone } from "@shared/account-registration";
+import { accountNameProblem, passwordProblem } from "@shared/account-security";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -121,8 +122,10 @@ export default function RegisterPage() {
       setError("Complete all fields to create your account.");
       return;
     }
-    if (form.password.length < 8) {
-      setError("Your password must be at least 8 characters.");
+    const names = name.split(/\s+/);
+    const validationError = accountNameProblem(names[0], names.slice(1).join(" ")) || passwordProblem(form.password, email);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     if (form.password !== form.confirmPassword) {
@@ -136,7 +139,6 @@ export default function RegisterPage() {
     setError("");
     setIsLoading(true);
     try {
-      const names = name.split(/\s+/);
       const response = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -265,17 +267,17 @@ export default function RegisterPage() {
                   <label className="block text-[15px] font-semibold text-[#33473e]">
                     Password
                     <span className="relative block">
-                      <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" className={`${inputClass} pr-12`} minLength={8} required data-testid="input-password" />
+                      <input value={form.password} onChange={(event) => updateField("password", event.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 12 characters" className={`${inputClass} pr-12`} minLength={12} required data-testid="input-password" />
                       <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-2 text-[#849087] hover:text-[#183b35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#236c53]" aria-label={showPassword ? "Hide password" : "Show password"}>
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </span>
-                    <span className="mt-1.5 block text-[13px] font-normal text-[#53655a]">Use at least 8 characters.</span>
+                    <span className="mt-1.5 block text-[13px] font-normal text-[#53655a]">Use at least 12 characters. Avoid common passwords.</span>
                   </label>
                   <label className="block text-[15px] font-semibold text-[#33473e]">
                     Confirm password
                     <span className="relative block">
-                      <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${inputClass} pr-12`} minLength={8} required data-testid="input-confirm-password" />
+                      <input value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter it again" className={`${inputClass} pr-12`} minLength={12} required data-testid="input-confirm-password" />
                       <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-2 text-[#849087] hover:text-[#183b35] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#236c53]" aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>

@@ -3,6 +3,10 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement } from "./payment-emails";
+import { vendorOrdersHandler } from "./vendor-orders";
+import { requestRateLimit } from "./request-rate-limit";
+import { orderDetailsHandler } from "./order-details";
+import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
@@ -79,8 +83,8 @@ import {
 } from "./finance";
 
 const shippingAddressSchema = z.object({
-  firstName: z.string().trim().min(1).max(100),
-  lastName: z.string().trim().min(1).max(100),
+  firstName: z.string().trim().min(1).max(120),
+  lastName: z.string().trim().max(120).optional().default(''),
   address1: z.string().trim().min(3).max(250),
   address2: z.string().trim().max(250).optional().default(''),
   city: z.string().trim().min(1).max(120),
@@ -872,6 +876,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const vendor = await storage.createVendor(vendorData);
       await storage.addUserRole(userId, 'vendor');
+      const applicant = await storage.getUser(userId);
+      await queueAccountEmail(applicant?.email, "Vendor application received",
+        "Your vendor application has been received and is awaiting verification and approval. You do not have permission to sell until approval. Sign in to view your application, or contact support@afrolandx.com."
+      ).catch(() => console.error("Vendor application email could not be queued."));
       res.json(vendor);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1068,6 +1076,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin: get single vendor with details
+  // Register literal order routes before :id, which would otherwise require
+  // Admin access and treat "orders" as a vendor identifier.
+  app.get('/api/vendors/orders', isAuthenticated, vendorOrdersHandler);
+  app.get('/api/vendors/me/orders', isAuthenticated, vendorOrdersHandler);
+
   app.get('/api/vendors/:id', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const actor = await storage.getUser((req.user as any)?.id);
@@ -3070,34 +3083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/orders/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const orderId = parseInt(req.params.id);
-      const userId = (req.user as any)?.id;
-      const order = await storage.getOrder(orderId);
-      if (!order) return res.status(404).json({ message: 'Order not found' });
-      const allowedNextStatus: Record<string, string> = { pending: 'processing', processing: 'shipped', shipped: 'delivered' };
-      if (status !== 'cancelled' && allowedNextStatus[order.orderStatus || ''] !== status) {
-        return res.status(409).json({ message: `Order cannot move from ${order.orderStatus} to ${status}` });
-      }
-      if (order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
-      // Return with items
-      const rawItems = await storage.getOrderItemsWithProducts(orderId);
-      const items = await Promise.all(rawItems.map(async (item) => {
-        const product = await storage.getProduct(item.productId);
-        const vendor = product ? await storage.getVendor(product.vendorId) : null;
-        return {
-          ...item,
-          productName: product?.name || 'Product',
-          productImage: (product?.images as string[])?.[0] || product?.imageUrl || null,
-          vendorName: vendor?.businessName || 'Unknown Vendor',
-        };
-      }));
-      res.json({ ...order, items });
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch order' });
-    }
-  });
+  app.get('/api/orders/:id', isAuthenticated, orderDetailsHandler);
 
   // Customer: cancel own order (only if pending or processing)
   app.patch('/api/orders/:id/cancel', isAuthenticated, async (req: any, res) => {
@@ -3406,58 +3392,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Webhook error:', error);
       res.status(500).json({ message: 'Webhook processing failed' });
-    }
-  });
-
-  // Vendor order tracking - simplified implementation using storage methods
-  app.get('/api/vendors/orders', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = (req.user as any)?.id;
-      const vendor = await storage.getVendorByUserId(userId);
-      
-      if (!vendor) {
-        return res.status(404).json({ message: 'Vendor not found' });
-      }
-
-      // Get all vendor products to filter orders
-      const vendorProducts = await storage.getProducts({ vendorId: vendor.id });
-      const vendorProductIds = vendorProducts.map(p => p.id);
-
-      if (vendorProductIds.length === 0) {
-        return res.json([]);
-      }
-
-      // Get all orders and filter for vendor-relevant ones
-      const allOrders = await storage.getAllOrders();
-      const vendorOrders = [];
-
-      for (const order of allOrders) {
-        const orderItems = await storage.getOrderItemsWithProducts(order.id);
-        const vendorItems = orderItems.filter(item => vendorProductIds.includes(item.productId));
-        
-        if (vendorItems.length > 0) {
-          const customer = await storage.getUser(order.userId);
-          const vendorTotal = vendorItems.reduce((sum, item) => 
-            sum + (parseFloat(item.priceAtTime) * item.quantity), 0
-          );
-
-          vendorOrders.push({
-            ...order,
-            items: vendorItems,
-            customer: {
-              firstName: customer?.firstName,
-              lastName: customer?.lastName,
-              email: customer?.email,
-            },
-            vendorTotal
-          });
-        }
-      }
-
-      res.json(vendorOrders);
-    } catch (error) {
-      console.error('Error fetching vendor orders:', error);
-      res.status(500).json({ message: 'Failed to fetch vendor orders' });
     }
   });
 
@@ -4222,10 +4156,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reinitializeCloudStorage();
       
       const isEnabled = isCloudStorageEnabled();
+      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
       res.json({ 
         message: 'Cloud storage reinitialization completed',
         cloudStorageEnabled: isEnabled,
-        status: isEnabled ? 'AWS credentials refreshed successfully' : 'Cloud storage not available - check credentials'
+        ...connection,
       });
     } catch (error) {
       console.error('Error reinitializing cloud storage:', error);
@@ -4238,14 +4173,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const isEnabled = isCloudStorageEnabled();
       const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET);
-      
+      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
       res.json({
         cloudStorageEnabled: isEnabled,
         hasCredentials,
-        awsRegion: process.env.AWS_REGION || 'us-east-1',
-        bucketName: process.env.AWS_S3_BUCKET || 'Not configured',
         hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
-        status: isEnabled ? 'Active' : (hasCredentials ? 'Credentials may be expired' : 'Not configured')
+        ...connection,
       });
     } catch (error) {
       console.error('Error checking cloud storage status:', error);
@@ -4263,7 +4196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     messages: z.array(chatMessageSchema).min(1).max(50),
   });
 
-  app.post('/api/chat', async (req, res) => {
+  app.post('/api/chat', requestRateLimit("public-ai", 20, 60), requestRateLimit("public-ai-daily", 200, 86400), async (req, res) => {
     try {
       // Validate request body to prevent injection of system messages or malformed data
       const validationResult = chatRequestSchema.safeParse(req.body);
@@ -5251,7 +5184,7 @@ INSTRUCTIONS:
   });
 
   // AI-powered collab drop suggestion based on free-text user query
-  app.post('/api/collab-drops/ai-suggest', async (req, res) => {
+  app.post('/api/collab-drops/ai-suggest', requestRateLimit("public-ai", 20, 60), requestRateLimit("public-ai-daily", 200, 86400), async (req, res) => {
     try {
       const { query } = req.body as { query: string };
       if (!query || query.trim().length < 3 || query.trim().length > 300) {

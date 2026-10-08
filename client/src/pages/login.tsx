@@ -61,7 +61,9 @@ export default function LoginPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome back!", description: "You are now signed in." });
       const result = await response.json();
-      window.location.href = result.user?.signupIntent === "vendor" ? "/vendor" : "/";
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+      window.location.href = returnTo?.startsWith("/") && !returnTo.startsWith("//") && !/[\\\u0000-\u0020]/.test(returnTo)
+        ? returnTo : result.user?.signupIntent === "vendor" ? "/vendor" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "We couldn't sign you in. Please try again.");
     } finally {
@@ -119,7 +121,9 @@ export default function LoginPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome!", description: "You are now signed in." });
       const result = await response.json();
-      window.location.href = result.user?.signupIntent === "vendor" ? "/vendor" : "/";
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+      window.location.href = returnTo?.startsWith("/") && !returnTo.startsWith("//") && !/[\\\u0000-\u0020]/.test(returnTo)
+        ? returnTo : result.user?.signupIntent === "vendor" ? "/vendor" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "That code is invalid or expired.");
     } finally {

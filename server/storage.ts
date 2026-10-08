@@ -87,7 +87,7 @@ import { db } from "./db";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import { subcategoryTag } from "@shared/product-subcategories";
-import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt } from "drizzle-orm";
+import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -166,6 +166,7 @@ export interface IStorage {
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersForUser(userId: string): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
+  getOrdersForVendor(vendorId: number): Promise<Order[]>;
   getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
   getAccountPurchaseItems(userId: string): Promise<AccountCommerceItem[]>;
   getAccountSalesItems(vendorId: number): Promise<AccountCommerceItem[]>;
@@ -1049,6 +1050,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(orders)
       .orderBy(desc(orders.createdAt));
+  }
+
+  async getOrdersForVendor(vendorId: number): Promise<Order[]> {
+    return db.select().from(orders).where(and(
+      eq(orders.paymentStatus, "paid"),
+      inArray(orders.id, db.select({ id: orderItems.orderId }).from(orderItems)
+        .innerJoin(products, eq(products.id, orderItems.productId))
+        .where(eq(products.vendorId, vendorId))),
+    )).orderBy(desc(orders.createdAt));
   }
 
   async updateOrderStatus(id: number, status: string): Promise<void> {

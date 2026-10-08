@@ -157,15 +157,22 @@ function Router() {
         {isAuthenticated ? <Shipping /> : <AuthRedirect to="/login" />}
       </Route>
 
+      <Route path="/profile">
+        {isAuthenticated ? <Profile /> : <AuthRedirect to="/login" />}
+      </Route>
+      <Route path="/my-orders">
+        {isAuthenticated ? <MyOrders /> : <AuthRedirect to="/login" />}
+      </Route>
+      <Route path="/order-success">
+        {isAuthenticated ? <OrderSuccess /> : <AuthRedirect to={`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`} />}
+      </Route>
+
       {/* Authenticated-only pages */}
       {isAuthenticated ? (
         <>
-          <Route path="/profile" component={Profile} />
-          <Route path="/my-orders" component={MyOrders} />
           <Route path="/measurements" component={Measurements} />
           <Route path="/messages" component={Messages} />
           <Route path="/loyalty" component={Loyalty} />
-          <Route path="/order-success" component={OrderSuccess} />
         </>
       ) : null}
 

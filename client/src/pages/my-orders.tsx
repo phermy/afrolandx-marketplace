@@ -16,6 +16,7 @@ import {
   ShoppingBag, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import type { Order } from '@/types';
+import { orderPaidTotal } from '@shared/order-totals';
 
 // Order lifecycle stages
 const STAGES = [
@@ -96,10 +97,9 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
   const queryClient = useQueryClient();
   const isCancelled = order.orderStatus === 'cancelled';
   const isDelivered = order.orderStatus === 'delivered';
-  const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
+  const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && ['paid', 'pending'].includes(order.paymentStatus);
   const canBuyAgain = !isCancelled && Array.isArray(order.items) && order.items.length > 0;
-  const separateShipping = ['awaiting_quote', 'pending', 'paid', 'rejected'].includes(order.shippingPaymentStatus);
-  const displayedTotal = Number(order.totalAmount) + (separateShipping ? Number(order.shippingAmount || 0) : 0);
+  const displayedTotal = orderPaidTotal(order);
   const payShippingMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', `/api/orders/${order.id}/initialize-shipping-payment`);
