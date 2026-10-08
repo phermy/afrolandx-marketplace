@@ -166,3 +166,30 @@ test("QA storage: configured SDK is not reported as a verified connection with i
   assert.match(result.status, /invalid or expired/);
   assert.doesNotMatch(result.status, /private provider details/);
 });
+
+test("QA storage: long-lived IAM keys do not send a stale session token", async () => {
+  const service = new CloudStorageService({
+    accessKeyId: `AKIA${"A".repeat(16)}`, secretAccessKey: "fixture",
+    sessionToken: "old-fixture-token", region: "eu-west-1", bucketName: "fixture",
+  });
+  const credentials = await (service as any).s3Client.config.credentials();
+  assert.equal(credentials.sessionToken, undefined);
+});
+
+test("QA storage: temporary credentials retain their matching session token", async () => {
+  const service = new CloudStorageService({
+    accessKeyId: `ASIA${"A".repeat(16)}`, secretAccessKey: "fixture",
+    sessionToken: "matching-fixture-token", region: "eu-west-1", bucketName: "fixture",
+  });
+  const credentials = await (service as any).s3Client.config.credentials();
+  assert.equal(credentials.sessionToken, "matching-fixture-token");
+});
+
+test("QA storage: missing bucket is distinguished from invalid credentials", async t => {
+  t.mock.method(S3Client.prototype, "send", async () => { throw Object.assign(new Error("private details"), { name: "NoSuchBucket" }); });
+  const service = new CloudStorageService({ accessKeyId: "fixture", secretAccessKey: "fixture", region: "eu-west-1", bucketName: "fixture" });
+  const result = await service.checkConnection();
+  assert.equal(result.connectionReady, false);
+  assert.match(result.status, /bucket was not found/);
+  assert.doesNotMatch(result.status, /private details|credentials are invalid/);
+});

@@ -23,8 +23,9 @@ export class CloudStorageService {
       secretAccessKey: config.secretAccessKey,
     };
 
-    // Add session token if provided (required for temporary credentials)
-    if (config.sessionToken) {
+    // AKIA keys are long-lived IAM credentials. An old STS token must not be
+    // attached to them; temporary credentials still require their matching token.
+    if (config.sessionToken && !config.accessKeyId.startsWith("AKIA")) {
       credentials.sessionToken = config.sessionToken;
     }
 
@@ -44,6 +45,9 @@ export class CloudStorageService {
       await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName, MaxKeys: 0 }));
       return { connectionReady: true, status: "Storage connection verified. Upload and image delivery still need testing." };
     } catch (error: any) {
+      if (error?.name === "NoSuchBucket") {
+        return { connectionReady: false, status: "The configured storage bucket was not found. Check its exact name and AWS region." };
+      }
       const credentialsInvalid = ["InvalidToken", "ExpiredToken", "InvalidAccessKeyId", "SignatureDoesNotMatch"].includes(error?.name);
       return { connectionReady: false, status: credentialsInvalid
         ? "Storage credentials are invalid or expired. Update the matching access key, secret key and session token securely."
