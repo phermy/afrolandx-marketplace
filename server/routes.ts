@@ -6,6 +6,7 @@ import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement }
 import { vendorOrdersHandler } from "./vendor-orders";
 import { requestRateLimit } from "./request-rate-limit";
 import { orderDetailsHandler } from "./order-details";
+import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
@@ -509,7 +510,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // The client route alone is not an access boundary; deny direct page loads too.
-  app.get('/discover', isAuthenticated, isAdmin, (_req, _res, next) => next());
+  app.get('/discover', (req: any, res, next) => {
+    res.set("Cache-Control", "no-store");
+    if (!req.isAuthenticated() || !req.user?.emailVerified || req.user?.closedAt) {
+      return res.redirect('/login?returnTo=%2Fdiscover');
+    }
+    if (!hasSupportManagementAccess(req.user)) return res.redirect('/products');
+    next();
+  }, isAuthenticated, isAdmin, (_req, _res, next) => next());
 
   // Ordinary admin tools cannot remove the owner-level role (including by
   // replacing all roles) or delete an account that holds it.
@@ -1579,25 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/:id', async (req, res) => {
-    try {
-      const productId = parseInt(req.params.id);
-      const product = await storage.getProduct(productId);
-      
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-      if (product.status !== 'approved') return res.status(404).json({ message: 'Product not found' });
-      const vendor = await storage.getVendor(product.vendorId);
-      if (!vendor || vendor.status !== 'approved' || vendor.verificationStatus !== 'verified') {
-        return res.status(404).json({ message: 'Product not found' });
-      }
-      
-      res.json(product);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch product' });
-    }
-  });
+  app.get('/api/products/:id', createPublicProductHandler(storage));
 
   // Vendor: update their own product (name, description, price, stock, imageUrl, removeImages)
   app.patch('/api/products/:id', isAuthenticated, async (req: any, res) => {

@@ -195,7 +195,7 @@ const canonicalAddressFingerprint = (address: ShippingAddress) => JSON.stringify
 
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { cartItems, cartTotal } = useCart();
+  const { cartItems, cartTotal, isCartLoading, isCartError, refetchCart } = useCart();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -299,7 +299,7 @@ export default function Checkout() {
 
   // Redirect if cart is empty
   useEffect(() => {
-    if (cartItems.length === 0 && !isLoading) {
+    if (isAuthenticated && cartItems.length === 0 && !isLoading && !isCartLoading && !isCartError) {
       toast({
         title: 'Empty Cart',
         description: 'Your cart is empty. Add some items first!',
@@ -307,7 +307,7 @@ export default function Checkout() {
       });
       window.location.href = '/products';
     }
-  }, [cartItems, isLoading, toast]);
+  }, [cartItems, isLoading, isAuthenticated, isCartLoading, isCartError, toast]);
 
   // Pre-fill user data
   useEffect(() => {
@@ -593,10 +593,23 @@ export default function Checkout() {
     }
   }, [effectiveShippingQuotes, selectedShipping]);
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && isCartLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner-nigerian"></div>
+        <div role="status" aria-label="Loading checkout" className="spinner-nigerian"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && isCartError) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div role="alert" className="max-w-xl mx-auto p-6 space-y-4">
+          <h1 className="text-2xl font-semibold">Your cart could not be loaded</h1>
+          <p>Please retry. No payment has been started.</p>
+          <Button onClick={refetchCart}>Retry loading cart</Button>
+        </div>
       </div>
     );
   }

@@ -142,6 +142,9 @@ export default function Navbar() {
                 variant="ghost"
                 size="sm"
                 onClick={toggleCart}
+                aria-label={`Open shopping cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                aria-haspopup="dialog"
+                data-testid="button-open-cart"
                 className="relative text-gray-700 hover:text-nigerian-green"
               >
                 <ShoppingCart className="w-6 h-6" />
@@ -158,7 +161,7 @@ export default function Navbar() {
               <div className="hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Button aria-label="Open account menu" variant="ghost" className="relative h-8 w-8 rounded-full">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.profileImageUrl} alt={user.firstName || 'User'} />
                         <AvatarFallback className="bg-nigerian-green text-white text-sm">

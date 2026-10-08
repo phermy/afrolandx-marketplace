@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'wouter';
 import LocalPrice from '@/components/LocalPrice';
+import { useRef } from 'react';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export default function ShoppingCart() {
   const { 
@@ -22,9 +24,9 @@ export default function ShoppingCart() {
   } = useCart();
   const { isAuthenticated } = useAuth();
 
-  console.log('Cart component render - isAuthenticated:', isAuthenticated, 'isCartOpen:', isCartOpen);
-  
-  if (!isAuthenticated || !isCartOpen) {
+  const openingControl = useRef<HTMLElement | null>(null);
+
+  if (!isAuthenticated) {
     return null;
   }
 
@@ -38,40 +40,29 @@ export default function ShoppingCart() {
     }
   };
 
-  const shipping = 10; // $10 base shipping
-  const finalTotal = cartTotal + shipping;
-
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 transition-opacity"
-        onClick={closeCart}
-      />
-      
-      {/* Cart Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+    <Sheet open={isCartOpen} onOpenChange={(open) => { if (!open) closeCart(); }}>
+      <SheetContent
+        className="w-full sm:max-w-md p-0 flex flex-col"
+        aria-describedby={undefined}
+        onOpenAutoFocus={() => { openingControl.current = document.activeElement as HTMLElement; }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (openingControl.current?.isConnected) openingControl.current.focus();
+          else document.querySelector<HTMLElement>('[data-testid="button-open-cart"]')?.focus();
+        }}
+      >
         {/* Header */}
         <div className="p-6 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
+            <SheetTitle className="text-xl font-semibold text-gray-900 pr-6">
               Shopping Cart
               {cartCount > 0 && (
                 <Badge className="ml-2 bg-nigerian-green text-white">
                   {cartCount} {cartCount === 1 ? 'item' : 'items'}
                 </Badge>
               )}
-            </h2>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={closeCart}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </Button>
+            </SheetTitle>
           </div>
         </div>
 
@@ -142,6 +133,7 @@ export default function ShoppingCart() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                          aria-label={`Decrease quantity of ${item.product.name}`}
                           disabled={isUpdatingQuantity}
                           className="w-8 h-8 p-0"
                         >
@@ -154,6 +146,7 @@ export default function ShoppingCart() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                          aria-label={`Increase quantity of ${item.product.name}`}
                           disabled={isUpdatingQuantity || item.quantity >= item.product.stock}
                           className="w-8 h-8 p-0"
                         >
@@ -166,6 +159,7 @@ export default function ShoppingCart() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFromCart(item.id)}
+                        aria-label={`Remove ${item.product.name} from cart`}
                         disabled={isRemovingFromCart}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       >
@@ -210,14 +204,14 @@ export default function ShoppingCart() {
 
               {/* Checkout Button */}
               <div className="mt-6 space-y-3">
-                <Link href="/checkout">
-                  <Button className="w-full btn-nigerian" onClick={closeCart}>
+                <Button asChild className="w-full btn-nigerian">
+                  <Link href="/checkout" onClick={closeCart}>
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
                     Proceed to Checkout
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 
                 <div className="text-center text-sm text-gray-500">
                   Secure checkout powered by{' '}
@@ -259,7 +253,7 @@ export default function ShoppingCart() {
             </div>
           </>
         )}
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }

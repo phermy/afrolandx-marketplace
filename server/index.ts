@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { securityHeaders } from "./security-headers";
+import { registerPublicPages } from "./public-pages";
 
 const app = express();
 app.disable("x-powered-by");
@@ -300,6 +301,7 @@ app.use((req, res, next) => {
   }
 
   const server = await registerRoutes(app);
+  registerPublicPages(app);
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ message: "API endpoint not found" });

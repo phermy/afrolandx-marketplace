@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { publicNumericId } from '@shared/page-metadata';
 import { useRoute, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/contexts/CartContext';
@@ -29,7 +30,7 @@ export default function ProductDetail() {
   const [liveArOpen, setLiveArOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
 
-  const productId = params?.id ? parseInt(params.id) : null;
+  const productId = publicNumericId(params?.id);
 
   const { data: product, isLoading, error } = useQuery<Product>({
     queryKey: ['/api/products', productId],

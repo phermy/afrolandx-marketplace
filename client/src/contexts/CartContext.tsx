@@ -8,6 +8,9 @@ import type { CartItem, Product } from '@/types';
 
 interface CartContextType {
   cartItems: (CartItem & { product: Product })[];
+  isCartLoading: boolean;
+  isCartError: boolean;
+  refetchCart: () => void;
   isCartOpen: boolean;
   cartTotal: number;
   cartCount: number;
@@ -31,7 +34,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   // Fetch cart items
-  const { data: cartItems = [] } = useQuery<(CartItem & { product: Product })[]>({
+  const { data: cartItems = [], isLoading: isCartLoading, isError: isCartError, refetch: refetchCart } = useQuery<(CartItem & { product: Product })[]>({
     queryKey: ['/api/cart'],
     retry: false,
   });
@@ -230,6 +233,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value: CartContextType = {
     cartItems,
+    isCartLoading,
+    isCartError,
+    refetchCart: () => { void refetchCart(); },
     isCartOpen,
     cartTotal,
     cartCount,
