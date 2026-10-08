@@ -9,7 +9,7 @@ import { requestRateLimit } from "./request-rate-limit";
 import { fetchPaymentConfirmation, PaymentConfirmationError } from "../client/src/lib/payment-confirmation";
 import { securityHeaders } from "./security-headers";
 import { vendorStatusMessage, notifyVendorStatus } from "./account-notifications";
-import { CloudStorageService } from "./cloudStorage";
+import { CloudStorageService, cloudStorageConfigProblem, normalizeCloudStorageRegion } from "./cloudStorage";
 import { S3Client } from "@aws-sdk/client-s3";
 
 function response() {
@@ -191,5 +191,45 @@ test("QA storage: missing bucket is distinguished from invalid credentials", asy
   const result = await service.checkConnection();
   assert.equal(result.connectionReady, false);
   assert.match(result.status, /bucket was not found/);
+  assert.doesNotMatch(result.status, /private details|credentials are invalid/);
+});
+
+test("QA storage: ARN and URL settings are rejected without echoing their values", () => {
+  const invalidRegion = "arn:aws:s3:::private-fixture";
+  const problem = cloudStorageConfigProblem({ region: invalidRegion, bucketName: "fixture" });
+  assert.match(problem!, /region code/);
+  assert.ok(!problem?.includes(invalidRegion));
+  for (const bucketName of ["arn:aws:s3:::private-fixture", "https://private-fixture.example", "127.0.0.1", "bad..bucket"]) {
+    const error = cloudStorageConfigProblem({ region: "af-south-1", bucketName });
+    assert.match(error!, /bucket name/);
+    assert.ok(!error?.includes(bucketName));
+  }
+  assert.equal(cloudStorageConfigProblem({ region: "af-south-1", bucketName: "fixture-media" }), null);
+});
+
+test("QA storage: malformed configuration never reaches the SDK", t => {
+  let requests = 0;
+  t.mock.method(S3Client.prototype, "send", async () => { requests++; return {}; });
+  assert.throws(() => new CloudStorageService({
+    accessKeyId: "fixture", secretAccessKey: "fixture", region: "arn:aws:s3:::private-fixture", bucketName: "fixture",
+  }), /region code/);
+  assert.equal(requests, 0);
+});
+
+test("QA storage: explicit region codes in console display labels are normalized without guessing", () => {
+  assert.equal(normalizeCloudStorageRegion("Africa (Cape Town) af-south-1"), "af-south-1");
+  assert.equal(normalizeCloudStorageRegion("US-EAST-1"), "us-east-1");
+  assert.equal(normalizeCloudStorageRegion("af-south-1 (Africa, Cape Town)"), "af-south-1");
+  assert.equal(normalizeCloudStorageRegion("arn:aws:s3:af-south-1::fixture"), "arn:aws:s3:af-south-1::fixture");
+  assert.equal(normalizeCloudStorageRegion("us-east-1 or af-south-1"), "us-east-1 or af-south-1");
+  assert.equal(normalizeCloudStorageRegion("Africa Cape Town"), "Africa Cape Town");
+});
+
+test("QA storage: denied permissions are not reported as invalid credentials", async t => {
+  t.mock.method(S3Client.prototype, "send", async () => { throw Object.assign(new Error("private details"), { name: "AccessDenied" }); });
+  const service = new CloudStorageService({ accessKeyId: "fixture", secretAccessKey: "fixture", region: "af-south-1", bucketName: "fixture" });
+  const result = await service.checkConnection();
+  assert.equal(result.connectionReady, false);
+  assert.match(result.status, /permissions/);
   assert.doesNotMatch(result.status, /private details|credentials are invalid/);
 });

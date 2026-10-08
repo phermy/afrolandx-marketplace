@@ -49,7 +49,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
+import { getCloudStorageService, getCloudStorageConnectionStatus, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import {
@@ -4156,7 +4156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reinitializeCloudStorage();
       
       const isEnabled = isCloudStorageEnabled();
-      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
+      const connection = await getCloudStorageConnectionStatus();
       res.json({ 
         message: 'Cloud storage reinitialization completed',
         cloudStorageEnabled: isEnabled,
@@ -4173,7 +4173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const isEnabled = isCloudStorageEnabled();
       const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET);
-      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
+      const connection = await getCloudStorageConnectionStatus();
       res.json({
         cloudStorageEnabled: isEnabled,
         hasCredentials,

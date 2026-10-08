@@ -12,12 +12,51 @@ interface CloudStorageConfig {
   endpoint?: string;
 }
 
+export function normalizeCloudStorageRegion(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/.test(normalized)) return normalized;
+  // AWS console region labels can include a human-readable name with the code.
+  // Accept exactly one explicit code; never infer a region from an ARN or URL.
+  if (/^[a-z0-9\s(),-]+$/.test(normalized)) {
+    const codes = normalized.match(/\b[a-z]{2,8}(?:-[a-z0-9]+)+-\d+\b/g);
+    if (codes?.length === 1) return codes[0];
+  }
+  return value.trim();
+}
+
+export function cloudStorageConfigProblem(config: Pick<CloudStorageConfig, "region" | "bucketName" | "endpoint">): string | null {
+  const region = normalizeCloudStorageRegion(config.region);
+  if (!/^[a-z]{2,8}(?:-[a-z0-9]+)+-\d+$/.test(region) && !(config.endpoint && region === "auto")) {
+    return "Enter an AWS region code such as af-south-1, not an ARN, account ID or URL.";
+  }
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(config.bucketName)
+    || config.bucketName.includes("..") || /^\d+\.\d+\.\d+\.\d+$/.test(config.bucketName)) {
+    return "Enter only the S3 bucket name, not an ARN or URL.";
+  }
+  if (config.endpoint) {
+    try {
+      const endpoint = new URL(config.endpoint);
+      if (!["https:", "http:"].includes(endpoint.protocol) || endpoint.username || endpoint.password) {
+        return "The custom storage endpoint is invalid.";
+      }
+    } catch {
+      return "The custom storage endpoint is invalid.";
+    }
+  }
+  return null;
+}
+
 export class CloudStorageService {
   private s3Client: S3Client;
   private bucketName: string;
   private region: string;
 
   constructor(config: CloudStorageConfig & { sessionToken?: string }) {
+    // Validate before constructing the SDK, which may log malformed endpoint
+    // values itself. Error messages must never include supplied configuration.
+    const problem = cloudStorageConfigProblem(config);
+    if (problem) throw new Error(problem);
+    const region = normalizeCloudStorageRegion(config.region);
     const credentials: any = {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
@@ -30,13 +69,13 @@ export class CloudStorageService {
     }
 
     this.s3Client = new S3Client({
-      region: config.region,
+      region,
       credentials,
       endpoint: config.endpoint,
       forcePathStyle: true, // Required for some S3-compatible services
     });
     this.bucketName = config.bucketName;
-    this.region = config.region;
+    this.region = region;
   }
 
   async checkConnection(): Promise<{ connectionReady: boolean; status: string }> {
@@ -47,6 +86,9 @@ export class CloudStorageService {
     } catch (error: any) {
       if (error?.name === "NoSuchBucket") {
         return { connectionReady: false, status: "The configured storage bucket was not found. Check its exact name and AWS region." };
+      }
+      if (error?.name === "AccessDenied") {
+        return { connectionReady: false, status: "AWS denied the bucket access check. Verify this access key's S3 bucket permissions." };
       }
       const credentialsInvalid = ["InvalidToken", "ExpiredToken", "InvalidAccessKeyId", "SignatureDoesNotMatch"].includes(error?.name);
       return { connectionReady: false, status: credentialsInvalid
@@ -88,7 +130,9 @@ export class CloudStorageService {
       return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${filename}`;
     } catch (error: any) {
       console.error('Product image upload failed. Check the storage connection and credentials.');
-      
+      if (error?.name === "AccessDenied") {
+        throw new Error('Storage upload permission was denied. Please contact support.');
+      }
       // Check if it's a token expiration error
       if (['ExpiredToken', 'InvalidToken'].includes(error?.name)) {
         console.error('AWS session credentials are invalid or expired. Update the matching credential set securely.');
@@ -140,12 +184,14 @@ export class CloudStorageService {
 }
 
 let cloudStorageService: CloudStorageService | null = null;
+let cloudStorageConfigurationProblem: string | null = null;
 
 export function initializeCloudStorage(): void {
+  cloudStorageConfigurationProblem = null;
   const config = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID?.trim() || '',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY?.trim() || '',
-    region: process.env.AWS_REGION?.trim() || 'us-east-1',
+    region: normalizeCloudStorageRegion(process.env.AWS_REGION?.trim() || 'us-east-1'),
     bucketName: process.env.AWS_S3_BUCKET?.trim() || '',
     sessionToken: process.env.AWS_SESSION_TOKEN?.trim(),
     endpoint: process.env.AWS_S3_ENDPOINT?.trim(),
@@ -153,9 +199,17 @@ export function initializeCloudStorage(): void {
 
   if (!config.accessKeyId || !config.secretAccessKey || !config.bucketName) {
     cloudStorageService = null;
+    cloudStorageConfigurationProblem = "Storage is not configured.";
     console.log(process.env.NODE_ENV === 'production'
       ? 'Cloud storage is not configured. Production image uploads are disabled.'
       : 'Cloud storage is not configured. Local image storage is available in development only.');
+    return;
+  }
+
+  cloudStorageConfigurationProblem = cloudStorageConfigProblem(config);
+  if (cloudStorageConfigurationProblem) {
+    cloudStorageService = null;
+    console.warn("Cloud storage settings are invalid. Check the bucket name and AWS region.");
     return;
   }
 
@@ -184,4 +238,9 @@ export function getCloudStorageService(): CloudStorageService {
 
 export function isCloudStorageEnabled(): boolean {
   return cloudStorageService !== null;
+}
+
+export async function getCloudStorageConnectionStatus() {
+  return cloudStorageService ? cloudStorageService.checkConnection()
+    : { connectionReady: false, status: cloudStorageConfigurationProblem || "Storage is not configured." };
 }

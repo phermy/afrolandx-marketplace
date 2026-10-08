@@ -11,6 +11,6 @@ Production product image uploads must fail explicitly if durable cloud storage i
 
 A configured AWS SDK client is not evidence of working storage. A successful bucket access check is also not evidence that photo writes or public image delivery work.
 
-**Why:** Client construction succeeds without authenticating, and temporary AWS credentials can become invalid independently of application code. Bucket-list access, object-write permission, and public-read permission are distinct.
+**Why:** Client construction succeeds without authenticating, and temporary AWS credentials can become invalid independently of application code. Bucket-list access, object-write permission, and public-read permission are distinct. A service key may legitimately lack account-wide bucket listing, so that denial alone must not trigger credential rotation or a request for broad AWS access.
 
 **How to apply:** Label configuration and connection checks separately. Before calling uploads ready, verify a representative image write and retrieval of its returned URL. Refresh temporary access keys, secret keys and session tokens as one matching set through secure secret tooling.
