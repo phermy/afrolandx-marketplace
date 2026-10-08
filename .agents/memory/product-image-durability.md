@@ -14,3 +14,9 @@ A configured AWS SDK client is not evidence of working storage. A successful buc
 **Why:** Client construction succeeds without authenticating, and temporary AWS credentials can become invalid independently of application code. Bucket-list access, object-write permission, and public-read permission are distinct. A service key may legitimately lack account-wide bucket listing, so that denial alone must not trigger credential rotation or a request for broad AWS access.
 
 **How to apply:** Label configuration and connection checks separately. Before calling uploads ready, verify a representative image write and retrieval of its returned URL. Refresh temporary access keys, secret keys and session tokens as one matching set through secure secret tooling.
+
+Cloudflare's agent connection and application connector have separate authorization. Reconnecting an agent connection does not necessarily expand its permissions.
+
+**Why:** An agent connection with account and user read scopes could list R2 buckets, but bucket creation remained denied after reconnection. The separate application connector also rejected its supplied credential; an attached connection is not proof of authenticated API access.
+
+**How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair credentials only through the existing integration's secure settings, never through chat.
