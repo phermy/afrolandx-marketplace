@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement } from "./payment-emails";
 import { vendorOrdersHandler } from "./vendor-orders";
+import { VENDOR_DETAILS_ROUTE } from "./vendor-route-paths";
 import { requestRateLimit } from "./request-rate-limit";
 import { orderDetailsHandler } from "./order-details";
 import { createPublicProductHandler } from "./public-product";
@@ -1089,7 +1090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/vendors/orders', isAuthenticated, vendorOrdersHandler);
   app.get('/api/vendors/me/orders', isAuthenticated, vendorOrdersHandler);
 
-  app.get('/api/vendors/:id', isAuthenticated, isAdmin, async (req, res) => {
+  app.get(VENDOR_DETAILS_ROUTE, isAuthenticated, isAdmin, async (req, res) => {
     try {
       const actor = await storage.getUser((req.user as any)?.id);
       if (!actor || !hasSupportManagementAccess(actor)) return res.status(403).json({ message: 'Verified Admin access is required.' });

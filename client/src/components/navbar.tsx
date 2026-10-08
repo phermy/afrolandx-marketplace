@@ -87,10 +87,10 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center min-h-16 py-2 gap-4">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/">
+          <div className="flex items-center flex-1 min-w-0">
+            <Link href="/" className="shrink-0">
               <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian cursor-pointer">
                 <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
                 <span className="hidden sm:block">Afrolandx</span>
@@ -98,7 +98,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:ml-8 lg:flex lg:space-x-2">
+            <div className="hidden lg:ml-4 lg:flex lg:flex-wrap lg:gap-x-1 lg:gap-y-1 min-w-0">
               <Link href="/" className={navLinkClass('/')}>Home</Link>
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
               <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
@@ -122,7 +122,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden lg:flex flex-1 max-w-lg mx-8">
+          <div className="hidden lg:flex flex-1 min-w-0 max-w-lg mx-4">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
@@ -135,7 +135,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Shopping Cart */}
             {isAuthenticated && (
               <Button

@@ -1,5 +1,5 @@
-// Public pages use real read-only responses. Signed-in UI checks use browser-only
-// fixtures, never server auth bypasses. All API writes are intercepted.
+// Public pages use real read-only responses. Signed-in checks use either explicit
+// browser fixtures or normal OTP authentication. All browser API writes are blocked.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -7,8 +7,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import WebSocket from "ws";
 
-const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://127.0.0.1:5000";
+const base = process.argv.find(argument => argument.startsWith("--base-url="))?.slice(11)
+  || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://127.0.0.1:5000");
 const realEmail = process.argv.find(argument => argument.startsWith("--qa-email="))?.slice(11);
+// Only use this mode after confirming approval and obtaining inbox/session consent.
+const realVendor = process.argv.includes("--approved-vendor");
+assert.ok(!realVendor || (realEmail && base.startsWith("https://")), "Vendor checks require an authorized inbox and HTTPS site.");
 let realCookie;
 let databasePool;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -23,7 +27,21 @@ const sessions = new Map(), pending = new Map();
 let nextId = 0;
 async function check(name, action) {
   try { await action(); checks.push({ name, passed: true }); }
-  catch (error) { checks.push({ name, passed: false, error: error.message }); }
+  catch (error) {
+    checks.push({ name, passed: false, error: error.message });
+    if (realVendor && socket?.readyState === WebSocket.OPEN && sessionId) {
+      // Record geometry, never text, codes, cookies or banking/customer details.
+      const diagnosticId = ++nextId;
+      socket.send(JSON.stringify({ id: diagnosticId, method: "Runtime.evaluate", sessionId, params: {
+        expression: `JSON.stringify([...document.querySelectorAll("body *")].filter(el => { const r=el.getBoundingClientRect(); return r.width && r.right > innerWidth + 1; }).slice(0,12).map(el => ({tag:el.tagName,classes:el.getAttribute("class"),right:Math.round(el.getBoundingClientRect().right)})))`,
+        returnByValue: true,
+      } }));
+      await new Promise(resolve => {
+        const timer = setTimeout(() => { pending.delete(diagnosticId); resolve(); }, 3000);
+        pending.set(diagnosticId, { timer, reject: resolve, resolve: result => { console.log("Overflow geometry:", result.result?.value); resolve(); } });
+      });
+    }
+  }
   console.log(JSON.stringify(checks.at(-1)));
 }
 try {
@@ -61,7 +79,7 @@ try {
       await send("Fetch.continueRequest", { requestId }, message.sessionId);
       return;
     } else if (path === "/api/auth/user") {
-      body = { id: "browser-fixture", email: "browser-fixture@example.test", firstName: "Fixture", lastName: "Customer", emailVerified: true, roles: state.role === "vendor" ? ["customer", "vendor"] : ["customer"] };
+      body = { id: "browser-fixture", email: "browser-fixture@example.test", firstName: "Fixture", lastName: "Customer", emailVerified: true, roles: state.role === "staff-vendor" ? ["customer", "vendor", "admin", "superadmin"] : state.role === "vendor" ? ["customer", "vendor"] : ["customer"] };
     } else if (path === "/api/cart") {
       if (state.delayCart) await wait(state.delayCart);
       body = state.cartError ? { message: "Fixture cart failure" } : cart;
@@ -69,6 +87,7 @@ try {
     } else if (path === "/api/orders/my-orders" || path === "/api/orders") body = [order];
     else if (path === "/api/vendors/orders" || path === "/api/vendors/me/orders") body = [{ ...order, items: order.items.map(item => ({ ...item, productName: product.name, imageUrl: product.imageUrl })) }];
     else if (path === "/api/vendors/me") body = { id: 900001, userId: "browser-fixture", businessName: "Fixture maker", status: "approved", verificationStatus: "verified", email: "browser-fixture@example.test", description: "Browser fixture only" };
+    else if (path === "/api/vendors/me/finance") body = { summary: { pending: "0", available: "0", settled: "0" }, entries: [], settlements: [], payoutAccount: null };
     else if (path === "/api/geo") body = { country_code: "NG", country_name: "Nigeria", currency: "NGN" };
     else if (/^\/api\/orders\/\d+$/.test(path)) body = order;
     else body = [];
@@ -111,10 +130,13 @@ try {
     throw new Error(`Page failed to render: ${route}`);
   };
   if (realEmail) {
-    const { storage } = await import("../server/storage.ts");
-    ({ pool: databasePool } = await import("../server/db.ts"));
-    const user = await storage.getUserByEmail(realEmail);
-    assert.ok(user?.emailVerified && !user.closedAt && user.firstName === "Delivery" && user.lastName === "Test" && user.roles?.join(",") === "customer", "Real mode is restricted to the dedicated QA customer.");
+    let user;
+    if (!realVendor) {
+      const { storage } = await import("../server/storage.ts");
+      ({ pool: databasePool } = await import("../server/db.ts"));
+      user = await storage.getUserByEmail(realEmail);
+      assert.ok(user?.emailVerified && !user.closedAt && user.firstName === "Delivery" && user.lastName === "Test" && user.roles?.join(",") === "customer", "Customer mode is restricted to the dedicated QA customer.");
+    }
     const started = Date.now() - 1000;
     const post = (path, body) => fetch(new URL(path, base), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     assert.equal((await post("/api/send-login-otp", { email: realEmail })).status, 200);
@@ -139,10 +161,74 @@ try {
     assert.equal(login.status, 200);
     realCookie = login.headers.get("set-cookie")?.split(";")[0];
     assert.ok(realCookie, "QA sign-in did not issue a session.");
+    if (realVendor) {
+      const read = path => fetch(new URL(path, base), { headers: { Cookie: realCookie } });
+      const auth = await read("/api/auth/user");
+      assert.equal(auth.status, 200, "Vendor session was not accepted.");
+      user = await auth.json();
+      assert.equal(user.email.toLowerCase(), realEmail.toLowerCase());
+      assert.ok(user.emailVerified && user.roles.includes("vendor"), "Account is not a verified vendor.");
+      const vendorResponse = await read("/api/vendors/me");
+      assert.equal(vendorResponse.status, 200);
+      const vendor = await vendorResponse.json();
+      assert.equal(vendor.status, "approved", "Vendor is no longer approved; stopping checks.");
+      assert.equal(vendor.userId, user.id);
+      for (const path of ["/api/vendors/me/products", "/api/vendors/orders", "/api/vendors/measurements", "/api/vendors/me/finance"]) {
+        await check(`real vendor read-only API: ${path}`, async () => {
+          const response = await read(path);
+          if (response.status !== 200) {
+            const errorBody = await response.json().catch(() => ({}));
+            assert.fail(`Read-only endpoint returned ${response.status}: ${errorBody.message || "no message"}`);
+          }
+          const body = await response.json();
+          if (path.endsWith("/finance")) {
+            assert.ok(body.summary && Array.isArray(body.entries) && Array.isArray(body.settlements), "Finance response missing ledger data.");
+          } else assert.ok(Array.isArray(body), "Expected a list response.");
+        });
+      }
+      for (const width of [375, 768, 1280]) {
+        await check(`real vendor dashboard and tabs at ${width}px`, async () => {
+          await open("/vendor", {}, width);
+          for (let attempt = 0; attempt < 60; attempt++) {
+            if (await evaluate(`document.querySelector("h1")?.textContent.includes(${JSON.stringify(vendor.businessName)})`)) break;
+            await wait(100);
+          }
+          assert.ok(await evaluate(`document.querySelector("h1")?.textContent.includes(${JSON.stringify(vendor.businessName)})`), "Approved vendor dashboard did not render.");
+          assert.equal(await evaluate("innerWidth"), width, "Browser viewport does not match requested width.");
+          for (const label of ["My Products", "Orders", "Measurements", "Profile"]) {
+            const labelJson = JSON.stringify(label);
+            assert.ok(await evaluate(`(() => { const tab = [...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.trim() === ${labelJson}); tab?.focus(); return !!tab; })()`), `Missing ${label} tab`);
+            await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+            await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+            await wait(300);
+            assert.ok(await evaluate(`[...document.querySelectorAll('[role="tab"]')].some(el => el.textContent.trim() === ${labelJson} && el.getAttribute("aria-selected") === "true")`), `${label} tab did not activate.`);
+            assert.ok(await evaluate('!!document.querySelector(\'[role="tabpanel"][data-state="active"]\')'), `${label} panel did not render.`);
+            assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false, `${label} panel overflows.`);
+          }
+          const image = await send("Page.captureScreenshot", { format: "png" });
+          await writeFile(`/tmp/afrolandx-real-vendor-${width}.png`, Buffer.from(image.data, "base64"));
+        });
+        await check(`real vendor finance layout at ${width}px`, async () => {
+          await open("/vendor/finance", {}, width);
+          for (let attempt = 0; attempt < 60; attempt++) {
+            if (await evaluate('document.querySelector("h1")?.textContent.trim() === "Vendor finance"')) break;
+            await wait(100);
+          }
+          assert.equal(await evaluate('document.querySelector("h1")?.textContent.trim()'), "Vendor finance");
+          await wait(700);
+          assert.equal(await evaluate("innerWidth"), width);
+          assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false);
+          assert.ok(await evaluate('document.body.innerText.includes("Available for payout")'), "Finance balances did not render.");
+          const image = await send("Page.captureScreenshot", { format: "png" });
+          await writeFile(`/tmp/afrolandx-real-vendor-finance-${width}.png`, Buffer.from(image.data, "base64"));
+        });
+      }
+    } else {
     for (const width of [375, 768, 1280]) {
       for (const route of ["/profile", "/my-orders", "/checkout"]) {
         await check(`real customer session and layout: ${route} at ${width}px`, async () => {
-          await open(route); await wait(1200);
+          await open(route, {}, width); await wait(1200);
+          assert.equal(await evaluate("innerWidth"), width, "Browser viewport does not match requested width.");
           const expectedHeading = route === "/profile" ? "Profile Settings" : route === "/my-orders" ? "My Orders" : undefined;
           if (expectedHeading) {
             for (let attempt = 0; attempt < 50; attempt++) {
@@ -178,6 +264,7 @@ try {
       assert.equal(response.status, 200, "Paystack read-only connectivity check failed.");
       assert.ok(Array.isArray(await response.json()));
     });
+    }
   } else {
   await check("public HTTP: metadata, crawl files and real 404 statuses", async () => {
     for (const route of ["/", "/products", "/events", "/policies", "/robots.txt", "/sitemap.xml", "/manifest.json"]) {
@@ -268,9 +355,33 @@ try {
     assert.ok(await evaluate('document.body.innerText.includes("Fixture garment")'), await evaluate('document.querySelector(\'[role="tabpanel"][data-state="active"]\')?.innerText.slice(0, 1200)'));
     assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false);
   });
+  for (const width of [375, 768, 1024, 1280]) {
+    await check(`corrected staff-vendor navigation and all tabs at ${width}px with fixtures`, async () => {
+      await open("/vendor", { role: "staff-vendor" }, width); await wait(800);
+      assert.equal(await evaluate("innerWidth"), width);
+      for (const label of ["My Products", "Orders", "Measurements", "Profile"]) {
+        await evaluate(`[...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.trim() === ${JSON.stringify(label)}).focus()`);
+        await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+        await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+        await wait(250);
+        assert.ok(await evaluate(`[...document.querySelectorAll('[role="tab"]')].some(el => el.textContent.trim() === ${JSON.stringify(label)} && el.getAttribute("aria-selected") === "true")`));
+        assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false, `${label} panel overflows`);
+      }
+      if (width === 1280) {
+        const image = await send("Page.captureScreenshot", { format: "png" });
+        await writeFile("/tmp/afrolandx-corrected-staff-vendor-1280.png", Buffer.from(image.data, "base64"));
+      }
+    });
+    await check(`corrected staff-vendor finance at ${width}px with fixtures`, async () => {
+      await open("/vendor/finance", { role: "staff-vendor" }, width); await wait(600);
+      assert.equal(await evaluate('document.querySelector("h1")?.textContent.trim()'), "Vendor finance");
+      assert.equal(await evaluate("innerWidth"), width);
+      assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false);
+    });
+  }
   }
   assert.deepEqual(exceptions, [], "Uncaught browser errors");
-  await writeFile(realEmail ? "/tmp/afrolandx-authenticated-browser-results.json" : "/tmp/afrolandx-launch-browser-results.json", JSON.stringify({ checks, exceptions, blockedWrites, signedInMode: realEmail ? "real QA customer session; browser API writes blocked" : "browser-only fixtures; real authentication not verified" }, null, 2));
+  await writeFile(realVendor ? "/tmp/afrolandx-vendor-browser-results.json" : realEmail ? "/tmp/afrolandx-authenticated-browser-results.json" : "/tmp/afrolandx-launch-browser-results.json", JSON.stringify({ checks, exceptions, blockedWrites, signedInMode: realVendor ? "real approved vendor session; browser API writes blocked" : realEmail ? "real QA customer session; browser API writes blocked" : "browser-only fixtures; real authentication not verified" }, null, 2));
   console.log(`Browser checks: ${checks.filter(check => check.passed).length}/${checks.length} passed. ${realEmail ? "Real QA sign-in; no browser API writes sent." : "No actual API writes sent."}`);
   if (checks.some(check => !check.passed)) process.exitCode = 1;
 } finally {
