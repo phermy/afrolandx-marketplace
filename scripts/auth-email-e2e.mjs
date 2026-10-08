@@ -1,9 +1,15 @@
+// Run with: npx tsx scripts/auth-email-e2e.mjs --email=FRESH_INBOX
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { randomBytes } from "node:crypto";
+import { emailPayload } from "../server/email.ts";
 
 const baseUrl = process.env.AUTH_E2E_BASE_URL
   || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://127.0.0.1:5000");
-const testEmail = process.env.AUTH_E2E_EMAIL;
-const sender = "Afrolandx <noreply@afrolandx.com>";
+// CLI input avoids saving a test recipient in the workspace environment.
+const testEmail = process.argv.find(argument => argument.startsWith("--email="))?.slice(8).trim()
+  || process.env.AUTH_E2E_EMAIL;
+const sender = emailPayload(testEmail || "", "", "").from;
+const resumeQa = process.argv.includes("--resume-unverified-qa");
 const subjects = {
   verification: "Verify your Afrolandx account",
   login: "Your Afrolandx sign-in code",
@@ -11,9 +17,11 @@ const subjects = {
 };
 const waitMs = Number(process.env.AUTH_E2E_POLL_MS || 2000);
 const maxPolls = Number(process.env.AUTH_E2E_MAX_POLLS || 45);
+const startedAt = Date.now() - 1000;
+const consumedMessages = new Set();
 
-if (!testEmail) {
-  throw new Error("AUTH_E2E_EMAIL is required and must be a fresh externally hosted inbox or plus-address.");
+if (!testEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+  throw new Error("Provide --email=ADDRESS or AUTH_E2E_EMAIL using a fresh inbox or plus address.");
 }
 
 const resend = new ReplitConnectors();
@@ -60,9 +68,13 @@ async function deliveredMessage(subject) {
     const body = await response.json();
     const message = (Array.isArray(body?.data) ? body.data : [])
       .filter((item) => item.subject === subject)
+      .filter((item) => Date.parse(item.created_at) >= startedAt && !consumedMessages.has(item.id))
       .filter((item) => Array.isArray(item.to) && item.to.some((recipient) => String(recipient).toLowerCase() === testEmail.toLowerCase()))
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
-    if (message?.last_event === "delivered") return message;
+    if (message?.last_event === "delivered") {
+      consumedMessages.add(message.id);
+      return message;
+    }
     await sleep(waitMs);
   }
   throw new Error(`Timed out waiting for a delivered "${subject}" message.`);
@@ -78,24 +90,48 @@ async function codeFromMessage(message) {
   return match[0];
 }
 
-const initialPassword = `E2E-${Date.now()}-Initial-Afrolandx!`;
-const resetPassword = `E2E-${Date.now()}-Reset-Afrolandx!`;
-const registration = await post("/api/register", {
-  firstName: "Delivery",
-  lastName: "Test",
-  email: testEmail,
-  password: initialPassword,
-  phone: "+2348000000000",
-});
-assert(registration.status === 200 && registration.body.emailVerificationSent === true, "Registration did not confirm verification email delivery.");
-assert(!registration.cookie, "Registration issued a session cookie before verification.");
-assert((await getAuth(registration.cookie)).status === 401, "Registration created an authenticated session before verification.");
+const initialPassword = `E2E-${randomBytes(24).toString("base64url")}-Initial!`;
+const resetPassword = `E2E-${randomBytes(24).toString("base64url")}-Reset!`;
+if (resumeQa) {
+  const { storage } = await import("../server/storage.ts");
+  const user = await storage.getUserByEmail(testEmail);
+  assert(user && !user.emailVerified && !user.closedAt && user.firstName === "Delivery" && user.lastName === "Test"
+    && user.roles?.length === 1 && user.roles[0] === "customer"
+    && Date.now() - new Date(user.createdAt).getTime() < 15 * 60 * 1000,
+    "Resume is restricted to the fresh unverified QA customer created by this test.");
+  const resendVerification = await post("/api/resend-verification", { email: testEmail });
+  assert(resendVerification.status === 200, "Could not resend verification for the QA customer.");
+} else {
+  const registration = await post("/api/register", {
+    firstName: "Delivery",
+    lastName: "Test",
+    email: testEmail,
+    password: initialPassword,
+    phone: "+2348000000000",
+  });
+  assert(registration.status === 200 && registration.body.emailVerificationSent === true, "Registration did not confirm verification email delivery.");
+  assert(!registration.cookie, "Registration issued a session cookie before verification.");
+  assert((await getAuth(registration.cookie)).status === 401, "Registration created an authenticated session before verification.");
+}
 
 const verificationMessage = await deliveredMessage(subjects.verification);
 assert(verificationMessage.from === sender, "Verification email used an unexpected sender.");
 const verification = await post("/api/verify-email", { email: testEmail, otp: await codeFromMessage(verificationMessage) });
 assert(verification.status === 200, "Verification code was not accepted.");
 assert((await getAuth(verification.cookie)).status === 200, "Verification did not create the expected authenticated session.");
+
+// A stopped run cannot recover its generated password. Establish a controlled
+// baseline through the real reset flow, only for the restricted QA resume above.
+if (resumeQa) {
+  const baselineRequest = await post("/api/forgot-password", { email: testEmail });
+  assert(baselineRequest.status === 200, "QA baseline reset request failed.");
+  const baselineMessage = await deliveredMessage(subjects.reset);
+  assert(baselineMessage.from === sender, "QA baseline email used an unexpected sender.");
+  const baselineReset = await post("/api/reset-password", {
+    email: testEmail, otp: await codeFromMessage(baselineMessage), newPassword: initialPassword,
+  });
+  assert(baselineReset.status === 200, "Could not establish the QA baseline password.");
+}
 
 const loginRequest = await post("/api/send-login-otp", { email: testEmail });
 assert(loginRequest.status === 200 && !loginRequest.cookie, "Email-code login unexpectedly created a session while requesting the code.");
@@ -130,7 +166,7 @@ console.log(JSON.stringify({
   sender,
   checks: [
     "verification email delivered and code accepted",
-    "registration did not authenticate before verification",
+    ...(resumeQa ? ["resumed only a fresh unverified QA customer"] : ["registration did not authenticate before verification"]),
     "email sign-in code delivered and accepted once",
     "reused email sign-in code rejected",
     "password-reset email delivered and code accepted",
@@ -139,3 +175,4 @@ console.log(JSON.stringify({
     "new password accepted by password login",
   ],
 }, null, 2));
+process.exit(0);
