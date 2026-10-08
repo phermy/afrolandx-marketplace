@@ -8,6 +8,9 @@ import { join } from "node:path";
 import WebSocket from "ws";
 
 const base = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://127.0.0.1:5000";
+const realEmail = process.argv.find(argument => argument.startsWith("--qa-email="))?.slice(11);
+let realCookie;
+let databasePool;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const profile = await mkdtemp(join(tmpdir(), "afrolandx-launch-browser-"));
 const browser = spawn("chromium", ["--headless", "--no-sandbox", "--disable-dev-shm-usage", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
@@ -53,6 +56,7 @@ try {
     if (!["GET", "HEAD"].includes(request.method)) {
       blockedWrites.push({ path, method: request.method });
       body = { success: true };
+      if (realEmail) { status = 403; body = { message: "Browser writes blocked during read-only QA." }; }
     } else if (!state?.role) {
       await send("Fetch.continueRequest", { requestId }, message.sessionId);
       return;
@@ -92,6 +96,10 @@ try {
     ({ sessionId } = await send("Target.attachToTarget", { targetId, flatten: true }, undefined));
     sessions.set(sessionId, state);
     await send("Page.enable"); await send("Runtime.enable");
+    if (realCookie) {
+      const separator = realCookie.indexOf("=");
+      await send("Network.setCookie", { name: realCookie.slice(0, separator), value: realCookie.slice(separator + 1), url: base, httpOnly: true, secure: base.startsWith("https:"), sameSite: "Lax" });
+    }
     await send("Fetch.enable", { patterns: [{ urlPattern: `${base}/api/*`, requestStage: "Request" }] });
     await send("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 1, mobile: false });
     await send("Page.navigate", { url: new URL(route, base).href });
@@ -102,6 +110,75 @@ try {
     }
     throw new Error(`Page failed to render: ${route}`);
   };
+  if (realEmail) {
+    const { storage } = await import("../server/storage.ts");
+    ({ pool: databasePool } = await import("../server/db.ts"));
+    const user = await storage.getUserByEmail(realEmail);
+    assert.ok(user?.emailVerified && !user.closedAt && user.firstName === "Delivery" && user.lastName === "Test" && user.roles?.join(",") === "customer", "Real mode is restricted to the dedicated QA customer.");
+    const started = Date.now() - 1000;
+    const post = (path, body) => fetch(new URL(path, base), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    assert.equal((await post("/api/send-login-otp", { email: realEmail })).status, 200);
+    const { ReplitConnectors } = await import("@replit/connectors-sdk");
+    const connector = new ReplitConnectors();
+    let message;
+    for (let attempt = 0; attempt < 45; attempt++) {
+      const response = await connector.proxy("resend", "/emails?limit=100");
+      assert.ok(response.ok, "Could not check QA sign-in delivery.");
+      const history = await response.json();
+      message = history.data?.find(item => item.subject === "Your Afrolandx sign-in code" && item.to?.includes(realEmail) && Date.parse(item.created_at) >= started && item.last_event === "delivered");
+      if (message) break;
+      await wait(2000);
+    }
+    assert.ok(message, "QA sign-in email was not delivered.");
+    const response = await connector.proxy("resend", `/emails/${encodeURIComponent(message.id)}`);
+    assert.ok(response.ok, "Could not read the QA sign-in message.");
+    const content = await response.json();
+    const otp = `${content.html || ""}\n${content.text || ""}`.match(/\b\d{6}\b/)?.[0];
+    assert.ok(otp, "QA sign-in code missing.");
+    const login = await post("/api/login-with-otp", { email: realEmail, otp });
+    assert.equal(login.status, 200);
+    realCookie = login.headers.get("set-cookie")?.split(";")[0];
+    assert.ok(realCookie, "QA sign-in did not issue a session.");
+    for (const width of [375, 768, 1280]) {
+      for (const route of ["/profile", "/my-orders", "/checkout"]) {
+        await check(`real customer session and layout: ${route} at ${width}px`, async () => {
+          await open(route); await wait(1200);
+          const expectedHeading = route === "/profile" ? "Profile Settings" : route === "/my-orders" ? "My Orders" : undefined;
+          if (expectedHeading) {
+            for (let attempt = 0; attempt < 50; attempt++) {
+              if (await evaluate(`document.querySelector("h1")?.textContent.trim() === ${JSON.stringify(expectedHeading)}`)) break;
+              await wait(100);
+            }
+            assert.equal(await evaluate('document.querySelector("h1")?.textContent.trim()'), expectedHeading, "Signed-in page content did not render.");
+          }
+          const result = await evaluate(`(async () => {
+            const response = await fetch("/api/auth/user");
+            const user = await response.json();
+            return { status: response.status, id: user.id, path: location.pathname, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+          })()`);
+          assert.equal(result.status, 200);
+          assert.equal(result.id, user.id);
+          assert.equal(result.path, route === "/checkout" ? "/products" : route);
+          assert.equal(result.overflow, false);
+          if (width === 375 && expectedHeading) {
+            const image = await send("Page.captureScreenshot", { format: "png" });
+            await writeFile(`/tmp/afrolandx-real-${route.slice(1)}-375.png`, Buffer.from(image.data, "base64"));
+          }
+        });
+      }
+    }
+    await check("real customer cannot access admin or vendor operations", async () => {
+      for (const route of ["/api/admin/vendors", "/api/vendors/me"]) {
+        const response = await fetch(new URL(route, base), { headers: { Cookie: realCookie } });
+        assert.ok([403, 404].includes(response.status), "Customer reached privileged operations.");
+      }
+    });
+    await check("Paystack bank directory is reachable without a money-moving request", async () => {
+      const response = await fetch(new URL("/api/paystack/banks", base), { headers: { Cookie: realCookie } });
+      assert.equal(response.status, 200, "Paystack read-only connectivity check failed.");
+      assert.ok(Array.isArray(await response.json()));
+    });
+  } else {
   await check("public HTTP: metadata, crawl files and real 404 statuses", async () => {
     for (const route of ["/", "/products", "/events", "/policies", "/robots.txt", "/sitemap.xml", "/manifest.json"]) {
       const response = await fetch(new URL(route, base)); assert.equal(response.status, 200, route);
@@ -191,9 +268,10 @@ try {
     assert.ok(await evaluate('document.body.innerText.includes("Fixture garment")'), await evaluate('document.querySelector(\'[role="tabpanel"][data-state="active"]\')?.innerText.slice(0, 1200)'));
     assert.equal(await evaluate("document.documentElement.scrollWidth > innerWidth + 1"), false);
   });
+  }
   assert.deepEqual(exceptions, [], "Uncaught browser errors");
-  await writeFile("/tmp/afrolandx-launch-browser-results.json", JSON.stringify({ checks, exceptions, blockedWrites, signedInMode: "browser-only fixtures; real authentication not verified" }, null, 2));
-  console.log(`Browser checks: ${checks.filter(check => check.passed).length}/${checks.length} passed. No actual API writes sent.`);
+  await writeFile(realEmail ? "/tmp/afrolandx-authenticated-browser-results.json" : "/tmp/afrolandx-launch-browser-results.json", JSON.stringify({ checks, exceptions, blockedWrites, signedInMode: realEmail ? "real QA customer session; browser API writes blocked" : "browser-only fixtures; real authentication not verified" }, null, 2));
+  console.log(`Browser checks: ${checks.filter(check => check.passed).length}/${checks.length} passed. ${realEmail ? "Real QA sign-in; no browser API writes sent." : "No actual API writes sent."}`);
   if (checks.some(check => !check.passed)) process.exitCode = 1;
 } finally {
   socket?.close();
@@ -206,4 +284,5 @@ try {
     });
   }
   await rm(profile, { recursive: true, force: true });
+  await databasePool?.end();
 }
