@@ -71,7 +71,12 @@ try {
     const state = sessions.get(message.sessionId);
     const path = new URL(request.url).pathname;
     let body, status = 200;
-    if (!["GET", "HEAD"].includes(request.method)) {
+    if (state?.role && !realEmail && path === "/api/orders/preview-total" && request.method === "POST") {
+      state.previewRequests = (state.previewRequests || 0) + 1;
+      status = state.pricingError ? 503 : 200;
+      body = state.pricingError ? { message: "Fixture pricing unavailable." }
+        : { subtotal: 8500, shippingAmount: 1, totalAmount: 8501, currency: "NGN", estimated: true };
+    } else if (!["GET", "HEAD"].includes(request.method)) {
       blockedWrites.push({ path, method: request.method });
       body = { success: true };
       if (realEmail) { status = 403; body = { message: "Browser writes blocked during read-only QA." }; }
@@ -89,7 +94,8 @@ try {
     else if (path === "/api/vendors/me") body = { id: 900001, userId: "browser-fixture", businessName: "Fixture maker", status: "approved", verificationStatus: "verified", email: "browser-fixture@example.test", description: "Browser fixture only" };
     else if (path === "/api/vendors/me/finance") body = { summary: { pending: "0", available: "0", settled: "0" }, entries: [], settlements: [], payoutAccount: null };
     else if (path === "/api/geo") body = { country_code: "NG", country_name: "Nigeria", currency: "NGN" };
-    else if (/^\/api\/orders\/\d+$/.test(path)) body = order;
+    else if (path === "/api/shipping/quote") body = [{ carrier: "Test shipping", service: "Fixture test shipping", price: null, estimatedPrice: 1, duration: "Test only", quoteRequired: true }];
+    else if (/^\/api\/orders\/\d+$/.test(path)) body = state.reviewPayment ? { ...order, orderStatus: "payment_review" } : order;
     else body = [];
     await send("Fetch.fulfillRequest", { requestId, responseCode: status, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(body)).toString("base64") }, message.sessionId);
   }
@@ -324,6 +330,41 @@ try {
     state.cartError = false;
     await evaluate('[...document.querySelectorAll("button")].find(el => el.textContent.includes("Retry loading cart")).click()');
     await wait(700); assert.equal(await evaluate('document.querySelector("h1")?.textContent'), "Checkout");
+  });
+  await check("closed paid checkout shows review without clearing the cart or promising fulfillment", async () => {
+    const before = blockedWrites.length;
+    await open("/order-success?order_id=900001&reference=browser-fixture-reference", { role: "customer", reviewPayment: true });
+    await wait(800);
+    assert.ok(await evaluate('document.body.innerText.includes("Payment received for a closed checkout")'));
+    assert.ok(await evaluate('document.body.innerText.includes("Do not pay again")'));
+    assert.ok(!blockedWrites.slice(before).some(item => item.path === "/api/cart"));
+  });
+  await check("checkout fails closed on missing server pricing and retries the same NGN total", async () => {
+    const state = { role: "customer", pricingError: true };
+    await open("/checkout", state); await wait(700);
+    const click = async selector => {
+      const point = await evaluate(`(() => { const el = ${selector}; if (!el) return null; el.scrollIntoView({block:"center"}); const r = el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+      assert.ok(point, `Missing control: ${selector}`);
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
+    };
+    for (const [id, text] of [["firstName","Fixture"],["lastName","Buyer"],["address1","Fixture address"],["city","Lagos"],["postalCode","100001"]]) {
+      await click(`document.getElementById(${JSON.stringify(id)})`);
+      await send("Input.insertText", { text });
+    }
+    await click('document.querySelector(\'label[for="state"]\').parentElement.querySelector(\'[role="combobox"]\')');
+    await wait(150);
+    await click('[...document.querySelectorAll(\'[role="option"]\')].find(el=>el.textContent.trim()==="Lagos")');
+    await click('document.querySelector(\'[role="radio"]\')');
+    await wait(600);
+    assert.ok(state.previewRequests > 0, "Complete checkout must request the server total.");
+    assert.ok(await evaluate('document.body.innerText.includes("The server total could not be loaded")'));
+    assert.equal(await evaluate('document.querySelector(\'button[type="submit"]\').disabled'), true);
+    state.pricingError = false;
+    await click('[...document.querySelectorAll("button")].find(el=>el.textContent.includes("Retry total"))');
+    await wait(600);
+    assert.ok(await evaluate('document.body.innerText.includes("₦8,501.00")'));
+    assert.equal(await evaluate('document.querySelector(\'button[type="submit"]\').disabled'), false);
   });
   await check("cart drawer traps focus, closes with Escape and restores focus", async () => {
     await open("/products", { role: "customer" }); await wait(700);

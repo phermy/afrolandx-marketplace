@@ -289,7 +289,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/send-login-otp", async (req, res) => {
+  app.post("/api/send-login-otp", requestRateLimit("login-code-request", 6, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email) return res.status(400).json({ message: "A valid email is required" });
     try {
@@ -320,7 +320,7 @@ export async function setupAuth(app: Express) {
     return "valid";
   }
 
-  app.post("/api/login-with-otp", async (req, res) => {
+  app.post("/api/login-with-otp", requestRateLimit("login-code-verify", 10, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email || !OTP_RE.test(req.body.otp || "")) return res.status(400).json({ message: "Email and a six-digit code are required" });
     try {
@@ -334,7 +334,7 @@ export async function setupAuth(app: Express) {
     } catch { return res.status(500).json({ message: "Sign-in failed" }); }
   });
 
-  app.post("/api/verify-email", async (req, res) => {
+  app.post("/api/verify-email", requestRateLimit("email-code-verify", 10, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email || !OTP_RE.test(req.body.otp || "")) return res.status(400).json({ message: "Email and a six-digit code are required" });
     try {
@@ -349,7 +349,7 @@ export async function setupAuth(app: Express) {
     } catch { return res.status(500).json({ message: "Verification failed" }); }
   });
 
-  app.post("/api/resend-verification", async (req, res) => {
+  app.post("/api/resend-verification", requestRateLimit("verification-request", 6, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email) return res.status(400).json({ message: "A valid email is required" });
     try {
@@ -367,7 +367,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/forgot-password", async (req, res) => {
+  app.post("/api/forgot-password", requestRateLimit("password-reset-request", 6, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email) return res.status(400).json({ message: "A valid email is required" });
     const genericResponse = { message: "If that email is registered, you'll receive a reset code shortly." };
@@ -393,7 +393,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/reset-password", async (req, res) => {
+  app.post("/api/reset-password", requestRateLimit("password-reset-verify", 10, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     const { otp, newPassword } = req.body;
     const passwordError = passwordProblem(newPassword, email || undefined);

@@ -1,6 +1,6 @@
 type PaymentCompletionStorage = {
   markOrderPaid(id: number, reference: string): Promise<boolean>;
-  getOrder(id: number): Promise<{ paymentStatus?: string | null; paymentReference?: string | null } | undefined>;
+  getOrder(id: number): Promise<{ paymentStatus?: string | null; paymentReference?: string | null; orderStatus?: string | null } | undefined>;
   updateOrderStatus(id: number, status: string): Promise<void>;
   reserveOrderStock(id: number): Promise<boolean>;
   clearCart(userId: string): Promise<void>;
@@ -22,12 +22,29 @@ export function createVerifiedOrderCompleter(
   storage: PaymentCompletionStorage,
   createFinanceLedger: (orderId: number) => Promise<void> = async () => {},
   createShipments: (orderId: number) => Promise<unknown> = async () => {},
+  notifyLatePayment: (orderId: number) => Promise<unknown> = async () => {},
 ) {
   return async function completeVerifiedOrder(order: any, reference: string): Promise<boolean> {
     const transitioned = await storage.markOrderPaid(order.id, reference);
     if (!transitioned) {
       const current = await storage.getOrder(order.id);
       if (current?.paymentStatus !== 'paid' || current.paymentReference !== reference) return false;
+    }
+    const confirmed = await storage.getOrder(order.id);
+    if (["cancelled", "expired", "payment_review"].includes(confirmed?.orderStatus || "")) {
+      // Record the real charge, but never grant inventory, vendor earnings or
+      // fulfillment for a cancelled/expired checkout pending human review.
+      if (transitioned) {
+        await notifyLatePayment(order.id).catch(() => console.error("Late payment email failed."));
+        for (const admin of await storage.getAdminUsers()) {
+          await storage.createNotification({
+            userId: admin.id, title: "Late payment requires review",
+            message: `Order #${order.id} received payment after its checkout closed. Review it before fulfillment or refund.`,
+            type: "order", orderId: order.id,
+          }).catch(() => console.error("Late payment review notification failed."));
+        }
+      }
+      return false;
     }
     await createFinanceLedger(order.id);
 
