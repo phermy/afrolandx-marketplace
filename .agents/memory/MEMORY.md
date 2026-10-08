@@ -29,3 +29,4 @@
 - [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
 - [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged
 - [Browser interaction checks](browser-interaction-checks.md) — use real input and assert active state; synthetic clicks can leave Radix tabs unchanged
+- [Live vendor testing](live-vendor-testing.md) — preserve approval gates during QA and obtain inbox consent before replacing an existing vendor session
