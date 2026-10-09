@@ -90,7 +90,7 @@ export default function LoginPage() {
       setCodeEmail(normalizedEmail);
       setCodeStep("verify");
       setCode("");
-      toast({ title: "Code sent", description: "Check your email for the code." });
+      toast({ title: "Check your email", description: "If an eligible account exists, a sign-in code will be sent. Check your inbox and spam folder." });
     } catch (submitError: any) {
       setError(submitError.message || "We couldn't send the code to sign in. Please try again.");
     } finally {

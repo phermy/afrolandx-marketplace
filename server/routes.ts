@@ -11,6 +11,7 @@ import { requestRateLimit } from "./request-rate-limit";
 import { checkoutAccess } from "./guest-checkout";
 import { ensureShippingProfileTable, registerMarketplaceCheckout } from "./marketplace-checkout";
 import { orderDetailsHandler } from "./order-details";
+import { loadOwnedOrder } from "./owned-order";
 import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
@@ -2001,8 +2002,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = Number(req.params.id);
       const userId = req.user.id;
-      const order = await storage.getOrder(orderId);
-      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      const order = await loadOwnedOrder(req, res, req.params.id, storage);
+      if (!order) return;
       const items = await storage.getOrderItemsWithProducts(orderId);
       const added: any[] = [], skipped: any[] = [], adjusted: any[] = [];
       for (const item of items) {
@@ -2262,8 +2263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       if (!Number.isSafeInteger(orderId) || orderId <= 0) return res.status(400).json({ message: 'Invalid order ID' });
 
-      const order = await storage.getOrder(orderId);
-      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      const order = await loadOwnedOrder(req, res, req.params.id, storage);
+      if (!order) return;
       if (order.paymentStatus !== 'paid' || order.shippingPaymentStatus !== 'rejected' || order.orderStatus !== 'awaiting_shipping_quote') {
         return res.status(409).json({ message: 'This order is not waiting for a replacement shipping quote' });
       }
@@ -2885,8 +2886,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isSafeInteger(orderId)) return res.status(400).json({ message: 'Invalid order ID' });
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
 
-      const [order, user] = await Promise.all([storage.getOrder(orderId), storage.getUser(userId)]);
-      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
+      const order = await loadOwnedOrder(req, res, req.params.id, storage);
+      if (!order) return;
+      const user = await storage.getUser(userId);
       if (!user?.email) return res.status(400).json({ message: 'User email required for payment' });
       if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Pay for the order items before paying shipping' });
       if (order.shippingPaymentStatus !== 'pending') {
@@ -3166,9 +3168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const userId = (req.user as any)?.id;
-      const order = await storage.getOrder(orderId);
-      if (!order) return res.status(404).json({ message: 'Order not found' });
-      if (order.userId !== userId) return res.status(403).json({ message: 'Forbidden' });
+      const order = await loadOwnedOrder(req, res, req.params.id, storage);
+      if (!order) return;
       if (order.paymentStatus === 'pending') {
         if (!await unpaidCheckoutCanClose(order, completeVerifiedOrder)) {
           return res.status(409).json({ message: 'Payment is confirmed or still being checked. Do not pay again. Refresh My Orders.' });
@@ -3217,8 +3218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       if (measurementData.orderId) {
-        const order = await storage.getOrder(measurementData.orderId);
-        if (!order || order.userId !== userId) return res.status(400).json({ message: 'Invalid order' });
+        const order = await loadOwnedOrder(req, res, measurementData.orderId, storage);
+        if (!order) return;
         const items = await storage.getOrderItemsWithProducts(order.id);
         if (measurementData.productId && !items.some(item => item.productId === measurementData.productId)) {
           return res.status(400).json({ message: 'Product is not part of this order' });

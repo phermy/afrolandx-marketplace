@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRegisterHandler } from "./auth";
+import { createRegisterHandler as registerWithChecks } from "./auth";
+const createRegisterHandler = (dependencies: Omit<Parameters<typeof registerWithChecks>[0], "assessPassword">) =>
+  registerWithChecks({ ...dependencies, assessPassword: async () => null });
+
+test("registration rejects a breached password before storage, hashing or email delivery", async () => {
+  let status = 200;
+  const fail = async () => assert.fail("No account operation is permitted");
+  const handler = registerWithChecks({
+    assessPassword: async () => "This password has appeared in a data breach.",
+    storage: { getUserByEmail: fail, upsertUser: fail, getUser: fail },
+    hashPassword: fail, issueOtp: fail, createId: () => assert.fail(), isRateLimited: () => false,
+  });
+  await handler({ body: { email: "test@example.com", password: "a-valid-length-password-294", firstName: "Test", phone: "+2348000000000" } }, {
+    status(code: number) { status = code; return this; },
+    json(body: any) { assert.match(body.message, /data breach/); },
+  });
+  assert.equal(status, 400);
+});
 
 test("registration delivery failure never issues a session", async () => {
   const id = "delivery-failure-user";

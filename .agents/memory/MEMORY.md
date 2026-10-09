@@ -35,3 +35,4 @@
 - [Unpaid checkout safety](unpaid-checkout-safety.md) — verify provider status before 24-hour expiry; retain closed records and hold late payments for explicit financial review
 - [Assisted feature copy](assisted-feature-copy.md) — plain task labels and neutral icons, with truthful AI disclosures retained nearby
 - [SEO performance budgets](seo-performance.md) — measure complete compressed first loads; keep server-rendered catalog content public and current
+- [Privacy and optional tracking](privacy-and-tracking.md) — consent before analytics; do not silently bypass breached-password checks or impose them on legacy sign-ins

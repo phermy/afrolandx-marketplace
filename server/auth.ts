@@ -14,6 +14,11 @@ import { getLogisticsAccess } from "./logistics-access";
 import { requestRateLimit } from "./request-rate-limit";
 import { accountNameProblem, passwordProblem } from "../shared/account-security";
 import { queueAccountEmail } from "./account-notifications";
+import { assessPassword, PasswordCheckUnavailable } from "./password-safety";
+import { growingLoginDelay } from "./login-delay";
+import { createLoginCodeRequestHandler } from "./login-code-request";
+
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("not-an-account-password-timing-only", 10);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_RE = /^\d{6}$/;
@@ -83,6 +88,7 @@ export function getSession() {
 }
 
 type RegisterHandlerDependencies = {
+  assessPassword: typeof assessPassword;
   storage: Pick<typeof storage, "getUserByEmail" | "upsertUser" | "getUser">;
   issueOtp: (req: any, user: any) => Promise<void>;
   hashPassword: (password: string) => Promise<string>;
@@ -127,6 +133,8 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
       }
     }
     try {
+      const safetyProblem = await dependencies.assessPassword(password, email);
+      if (safetyProblem) return res.status(400).json({ message: safetyProblem });
       const existing = await dependencies.storage.getUserByEmail(email);
       if (existing) {
         return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
@@ -158,6 +166,9 @@ export function createRegisterHandler(dependencies: RegisterHandlerDependencies)
       }
       return res.json({ message: "Account created. Please verify your email.", email, emailVerificationSent: true });
     } catch (error: any) {
+      if (error instanceof PasswordCheckUnavailable) {
+        return res.status(503).json({ message: error.message });
+      }
       if (error?.code === "23505") {
         return res.status(409).json({ message: "An account already exists for this email. Log in or reset your password.", hint: "SIGN_IN" });
       }
@@ -178,7 +189,8 @@ export async function setupAuth(app: Express) {
       const email = canonicalEmail(rawEmail);
       if (!email || typeof password !== "string" || password.length < 8) return done(null, false, { message: "Invalid email or password" });
       const user = await storage.getUserByEmail(email);
-      if (!user || !user.password || !await bcrypt.compare(password, user.password)) return done(null, false, { message: "Invalid email or password" });
+      const matches = await bcrypt.compare(password, user?.password || DUMMY_PASSWORD_HASH);
+      if (!user?.password || !matches) return done(null, false, { message: "Invalid email or password" });
       if (user.closedAt) return done(null, false, { message: "This account has been closed. Contact support." });
       if (!user.emailVerified) {
         return done(
@@ -254,6 +266,7 @@ export async function setupAuth(app: Express) {
   });
 
   app.post("/api/register", requestRateLimit("register", 6, 900), createRegisterHandler({
+    assessPassword,
     storage,
     issueOtp: (req, user) => issueOtp(req, user, "email"),
     hashPassword: (password) => bcrypt.hash(password, 10),
@@ -264,7 +277,7 @@ export async function setupAuth(app: Express) {
       : registrationTurnstileConfig().enabled ? verifyRegistrationTurnstile : undefined,
   }));
 
-  app.post("/api/login", requestRateLimit("password-login", 10, 900), (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
+  app.post("/api/login", requestRateLimit("password-login", 10, 900), growingLoginDelay("password"), (req, res, next) => passport.authenticate("local", (err: any, user: any, info: any) => {
     if (err) return res.status(500).json({ message: "Authentication error" });
     if (!user) return res.status(401).json({ message: info?.message || "Invalid credentials", ...(info?.hint ? { hint: info.hint } : {}) });
     finalizeLogin(req, res, user, () => res.json({ user: sanitizeUser(user) }));
@@ -294,22 +307,11 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/send-login-otp", requestRateLimit("login-code-request", 6, 900), async (req, res) => {
-    const email = canonicalEmail(req.body.email);
-    if (!email) return res.status(400).json({ message: "A valid email is required" });
-    try {
-      const user = await storage.getUserByEmail(email);
-      if (!user) return res.status(404).json({ message: "No account found with that email. Please create one first." });
-      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
-      await issueOtp(req, user, "login");
-      return res.json({ message: "Sign-in code sent to your email" });
-    } catch (error) {
-      if (error instanceof OtpRateLimitError) {
-        return res.status(429).json({ message: "Too many code requests. Please try again later.", hint: "RATE_LIMITED" });
-      }
-      return res.status(503).json({ message: "Failed to send sign-in code" });
-    }
-  });
+  app.post("/api/send-login-otp", requestRateLimit("login-code-request", 6, 900), createLoginCodeRequestHandler({
+    getUserByEmail: email => storage.getUserByEmail(email),
+    issueOtp: (req, user) => issueOtp(req, user, "login"),
+    onDeliveryError: () => console.warn("Sign-in code could not be issued."),
+  }));
 
   async function verifyOtp(req: any, user: any, otp: unknown, kind: "email" | "login" | "reset") {
     const digest = kind === "email" ? user.emailOtp : kind === "login" ? user.loginOtp : user.passwordResetOtp;
@@ -325,7 +327,7 @@ export async function setupAuth(app: Express) {
     return "valid";
   }
 
-  app.post("/api/login-with-otp", requestRateLimit("login-code-verify", 10, 900), async (req, res) => {
+  app.post("/api/login-with-otp", requestRateLimit("login-code-verify", 10, 900), growingLoginDelay("code"), async (req, res) => {
     const email = canonicalEmail(req.body.email);
     if (!email || !OTP_RE.test(req.body.otp || "")) return res.status(400).json({ message: "Email and a six-digit code are required" });
     try {
@@ -354,49 +356,20 @@ export async function setupAuth(app: Express) {
     } catch { return res.status(500).json({ message: "Verification failed" }); }
   });
 
-  app.post("/api/resend-verification", requestRateLimit("verification-request", 6, 900), async (req, res) => {
-    const email = canonicalEmail(req.body.email);
-    if (!email) return res.status(400).json({ message: "A valid email is required" });
-    try {
-      const user = await storage.getUserByEmail(email);
-      if (!user) return res.status(404).json({ message: "Account not found" });
-      if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
-      if (user.emailVerified) return res.json({ message: "Email is already verified" });
-      await issueOtp(req, user, "email");
-      return res.json({ message: "Verification code sent to your email" });
-    } catch (error) {
-      if (error instanceof OtpRateLimitError) {
-        return res.status(429).json({ message: "Too many code requests. Please try again later.", hint: "RATE_LIMITED" });
-      }
-      return res.status(503).json({ message: "Failed to resend verification code" });
-    }
-  });
+  app.post("/api/resend-verification", requestRateLimit("verification-request", 6, 900), createLoginCodeRequestHandler({
+    getUserByEmail: email => storage.getUserByEmail(email),
+    issueOtp: (req, user) => issueOtp(req, user, "email"),
+    eligible: user => !user.emailVerified,
+    response: { message: "If an eligible account needs verification, a code will be sent. Check your inbox and spam folder." },
+    onDeliveryError: () => console.warn("Verification code could not be issued."),
+  }));
 
-  app.post("/api/forgot-password", requestRateLimit("password-reset-request", 6, 900), async (req, res) => {
-    const email = canonicalEmail(req.body.email);
-    if (!email) return res.status(400).json({ message: "A valid email is required" });
-    const genericResponse = { message: "If that email is registered, you'll receive a reset code shortly." };
-
-    // Apply the same public response and IP limit before lookup to prevent account enumeration.
-    if (!permitted(requestLimits, `reset:public-ip:${clientIp(req)}`, MAX_OTP_REQUESTS)) {
-      return res.json(genericResponse);
-    }
-
-    try {
-      const user = await storage.getUserByEmail(email);
-      if (user && !user.closedAt) {
-        try {
-          await issueOtp(req, user, "reset");
-        } catch (error) {
-          console.error("Password reset code delivery failed:", error);
-        }
-      }
-      return res.json(genericResponse);
-    } catch (error) {
-      console.error("Password reset request failed:", error);
-      return res.json(genericResponse);
-    }
-  });
+  app.post("/api/forgot-password", requestRateLimit("password-reset-request", 6, 900), createLoginCodeRequestHandler({
+    getUserByEmail: email => storage.getUserByEmail(email),
+    issueOtp: (req, user) => issueOtp(req, user, "reset"),
+    response: { message: "If an eligible account exists, a password reset code will be sent. Check your inbox and spam folder." },
+    onDeliveryError: () => console.warn("Password reset code could not be issued."),
+  }));
 
   app.post("/api/reset-password", requestRateLimit("password-reset-verify", 10, 900), async (req, res) => {
     const email = canonicalEmail(req.body.email);
@@ -404,6 +377,8 @@ export async function setupAuth(app: Express) {
     const passwordError = passwordProblem(newPassword, email || undefined);
     if (!email || !OTP_RE.test(otp || "") || passwordError) return res.status(400).json({ message: passwordError || "A valid email and six-digit code are required" });
     try {
+      const safetyProblem = await assessPassword(newPassword, email);
+      if (safetyProblem) return res.status(400).json({ message: safetyProblem });
       const user = await storage.getUserByEmail(email);
       if (!user) return res.status(400).json({ message: "Invalid or expired reset code" });
       if (user.closedAt) return res.status(403).json({ message: "This account has been closed. Contact support." });
@@ -415,7 +390,11 @@ export async function setupAuth(app: Express) {
         "Your password was changed successfully, and previous signed-in sessions have been ended. If you did not make this change, request a password reset and contact support@afrolandx.com immediately. Never send your password or verification code by email."
       ).catch(() => console.error("Password change notice could not be queued."));
       return res.json({ message: "Password reset successfully. You can now sign in." });
-    } catch { return res.status(500).json({ message: "Failed to reset password" }); }
+    } catch (error) {
+      return res.status(error instanceof PasswordCheckUnavailable ? 503 : 500).json({
+        message: error instanceof PasswordCheckUnavailable ? error.message : "Failed to reset password",
+      });
+    }
   });
 }
 

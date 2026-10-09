@@ -66,7 +66,7 @@ try {
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
     return result.result.value;
   };
-  const paths = ["/contact", "/faq", "/size-guide", "/shipping-information", "/returns", "/policies/prohibited-and-restricted-products", "/accessibility"];
+  const paths = ["/contact", "/faq", "/size-guide", "/shipping-information", "/returns", "/policies/prohibited-and-restricted-products", "/accessibility", "/policies/privacy-and-cookie-policy"];
   for (const width of [1280, 390]) {
     await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 500 }, sessionId);
     for (const path of paths) {
@@ -113,6 +113,12 @@ try {
         assert.ok(page.text.includes("WCAG"));
         assert.ok(page.links.includes("mailto:support@afrolandx.com"));
         assert.ok(page.text.includes("not a claim"));
+      }
+      if (path.includes("privacy-and-cookie")) {
+        assert.match(page.text, /Nigeria Data Protection Act 2023/);
+        assert.match(page.text, /Service providers and data processors/);
+        assert.match(page.text, /Pwned Passwords/);
+        assert.match(page.text, /consent choice/);
       }
       if (path === "/faq") {
         const question = await evaluate(`(() => {

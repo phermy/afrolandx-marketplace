@@ -1047,7 +1047,7 @@ export default function Checkout() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span className="font-medium">{formatPrice(serverTotal?.subtotal ?? cartTotal)}</span>
+                      <span className="font-medium">{serverTotal ? formatPrice(serverTotal.subtotal) : "Awaiting server calculation"}</span>
                     </div>
                     
                     {selectedShippingQuote && (

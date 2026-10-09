@@ -135,7 +135,7 @@ export function getShippingQuote(shippingMethod: unknown) {
 }
 
 export function calculateCheckoutSubtotal(cartItems: CheckoutCartItem[]): number {
-  let subtotal = 0;
+  let subtotalKobo = 0;
 
   for (const item of cartItems) {
     const product = item.product;
@@ -157,10 +157,14 @@ export function calculateCheckoutSubtotal(cartItems: CheckoutCartItem[]): number
     if (!Number.isFinite(price) || price <= 0) {
       throw new CheckoutValidationError('A cart item has an invalid price');
     }
-    subtotal += price * item.quantity;
+    const lineKobo = Math.round(price * 100) * item.quantity;
+    if (!Number.isSafeInteger(lineKobo) || !Number.isSafeInteger(subtotalKobo + lineKobo)) {
+      throw new CheckoutValidationError('Cart amount is outside the supported range');
+    }
+    subtotalKobo += lineKobo;
   }
 
-  return subtotal;
+  return subtotalKobo / 100;
 }
 
 const SHIPPING_ESTIMATE_MULTIPLIERS: Record<string, number> = {
