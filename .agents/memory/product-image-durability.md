@@ -25,7 +25,7 @@ Cloudflare token verification errors 6003 with nested 6111 indicate a malformed 
 
 **Why:** An existing, publicly enabled R2 bucket could be inspected through the agent connection while the application connector failed at token verification before bucket authorization.
 
-**How to apply:** Confirm the credential's kind and formatting before further bucket changes or reconnect attempts. Ask only which kind of credential was saved, never its value; do not assume the user supplied the wrong key when the connector's header configuration could also be responsible.
+**How to apply:** Confirm the credential's kind and formatting before further bucket changes or reconnect attempts. Ask only which kind of credential was saved, never its value; do not assume the user supplied the wrong key when the connector's header configuration could also be responsible. Validate a direct request before implementing a secret-based fallback: bypassing the connector does not prove that the saved token will work. If both paths fail, stop asking for blind credential replacements and inspect the credential's source screen with every secret fully redacted.
 
 The R2 rollout is for new product photos in development, not a replacement for all AWS storage.
 
