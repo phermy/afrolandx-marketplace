@@ -19,6 +19,7 @@ export const cacReviewSchema = z.discriminatedUnion("decision", [
     relationshipConfirmed: z.boolean().default(false),
     relationshipEvidence: z.string().trim().max(1000).default(""),
     notes: z.string().trim().max(1500).default(""),
+    duplicateResolutionNotes: z.string().trim().max(2000).default(""),
   }),
   z.object({
     decision: z.literal("rejected"),

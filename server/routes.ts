@@ -16,10 +16,13 @@ import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
-import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
+import { RoleManagementError, updateManagedRoles, lockVerifiedAdminAndTarget } from "./superadmin-role-management";
 import { vendorStatusHandler } from "./admin-vendor-status";
 import { canReviewVendorApplication, vendorApplicationForReviewer } from "./vendor-application-access";
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
+import { registerVendorOnboardingRoutes } from "./vendor-onboarding-routes";
+import { invalidateOnboarding, recordFirstVendorReview, OnboardingError, lockCacReview, ensureOnboardingState } from "./vendor-onboarding-state";
+import { cacNumberInput } from "../shared/vendor-onboarding";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import {
   approveSelectedProducts, getPendingAdminProducts, getProductByClientImportKey,
@@ -294,6 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   registerMarketplaceCheckout(app);
   app.use('/api/admin', isAuthenticated, managementGuard);
+  await registerVendorOnboardingRoutes(app);
   app.use(['/api/categories/init', '/api/discover/inquiries', '/api/discover/premium', '/api/places'], isAuthenticated, requireFullManagement);
   registerLogisticsRoutes(app);
   registerReviewRoutes(app);
@@ -879,10 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return phone;
         }),
-        cacNumber: z.preprocess(
-          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
-          z.string().trim().min(3).max(60).nullable().optional(),
-        ),
+        cacNumber: cacNumberInput,
         description: z.string().trim().min(10).max(2000),
       }).parse(req.body);
       const vendorData = insertVendorSchema.parse({
@@ -891,7 +892,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'pending',
       });
 
-      const vendor = await storage.createVendor(vendorData);
+      const vendor = await db.transaction(async tx => {
+        await lockCacReview(tx, vendorData.cacNumber || null);
+        const [created] = await tx.insert(vendors).values(vendorData).returning();
+        await ensureOnboardingState(tx, created.id);
+        return created;
+      });
       await storage.addUserRole(userId, 'vendor');
       const applicant = await storage.getUser(userId);
       await queueAccountEmail(applicant?.email, "Vendor application received",
@@ -939,10 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactName: z.string().trim().min(2).max(120).optional(),
         businessName: z.string().trim().min(2).max(160).optional(),
         phone: z.string().trim().min(7).max(30).optional(),
-        cacNumber: z.preprocess(
-          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
-          z.string().trim().min(3).max(60).nullable().optional(),
-        ),
+        cacNumber: cacNumberInput.optional(),
         description: z.string().trim().min(10).max(2000).optional(),
       }).parse(req.body);
       if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
@@ -954,6 +957,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           || (profile.businessName !== undefined && profile.businessName !== current.businessName);
         if (registrationChanged && current.verificationStatus === 'verified') {
           throw new RoleManagementError('A verified CAC number or business name cannot be changed here. Contact support for a new verification review.');
+        }
+        if (registrationChanged) {
+          await lockCacReview(tx, profile.cacNumber || current.cacNumber);
+        }
+        const applicationChanged = Object.entries(profile).some(([key, value]) => (current as any)[key] !== value);
+        if (applicationChanged && !["approved","suspended"].includes(current.status || "")) {
+          await invalidateOnboarding(tx, vendor.id);
         }
         const [saved] = await tx.update(vendors).set({ ...profile, updatedAt: new Date() })
           .where(eq(vendors.id, vendor.id)).returning();
@@ -1135,10 +1145,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorId = Number(req.params.id);
       if (!Number.isSafeInteger(vendorId) || vendorId <= 0) return res.status(400).json({ message: 'Invalid vendor ID' });
       const input = cacReviewSchema.parse(req.body);
-      const { updated, userId } = await db.transaction(async tx => {
+      const { updated, userId, actor, applicant } = await db.transaction(async tx => {
+        const [record] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
+        if (!record) throw new RoleManagementError('Vendor not found', 404);
+        const lockedAccounts = await lockVerifiedAdminAndTarget(tx, (req.user as any).id, record.userId);
+        const actor = { ...lockedAccounts.actor, emailVerified: lockedAccounts.actor.email_verified, roles: lockedAccounts.actor.roles as string[] };
+        const applicant = { ...lockedAccounts.target, emailVerified: lockedAccounts.target.email_verified, roles: lockedAccounts.target.roles as string[] };
         await tx.execute(sql`SELECT id FROM vendors WHERE id = ${vendorId} FOR UPDATE`);
         const [vendor] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
         if (!vendor) throw new RoleManagementError('Vendor not found', 404);
+        if (!canReviewVendorApplication(actor, applicant)) throw new RoleManagementError('Vendor not found', 404);
+        await recordFirstVendorReview(tx, vendor, (req.user as any).id, input.decision === 'verified',
+          input.decision === 'verified' ? input.duplicateResolutionNotes : "");
         const now = new Date();
         let reviewNotes: string;
         try {
@@ -1153,22 +1171,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           identityVerifiedAt: verified ? now : null,
           businessVerifiedAt: verified ? now : null,
           verificationNotes: [vendor.verificationNotes, reviewNotes].filter(Boolean).join('\n\n---\n\n'),
-          status: !verified && vendor.status === 'approved' ? 'suspended' : vendor.status,
+          status: vendor.status === 'approved' ? 'suspended' : vendor.status,
           updatedAt: now,
         }).where(eq(vendors.id, vendorId)).returning();
-        return { updated, userId: vendor.userId };
+        return { updated, userId: vendor.userId, actor, applicant };
       });
       await storage.createNotification({
         userId,
         type: 'vendor_verification',
-        title: input.decision === 'verified' ? 'Vendor verification completed' : 'Vendor verification needs attention',
+        title: input.decision === 'verified' ? 'First vendor review recorded' : 'Vendor verification needs attention',
         message: input.decision === 'verified'
-          ? 'Your CAC, identity, and business checks are complete. Afrolandx can now approve your vendor account.'
+          ? 'The first CAC, identity, and business review is complete. A different authorised reviewer must approve the application before you can sell.'
           : `Your verification was not approved. ${input.notes || 'Contact support for the required corrections.'}`,
       });
-      res.json(updated);
+      res.json(vendorApplicationForReviewer(updated, applicant, actor));
     } catch (error) {
-      if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
+      if (error instanceof RoleManagementError || error instanceof OnboardingError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Complete the verification checklist' });
       console.error('Error reviewing vendor verification:', error);
       res.status(500).json({ message: 'Failed to update vendor verification' });

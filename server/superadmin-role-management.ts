@@ -3,6 +3,7 @@ import { db } from "./db";
 import { users, vendors } from "../shared/schema";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
 import { hasManualCacReview } from "./cac-review";
+import { recordSecondVendorApproval, OnboardingError } from "./vendor-onboarding-state";
 
 const managedRoles = ["customer", "vendor", "admin", "superadmin"] as const;
 type ManagedRole = (typeof managedRoles)[number];
@@ -119,6 +120,12 @@ export async function approveVendorWithRole(actorId: string, vendorId: number) {
     if (locked.rows[0]?.verification_status !== "verified" ||
       !hasManualCacReview(locked.rows[0]?.verification_notes as string | null)) {
       throw new RoleManagementError("Complete a documented review using CAC Public Search before approval.");
+    }
+    const [currentVendor] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
+    try { await recordSecondVendorApproval(tx, currentVendor, actorId); }
+    catch (error) {
+      if (error instanceof OnboardingError) throw new RoleManagementError(error.message, error.status);
+      throw error;
     }
     const [updated] = await tx.update(vendors).set({ status: "approved", updatedAt: new Date() })
       .where(eq(vendors.id, vendorId)).returning();

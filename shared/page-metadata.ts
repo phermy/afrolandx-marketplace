@@ -21,7 +21,7 @@ const privatePages: Record<string, string> = {
   "/login": "Sign In", "/register": "Create an Account", "/forgot-password": "Reset Password",
   "/checkout": "Checkout", "/profile": "Your Profile", "/my-orders": "Your Orders",
   "/order-success": "Payment Confirmation", "/admin": "Administration", "/admin/finance": "Administration Finance",
-  "/vendor": "Vendor Dashboard", "/vendor/finance": "Vendor Finance", "/vendor/workshop": "Vendor Workshop",
+  "/vendor": "Vendor Dashboard", "/vendor/apply": "Vendor Application", "/vendor/finance": "Vendor Finance", "/vendor/workshop": "Vendor Workshop",
   "/shipping": "Shipping Operations", "/discover": "Discover Preview", "/measurements": "Your Measurements",
   "/messages": "Your Messages", "/loyalty": "Your Rewards",
 };

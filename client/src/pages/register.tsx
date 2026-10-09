@@ -191,7 +191,7 @@ export default function RegisterPage() {
       const result = await response.json();
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Email verified", description: "Your account is ready." });
-      window.location.href = (result.user?.signupIntent ?? signupIntent) === "vendor" ? "/vendor" : "/";
+      window.location.href = (result.user?.signupIntent ?? signupIntent) === "vendor" ? "/vendor/apply" : "/";
     } catch (submitError: any) {
       setError(submitError.message || "That code is invalid or expired.");
     } finally {

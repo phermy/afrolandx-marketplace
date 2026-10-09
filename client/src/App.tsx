@@ -26,6 +26,7 @@ const Profile = lazyWithRetry(() => import("@/pages/profile"));
 const MyOrders = lazyWithRetry(() => import("@/pages/my-orders"));
 const OrderSuccess = lazyWithRetry(() => import("@/pages/order-success"));
 const VendorDashboard = lazyWithRetry(() => import("@/pages/vendor-dashboard"));
+const VendorApply = lazyWithRetry(() => import("@/pages/vendor-apply"));
 const AdminDashboard = lazyWithRetry(() => import("@/pages/admin-dashboard"));
 const AdminProductReview = lazyWithRetry(() => import("@/pages/admin-product-review"));
 const AdminFinance = lazyWithRetry(() => import("@/pages/admin-finance"));
@@ -136,10 +137,10 @@ function Router() {
     <Switch>
       {/* Auth pages — always accessible, redirect home if already logged in */}
       <Route path="/login">
-        {isAuthenticated ? <AuthRedirect to={user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Login />}
+        {isAuthenticated ? <AuthRedirect to={user?.signupIntent === "vendor" ? "/vendor/apply" : "/"} /> : <Login />}
       </Route>
       <Route path="/register">
-        {isAuthenticated ? <AuthRedirect to={new URLSearchParams(window.location.search).get("as") === "vendor" || user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Register />}
+        {isAuthenticated ? <AuthRedirect to={new URLSearchParams(window.location.search).get("as") === "vendor" || user?.signupIntent === "vendor" ? "/vendor/apply" : "/"} /> : <Register />}
       </Route>
       <Route path="/forgot-password">
         <ForgotPassword />
@@ -196,6 +197,7 @@ function Router() {
       <Route path="/vendor/finance">
         {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorFinance /> : <AuthRedirect to="/vendor" />}
       </Route>
+      <Route path="/vendor/apply" component={VendorApply} />
       <Route path="/checkout">
         <Checkout />
       </Route>

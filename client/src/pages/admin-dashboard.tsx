@@ -33,6 +33,8 @@ import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest
 import { trackEvent } from '@/lib/analytics';
 import { AdminUserDetails } from '@/components/admin-user-details';
 import { cacBusinessNamesMatch } from '@shared/cac-review';
+import VendorOnboardingReview from '@/components/vendor-onboarding-review';
+import VendorMonitoring from '@/components/vendor-monitoring';
 
 const AdminAnalyticsCharts = lazy(() => import('@/components/admin-analytics-charts'));
 
@@ -107,6 +109,7 @@ export default function AdminDashboard() {
   const [cacRegistryStatus, setCacRegistryStatus] = useState('');
   const [relationshipConfirmed, setRelationshipConfirmed] = useState(false);
   const [relationshipEvidence, setRelationshipEvidence] = useState('');
+  const [duplicateResolutionNotes, setDuplicateResolutionNotes] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
   const [selectedPendingProductIds, setSelectedPendingProductIds] = useState<number[]>([]);
   const [bulkApproveConfirmationOpen, setBulkApproveConfirmationOpen] = useState(false);
@@ -145,6 +148,11 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/vendors', user?.id, fullManagement],
     queryFn: async () => (await apiRequest('GET', '/api/admin/vendors')).json(),
     enabled: isAuthenticated && isAdmin(user), retry: false,
+  });
+  const { data: onboardingDetail } = useQuery<any>({
+    queryKey: ['/api/admin/vendors', reviewVendor?.id, 'onboarding'],
+    queryFn: async () => (await apiRequest('GET', `/api/admin/vendors/${reviewVendor.id}/onboarding`)).json(),
+    enabled: !!reviewVendor?.id,
   });
   const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
   const {
@@ -245,7 +253,7 @@ export default function AdminDashboard() {
         if (['delivered', 'cancelled'].includes(o.orderStatus)) {
           newActivity.push({ id: Date.now() + o.id, orderId: o.id, status: o.orderStatus, amount: o.totalAmount, time: new Date() });
           toast({
-            title: o.orderStatus === 'delivered' ? `✅ Order #${o.id} Delivered` : `❌ Order #${o.id} Cancelled`,
+            title: o.orderStatus === 'delivered' ? `Order #${o.id} delivered` : `Order #${o.id} cancelled`,
             description: `₦${parseFloat(o.totalAmount || 0).toLocaleString()} order has been ${o.orderStatus}.`,
           });
         }
@@ -305,6 +313,8 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/vendors/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors', result?.vendor?.id, 'onboarding'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendor-monitoring'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
@@ -325,6 +335,7 @@ export default function AdminDashboard() {
           relationshipEvidence,
         } : {}),
         notes: verificationNotes,
+        ...(onboardingDetail?.duplicatesCount > 0 ? { duplicateResolutionNotes } : {}),
         decision,
       });
       return response.json();
@@ -333,8 +344,9 @@ export default function AdminDashboard() {
       setReviewVendor((current: any) => current?.id === updated.id ? { ...current, ...updated } : current);
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors', updated.id, 'onboarding'] });
       toast({ title: updated.verificationStatus === 'verified' ? 'Verification recorded' : 'Verification rejected',
-        description: updated.verificationStatus === 'verified' ? 'You can now approve this vendor.' : 'The vendor cannot be approved until a new review passes.' });
+        description: updated.verificationStatus === 'verified' ? 'The CAC first review is recorded. A different authorised reviewer must make the final approval.' : 'The vendor cannot be approved until a new review passes.' });
     },
     onError: (error: Error) => toast({ title: 'Verification not recorded', description: getApiErrorMessage(error, 'The verification could not be recorded.'), variant: 'destructive' }),
   });
@@ -752,7 +764,6 @@ export default function AdminDashboard() {
                 {(adminNotifications as any[]).slice(0, 4).map((n: any) => (
                   <div key={n.id} className="flex items-start justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <span className="text-lg">{n.type === 'order' ? '📦' : '📢'}</span>
                       <div>
                         <p className="font-semibold text-red-800 text-sm">{n.title}</p>
                         <p className="text-red-700 text-xs">{n.message}</p>
@@ -932,7 +943,7 @@ export default function AdminDashboard() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-bold text-gray-400 w-4">#{i + 1}</span>
                                   <span className="text-sm font-medium truncate max-w-[140px]">{v.businessName}</span>
-                                  {i === 0 && <span className="text-xs">🏆</span>}
+                                  {i === 0 && <span className="text-xs font-semibold uppercase tracking-wide text-amber-700">Top</span>}
                                 </div>
                                 <div className="text-right">
                                   <span className="text-xs font-semibold text-green-700">{fmtCurrency(v.totalInventoryValue)}</span>
@@ -1721,13 +1732,21 @@ export default function AdminDashboard() {
 
           {/* ═══ VENDOR MANAGEMENT TAB ══════════════════════════════════════ */}
           <TabsContent value="vendors">
+            <div className="mb-5 rounded-xl border border-stone-200 bg-[#fbfaf7] p-4 sm:p-6">
+              <div className="mb-4">
+                <p className="text-xs font-bold uppercase tracking-[.16em] text-[#a35c3f]">After approval</p>
+                <h2 className="mt-1 text-xl font-semibold text-[#193d32]">Manual vendor monitoring</h2>
+                <p className="mt-1 text-sm text-stone-600">Review recent business signals and record a staff decision.</p>
+              </div>
+              <VendorMonitoring />
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Vendor Management
                   <Badge variant="secondary">{(vendors as any[]).length} total</Badge>
                 </CardTitle>
-                <CardDescription>Review applications and manage active vendor accounts.</CardDescription>
+                <CardDescription>First record the CAC Public Search review. A different authorised reviewer must make the final approval.</CardDescription>
               </CardHeader>
               <CardContent>
                 {(vendors as any[]).length === 0 ? (
@@ -1776,13 +1795,6 @@ export default function AdminDashboard() {
                             </Button>
                             {vendor.status === 'pending' && (
                               <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
-                                  disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified' ||
-                                     !isAdmin(user) || !user?.emailVerified}
-                                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
-                                  onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
-                                  <CheckCircle className="w-3 h-3 mr-1" />Approve
-                                </Button>
                                 <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'rejected' })}>
                                   <XCircle className="w-3 h-3 mr-1" />Reject
                                 </Button>
@@ -1822,6 +1834,7 @@ export default function AdminDashboard() {
               setCacRegistryStatus('');
               setRelationshipConfirmed(false);
               setRelationshipEvidence('');
+                              setDuplicateResolutionNotes('');
             }} />
             <Card>
               <CardHeader>
@@ -2352,6 +2365,8 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <Separator />
+                <VendorOnboardingReview vendorId={reviewVendor.id} />
+                <Separator />
                 <div className="space-y-3">
                   <h3 className="flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Business verification</h3>
                   <p className="text-sm text-gray-600">CAC number: <span className="font-medium text-gray-800">{reviewVendor.cacNumber || 'Not provided'}</span></p>
@@ -2359,7 +2374,15 @@ export default function AdminDashboard() {
                     className="inline-flex text-sm font-medium text-[#176847] underline underline-offset-2">
                     Open official CAC Public Search <ArrowUpRight className="ml-1 h-4 w-4" />
                   </a>
-                  <p className="text-sm text-gray-600">Search by RC number on CAC’s site. Compare the number, registered name, and listing status with this vendor. This is a manual review, not an automatic CAC lookup.</p>
+                  <p className="text-sm text-gray-600">Search the registration number on CAC Public Search. Compare the number, registered name, and listing status with this vendor. This first review is manual, not an automatic CAC lookup. A different authorised reviewer must record final approval after this step.</p>
+                  {(onboardingDetail?.duplicatesCount || 0) > 0 && (
+                    <label className="block text-sm font-medium">Resolution for possible duplicate records
+                      <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal"
+                        maxLength={1500} value={duplicateResolutionNotes} onChange={event => setDuplicateResolutionNotes(event.target.value)}
+                        placeholder="Explain why this business is distinct or how the records relate. At least 20 characters." />
+                      <span className="mt-1 block text-xs text-gray-500">{duplicateResolutionNotes.trim().length}/20 minimum characters</span>
+                    </label>
+                  )}
                   {reviewVendor.verificationNotes && (
                     <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
                       <p className="text-xs font-medium text-gray-600">Previous review record</p>
@@ -2403,7 +2426,7 @@ export default function AdminDashboard() {
                       )}
                       {([
                         { key: 'cacVerified', label: 'I compared this number and registered name on the official CAC search' },
-                        { key: 'identityVerified', label: 'I checked the owner identity' },
+                        { key: 'identityVerified', label: 'I checked the evidence that the applicant may act for this business' },
                         { key: 'businessVerified', label: 'I checked the business details' },
                       ] as const).map(({ key, label }) => (
                         <label key={key} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-3 text-sm">
@@ -2413,12 +2436,20 @@ export default function AdminDashboard() {
                           {label}
                         </label>
                       ))}
+                      {reviewVendor.status === 'approved' && (
+                        <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-6 text-amber-950" role="alert">
+                          Recording a new first CAC review for this approved business will suspend selling access. A different verified Admin must record final approval before selling can resume.
+                        </p>
+                      )}
                       <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber ||
+                        !onboardingDetail?.evidence?.some((item: any) => item.kind === 'cac_certificate') ||
+                        !onboardingDetail?.evidence?.some((item: any) => item.kind === 'identity_authority') ||
+                        ((onboardingDetail?.duplicatesCount || 0) > 0 && duplicateResolutionNotes.trim().length < 20) ||
                         !Object.values(verificationChecks).every(Boolean) || cacRegisteredName.trim().length < 2 ||
                         cacRegistryStatus !== 'active' || (!cacBusinessNamesMatch(cacRegisteredName, reviewVendor.businessName) &&
                           (!relationshipConfirmed || relationshipEvidence.trim().length < 20))}
                         onClick={() => verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'verified' })}>
-                        {verifyVendorMutation.isPending ? 'Saving…' : 'Record verification'}
+                        {verifyVendorMutation.isPending ? 'Saving…' : 'Record first CAC review'}
                       </Button>
                     </>
                   )}
@@ -2433,7 +2464,7 @@ export default function AdminDashboard() {
                         !window.confirm('Rejecting this verification will suspend this vendor from selling. Continue?')) return;
                       verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'rejected' });
                     }}>
-                    {reviewVendor.verificationStatus === 'verified' ? 'Revoke verification' : 'Reject verification'}
+                    {reviewVendor.verificationStatus === 'verified' ? 'Revoke first review' : 'Reject application review'}
                   </Button>
                 </div>
                 <Separator />
@@ -2466,12 +2497,14 @@ export default function AdminDashboard() {
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
                 <Button className="bg-green-600 hover:bg-green-700 text-white"
-                   disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
-                     !reviewVendor.cacReviewComplete ||
+                 disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                   !reviewVendor.cacReviewComplete || !onboardingDetail?.evidence?.some((item: any) => item.kind === 'cac_certificate') ||
+                   !onboardingDetail?.evidence?.some((item: any) => item.kind === 'identity_authority') ||
+                   (!!onboardingDetail?.review?.firstReviewerId && String(onboardingDetail.review.firstReviewerId) === String(user?.id)) ||
                     !isAdmin(user) || !user?.emailVerified}
-                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
+                  title={!user?.emailVerified ? 'Verify your admin email before recording final approval.' : 'A different authorised reviewer must make final approval after both documents and the first CAC review are recorded.'}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
-                  <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
+                   <CheckCircle className="w-4 h-4 mr-2" />Record final approval
                 </Button>
               </>
             )}
