@@ -1,396 +1,388 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
-import { useAuth } from '@/hooks/useAuth';
-import { hasFullManagementAccess, hasShippingOperationsAccess } from '@shared/admin-access';
-import { useCart } from '@/contexts/CartContext';
-import MegaMenu from '@/components/mega-menu';
-import { useQuery } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
-import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { useState, type FormEvent } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  BookOpen,
+  Calendar,
+  ChevronDown,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Gift,
+  Home,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Package,
+  Palette,
+  Ruler,
+  Search,
+  Settings,
+  ShoppingCart,
+  Star,
+  Truck,
+  X,
+  Zap,
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { hasFullManagementAccess, hasShippingOperationsAccess } from "@shared/admin-access";
+import { useCart } from "@/contexts/CartContext";
+import MegaMenu from "@/components/mega-menu";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { isAdmin, isVendor, getUserRoleDisplay } from "@/lib/roleUtils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText, CreditCard, Truck } from 'lucide-react';
-import logoImage from '@assets/Group 1000002646_1749631956471.png';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import logoImage from "@assets/Group 1000002646_1749631956471.png";
 
 export default function Navbar() {
   const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { cartCount, toggleCart } = useCart();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ['/api/messages/unread-count'],
+    queryKey: ["/api/messages/unread-count"],
     enabled: isAuthenticated,
     refetchInterval: 30000,
   });
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      window.location.href = `/products?search=${encodeURIComponent(searchQuery)}`;
-    }
+  const fullManagement = hasFullManagementAccess(user);
+  const canAccessShipping = !!(
+    isAuthenticated &&
+    user &&
+    (hasShippingOperationsAccess(user) || isVendor(user) || user.isShippingPartner)
+  );
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const term = searchQuery.trim();
+    if (term) window.location.href = `/products?search=${encodeURIComponent(term)}`;
     setIsMobileMenuOpen(false);
   };
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      window.location.href = '/';
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      window.location.href = "/";
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     }
-  };
-
-  const handleLogin = () => {
-    window.location.href = '/login';
   };
 
   const getUserInitials = () => {
     if (user?.firstName && user?.lastName) {
       return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     }
-    if (user?.email) {
-      return user.email[0].toUpperCase();
-    }
-    return 'U';
+    return user?.email?.[0]?.toUpperCase() || "U";
   };
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
-
   const navLinkClass = (path: string) =>
-    `px-3 py-2 font-medium transition-colors ${
+    `rounded-sm px-2.5 py-2 text-[0.84rem] font-semibold transition-colors ${
       location === path
-        ? 'text-nigerian-green border-b-2 border-nigerian-green'
-        : 'text-gray-700 hover:text-nigerian-green'
+        ? "text-[#17533f]"
+        : "text-[#4c5d53] hover:text-[#17533f]"
     }`;
-  const fullManagement = hasFullManagementAccess(user);
-  const canAccessShipping = !!(isAuthenticated && user && (hasShippingOperationsAccess(user) || isVendor(user) || user.isShippingPartner));
-
   const mobileNavLinkClass = (path: string) =>
-    `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+    `flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
       location === path
-        ? 'bg-green-50 text-nigerian-green'
-        : 'text-gray-700 hover:bg-gray-50 hover:text-nigerian-green'
+        ? "bg-[#e9eee5] text-[#174c3b]"
+        : "text-[#334840] hover:bg-[#f2f0e8]"
     }`;
+
+  const accountName =
+    user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.email;
 
   return (
-    <nav className="bg-white shadow-lg sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center min-h-16 py-2 gap-4">
-          {/* Logo */}
-          <div className="flex items-center flex-1 min-w-0">
-            <Link href="/" className="shrink-0">
-              <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian cursor-pointer">
-                <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
-                <span className="hidden sm:block">Afrolandx</span>
-              </div>
-            </Link>
+    <nav className="sticky top-0 z-40 border-b border-[#ded9cd] bg-[#fbf8f0]">
+      <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-[68px] items-center gap-3 sm:gap-5">
+          <Link href="/" aria-label="Afrolandx home" className="flex shrink-0 items-center gap-2">
+            <img src={logoImage} alt="" className="h-9 w-9 object-contain" />
+            <span
+              className="text-[1.18rem] font-bold tracking-[-0.045em] text-[#174c3b] sm:text-[1.35rem]"
+              style={{ fontFamily: '"Space Grotesk", sans-serif' }}
+            >
+              Afrolandx
+            </span>
+          </Link>
 
-            {/* Desktop Navigation */}
-            <div className="hidden lg:ml-4 lg:flex lg:flex-wrap lg:gap-x-1 lg:gap-y-1 min-w-0">
-              <Link href="/" className={navLinkClass('/')}>Home</Link>
-              <Link href="/products" className={navLinkClass('/products')}>Products</Link>
-              <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
-              <Link href="/events" className={navLinkClass('/events')}>Events</Link>
-              <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
-              {isAuthenticated && isAdmin(user) && <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>}
-              <Link href="/policies" className={navLinkClass('/policies')}>Policies</Link>
-              {isAuthenticated && (
-                <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
-              )}
-              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} className={navLinkClass('/vendor')}>
-                {isAuthenticated && isVendor(user) ? "Vendor" : "Become a Vendor"}
-              </Link>
-              {isAuthenticated && isAdmin(user) && (
-                <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
-                }`}>Admin</Link>
-              )}
-              {canAccessShipping && <Link href="/shipping" className={navLinkClass('/shipping')}>Shipping</Link>}
-            </div>
+          <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
+            <Link href="/products" className={navLinkClass("/products")}>Shop</Link>
+            <Link href="/events" className={navLinkClass("/events")}>Events</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-10 gap-1 rounded-sm px-2.5 text-[0.84rem] font-semibold text-[#4c5d53] hover:bg-[#f0ece1] hover:text-[#17533f]"
+                  aria-label="Open more links"
+                >
+                  More <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52 border-[#e2ddd1] bg-[#fbf8f0]">
+                <DropdownMenuItem asChild><Link href="/reviews">Reviews</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="/collab-drops">Collab Drops</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link href="/policies">Policies</Link></DropdownMenuItem>
+                {isAuthenticated && <DropdownMenuItem asChild><Link href="/lookbook">Lookbook</Link></DropdownMenuItem>}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild><Link href="/vendor/apply">Sell with Afrolandx</Link></DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          {/* Desktop Search Bar */}
-          <div className="hidden lg:flex flex-1 min-w-0 max-w-lg mx-4">
-            <form onSubmit={handleSearch} className="relative w-full">
+          <form onSubmit={handleSearch} role="search" className="hidden min-w-0 flex-1 lg:block">
+            <label htmlFor="desktop-site-search" className="sr-only">Search the marketplace</label>
+            <div className="relative mx-auto max-w-[430px]">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7b8278]" />
               <Input
-                type="text"
-                placeholder="Search traditional wear, Aso Oke, beads..."
+                id="desktop-site-search"
+                type="search"
+                placeholder="Search clothing, cloth, jewellery..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 input-nigerian h-10"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="h-10 rounded-md border-[#d9d3c5] bg-[#f5f1e7] pl-10 pr-4 text-sm text-[#243a31] placeholder:text-[#7b8278] focus-visible:ring-[#93683b]"
               />
-            </form>
-          </div>
+            </div>
+          </form>
 
-          {/* Right Side Actions */}
-          <div className="flex items-center space-x-2 shrink-0">
-            {/* Shopping Cart */}
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             {isAuthenticated && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={toggleCart}
-                aria-label={`Open shopping cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+                aria-label={`Open shopping cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}
                 aria-haspopup="dialog"
                 data-testid="button-open-cart"
-                className="relative text-gray-700 hover:text-nigerian-green"
+                className="relative h-10 w-10 rounded-full text-[#365449] hover:bg-[#ecefe7]"
               >
-                <ShoppingCart className="w-6 h-6" />
+                <ShoppingCart className="h-[1.15rem] w-[1.15rem]" />
                 {cartCount > 0 && (
-                  <Badge className="absolute -top-2 -right-2 bg-coral text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full">
+                  <Badge className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#a84932] px-1 text-[10px] text-white">
                     {cartCount}
                   </Badge>
                 )}
               </Button>
             )}
 
-            {/* Desktop User Menu */}
             {isAuthenticated && user ? (
               <div className="hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button aria-label="Open account menu" variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Button
+                      variant="ghost"
+                      aria-label="Open account menu"
+                      className="h-10 gap-2 rounded-full pl-1.5 pr-2.5 text-[#315345] hover:bg-[#ecefe7]"
+                    >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.profileImageUrl} alt={user.firstName || 'User'} />
-                        <AvatarFallback className="bg-nigerian-green text-white text-sm">
+                        <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Account"} />
+                        <AvatarFallback className="bg-[#174c3b] text-xs font-semibold text-[#fbf5e7]">
                           {getUserInitials()}
                         </AvatarFallback>
                       </Avatar>
+                      <span className="hidden max-w-24 truncate text-sm font-semibold xl:block">
+                        {user.firstName || "Account"}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <div className="flex flex-col space-y-1 p-2">
-                      <p className="text-sm font-medium leading-none">
-                        {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                      <Badge variant="secondary" className="w-fit text-xs">{getUserRoleDisplay(user)}</Badge>
+                  <DropdownMenuContent className="w-60 border-[#e2ddd1] bg-[#fbf8f0]" align="end" forceMount>
+                    <div className="space-y-1 px-3 py-2.5">
+                      <p className="truncate text-sm font-semibold text-[#233a31]">{accountName}</p>
+                      <p className="truncate text-xs text-[#778077]">{user.email}</p>
+                      <Badge variant="secondary" className="mt-1 w-fit bg-[#e9eee5] text-xs text-[#315345]">
+                        {getUserRoleDisplay(user)}
+                      </Badge>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem><Link href="/my-orders"><span className="cursor-pointer">My Orders</span></Link></DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link href="/messages">
-                        <span className="cursor-pointer flex items-center justify-between">
-                          Messages
-                          {unreadData && unreadData.count > 0 && (
-                            <Badge variant="default" className="ml-2">{unreadData.count}</Badge>
-                          )}
-                        </span>
+                    <DropdownMenuItem asChild><Link href="/my-orders">My Orders</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/messages" className="flex items-center justify-between">
+                        Messages
+                        {unreadData && unreadData.count > 0 && <Badge className="ml-2 bg-[#a84932] text-white">{unreadData.count}</Badge>}
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem><Link href="/measurements"><span className="cursor-pointer">Measurements</span></Link></DropdownMenuItem>
-                    <DropdownMenuItem><Link href="/lookbook"><span className="cursor-pointer">My Lookbook</span></Link></DropdownMenuItem>
-                    <DropdownMenuItem><Link href="/loyalty"><span className="cursor-pointer">Loyalty & Rewards</span></Link></DropdownMenuItem>
-                    <DropdownMenuItem><Link href="/profile"><span className="cursor-pointer">Profile Settings</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/measurements">Measurements</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/lookbook">My Lookbook</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/loyalty">Loyalty and Rewards</Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/profile">Profile Settings</Link></DropdownMenuItem>
                     {isVendor(user) && (
                       <>
                         <DropdownMenuSeparator />
-                         <DropdownMenuItem>
-                           <Link href="/products"><span className="cursor-pointer">Shop as buyer</span></Link>
-                         </DropdownMenuItem>
-                        <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
-                        <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
-                        <DropdownMenuItem><Link href="/vendor/finance"><span className="cursor-pointer">Finance & Statements</span></Link></DropdownMenuItem>
-                        <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/products">Shop as buyer</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/vendor">Vendor Dashboard</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/vendor/workshop">Workshop</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/vendor/finance">Finance and Statements</Link></DropdownMenuItem>
                       </>
                     )}
+                    {canAccessShipping && <DropdownMenuItem asChild><Link href="/shipping">Shipping operations</Link></DropdownMenuItem>}
                     {isAdmin(user) && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
-                        {fullManagement && <DropdownMenuItem><Link href="/admin/finance"><span className="cursor-pointer">Finance Administration</span></Link></DropdownMenuItem>}
-                        {hasShippingOperationsAccess(user) && <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>}
+                        <DropdownMenuItem asChild><Link href="/admin">Admin Panel</Link></DropdownMenuItem>
+                        <DropdownMenuItem asChild><Link href="/discover">Discover</Link></DropdownMenuItem>
+                        {fullManagement && <DropdownMenuItem asChild><Link href="/admin/finance">Finance Administration</Link></DropdownMenuItem>}
                       </>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>Sign Out</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             ) : (
-              <Button onClick={handleLogin} className="btn-nigerian hidden lg:flex">
-                Sign In
-              </Button>
+              <div className="hidden items-center gap-2 lg:flex">
+                <Link href="/vendor/apply" className="rounded-sm px-2 py-2 text-sm font-semibold text-[#315345] hover:text-[#174c3b]">
+                  Sell with us
+                </Link>
+                <Button
+                  onClick={() => { window.location.href = "/login"; }}
+                  className="h-10 rounded-md bg-[#174c3b] px-4 font-semibold text-[#fff8e9] hover:bg-[#103e30]"
+                >
+                  Sign In
+                </Button>
+              </div>
             )}
 
-            {/* Mobile Menu Button */}
             <Button
               variant="ghost"
-              size="sm"
-              className="lg:hidden"
+              size="icon"
+              className="h-10 w-10 rounded-full text-[#315345] hover:bg-[#ecefe7] lg:hidden"
               aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-navigation-menu"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
             >
-              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Mega Menu - desktop category bar */}
       <MegaMenu />
 
-      {/* Mobile Menu - Full Screen Overlay */}
       {isMobileMenuOpen && (
-        <div id="mobile-navigation-menu" className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
-          <div className="px-4 py-4 space-y-1 pb-24">
-            {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="mb-4">
+        <div
+          id="mobile-navigation-menu"
+          className="fixed inset-x-0 bottom-0 top-16 z-50 overflow-y-auto border-t border-[#e3ded2] bg-[#fbf8f0] lg:hidden"
+        >
+          <div className="mx-auto max-w-xl px-4 pb-10 pt-4">
+            <form onSubmit={handleSearch} role="search" className="mb-5">
+              <label htmlFor="mobile-site-search" className="sr-only">Search the marketplace</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7b8278]" />
                 <Input
-                  type="text"
-                  placeholder="Search products..."
+                  id="mobile-site-search"
+                  type="search"
+                  placeholder="Search clothing, cloth, jewellery..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="input-nigerian pl-10"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="h-11 rounded-md border-[#d9d3c5] bg-white pl-10 text-sm"
                 />
               </div>
             </form>
 
-            {/* Main Navigation */}
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Browse</p>
-            <Link href="/" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/')}><Home className="w-5 h-5" /><span>Home</span></div>
-            </Link>
-            <Link href="/products" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/products')}><Package className="w-5 h-5" /><span>Products</span></div>
-            </Link>
-            <Link href="/reviews" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/reviews')}><Star className="w-5 h-5" /><span>Reviews</span></div>
-            </Link>
-            <Link href="/events" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/events')}><Calendar className="w-5 h-5" /><span>Events</span></div>
-            </Link>
-            <Link href="/collab-drops" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/collab-drops')}><Zap className="w-5 h-5" /><span>Collab Drops</span></div>
-            </Link>
-            {isAuthenticated && isAdmin(user) && <Link href="/discover" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
-            </Link>}
-            <Link href="/policies" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/policies')}><FileText className="w-5 h-5" /><span>Policies</span></div>
-            </Link>
-            {canAccessShipping && <Link href="/shipping" onClick={closeMobileMenu}>
-              <div className={mobileNavLinkClass('/shipping')}><Truck className="w-5 h-5" /><span>Shipping operations</span></div>
-            </Link>}
+            <p className="mb-2 px-4 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#8c7860]">Explore</p>
+            <div className="space-y-0.5">
+              <Link href="/" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/")}><Home className="h-4 w-4" />Home</span></Link>
+              <Link href="/products" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/products")}><Package className="h-4 w-4" />Shop all</span></Link>
+              <Link href="/reviews" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/reviews")}><Star className="h-4 w-4" />Reviews</span></Link>
+              <Link href="/events" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/events")}><Calendar className="h-4 w-4" />Events</span></Link>
+              <Link href="/collab-drops" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/collab-drops")}><Zap className="h-4 w-4" />Collab Drops</span></Link>
+              <Link href="/policies" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/policies")}><FileText className="h-4 w-4" />Policies</span></Link>
+              {isAuthenticated && <Link href="/lookbook" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/lookbook")}><BookOpen className="h-4 w-4" />Lookbook</span></Link>}
+              {isAuthenticated && isAdmin(user) && <Link href="/discover" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/discover")}>Discover</span></Link>}
+              <Link href="/vendor/apply" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/vendor/apply")}><Star className="h-4 w-4" />Sell with Afrolandx</span></Link>
+            </div>
 
-            {/* Account Section - only if logged in */}
-            {isAuthenticated && user && (
-              <Link href="/lookbook" onClick={closeMobileMenu}>
-                <div className={mobileNavLinkClass('/lookbook')}><BookOpen className="w-5 h-5" /><span>Lookbook Studio</span></div>
-              </Link>
-            )}
             {isAuthenticated && user && (
               <>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">My Account</p>
-                <Link href="/my-orders" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/my-orders')}><ClipboardList className="w-5 h-5" /><span>My Orders</span></div>
-                </Link>
-                <Link href="/messages" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/messages')}>
-                    <MessageSquare className="w-5 h-5" />
-                    <span>Messages</span>
-                    {unreadData && unreadData.count > 0 && (
-                      <Badge variant="default" className="ml-auto">{unreadData.count}</Badge>
-                    )}
-                  </div>
-                </Link>
-                <Link href="/measurements" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/measurements')}><Ruler className="w-5 h-5" /><span>Measurements</span></div>
-                </Link>
-                <Link href="/loyalty" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/loyalty')}><Gift className="w-5 h-5" /><span>Loyalty & Rewards</span></div>
-                </Link>
-                <Link href="/profile" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/profile')}><Settings className="w-5 h-5" /><span>Profile Settings</span></div>
-                </Link>
+                <p className="mb-2 mt-6 px-4 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#8c7860]">Your account</p>
+                <div className="space-y-0.5">
+                  <Link href="/my-orders" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/my-orders")}><ClipboardList className="h-4 w-4" />My Orders</span></Link>
+                  <Link href="/messages" onClick={closeMobileMenu}>
+                    <span className={mobileNavLinkClass("/messages")}>
+                      <MessageSquare className="h-4 w-4" />Messages
+                      {unreadData && unreadData.count > 0 && <Badge className="ml-auto bg-[#a84932] text-white">{unreadData.count}</Badge>}
+                    </span>
+                  </Link>
+                  <Link href="/measurements" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/measurements")}><Ruler className="h-4 w-4" />Measurements</span></Link>
+                  <Link href="/loyalty" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/loyalty")}><Gift className="h-4 w-4" />Loyalty and Rewards</span></Link>
+                  <Link href="/profile" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/profile")}><Settings className="h-4 w-4" />Profile Settings</span></Link>
+                </div>
               </>
             )}
 
-            {/* Vendor Section */}
-            {!isVendor(user) && (
-              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} onClick={closeMobileMenu}>
-                <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Become a Vendor</span></div>
-              </Link>
-            )}
-            {isAuthenticated && isVendor(user) && (
+            {isAuthenticated && user && isVendor(user) && (
               <>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Vendor</p>
-                 <Link href="/products" onClick={closeMobileMenu}>
-                   <div className={mobileNavLinkClass('/products')}><ShoppingCart className="w-5 h-5" /><span>Shop as buyer</span></div>
-                 </Link>
-                <Link href="/vendor" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Vendor Dashboard</span></div>
-                </Link>
-                <Link href="/vendor/workshop" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/vendor/workshop')}><Palette className="w-5 h-5" /><span>Workshop</span></div>
-                </Link>
-                <Link href="/vendor/finance" onClick={closeMobileMenu}>
-                  <div className={mobileNavLinkClass('/vendor/finance')}><CreditCard className="w-5 h-5" /><span>Finance & Statements</span></div>
-                </Link>
+                <p className="mb-2 mt-6 px-4 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#8c7860]">Maker studio</p>
+                <div className="space-y-0.5">
+                  <Link href="/vendor" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/vendor")}><Star className="h-4 w-4" />Vendor Dashboard</span></Link>
+                  <Link href="/vendor/workshop" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/vendor/workshop")}><Palette className="h-4 w-4" />Workshop</span></Link>
+                  <Link href="/vendor/finance" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/vendor/finance")}><CreditCard className="h-4 w-4" />Finance and Statements</span></Link>
+                  <Link href="/products" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/products")}><ShoppingCart className="h-4 w-4" />Shop as buyer</span></Link>
+                </div>
               </>
             )}
 
-            {/* Admin Section */}
+            {isAuthenticated && canAccessShipping && (
+              <>
+                <p className="mb-2 mt-6 px-4 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#8c7860]">Operations</p>
+                <Link href="/shipping" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/shipping")}><Truck className="h-4 w-4" />Shipping operations</span></Link>
+              </>
+            )}
+
             {isAuthenticated && isAdmin(user) && (
               <>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Admin</p>
-                <Link href="/admin" onClick={closeMobileMenu}>
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
-                    <User className="w-5 h-5" /><span>Admin Panel</span>
-                  </div>
-                </Link>
-                {fullManagement && <Link href="/admin/finance" onClick={closeMobileMenu}>
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
-                    <CreditCard className="w-5 h-5" /><span>Finance Administration</span>
-                  </div>
-                </Link>}
+                <p className="mb-2 mt-6 px-4 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#8c7860]">Staff access</p>
+                <div className="space-y-0.5">
+                  <Link href="/admin" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/admin")}>Admin Panel</span></Link>
+                  {fullManagement && <Link href="/admin/finance" onClick={closeMobileMenu}><span className={mobileNavLinkClass("/admin/finance")}><CreditCard className="h-4 w-4" />Finance Administration</span></Link>}
+                </div>
               </>
             )}
 
-            {/* Auth Actions */}
-            <div className="pt-4 border-t border-gray-200 mt-4">
-              {isAuthenticated ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 px-4 py-2">
+            <div className="mt-6 border-t border-[#e3ded2] pt-4">
+              {isAuthenticated && user ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3 px-2">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={user?.profileImageUrl} />
-                      <AvatarFallback className="bg-nigerian-green text-white">{getUserInitials()}</AvatarFallback>
+                      <AvatarImage src={user.profileImageUrl} alt={user.firstName || "Account"} />
+                      <AvatarFallback className="bg-[#174c3b] text-sm text-white">{getUserInitials()}</AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-medium text-gray-900 text-sm">
-                        {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email}
-                      </p>
-                      <Badge variant="secondary" className="text-xs">{getUserRoleDisplay(user)}</Badge>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#233a31]">{accountName}</p>
+                      <Badge variant="secondary" className="mt-0.5 bg-[#e9eee5] text-xs text-[#315345]">{getUserRoleDisplay(user)}</Badge>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => { handleLogout(); closeMobileMenu(); }}
-                    variant="outline"
-                    className="w-full flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" /> Sign Out
+                  <Button variant="outline" onClick={() => { void handleLogout(); closeMobileMenu(); }} className="shrink-0 border-[#cfc7b7] text-[#315345]">
+                    <LogOut className="mr-2 h-4 w-4" />Sign Out
                   </Button>
                 </div>
               ) : (
-                <Button onClick={() => { handleLogin(); closeMobileMenu(); }} className="w-full btn-nigerian">
-                  Sign In
-                </Button>
+                <div className="flex gap-3">
+                  <Link href="/vendor/apply" onClick={closeMobileMenu} className="flex flex-1 items-center justify-center rounded-md border border-[#cfc7b7] px-4 py-3 text-sm font-semibold text-[#315345]">
+                    Sell with us
+                  </Link>
+                  <Button onClick={() => { window.location.href = "/login"; closeMobileMenu(); }} className="flex-1 bg-[#174c3b] text-[#fff8e9] hover:bg-[#103e30]">
+                    Sign In
+                  </Button>
+                </div>
               )}
             </div>
           </div>

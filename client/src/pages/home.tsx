@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useState } from "react";
 import Navbar from "@/components/navbar";
+import HomeHero from "@/components/home-hero";
 import SiteFooter from "@/components/site-footer";
 import ProductCard from "@/components/product-card";
 import ShoppingCart from "@/components/shopping-cart";
@@ -11,53 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
-import { getUserRoleDisplay, isAdmin } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
-import logoImage from '@assets/Group 1000002646_1749631956471.png';
-import useEmblaCarousel from 'embla-carousel-react';
 import HeritageEditorial from "@/components/heritage-editorial";
-
-const homeImage = (basename: string) => `/images/home/${basename}`;
-
-const culturalSlides = [
-  { image: homeImage("pan_african_diversity"), country: "Across Africa", label: "Unity in Diversity", flag: "AF" },
-  { image: homeImage("maasai_warriors_kenya"), country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
-  { image: homeImage("african_leader_mandela_tribute"), country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
-  { image: homeImage("ethiopian_traditional_timkat"), country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
-  { image: homeImage("ghanaian_ashanti_chief"), country: "Ghana", label: "Ashanti Royal Heritage", flag: "GH" },
-  { image: homeImage("moroccan_berber_culture"), country: "Morocco", label: "Berber Tradition", flag: "MA" },
-  { image: homeImage("ndebele_south_africa"), country: "South Africa", label: "Ndebele Cultural Art", flag: "ZA" },
-  { image: homeImage("rwandan_intore_dancer"), country: "Rwanda", label: "Intore Ceremony", flag: "RW" },
-  { image: homeImage("african_kente_cloth__8cfc9c20"), country: "West Africa", label: "Kente Cloth", flag: "AF" },
-];
 
 export default function Home() {
   const { user } = useAuth();
   const { cartItems, isCartOpen, toggleCart } = useCart();
-  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-
-  useEffect(() => {
-    if (!emblaApi) return;
-
-    const autoplay = setInterval(() => {
-      emblaApi.scrollNext();
-    }, 5000);
-
-    return () => clearInterval(autoplay);
-  }, [emblaApi]);
 
   const scrollToProducts = () => {
     const productsSection = document.getElementById('products-section');
     if (productsSection) {
       productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  };
-
-  const handleBecomeVendor = () => {
-    setLocation('/vendor');
   };
 
   const handleCategorySelect = (categoryId: number | null) => {
@@ -86,116 +53,10 @@ export default function Home() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-[100dvh] bg-[#f6f1e7]">
       <Navbar />
 
-      {/* Admin Quick-Access Banner */}
-      {isAdmin(user) && (
-        <div className="bg-gradient-to-r from-red-700 to-red-600 text-white px-4 py-3">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm sm:text-base">
-                Admin Mode: Welcome back, {user?.firstName || user?.email}
-              </span>
-            </div>
-            <Button
-              size="sm"
-              className="bg-white text-red-700 hover:bg-red-50 font-bold shrink-0"
-              onClick={() => window.location.href = '/admin'}
-            >
-              Open Admin Panel →
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[calc(100vh-64px)]">
-        {/* Cultural Images Carousel */}
-        <div className="absolute inset-0" ref={emblaRef}>
-          <div className="flex h-full">
-            {culturalSlides.map((slide, index) => (
-              <div key={index} className="flex-[0_0_100%] min-w-0 relative">
-                <img
-                  src={`${slide.image}-1280.webp`}
-                  srcSet={`${slide.image}-640.webp 640w, ${slide.image}-1280.webp 1280w`}
-                  sizes="100vw"
-                  alt={`${slide.label} — ${slide.country}`}
-                  className="w-full h-full object-cover"
-                  loading={index === 0 ? "eager" : "lazy"}
-                  {...{ fetchpriority: index === 0 ? "high" : "auto" }}
-                  decoding="async"
-                />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
-                {/* Slide culture badge */}
-                <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
-                  <span className="text-base sm:text-xl">{slide.flag}</span>
-                  <div>
-                    <p className="text-white/90 font-semibold text-xs sm:text-sm leading-none">{slide.label}</p>
-                    <p className="text-amber-300 text-xs mt-0.5">{slide.country}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Pattern Overlay */}
-        <div className="absolute inset-0 z-10" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.06'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundSize: '60px 60px'
-        }}></div>
-
-        {/* Hero Content */}
-        <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
-          <div className="text-center w-full">
-            <h1 className="text-2xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-3 sm:mb-6 md:mb-8 text-white">
-              <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
-                Celebrate Cultural
-              </span>
-              <span className="block text-amber-300 mt-1 sm:mt-2">
-                Heritage
-              </span>
-            </h1>
-            <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke and Ghanaian Kente to Ethiopian Habesha clothing and Maasai beadwork, explore authentic fashion from all 54 African nations.
-            </p>
-            <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-4">
-              Authentic fashion from all 54 African nations.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-              <Button
-                size="lg"
-                className="btn-gold w-full sm:w-auto max-w-xs sm:max-w-none"
-                onClick={scrollToProducts}
-                data-testid="button-shop-traditional-wear"
-              >
-                Shop Traditional Wear
-              </Button>
-              <Button
-                size="lg"
-                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 w-full sm:w-auto max-w-xs sm:max-w-none"
-                onClick={handleBecomeVendor}
-                data-testid="button-become-vendor"
-              >
-                Become a Vendor
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Carousel Indicators */}
-        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
-          {culturalSlides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => emblaApi?.scrollTo(index)}
-              className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
-              aria-label={`Go to slide ${index + 1}`}
-            />
-          ))}
-        </div>
-      </section>
+      <HomeHero variant="shopper" />
 
       {/* Search and Filters */}
       <HeritageEditorial />
