@@ -71,7 +71,7 @@ export default function Navbar() {
   const navLinkClass = (path: string) =>
     `px-3 py-2 font-medium transition-colors ${
       location === path
-        ? 'text-nigerian-green border-b-2 border-nigerian-green'
+        ? 'text-nigerian-green'
         : 'text-gray-700 hover:text-nigerian-green'
     }`;
   const fullManagement = hasFullManagementAccess(user);
@@ -114,7 +114,7 @@ export default function Navbar() {
               </Link>
               {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
+                  location === '/admin' ? 'text-red-600' : 'text-gray-700 hover:text-red-600'
                 }`}>Admin</Link>
               )}
               {canAccessShipping && <Link href="/shipping" className={navLinkClass('/shipping')}>Shipping</Link>}

@@ -31,3 +31,4 @@
 - [Landing page carousel preference](landing-page-preference.md) — preserve the previous homepage carousel and all its display images; do not treat restoration as storage or payment work
 - [Profile photo storage](profile-photo-storage.md) — use R2 links for new avatars; failed writes must preserve the old photo and cleanup must remain scoped
 - [Cloudflare instead of AWS](cloudflare-storage-direction.md) — switch only features still blocked by AWS; leave working features and existing content unchanged
+- [Navbar active-page style](navbar-active-style.md) — user disliked the line under Home; use text colour without an active-link underline
