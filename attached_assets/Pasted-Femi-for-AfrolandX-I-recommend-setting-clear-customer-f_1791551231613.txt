@@ -1,0 +1,61 @@
+Femi, for AfrolandX, I recommend setting clear, customer-friendly policies that are realistic for an Africa-wide marketplace. Since AfrolandX manages orders, shipping, refunds and vendor settlements centrally, your policies should distinguish between product refunds and shipping refunds.
+
+## Recommended AfrolandX settings
+
+Business address
+
+Use your actual registered business address as the official address. If you operate online without a public storefront, display your registered office or business correspondence address rather than inventing a physical location.
+
+Customer support hours
+
+## Monday–Saturday, 8:00 AM–6:00 PM WAT
+
+West Africa Time (UTC+1)
+
+This gives customers predictable support hours while keeping staffing manageable. You can offer automated support outside these hours.
+
+Refund processing timeline
+
+## 5–14 business days
+
+Use this as the estimated time for refunds to reach the original payment method after approval and initiation. Payment providers and banks may take longer.
+
+Returns and shipping refunds
+
+* Acknowledge refund requests within 1–2 business days.
+
+* Aim to review requests within 3 business days after receiving the necessary evidence.
+
+* Refund eligible shipping charges when the order was not delivered due to a seller or logistics failure, subject to applicable law and the published policy.
+
+## Values to enter in your admin dashboard
+
+Support hours
+
+Refund processing timeline
+
+3–7 business days (ambitious)
+
+5–14 business days (recommended)
+
+7–14 business days (more conservative)
+
+Customer enquiry response target
+
+Within 1 business day
+
+Within 24 hours
+
+Within 48 hours
+
+Refund request review target
+
+Within 2 business days
+
+Within 3 business days
+
+Within 5 business days
+
+Copy recommended settings
+
+My strongest recommendation: Start with these service targets, but make sure the refund timeline matches your actual Paystack settlement and refund capabilities before publishing it. Do not promise a refund completion date that your payment provider cannot reliably meet.
