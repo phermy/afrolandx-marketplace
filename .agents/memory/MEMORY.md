@@ -2,7 +2,7 @@
 - [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
 - [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support and info were confirmed by inbox receipt
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
-- [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — every carrier requires a confirmed quote before payment, then locks into one server-priced order
+- [Shipping checkout requirements](shipping-quote-lifecycle.md) — aggregator rates, one total without deposits, guest checkout, DDP for UK/US/Canada and paid-only vendor orders
 - [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
 - [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
 - [Product image durability](product-image-durability.md) — production uploads must not claim success by falling back to temporary local storage
@@ -25,7 +25,7 @@
 - [Registration visual direction](registration-visual-direction.md) — user likes the editorial Afrolandx split layout; prioritize readable copy over decorative overlap
 - [Responsive copy alignment](responsive-copy-alignment.md) — avoid forced justification in narrow columns or short cards; reserve it for wide long-form reading
 - [Account signup requirements](account-signup-requirements.md) — require phones for new accounts; vendor signup leads to an application, not automatic selling permission
-- [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later
+- [Managed shipping model](managed-shipping-model.md) — marketplace aggregator fulfillment under Afrolandx oversight, not a warehouse operation
 - [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
 - [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged
 - [Browser interaction checks](browser-interaction-checks.md) — use real input and assert active state; synthetic clicks can leave Radix tabs unchanged

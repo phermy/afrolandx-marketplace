@@ -15,7 +15,7 @@ All product and service prices are stored in **NGN (Nigerian Naira)**. Never tre
 - Checkout `handleSubmit` sends `currency: 'NGN'` and `totalAmount` as the raw Naira sum (no multiplication)
 - `server/routes.ts` `/api/orders/initialize-payment`: `chargeCurrency = 'NGN'`, `chargeAmount = parseFloat(totalAmount)` — no currency conversion
 - Paystack's `initializeTransaction` multiplies by 100 for kobo internally — pass Naira amount directly
-- International shipping rates are confirmed quotes in NGN. Estimates are deposits, not final carrier prices.
+- New international checkout must use final aggregator rates in NGN, including prepaid duties for UK/US/Canada. No shipping deposits; preserve historical estimate and reconciliation records.
 - Discover bookings and Premium access follow the same server-priced, exact-match verification rule as product orders.
 
 ## Payment callback flow (normal path)
