@@ -90,6 +90,11 @@
 }
 .heritage-notice svg { flex: 0 0 auto; color: #a45336; margin-top: .15rem; }
 .heritage-notice strong { color: #183d36; }
+.ssr-nav { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; padding:1.2rem max(1rem,calc((100vw - 1200px)/2)); background:#173c2e; color:#fbf8f2; }
+.ssr-nav a { text-decoration:underline; text-underline-offset:.2em; }
+.ssr-nav p { width:100%; }
+.ssr-catalog { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; padding:0; list-style:none; margin:1.5rem 0; }
+.ssr-catalog li { padding:1rem; border:1px solid #e1d6c4; }
 .heritage-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -4,7 +4,8 @@ import { ArrowRight, Mail, MessageCircle, Ruler, PackageCheck, RotateCcw, Circle
 import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
 import { policies } from "@/lib/policies";
-import { SUPPORT_HOURS, REFUND_TIMELINE } from "@shared/customer-support";
+import { SUPPORT_HOURS } from "@shared/customer-support";
+import { faqItems } from "@shared/support-faq";
 
 function SupportLayout({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children: ReactNode }) {
   return <div className="min-h-screen bg-[#fbf8f2]"><Navbar />
@@ -59,21 +60,6 @@ export function ContactPage() {
     <div className="support-next-links"><Link href="/faq">Browse common questions <ArrowRight aria-hidden="true" /></Link><Link href="/policies">Visit the trust centre <ArrowRight aria-hidden="true" /></Link></div>
   </SupportLayout>;
 }
-
-const faqItems = [
-  { q: "How do I place an order?", a: "Add the product and any required size or option to your cart, then continue to checkout. The checkout displays the order details and amount due before you submit payment. Product sellers are independent vendors unless Afrolandx is identified as the seller." },
-  { q: "Can I check out without an account?", a: "Guest checkout is available for supported orders. Keep your order number and checkout email for reference. Contact support if you need help locating a guest purchase." },
-  { q: "Where can I see my order?", a: "Customers who are signed in can open My Orders to review order information and available order actions. Keep your order number and checkout email available when contacting support." },
-  { q: "When will my order arrive?", a: "Preparation time is the handling time shown on the product listing. Delivery timing also depends on destination, verification where applicable, carrier and customs. Tracking or delivery updates are shared when available; see Shipping information for details." },
-  { q: "Can I cancel an order?", a: "You may request cancellation until the earlier of 42 hours after ordering or the item reaching the Afrolandx verification agent or logistics provider. Open the order page and check the available action; after that point, the shipping and return terms apply." },
-  { q: "How do I ask to return an item?", a: "Open the order and select “Request a return” if available, or contact support with the order number, reason and requested outcome. Wait for the return instructions for your order before sending anything back. Eligibility depends on the listing classification, condition, circumstances and applicable rights." },
-  { q: "How do I know whether a product can be returned?", a: "Each product displays a return classification approved by Afrolandx. It explains eligibility when you change your mind; it does not remove rights relating to faulty, unsafe, damaged, counterfeit or materially misdescribed goods. Review the listing and Returns page before buying." },
-  { q: "How can I choose the right size?", a: "Each vendor uses their own sizing and measurements, not a universal chart. Read the individual listing carefully and compare its garment measurements with a similar item that fits you. See the Size guide for how to measure and contact the vendor through the product page if a detail is unclear." },
-  { q: "Who can help with a payment or refund question?", a: "For a payment, refund or payout question, email payments@afrolandx.com and include the order or transaction reference. The payments team can help with the status of an approved refund." },
-  { q: "When is customer support available?", a: `${SUPPORT_HOURS}. You can send an email or WhatsApp message outside these hours; our support team responds during support hours.` },
-  { q: "How long does a refund take?", a: REFUND_TIMELINE },
-  { q: "How are automated suggestions and previews made?", a: "Some tools use AI to suggest outfits, draft listing details or generate visual previews. Review the results before relying on them. A generated preview does not guarantee fit or an exact match to the product. Read the privacy information shown by a photo tool before uploading an image." },
-];
 
 export function FaqPage() {
   return <SupportLayout eyebrow="Help / FAQ" title="Good questions, clear answers." intro="A practical guide to buying from independent makers on Afrolandx. For the full conditions, read the linked policy or contact support.">

@@ -1,3 +1,4 @@
+import { Component, Suspense, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,47 +7,87 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { CartProvider } from "@/contexts/CartContext";
-import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
-import Policies from "@/pages/policies";
-import PolicyDetail from "@/pages/policy-detail";
-import Home from "@/pages/home";
-import Products from "@/pages/products";
-import Reviews from "@/pages/reviews";
-import Profile from "@/pages/profile";
-import MyOrders from "@/pages/my-orders";
-import OrderSuccess from "@/pages/order-success";
-import VendorDashboard from "@/pages/vendor-dashboard";
-import AdminDashboard from "@/pages/admin-dashboard";
-import AdminProductReview from "@/pages/admin-product-review";
-import AdminFinance from "@/pages/admin-finance";
 import { hasFullManagementAccess } from "@shared/admin-access";
-import VendorFinance from "@/pages/vendor-finance";
-import Shipping from "@/pages/shipping";
-import Checkout from "@/pages/checkout";
-import Measurements from "@/pages/measurements";
-import Messages from "@/pages/messages";
-import Lookbook from "@/pages/lookbook";
-import Loyalty from "@/pages/loyalty";
-import CollabDrops from "@/pages/collab-drops";
-import CollabDropDetail from "@/pages/collab-drop-detail";
-import VendorWorkshop from "@/pages/vendor-workshop";
-import EventPlanner from "@/pages/event-planner";
-import Quiz from "@/pages/quiz";
-import DiscoverAfrica from "@/pages/discover-africa";
-import ProductDetail from "@/pages/product-detail";
-import PublicVendor from "@/pages/public-vendor";
-import Login from "@/pages/login";
-import Register from "@/pages/register";
-import ForgotPassword from "@/pages/forgot-password";
-import ShoppingCart from "@/components/shopping-cart";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import DeferredGlobalTools from "@/components/deferred-global-tools";
 import PageHead from "@/components/page-head";
-import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { isVendor } from "@/lib/roleUtils";
 import SessionTimeout from "@/components/session-timeout";
-import { ContactPage, FaqPage, SizeGuidePage, ShippingInformationPage, ReturnsPage } from "@/pages/support-pages";
-import { useEffect } from "react";
+
+const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+const Landing = lazyWithRetry(() => import("@/pages/landing"));
+const Policies = lazyWithRetry(() => import("@/pages/policies"));
+const PolicyDetail = lazyWithRetry(() => import("@/pages/policy-detail"));
+const Home = lazyWithRetry(() => import("@/pages/home"));
+const Products = lazyWithRetry(() => import("@/pages/products"));
+const Reviews = lazyWithRetry(() => import("@/pages/reviews"));
+const Profile = lazyWithRetry(() => import("@/pages/profile"));
+const MyOrders = lazyWithRetry(() => import("@/pages/my-orders"));
+const OrderSuccess = lazyWithRetry(() => import("@/pages/order-success"));
+const VendorDashboard = lazyWithRetry(() => import("@/pages/vendor-dashboard"));
+const AdminDashboard = lazyWithRetry(() => import("@/pages/admin-dashboard"));
+const AdminProductReview = lazyWithRetry(() => import("@/pages/admin-product-review"));
+const AdminFinance = lazyWithRetry(() => import("@/pages/admin-finance"));
+const VendorFinance = lazyWithRetry(() => import("@/pages/vendor-finance"));
+const Shipping = lazyWithRetry(() => import("@/pages/shipping"));
+const Checkout = lazyWithRetry(() => import("@/pages/checkout"));
+const Measurements = lazyWithRetry(() => import("@/pages/measurements"));
+const Messages = lazyWithRetry(() => import("@/pages/messages"));
+const Lookbook = lazyWithRetry(() => import("@/pages/lookbook"));
+const Loyalty = lazyWithRetry(() => import("@/pages/loyalty"));
+const CollabDrops = lazyWithRetry(() => import("@/pages/collab-drops"));
+const CollabDropDetail = lazyWithRetry(() => import("@/pages/collab-drop-detail"));
+const VendorWorkshop = lazyWithRetry(() => import("@/pages/vendor-workshop"));
+const EventPlanner = lazyWithRetry(() => import("@/pages/event-planner"));
+const Quiz = lazyWithRetry(() => import("@/pages/quiz"));
+const DiscoverAfrica = lazyWithRetry(() => import("@/pages/discover-africa"));
+const ProductDetail = lazyWithRetry(() => import("@/pages/product-detail"));
+const PublicVendor = lazyWithRetry(() => import("@/pages/public-vendor"));
+const Login = lazyWithRetry(() => import("@/pages/login"));
+const Register = lazyWithRetry(() => import("@/pages/register"));
+const ForgotPassword = lazyWithRetry(() => import("@/pages/forgot-password"));
+const ContactPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ContactPage })));
+const FaqPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.FaqPage })));
+const SizeGuidePage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.SizeGuidePage })));
+const ShippingInformationPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ShippingInformationPage })));
+const ReturnsPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ReturnsPage })));
+
+class RouteChunkErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Route failed to load", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="min-h-[50vh] flex flex-col items-center justify-center gap-3 px-4 text-center" role="alert">
+          <h1 className="text-xl font-semibold">This page could not be loaded</h1>
+          <p className="max-w-md text-sm text-muted-foreground">A network interruption may have stopped part of Afrolandx from loading. Reload the page to try again.</p>
+          <button type="button" onClick={() => window.location.reload()} className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            Reload page
+          </button>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function RouteLoading() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center px-4" role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Loading page</span>
+      <div className="spinner-nigerian" aria-hidden="true" />
+    </div>
+  );
+}
 
 function SessionKickoutGuard() {
   const { toast } = useToast();
@@ -89,6 +130,8 @@ function Router() {
   }
 
   return (
+    <RouteChunkErrorBoundary>
+    <Suspense fallback={<RouteLoading />}>
     <Switch>
       {/* Auth pages — always accessible, redirect home if already logged in */}
       <Route path="/login">
@@ -185,6 +228,8 @@ function Router() {
 
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
+    </RouteChunkErrorBoundary>
   );
 }
 
@@ -206,8 +251,7 @@ function App() {
           <div id="main-content" tabIndex={-1}>
             <Router />
           </div>
-          <ShoppingCart />
-          <Chatbot />
+          <DeferredGlobalTools />
           <SessionTimeout />
           <SessionKickoutGuard />
         </TooltipProvider>

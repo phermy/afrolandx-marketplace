@@ -9,6 +9,12 @@ Use real browser keyboard or pointer input to test headless UI controls, and ver
 
 **How to apply:** Focus a tab and send Enter, or send a complete pointer gesture through the browser protocol. Assert the selected tab or active panel before judging its contents. Keep browser-only response fixtures clearly distinguished from verification of real authentication.
 
+Wait for the actual control or active panel before interacting with a freshly loaded route; fixed sleeps are not readiness checks.
+
+**Why:** Route splitting introduced variable cold-load times, making otherwise valid homepage and checkout checks fail intermittently before their controls existed.
+
+**How to apply:** Use bounded polling with an explicit assertion and timeout. Maintain accurate response shapes for browser fixtures when newly added profile forms are mounted.
+
 If the testing callback rejects the documented testing configuration as an unknown kind, use the project's headless Chromium/CDP checks rather than retrying that unavailable configuration.
 
 **Why:** The runtime rejected the configuration even though the local testing instructions advertised it.

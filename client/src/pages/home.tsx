@@ -15,27 +15,20 @@ import { getUserRoleDisplay, isAdmin } from "@/lib/roleUtils";
 import type { Product, Category } from "@/types";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.webp';
-import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.webp';
-import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.webp';
-import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.webp';
-import moroccanImg from '@assets/stock_images/moroccan_berber_culture.webp';
-import ndebeImg from '@assets/stock_images/ndebele_south_africa.webp';
-import panAfricanImg from '@assets/stock_images/pan_african_diversity.webp';
-import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
-import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
 import HeritageEditorial from "@/components/heritage-editorial";
 
+const homeImage = (basename: string) => `/images/home/${basename}`;
+
 const culturalSlides = [
-  { image: panAfricanImg,  country: "Across Africa",    label: "Unity in Diversity",         flag: "AF" },
-  { image: maasaiImg,      country: "Kenya · Tanzania", label: "Maasai Warriors",            flag: "KE" },
-  { image: mandelaImg,     country: "South Africa",     label: "Spirit of African Heroes",   flag: "ZA" },
-  { image: ethiopianImg,   country: "Ethiopia",         label: "Timkat Festival",            flag: "ET" },
-  { image: ashantImg,      country: "Ghana",            label: "Ashanti Royal Heritage",     flag: "GH" },
-  { image: moroccanImg,    country: "Morocco",          label: "Berber Tradition",           flag: "MA" },
-  { image: ndebeImg,       country: "South Africa",     label: "Ndebele Cultural Art",       flag: "ZA" },
-  { image: rwandanImg,     country: "Rwanda",           label: "Intore Ceremony",            flag: "RW" },
-  { image: fabricImg,      country: "West Africa",      label: "Kente Cloth",                flag: "AF" },
+  { image: homeImage("pan_african_diversity"), country: "Across Africa", label: "Unity in Diversity", flag: "AF" },
+  { image: homeImage("maasai_warriors_kenya"), country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
+  { image: homeImage("african_leader_mandela_tribute"), country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
+  { image: homeImage("ethiopian_traditional_timkat"), country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
+  { image: homeImage("ghanaian_ashanti_chief"), country: "Ghana", label: "Ashanti Royal Heritage", flag: "GH" },
+  { image: homeImage("moroccan_berber_culture"), country: "Morocco", label: "Berber Tradition", flag: "MA" },
+  { image: homeImage("ndebele_south_africa"), country: "South Africa", label: "Ndebele Cultural Art", flag: "ZA" },
+  { image: homeImage("rwandan_intore_dancer"), country: "Rwanda", label: "Intore Ceremony", flag: "RW" },
+  { image: homeImage("african_kente_cloth__8cfc9c20"), country: "West Africa", label: "Kente Cloth", flag: "AF" },
 ];
 
 export default function Home() {
@@ -124,9 +117,14 @@ export default function Home() {
             {culturalSlides.map((slide, index) => (
               <div key={index} className="flex-[0_0_100%] min-w-0 relative">
                 <img
-                  src={slide.image}
+                  src={`${slide.image}-1280.webp`}
+                  srcSet={`${slide.image}-640.webp 640w, ${slide.image}-1280.webp 1280w`}
+                  sizes="100vw"
                   alt={`${slide.label} — ${slide.country}`}
                   className="w-full h-full object-cover"
+                  loading={index === 0 ? "eager" : "lazy"}
+                  {...{ fetchpriority: index === 0 ? "high" : "auto" }}
+                  decoding="async"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
                 {/* Slide culture badge */}

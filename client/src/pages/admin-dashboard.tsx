@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,10 +33,8 @@ import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest
 import { trackEvent } from '@/lib/analytics';
 import { AdminUserDetails } from '@/components/admin-user-details';
 import { cacBusinessNamesMatch } from '@shared/cac-review';
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts';
+
+const AdminAnalyticsCharts = lazy(() => import('@/components/admin-analytics-charts'));
 
 const MAX_FEATURED = 8;
 const PENDING_PRODUCTS_PAGE_SIZE = 50;
@@ -918,72 +916,9 @@ export default function AdminDashboard() {
                 <div className="flex justify-center py-16"><div className="spinner-nigerian"></div></div>
               ) : analytics ? (
                 <>
-                  {/* Revenue Trend */}
-                  <Card>
-                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Actual Sales Revenue — Last 30 Days</CardTitle></CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <AreaChart data={analytics.revenueTrend}>
-                          <defs>
-                            <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₦${Number(v).toLocaleString()}`} />
-                          <Tooltip formatter={(v: any) => [`₦${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
-                          <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="url(#revGrad)" strokeWidth={2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Orders by Status */}
-                    <Card>
-                      <CardHeader><CardTitle className="text-base">Orders by Status</CardTitle></CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <PieChart>
-                            <Pie data={analytics.ordersByStatus.filter((d: any) => d.count > 0)} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={70} label={({ status, count }) => `${status} (${count})`} labelLine={false}>
-                              {analytics.ordersByStatus.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {analytics.ordersByStatus.map((d: any, i: number) => (
-                            <div key={d.status} className="flex items-center gap-1 text-xs">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                              <span className="capitalize">{d.status}: {d.count}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Geographic Distribution */}
-                    <Card>
-                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Globe className="w-4 h-4" />Orders by Country</CardTitle></CardHeader>
-                      <CardContent>
-                        {analytics.geoDistribution.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={analytics.geoDistribution} layout="vertical">
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                              <XAxis type="number" tick={{ fontSize: 10 }} />
-                              <YAxis dataKey="country" type="category" tick={{ fontSize: 10 }} width={90} />
-                              <Tooltip />
-                              <Bar dataKey="count" fill="#a855f7" radius={[0, 4, 4, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. The chart will update as orders come in.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <Suspense fallback={<div className="py-10 text-center text-sm text-gray-600" role="status" aria-live="polite" aria-busy="true">Loading analytics charts…</div>}>
+                    <AdminAnalyticsCharts analytics={analytics} />
+                  </Suspense>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Vendor Performance */}

@@ -1,39 +1,33 @@
 import { useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
-import panAfricanImg from "@assets/stock_images/pan_african_diversity.webp";
-import beadworkImg from "@assets/stock_images/nigerian_tribal_chie_11b29bb3.jpg";
-import textileImg from "@assets/stock_images/hausa_traditional_cr_fa5db11d.jpg";
-import artisanImg from "@assets/stock_images/nigeria_cultural_her_0933402b.jpg";
-import craftImg from "@assets/stock_images/nigerian_tribal_chie_4e3710c4.jpg";
-
 const slides = [
   {
-    image: panAfricanImg,
+    image: "/images/home/pan_african_diversity",
     alt: "Women wearing colourful African traditional dress",
     title: "African Heritage",
     description: "Celebrating the creativity and traditions of our continent",
   },
   {
-    image: beadworkImg,
+    image: "/images/home/nigerian_tribal_chie_11b29bb3",
     alt: "Woman wearing traditional African beaded jewellery",
     title: "Beautiful Beadwork",
     description: "Adornment inspired by generations of artistry",
   },
   {
-    image: textileImg,
+    image: "/images/home/hausa_traditional_cr_fa5db11d",
     alt: "Brightly colored African patterned textiles",
     title: "Bold African Textiles",
     description: "Colours and patterns that tell a story",
   },
   {
-    image: artisanImg,
+    image: "/images/home/nigeria_cultural_her_0933402b",
     alt: "African artisans making traditional crafts together",
     title: "Made by Artisans",
     description: "Discover the hands and skills behind each creation",
   },
   {
-    image: craftImg,
+    image: "/images/home/nigerian_tribal_chie_4e3710c4",
     alt: "Handcrafted baskets and woven goods on display",
     title: "Handcrafted Finds",
     description: "Explore the beauty of everyday African craft",
@@ -98,10 +92,14 @@ export default function HeritageCarousel() {
               aria-hidden={index !== selectedIndex}
             >
               <img
-                src={slide.image}
+                src={`${slide.image}-1280.webp`}
+                srcSet={`${slide.image}-640.webp 640w, ${slide.image}-1280.webp 1280w`}
+                sizes="100vw"
                 alt={slide.alt}
                 className="absolute inset-0 h-full w-full object-cover"
                 loading={index === 0 ? "eager" : "lazy"}
+                {...{ fetchpriority: index === 0 ? "high" : "auto" }}
+                decoding="async"
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10" />
               <div className="pointer-events-none absolute bottom-14 left-4 right-4 max-w-[calc(100%-2rem)] rounded-lg bg-black/75 px-4 py-3 text-left shadow-lg backdrop-blur-sm">

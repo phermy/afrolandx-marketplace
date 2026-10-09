@@ -1,13 +1,4 @@
 import { BookOpen, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
-import beninBronzes from "@assets/heritage/benin-bronzes.webp";
-import crownDetail from "@assets/heritage/yoruba-crown-detail.webp";
-import kenteWeaving from "@assets/heritage/kente-weaving.webp";
-import dogonAncestor from "@assets/heritage/dogon-ancestor.webp";
-import amazighJewellery from "@assets/heritage/north-africa-amazigh.webp";
-import ethiopianGarment from "@assets/heritage/east-africa-ethiopian-garment.webp";
-import kubaTextile from "@assets/heritage/central-africa-kuba-textile.webp";
-import ndebeleBeadwork from "@assets/heritage/southern-africa-ndebele-beadwork.webp";
-
 type HeritageStory = {
   image: string;
   title: string;
@@ -20,7 +11,7 @@ type HeritageStory = {
 
 const stories: HeritageStory[] = [
   {
-    image: beninBronzes,
+    image: "/images/home/benin-bronzes",
     title: "The court in cast metal",
     place: "Benin City, present-day Nigeria",
     body: "Benin court artists developed the lost-wax process into a language of memory, rank, and ritual. These works belong to a historic royal tradition; they are shown here for learning, not sale.",
@@ -28,7 +19,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/Category:Benin_bronzes",
   },
   {
-    image: crownDetail,
+    image: "/images/home/yoruba-crown-detail",
     title: "A crown detail, closely read",
     place: "Edo / Benin court context",
     body: "Ivory and coral court regalia carried layered ideas of authority and protection. This detail is associated with Iyoba court art; the available documentation does not establish Yoruba provenance.",
@@ -36,7 +27,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/Category:Benin_ivories",
   },
   {
-    image: kenteWeaving,
+    image: "/images/home/kente-weaving",
     title: "The rhythm of narrow strips",
     place: "Northern Ghana",
     body: "Strip weaving turns colour, repetition, and patient handwork into cloth. Kente has many regional histories; this image records a weaving practice in northern Ghana rather than a product listing.",
@@ -44,7 +35,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/Category:Kente",
   },
   {
-    image: dogonAncestor,
+    image: "/images/home/dogon-ancestor",
     title: "A figure for the ancestors",
     place: "Dogon region, Mali",
     body: "Dogon sculpture has been discussed in relation to lineage, memory, and ritual life. This museum-held figure is presented with care: its meaning belongs to the communities and histories that made it.",
@@ -53,7 +44,7 @@ const stories: HeritageStory[] = [
     objectPosition: "center top",
   },
   {
-    image: amazighJewellery,
+    image: "/images/home/north-africa-amazigh",
     title: "Silver as a living archive",
     place: "Agadir, Morocco · North Africa",
     body: "Amazigh jewellery carries regional knowledge through silverwork, enamel, geometry, and protective forms. This museum display records a long design tradition rather than merchandise for sale.",
@@ -61,7 +52,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/File:2010-12-14_Morocco_Agadir_municipal_museum_exhibition_jewelry_berber.JPG",
   },
   {
-    image: ethiopianGarment,
+    image: "/images/home/east-africa-ethiopian-garment",
     title: "Pattern held in the weave",
     place: "Ethiopia · East Africa",
     body: "Ethiopian dress traditions bring handwoven cotton, border pattern, and skilled finishing together. Regional and community variations carry distinct histories that cannot be reduced to one national style.",
@@ -69,7 +60,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/File:Detail,_Traditional_Ethiopian_Garment_(2131600381).jpg",
   },
   {
-    image: kubaTextile,
+    image: "/images/home/central-africa-kuba-textile",
     title: "Geometry in raffia cloth",
     place: "Kuba peoples, DR Congo · Central Africa",
     body: "Kuba textile artists transform raffia through weaving, embroidery, appliqué, and cut-pile techniques. Repeated forms shift deliberately, preserving rhythm without mechanical uniformity.",
@@ -77,7 +68,7 @@ const stories: HeritageStory[] = [
     sourceUrl: "https://commons.wikimedia.org/wiki/File:Fabric,_raffia_-_Kuba_-_Royal_Museum_for_Central_Africa_-_DSC05968.JPG",
   },
   {
-    image: ndebeleBeadwork,
+    image: "/images/home/southern-africa-ndebele-beadwork",
     title: "Identity built bead by bead",
     place: "Ndebele peoples, South Africa · Southern Africa",
     body: "Ndebele beadwork uses colour, pattern, and structure to communicate identity and social meaning. This early twentieth-century cape is shown as cultural documentation, not inventory.",
@@ -107,9 +98,11 @@ export default function HeritageEditorial() {
           <article className="heritage-card" key={story.title}>
             <div className="heritage-card__image-wrap">
               <img
-                src={story.image}
+                src={`${story.image}-1280.webp`}
+                srcSet={`${story.image}-640.webp 640w, ${story.image}-1280.webp 1280w`}
+                sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                 alt={`${story.title}, ${story.place}`}
-                loading={index === 0 ? "eager" : "lazy"}
+                loading="lazy"
                 decoding="async"
                 style={{ objectPosition: story.objectPosition || "center" }}
               />
