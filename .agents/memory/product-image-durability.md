@@ -21,6 +21,12 @@ Cloudflare's agent connection and application connector have separate authorizat
 
 **How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair credentials only through the existing integration's secure settings, never through chat.
 
+Cloudflare token verification depends on token ownership: account-owned tokens use the account-specific verification endpoint, while user-owned tokens use the user endpoint.
+
+**Why:** The Account API tokens screen and My Profile API Tokens screen represent different ownership models. Confusing them can make diagnostic checks misleading.
+
+**How to apply:** Use `/accounts/{account_id}/tokens/verify` for an account-owned token and `/user/tokens/verify` for a user-owned token. Still test the actual bucket operation separately. An Active label or successful token verification does not establish object-write permission; a token showing Workers R2 Storage Bucket Item Read cannot upload photos.
+
 Cloudflare token verification errors 6003 with nested 6111 indicate a malformed Authorization header, not a bucket permission failure.
 
 **Why:** An existing, publicly enabled R2 bucket could be inspected through the agent connection while the application connector failed at token verification before bucket authorization.
