@@ -1,5 +1,6 @@
 - [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
 - [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
+- [Guest order custody](guest-order-custody.md) — guest purchase records are not accounts; verified linking must preserve original payment ownership
 - [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support and info were confirmed by inbox receipt
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
 - [Shipping checkout requirements](shipping-quote-lifecycle.md) — aggregator rates, one total without deposits, guest checkout, DDP for UK/US/Canada and paid-only vendor orders

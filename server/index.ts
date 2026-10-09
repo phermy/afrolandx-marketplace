@@ -27,7 +27,7 @@ app.disable("x-powered-by");
 app.use(securityHeaders);
 app.use(express.json({
   verify: (req: any, _res, buffer) => {
-    if (req.path === "/api/webhooks/paystack") req.rawBody = Buffer.from(buffer);
+    if (req.path === "/api/webhooks/paystack" || req.path === "/api/checkout/shipbubble/webhook") req.rawBody = Buffer.from(buffer);
   },
 }));
 app.use(express.urlencoded({ extended: false }));

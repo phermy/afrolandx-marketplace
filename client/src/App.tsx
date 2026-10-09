@@ -146,7 +146,7 @@ function Router() {
         {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorFinance /> : <AuthRedirect to="/vendor" />}
       </Route>
       <Route path="/checkout">
-        {isAuthenticated ? <Checkout /> : <AuthRedirect to="/login" />}
+        <Checkout />
       </Route>
       <Route path="/vendor/workshop">
         {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorWorkshop /> : <AuthRedirect to="/vendor" />}
@@ -165,7 +165,7 @@ function Router() {
         {isAuthenticated ? <MyOrders /> : <AuthRedirect to="/login" />}
       </Route>
       <Route path="/order-success">
-        {isAuthenticated ? <OrderSuccess /> : <AuthRedirect to={`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`} />}
+        <OrderSuccess />
       </Route>
 
       {/* Authenticated-only pages */}

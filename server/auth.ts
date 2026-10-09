@@ -199,12 +199,17 @@ export async function setupAuth(app: Express) {
   });
 
   async function finalizeLogin(req: any, res: any, user: any, onSuccess: () => void) {
+    const guestBuyerId = req.session.guestBuyerId;
     req.session.regenerate((regenerateError: any) => {
       if (regenerateError) return res.status(500).json({ message: "Login failed" });
       req.login(user, async (loginError: any) => {
         if (loginError) return res.status(500).json({ message: "Login failed" });
         try {
           await storage.updateActiveSession(user.id, req.sessionID);
+          if (guestBuyerId) {
+            const { claimGuestPaidOrders } = await import("./guest-checkout");
+            await claimGuestPaidOrders(guestBuyerId, user);
+          }
         } catch (error) {
           return req.logout(() => {
             req.session.destroy(() => res.status(error instanceof Error && error.message === "ACCOUNT_CLOSED" ? 403 : 500)

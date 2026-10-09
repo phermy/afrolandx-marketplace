@@ -136,6 +136,8 @@ export interface ShippingAddress {
   state: string;
   postalCode: string;
   country: string;
+  contactEmail?: string;
+  phone?: string;
 }
 
 export interface SavedAddress extends ShippingAddress {

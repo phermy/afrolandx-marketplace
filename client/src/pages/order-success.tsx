@@ -85,6 +85,12 @@ export default function OrderSuccess() {
           <CardContent className="p-8">
             <div className="text-center space-y-6">
               <div className="space-y-4">
+                {order.shippingAddress?.guestCheckout && <div className="rounded-lg border border-green-200 bg-white p-6">
+                  <h2 className="text-xl font-semibold">Keep track of your order</h2>
+                  <p className="my-3 text-sm text-gray-600">Your payment is complete. Create an account using your checkout email and verify it to add this paid order to My Orders. Already have an account? Sign in with the same email.</p>
+                  <Button onClick={()=>{window.location.href='/register';}}>Create an account</Button>
+                  <Button variant="outline" className="ml-2" onClick={()=>{window.location.href='/login';}}>Sign in</Button>
+                </div>}
                 <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                   <h2 className="text-2xl font-bold text-green-800 mb-3">
                     Your Payment Was Successful! ✨

@@ -89,10 +89,6 @@ export default function ProductDetail() {
   }, [product]);
 
   const handleAddToCart = () => {
-    if (!isAuthenticated) {
-      setLocation('/login');
-      return;
-    }
     if (!product) return;
 
     // Require size selection if product has sizes defined
@@ -347,8 +343,6 @@ export default function ProductDetail() {
                   </span>
                 ) : !isAvailable ? (
                   isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'
-                ) : !isAuthenticated ? (
-                  'Sign In to Buy'
                 ) : hasSizes && !selectedSize ? (
                   'Select a Size to Continue'
                 ) : (
@@ -363,7 +357,7 @@ export default function ProductDetail() {
                   className="w-full border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
                   onClick={() => setLocation('/login')}
                 >
-                  Sign In to Purchase
+                  Sign in to your account
                 </Button>
               )}
             </div>

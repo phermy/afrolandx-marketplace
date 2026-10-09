@@ -127,6 +127,14 @@ export const vendors = pgTable("vendors", {
 ]);
 
 // Categories table
+export const vendorShippingProfiles = pgTable("vendor_shipping_profiles", {
+  vendorId: integer("vendor_id").primaryKey().references(() => vendors.id),
+  address: jsonb("address").notNull(),
+  categoryId: integer("category_id").notNull(),
+  processingDays: integer("processing_days").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),

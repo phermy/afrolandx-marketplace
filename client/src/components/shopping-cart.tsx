@@ -26,9 +26,6 @@ export default function ShoppingCart() {
 
   const openingControl = useRef<HTMLElement | null>(null);
 
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
 

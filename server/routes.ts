@@ -8,6 +8,8 @@ import { checkoutTotal, unpaidCheckoutExpired } from "../shared/checkout-lifecyc
 import { vendorOrdersHandler } from "./vendor-orders";
 import { VENDOR_DETAILS_ROUTE } from "./vendor-route-paths";
 import { requestRateLimit } from "./request-rate-limit";
+import { checkoutAccess } from "./guest-checkout";
+import { ensureShippingProfileTable, registerMarketplaceCheckout } from "./marketplace-checkout";
 import { orderDetailsHandler } from "./order-details";
 import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
@@ -195,6 +197,7 @@ const localUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await ensureShippingProfileTable();
   const finalizeNegativeAdjustment = async (reference: string, status: string) => {
     await finalizeNegativeAdjustmentRecord(reference, status);
     await notifyFinancialAdjustment(reference);
@@ -288,6 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+  registerMarketplaceCheckout(app);
   app.use('/api/admin', isAuthenticated, managementGuard);
   app.use(['/api/categories/init', '/api/discover/inquiries', '/api/discover/premium', '/api/places'], isAuthenticated, requireFullManagement);
   registerLogisticsRoutes(app);
@@ -2035,7 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/cart', isAuthenticated, async (req: any, res) => {
+  app.post('/api/cart', checkoutAccess, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
       const cartItemData = insertCartItemSchema.parse({
@@ -2072,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/cart', isAuthenticated, async (req: any, res) => {
+  app.get('/api/cart', checkoutAccess, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
       const cartItems = await storage.getCartItems(userId);
@@ -2082,7 +2086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/cart/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/cart/:id', checkoutAccess, async (req: any, res) => {
     try {
       const cartItemId = parseInt(req.params.id);
       const { quantity } = req.body;
@@ -2104,7 +2108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/cart/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/cart/:id', checkoutAccess, async (req: any, res) => {
     try {
       const cartItemId = parseInt(req.params.id);
       const userId = (req.user as any)?.id;
@@ -2116,7 +2120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/cart', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/cart', checkoutAccess, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
       await storage.clearCart(userId);
@@ -2601,6 +2605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(orders.userId, userId),
         eq(orders.checkoutRequestId, checkoutRequestId),
       ));
+      if (!existingCheckout) return res.status(410).json({message:"New orders require live, fully priced shipping. Return to checkout to fetch delivery services."});
       if (existingCheckout) {
         if (unpaidCheckoutExpired(existingCheckout)) {
           if (!await unpaidCheckoutCanClose(existingCheckout, completeVerifiedOrder)) {
@@ -2834,7 +2839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payment verification and completion endpoint
-  app.post('/api/orders/verify-payment', isAuthenticated, async (req: any, res) => {
+  app.post('/api/orders/verify-payment', checkoutAccess, async (req: any, res) => {
     try {
       const { reference } = req.body;
       const userId = (req.user as any)?.id;
@@ -3154,7 +3159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/orders/:id', isAuthenticated, orderDetailsHandler);
+  app.get('/api/orders/:id', checkoutAccess, orderDetailsHandler);
 
   // Customer: cancel own order (only if pending or processing)
   app.patch('/api/orders/:id/cancel', isAuthenticated, async (req: any, res) => {

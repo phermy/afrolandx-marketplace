@@ -41,11 +41,9 @@ test("checkout computes the server-side NGN subtotal", () => {
   assert.equal(calculateCheckoutSubtotal(cart), 121000);
 });
 
-test("test shipping charges exactly one naira as a server-priced deposit, not a dispatch-ready carrier rate", () => {
-  assert.equal(calculateEstimatedShippingAmount(121000, "test shipping"), 1);
-  assert.equal(calculateEstimatedShippingAmount(100, "Test shipping"), 1);
-  assert.equal(getShippingQuote("test shipping")?.quoteRequired, true);
-  assert.equal(getShippingQuote("test shipping")?.price, null);
+test("test shipping and the one naira deposit are no longer offered", () => {
+  assert.throws(() => calculateEstimatedShippingAmount(121000, "test shipping"), CheckoutValidationError);
+  assert.equal(getShippingQuote("test shipping"), undefined);
   assert.throws(() => calculateCheckoutTotal(cart, "test shipping"), CheckoutValidationError);
   assert.equal(recommendShippingCarriers({ country: "Nigeria" }).ranked.some(option => option.carrier === "Test shipping"), false);
 });
@@ -140,6 +138,16 @@ function verification(overrides: Record<string, unknown> = {}) {
 
 test("payment verification accepts an exact reference, amount, currency, and metadata", () => {
   assert.equal(paymentVerificationError(order, verification(), "order_42_abc"), null);
+});
+
+test("verified guest order linking retains the original payment owner and receipt email checks",()=>{
+  const order={id:8,userId:"registered-buyer",totalAmount:"1500.00",paymentReference:"fixture_reference",
+    shippingAddress:{_paymentOwnerId:"guest_original",contactEmail:"fixture@example.test"}};
+  const payment={status:true,data:{status:"success",reference:"fixture_reference",currency:"NGN",amount:150000,
+    metadata:{orderId:8,userId:"guest_original"},customer:{email:"fixture@example.test"}}};
+  assert.equal(paymentVerificationError(order,payment,"fixture_reference"),null);
+  assert.equal(paymentVerificationError(order,{...payment,data:{...payment.data,customer:{email:"different@example.test"}}},"fixture_reference"),"Payment customer mismatch");
+  assert.equal(paymentVerificationError(order,{...payment,data:{...payment.data,metadata:{orderId:8,userId:"another_guest"}}},"fixture_reference"),"Payment metadata mismatch");
 });
 
 test("payment verification rejects mismatched amount, currency, metadata, and reference", () => {

@@ -21,6 +21,7 @@ import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFash
 import { selectedSubcategory, subcategoriesFor } from "@shared/product-subcategories";
 import Navbar from "@/components/navbar";
 import VendorBatchImport from "@/components/vendor-batch-import";
+import VendorShippingProfile from "@/components/vendor-shipping-profile";
 import type { Vendor, Product, Category } from "@/types";
 import type { Notification } from "@shared/schema";
 import { RETURN_POLICY_OPTIONS, type ReturnPolicyValue } from "@shared/schema";
@@ -1084,6 +1085,7 @@ export default function VendorDashboard() {
           </TabsContent>
 
           <TabsContent value="orders">
+            <VendorShippingProfile />
             <Card>
               <CardHeader>
                 <CardTitle>Your Orders</CardTitle>
@@ -1107,6 +1109,11 @@ export default function VendorDashboard() {
                             <p className="break-all text-gray-600 text-sm">
                               Email: {order.customer?.email}
                             </p>
+                            <p className="mt-2 text-sm font-medium">Shipping: {order.shippingStatus || 'Preparing'}</p>
+                            {order.shipments?.map((shipment:any)=><p key={shipment.id} className="mt-1 text-sm text-gray-600">
+                              Package #{shipment.id}: {String(shipment.status).replaceAll('_',' ')}
+                              {shipment.trackingNumber ? ` · Tracking ${shipment.trackingNumber}` : ' · Tracking not issued yet'}
+                            </p>)}
                           </div>
                           <div className="text-right">
                             <Badge className={

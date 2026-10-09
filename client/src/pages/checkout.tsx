@@ -183,7 +183,9 @@ const isShippingAddressComplete = (address: ShippingAddress) =>
     && address.city.trim()
     && address.state.trim()
     && address.postalCode.trim()
-    && address.country.trim(),
+    && address.country.trim()
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.contactEmail || '')
+    && (address.phone || '').replace(/\D/g,'').length >= 7,
   );
 
 const canonicalAddressFingerprint = (address: ShippingAddress) => JSON.stringify(
@@ -208,6 +210,7 @@ export default function Checkout() {
     state: '',
     postalCode: '',
     country: detectCountryFromGeo(),
+    contactEmail: '', phone: '',
   });
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
@@ -282,24 +285,9 @@ export default function Checkout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: 'Unauthorized',
-        description: 'Please sign in to check out.',
-        variant: 'destructive',
-      });
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
   // Redirect if cart is empty
   useEffect(() => {
-    if (isAuthenticated && cartItems.length === 0 && !isLoading && !isCartLoading && !isCartError) {
+    if (cartItems.length === 0 && !isLoading && !isCartLoading && !isCartError) {
       toast({
         title: 'Empty Cart',
         description: 'Your cart is empty. Add some items first!',
@@ -316,6 +304,7 @@ export default function Checkout() {
         ...prev,
         firstName: user.firstName || '',
         lastName: user.lastName || '',
+        contactEmail: user.email || '', phone: user.phone || '',
       }));
     }
   }, [user]);
@@ -350,15 +339,16 @@ export default function Checkout() {
     onError: () => toast({ title: 'Could not save address', description: 'Please check the address and try again.', variant: 'destructive' }),
   });
 
-  const { data: shippingQuoteResponse, isLoading: isLoadingShipping, isError: shippingError } = useQuery<ShippingQuote[] | ShippingQuoteResponse>({
-    queryKey: ['/api/shipping/quote'],
+  const { data: shippingQuoteResponse, isFetching: isLoadingShipping, isError: shippingError, error: shippingFailure, refetch: refetchShipping } = useQuery<ShippingQuote[] | ShippingQuoteResponse>({
+    queryKey: ['/api/checkout/rates', cartItems, shippingAddress],
     queryFn: async () => {
-      const res = await fetch('/api/shipping/quote', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch shipping quotes');
+      const res = await apiRequest('POST', '/api/checkout/rates', { shippingAddress });
       return res.json();
     },
-    enabled: !!cartItems.length,
+    enabled: false,
     retry: false,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
   const shippingQuotes = Array.isArray(shippingQuoteResponse)
     ? shippingQuoteResponse
@@ -373,15 +363,14 @@ export default function Checkout() {
       );
       return response.json();
     },
-    enabled: isAuthenticated && !!cartItems.length && isShippingAddressComplete(shippingAddress),
+    enabled: false,
     retry: false,
   });
 
   const { data: quoteRequests = [], isLoading: isLoadingQuoteRequests } = useQuery<ShippingQuoteRequest[]>({
     queryKey: ['/api/shipping/quote-requests/mine'],
-    enabled: isAuthenticated && !!cartItems.length,
+    enabled: false,
     retry: false,
-    refetchInterval: 15000,
   });
 
   const requestQuoteMutation = useMutation({
@@ -427,7 +416,7 @@ export default function Checkout() {
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
+      const response = await apiRequest('POST', '/api/checkout/pay', orderData);
       return response.json();
     },
     onSuccess: (result) => {
@@ -502,9 +491,9 @@ export default function Checkout() {
     const orderData = {
       shippingAddress,
       expectedTotalAmount: serverTotal?.totalAmount,
-      shippingMethod: selectedShipping.toLowerCase(),
+      shippingMethod: selectedShipping,
       checkoutRequestId: checkoutRequestId.current,
-      ...(selectedQuote.quoteRequired && selectedQuote.quoteRequestId
+      ...(selectedQuote.quoteRequestId
         ? { shippingQuoteId: selectedQuote.quoteRequestId }
         : {}),
     };
@@ -524,37 +513,16 @@ export default function Checkout() {
     canonicalAddressFingerprint(request.shippingAddress) === canonicalAddressFingerprint(shippingAddress);
   const requestForCarrier = (carrier: string) =>
     quoteRequests.find(request => request.carrier === carrier && requestMatchesAddress(request));
-  const effectiveShippingQuotes = shippingQuotes.map(quote => {
-    const request = requestForCarrier(quote.carrier);
-    const usable = quote.quoteRequired
-      && request?.status === 'quoted'
-      && request.cartMatches !== false
-      && !!request.quotedAmount
-      && !!request.expiresAt
-      && new Date(request.expiresAt) > new Date();
-    return usable
-      ? {
-          ...quote,
-          price: Number(request.quotedAmount),
-          duration: request.estimatedDelivery || quote.duration,
-          quoteRequestId: request.id,
-        }
-      : {
-          ...quote,
-          price: quote.estimatedPrice ?? null,
-          ...(request?.status === 'pending' && request.cartMatches !== false ? { quoteRequestId: request.id } : {}),
-          estimated: true,
-        };
-  });
+  const effectiveShippingQuotes = shippingQuotes;
   const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const { data: serverTotal, isFetching: totalLoading, isError: totalError, refetch: refetchTotal } = useQuery<{
     subtotal: number; shippingAmount: number; totalAmount: number; currency: string; estimated: boolean;
   }>({
-    queryKey: ["/api/orders/preview-total", cartItems, selectedShippingQuote?.carrier, selectedShippingQuote?.quoteRequestId, shippingAddress],
-    enabled: isAuthenticated && !!cartItems.length && !!selectedShippingQuote && isShippingAddressComplete(shippingAddress),
+    queryKey: ["/api/checkout/total", cartItems, selectedShippingQuote?.carrier, selectedShippingQuote?.quoteRequestId, shippingAddress],
+    enabled: !!cartItems.length && !!selectedShippingQuote && isShippingAddressComplete(shippingAddress),
     retry: false,
     queryFn: async () => {
-      const response = await apiRequest("POST", "/api/orders/preview-total", {
+      const response = await apiRequest("POST", "/api/checkout/total", {
         shippingMethod: selectedShippingQuote?.carrier,
         shippingQuoteId: selectedShippingQuote?.quoteRequestId,
         shippingAddress,
@@ -569,7 +537,7 @@ export default function Checkout() {
   const totalAmount = serverTotal?.totalAmount ?? 0;
   const recommendedCarrier = shippingRecommendation?.ranked?.[0]?.carrier
     || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.recommendation : null)
-    || '';
+    || shippingQuotes[0]?.carrier || '';
   const recommendationReasons = shippingRecommendation?.ranked?.[0]?.reasons
     || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.reasons : [])
     || [];
@@ -594,6 +562,8 @@ export default function Checkout() {
         state: preferred.state,
         postalCode: preferred.postalCode,
         country: preferred.country,
+        contactEmail: user?.email || shippingAddress.contactEmail || '',
+        phone: user?.phone || shippingAddress.phone || '',
       });
     }
   }, [savedAddresses]);
@@ -624,7 +594,7 @@ export default function Checkout() {
     }
   }, [effectiveShippingQuotes, selectedShipping]);
 
-  if (isLoading || (isAuthenticated && isCartLoading)) {
+  if (isLoading || isCartLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div role="status" aria-label="Loading checkout" className="spinner-nigerian"></div>
@@ -632,7 +602,7 @@ export default function Checkout() {
     );
   }
 
-  if (isAuthenticated && isCartError) {
+  if (isCartError) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -645,7 +615,7 @@ export default function Checkout() {
     );
   }
 
-  if (!isAuthenticated || cartItems.length === 0) {
+  if (cartItems.length === 0) {
     return null; // Will redirect in useEffect
   }
 
@@ -668,6 +638,18 @@ export default function Checkout() {
                   <CardTitle>Shipping Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="rounded-md border border-green-200 bg-green-50 p-4" aria-live="polite">
+                    <p className="font-semibold">Full order total: {serverTotal && !totalLoading && !totalError && !shippingError ? formatPrice(serverTotal.totalAmount) : 'Awaiting delivery details and live shipping rate'}</p>
+                    <p className="mt-1 text-sm">Includes merchandise, shipping and any prepaid import duties. Pay before dispatch; no cash on delivery.</p>
+                    {!isAuthenticated && <p className="mt-1 text-sm">Guest checkout: no account required. You can create an account after payment.</p>}
+                  </div>
+                  <Button type="button" onClick={()=>refetchShipping()} disabled={!isShippingAddressComplete(shippingAddress)||isLoadingShipping}>
+                    {isLoadingShipping ? 'Fetching live shipping rates…' : 'Get live delivery options'}
+                  </Button>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div><Label htmlFor="checkout-email">Email for receipt *</Label><Input id="checkout-email" type="email" required autoComplete="email" value={shippingAddress.contactEmail || ''} onChange={e=>setShippingAddress(a=>({...a,contactEmail:e.target.value}))}/></div>
+                    <div><Label htmlFor="checkout-phone">Delivery phone *</Label><Input id="checkout-phone" type="tel" required autoComplete="tel" value={shippingAddress.phone || ''} onChange={e=>setShippingAddress(a=>({...a,phone:e.target.value}))}/></div>
+                  </div>
                   {savedAddresses.length > 0 && (
                     <div className="rounded-lg border border-green-200 bg-green-50/60 p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -693,6 +675,7 @@ export default function Checkout() {
                                 state: address.state,
                                 postalCode: address.postalCode,
                                 country: address.country,
+                                contactEmail: shippingAddress.contactEmail, phone: shippingAddress.phone,
                               });
                               setCountryTouched(true);
                             }}
@@ -906,10 +889,10 @@ export default function Checkout() {
                     </div>
                   ) : shippingError ? (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                      Shipping options are temporarily unavailable. Please refresh and try again.
+                      {(shippingFailure as Error)?.message || 'Shipping options are temporarily unavailable. Please retry.'}
                     </div>
                   ) : shippingQuotes.length === 0 ? (
-                    <div className="rounded-lg border p-4 text-sm text-gray-600">No shipping options are currently available.</div>
+                    <div className="rounded-lg border p-4 text-sm text-gray-600">{isShippingAddressComplete(shippingAddress) ? 'No confirmed shipping options are currently available.' : 'Complete your contact and delivery details to see live delivery prices and expected dates.'}</div>
                   ) : (
                     <RadioGroup
                       value={selectedShipping}
@@ -927,12 +910,12 @@ export default function Checkout() {
                       aria-label="Choose a shipping option"
                     >
                       <p className="mb-4 text-sm text-gray-600">
-                        Choose a delivery service. A server-generated testing estimate is included now, and Afrolandx will confirm the final carrier price after the order is placed.
+                        Choose a live delivery service. The price includes the complete delivery charge and any required prepaid import duties.
                       </p>
                       {recommendedCarrier && effectiveShippingQuotes.some((quote) => quote.carrier === recommendedCarrier) && (
                         <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                          <span className="font-semibold">Recommended: {recommendedCarrier}.</span>{' '}
-                          {recommendationReasons[0] || 'This option best matches your destination and cart.'}
+                          <span className="font-semibold">{effectiveShippingQuotes.find(q=>q.carrier===recommendedCarrier)?.service}.</span>{' '}
+                          Lowest complete delivery price available for your cart.
                         </div>
                       )}
                       <div className="space-y-3">
@@ -961,7 +944,7 @@ export default function Checkout() {
                                   {quote.quoteRequired && request?.status === 'pending' && (
                                      <div className="mt-2">
                                        <Badge variant="outline" className="border-amber-300 text-amber-700">Final price pending</Badge>
-                                       <p className="mt-1 text-xs text-amber-700">The estimated shipping amount is included now. Only any difference will be collected after Afrolandx confirms the carrier price.</p>
+                                       <p className="mt-1 text-xs text-amber-700">Fetch a confirmed delivery rate before paying.</p>
                                      </div>
                                   )}
                                   {quote.quoteRequired && !request && (
@@ -986,11 +969,6 @@ export default function Checkout() {
                           </div>
                         )})}
                       </div>
-                      {shippingQuotes.some(quote => quote.quoteRequired) && (
-                        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                          Testing mode: checkout includes an estimated shipping deposit so buyers can pay immediately. Afrolandx confirms the final rate afterward and collects only any remaining balance.
-                        </p>
-                      )}
                       {!selectedShipping && (
                         <p className="mt-4 text-sm font-medium text-amber-700">
                           Select a shipping option to continue to payment.
@@ -1076,7 +1054,7 @@ export default function Checkout() {
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
                         <span className="font-medium">
-                          {serverTotal ? `${serverTotal.estimated ? 'Estimated deposit ' : ''}${formatPrice(serverTotal.shippingAmount)}` : 'Awaiting server calculation'}
+                          {serverTotal ? formatPrice(serverTotal.shippingAmount) : 'Awaiting server calculation'}
                         </span>
                       </div>
                     )}
