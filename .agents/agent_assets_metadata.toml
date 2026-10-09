@@ -145,3 +145,17 @@ mtime_ms = 1790217223246
 storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/80ab902e-a29b-467c-a0d3-c7996c32557d/38c64b1b-75cf-4d44-bd09-1144981db529"
 storage_version_token = "1790217228370364"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "M2gARub9yR9ULtG5pY_S_"
+uri = "file://client/public/downloads/afrolandx-qa-completion-checklist.pdf"
+type = "pdf"
+title = "Afrolandx QA Completion Checklist"
+description = "Three-page PDF covering completed work, partial items, outstanding checks and verification results."
+logical_id = "8a57adcc-6d7c-4402-9598-0dfe16e376d0"
+content_hash = "sha256:45292deca3b3f9ead6d39d98e8c1100f0c588465d8c971504b8da86ce8028a2c"
+size = 31757
+mtime_ms = 1791556982920
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/8a57adcc-6d7c-4402-9598-0dfe16e376d0/d9c46d59-693d-4363-8919-f3fa6e518a5b"
+storage_version_token = "1791557035500445"
+content_type = "application/pdf"

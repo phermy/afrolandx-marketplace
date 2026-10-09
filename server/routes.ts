@@ -216,6 +216,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!fs.existsSync(photoPath)) return res.status(404).send('Photo not available');
     res.download(photoPath, 'femi-elegbeleye-profile.jpg');
   });
+  app.get('/downloads/afrolandx-qa-completion-checklist.pdf', (_req, res) => {
+    const publicRoot = app.get('env') === 'development' ? 'client/public' : 'dist/public';
+    const filePath = path.resolve(process.cwd(), publicRoot, 'downloads/afrolandx-qa-completion-checklist.pdf');
+    if (!fs.existsSync(filePath)) return res.status(404).send('Checklist not available');
+    res.download(filePath, 'afrolandx-qa-completion-checklist.pdf');
+  });
 
   // Optimized image serving route
   app.get('/uploads/:filename', async (req, res) => {
