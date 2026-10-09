@@ -4,6 +4,7 @@
 - [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support and info were confirmed by inbox receipt
 - [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
 - [Shipping checkout requirements](shipping-quote-lifecycle.md) — aggregator rates, one total without deposits, guest checkout, DDP for UK/US/Canada and paid-only vendor orders
+- [Shipping provider environments](shipping-provider-environments.md) — sandbox access must never substitute for live carrier rates or real customer fulfillment
 - [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
 - [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
 - [Product image durability](product-image-durability.md) — production uploads must not claim success by falling back to temporary local storage
