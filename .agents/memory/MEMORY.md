@@ -28,3 +28,4 @@
 - [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later
 - [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
 - [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged
+- [Landing page carousel preference](landing-page-preference.md) — preserve the previous homepage carousel and all its display images; do not treat restoration as storage or payment work

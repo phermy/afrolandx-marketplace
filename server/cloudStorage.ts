@@ -44,6 +44,9 @@ export class CloudStorageService {
       await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName, MaxKeys: 0 }));
       return { connectionReady: true, status: "Storage connection verified. Upload and image delivery still need testing." };
     } catch (error: any) {
+      if (error?.name === "EndpointError") {
+        return { connectionReady: false, status: "The storage endpoint configuration is invalid. Check the AWS region and bucket settings." };
+      }
       const credentialsInvalid = ["InvalidToken", "ExpiredToken", "InvalidAccessKeyId", "SignatureDoesNotMatch"].includes(error?.name);
       return { connectionReady: false, status: credentialsInvalid
         ? "Storage credentials are invalid or expired. Update the matching access key, secret key and session token securely."
