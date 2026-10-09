@@ -13,7 +13,7 @@
     "test:launch-qa": "tsx --test server/launch-qa.test.ts server/database-availability.test.ts",
     "test:shipping": "tsx --test server/logistics-policy.test.ts server/logistics.integration.test.ts",
     "test:account-closure": "tsx --test server/account-closure.test.ts",
-    "test:profile-images": "tsx --test server/profile-image.test.ts",
+    "test:profile-images": "tsx --test server/profile-image.test.ts server/r2-storage.test.ts",
     "test:admin-products": "tsx --test server/admin-product-bulk.test.ts server/admin-product-review.test.ts client/src/lib/api-error-message.test.ts",
     "test:reviews": "tsx --test server/reviews.test.ts",
     "test:lookbook": "tsx --test server/lookbook-generation.test.ts",
@@ -26,8 +26,6 @@
     "test:orders": "tsx --test server/order-security.test.ts server/order-processing.test.ts server/paystack.test.ts server/finance.test.ts server/product-return-policy.test.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.826.0",
-    "@aws-sdk/s3-request-presigner": "^3.826.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@mediapipe/tasks-vision": "^1.0.1",

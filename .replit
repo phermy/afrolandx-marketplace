@@ -45,6 +45,8 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 
 [userenv.shared]
 FROM_EMAIL = "management@afrolandx.com"
+R2_ACCOUNT_ID = "fd643e7f189999a0b316d38cfe340f33"
+R2_BUCKET = "afrolandx"
 
 [userenv.development]
 TURNSTILE_REGISTER_ENABLED = "false"

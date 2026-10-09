@@ -10,7 +10,6 @@ import { fetchPaymentConfirmation, PaymentConfirmationError } from "../client/sr
 import { securityHeaders } from "./security-headers";
 import { vendorStatusMessage, notifyVendorStatus } from "./account-notifications";
 import { CloudStorageService } from "./cloudStorage";
-import { S3Client } from "@aws-sdk/client-s3";
 
 function response() {
   return {
@@ -158,11 +157,12 @@ test("QA security headers: set CSP, nosniff and referrer protection while allowi
   assert.match(res.headers["Content-Security-Policy"], /object-src 'none'/);
   assert.match(res.headers["Content-Security-Policy"], /challenges\.cloudflare\.com/);
 });
-test("QA storage: configured SDK is not reported as a verified connection with invalid credentials", async t => {
-  t.mock.method(S3Client.prototype, "send", async () => { throw Object.assign(new Error("private provider details"), { name: "InvalidToken" }); });
-  const service = new CloudStorageService({ accessKeyId: "fixture", secretAccessKey: "fixture", region: "eu-west-1", bucketName: "fixture" });
+test("QA storage: configured R2 client is not reported as verified with invalid credentials", async () => {
+  const service = new CloudStorageService({
+    accountId: "a".repeat(32), apiToken: "fixture", bucketName: "fixture",
+  }, async () => new Response("private provider details", { status: 403 }));
   const result = await service.checkConnection();
   assert.equal(result.connectionReady, false);
-  assert.match(result.status, /invalid or expired/);
+  assert.match(result.status, /invalid or lack permission/);
   assert.doesNotMatch(result.status, /private provider details/);
 });

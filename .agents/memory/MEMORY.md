@@ -29,3 +29,5 @@
 - [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
 - [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged
 - [Landing page carousel preference](landing-page-preference.md) — preserve the previous homepage carousel and all its display images; do not treat restoration as storage or payment work
+- [Profile photo storage](profile-photo-storage.md) — use R2 links for new avatars; failed writes must preserve the old photo and cleanup must remain scoped
+- [Cloudflare instead of AWS](cloudflare-storage-direction.md) — switch only features still blocked by AWS; leave working features and existing content unchanged

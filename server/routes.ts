@@ -68,7 +68,9 @@ import {
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
 import { retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
-import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, prepareProfileImage, PROFILE_IMAGE_TYPES } from "./profile-image";
+import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, PROFILE_IMAGE_TYPES } from "./profile-image";
+import { ProfilePhotoAccountNotFoundError, updateProfilePhoto } from "./profile-photo-service";
+import { isR2ImageKey } from "./r2-image-url";
 import { sendExperienceFeedbackNotification } from "./email";
 import {
   createFinanceReference,
@@ -189,7 +191,34 @@ const localUpload = multer({
   }
 });
 
+function cleanupLegacyProfilePhoto(imageUrl: string | null): void {
+  try {
+    if (!imageUrl || !isCloudStorageEnabled() || !isManagedProfileImage(imageUrl)) return;
+    void getCloudStorageService().deleteImage(imageUrl).catch(() => {
+      console.error("Legacy profile photo cleanup could not complete.");
+    });
+  } catch {
+    console.error("Legacy profile photo cleanup could not complete.");
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Public image bytes only. Upload/delete remain behind the existing account
+  // and vendor checks; the Cloudflare API token never reaches the browser.
+  app.get('/api/media/:folder/:filename', async (req, res) => {
+    try {
+      const key = `${req.params.folder}/${req.params.filename}`;
+      if (!isR2ImageKey(key)) return res.status(404).end();
+      if (!isCloudStorageEnabled()) return res.status(503).end();
+      const image = await getCloudStorageService().readImage(key);
+      if (!image) return res.status(404).end();
+      res.setHeader("Content-Type", image.contentType);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(image.buffer);
+    } catch {
+      return res.status(503).end();
+    }
+  });
   const finalizeNegativeAdjustment = async (reference: string, status: string) => {
     await finalizeNegativeAdjustmentRecord(reference, status);
     await notifyFinancialAdjustment(reference);
@@ -421,31 +450,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             : "Choose a JPEG, PNG, or WebP image up to 5 MB." });
       }
       if (!req.file) return res.status(400).json({ message: "Choose an image to upload." });
-      if (!isCloudStorageEnabled()) {
-        return res.status(503).json({ message: "Photo storage is unavailable right now. Please try again later." });
-      }
-
-      let uploadedUrl: string | undefined;
       try {
         const userId = req.user.id as string;
-        const previousUser = await storage.getUser(userId);
-        if (!previousUser) return res.status(404).json({ message: "Account not found." });
-
-        const image = await prepareProfileImage(req.file.buffer);
-        const cloud = getCloudStorageService();
-        uploadedUrl = await cloud.uploadImage(image, "image/jpeg", "profiles");
-        const updatedUser = await storage.updateUserProfile(userId, { profileImageUrl: uploadedUrl });
-        if (!updatedUser) {
-          await cloud.deleteImage(uploadedUrl);
-          return res.status(404).json({ message: "Account not found." });
-        }
-        uploadedUrl = undefined;
-        if (previousUser.profileImageUrl && isManagedProfileImage(previousUser.profileImageUrl)) {
-          await cloud.deleteImage(previousUser.profileImageUrl);
-        }
+        const { user: updatedUser, previousImageUrl } = await updateProfilePhoto(userId, req.file.buffer, storage);
+        // A legacy cloud-photo cleanup must never turn a successful save into
+        // an upload failure. New avatars do not need an external image store.
+        cleanupLegacyProfilePhoto(previousImageUrl);
         return res.json(sanitizeUser(updatedUser));
       } catch (error) {
-        if (uploadedUrl) await getCloudStorageService().deleteImage(uploadedUrl);
+        if (error instanceof ProfilePhotoAccountNotFoundError) {
+          return res.status(404).json({ message: error.message });
+        }
         if (error instanceof InvalidProfileImageError) {
           return res.status(400).json({ message: error.message });
         }
@@ -458,17 +473,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/profile/image', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id as string;
-      const previousUser = await storage.getUser(userId);
-      if (!previousUser) return res.status(404).json({ message: "Account not found." });
-      if (!previousUser.profileImageUrl) return res.json(sanitizeUser(previousUser));
-
-      const updatedUser = await storage.updateUserProfile(userId, { profileImageUrl: null });
-      if (!updatedUser) return res.status(404).json({ message: "Account not found." });
-      if (isCloudStorageEnabled() && isManagedProfileImage(previousUser.profileImageUrl)) {
-        await getCloudStorageService().deleteImage(previousUser.profileImageUrl);
-      }
+      const { user: updatedUser, previousImageUrl } = await updateProfilePhoto(userId, null, storage);
+      cleanupLegacyProfilePhoto(previousImageUrl);
       return res.json(sanitizeUser(updatedUser));
     } catch (error) {
+      if (error instanceof ProfilePhotoAccountNotFoundError) {
+        return res.status(404).json({ message: error.message });
+      }
       console.error("Error removing profile photo:", error);
       return res.status(500).json({ message: "Could not remove your photo. Please try again." });
     }
@@ -4149,7 +4160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin endpoint to refresh AWS credentials
+  // Admin endpoint to refresh Cloudflare R2 configuration
   app.post('/api/admin/refresh-cloud-storage', isAuthenticated, isAdmin, async (req, res) => {
     try {
       console.log('Admin requested cloud storage reinitialization...');
@@ -4172,12 +4183,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/cloud-storage-status', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const isEnabled = isCloudStorageEnabled();
-      const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET);
+      const hasCredentials = isEnabled;
       const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
       res.json({
         cloudStorageEnabled: isEnabled,
         hasCredentials,
-        hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
+        provider: 'cloudflare-r2',
         ...connection,
       });
     } catch (error) {

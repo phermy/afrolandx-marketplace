@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { getR2ImageKey } from "./r2-image-url";
 
 export const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 export const PROFILE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -25,13 +26,5 @@ export async function prepareProfileImage(buffer: Buffer): Promise<Buffer> {
 }
 
 export function isManagedProfileImage(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    const expectedHost = `${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com`;
-    return parsed.protocol === "https:"
-      && parsed.hostname === expectedHost
-      && parsed.pathname.startsWith("/profiles/");
-  } catch {
-    return false;
-  }
+  return getR2ImageKey(url)?.startsWith("profiles/") === true;
 }

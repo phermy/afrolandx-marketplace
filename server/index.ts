@@ -71,7 +71,7 @@ app.use((req, res, next) => {
 
   // Cloud storage migration disabled to prevent credential errors
   // Migration can be manually triggered via /api/admin/migrate-images when credentials are valid
-  log('Cloud storage infrastructure ready, using optimized local image serving with automatic compression');
+  log('Image storage initialized. Cloudflare R2 availability is verified on use.');
 
   // Remove the confirmed legacy demo catalog while retaining products referenced
   // by historical orders. The date boundary prevents future vendors or content
