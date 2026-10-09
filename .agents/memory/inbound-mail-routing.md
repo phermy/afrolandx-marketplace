@@ -9,8 +9,6 @@ Outbound email through Resend can deliver successfully to external providers. So
 
 **How to apply:** When testing authentication email, use a confirmed working inbox; inspect any newly failing Titan recipient as a mailbox or alias individually. The public site advertises info as a contact address, while outgoing app email uses support as the reply address. Keep root-domain Titan MX and the verified Resend sender configuration intact. A Resend accepted or delivered response alone is not proof of inbox arrival; ask for recipient confirmation.
 
-On 2026-10-08 the user confirmed that verification, sign-in code and password-reset emails from development authentication tests all reached the support inbox. This confirms those three message types at the recipient mailbox, not vendor or payment notifications or the published site's current behavior.
-
 **Rule:** A successful email test from the development workspace does not show what the published site sends until the site is republished after the code change.
 **Why:** The live feedback form kept sending to its old recipient after a later workspace change; the most recent publish preceded that change.
 **How to apply:** Compare publish timing with workspace changes before diagnosing a second email path or editing working routing again.

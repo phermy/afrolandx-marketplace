@@ -40,7 +40,6 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ShoppingCart from "@/components/shopping-cart";
-import PageHead from "@/components/page-head";
 import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { isVendor } from "@/lib/roleUtils";
@@ -188,18 +187,7 @@ function App() {
       <CartProvider>
         <TooltipProvider>
           <Toaster />
-          <PageHead />
-          <a href="#main-content" onClick={(event) => {
-            event.preventDefault();
-            const root = document.getElementById("main-content");
-            const content = root?.querySelector<HTMLElement>("main, h1") || root;
-            if (content) { content.tabIndex = -1; content.focus(); content.scrollIntoView({ block: "start" }); }
-          }} className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-white focus:text-black focus:p-3 focus:rounded">
-            Skip to main content
-          </a>
-          <div id="main-content" tabIndex={-1}>
-            <Router />
-          </div>
+          <Router />
           <ShoppingCart />
           <Chatbot />
           <SessionTimeout />

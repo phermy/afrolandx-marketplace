@@ -928,7 +928,7 @@ export class DatabaseStorage implements IStorage {
       .set(update)
       .where(and(
         eq(orders.shippingQuoteRequestId, quoteId),
-        sql`${orders.orderStatus} NOT IN ('cancelled', 'expired', 'payment_review')`,
+        sql`${orders.orderStatus} <> 'cancelled'`,
       ))
       .returning();
     return order;
@@ -1015,7 +1015,6 @@ export class DatabaseStorage implements IStorage {
         eq(orders.id, id),
         eq(orders.paymentStatus, 'paid'),
         isNull(orders.shippingRefundStatus),
-        sql`${orders.orderStatus} NOT IN ('cancelled', 'expired', 'payment_review')`,
       ))
       .returning({ id: orders.id });
     return updated.length > 0;
@@ -1075,7 +1074,6 @@ export class DatabaseStorage implements IStorage {
       const updated = await tx.update(orders)
         .set({ orderStatus: status, updatedAt: new Date() })
         .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus),
-          sql`${orders.orderStatus} NOT IN ('cancelled', 'expired', 'payment_review')`,
           ['shipped', 'delivered'].includes(status) ? sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})` : undefined))
         .returning({ id: orders.id });
       return updated.length > 0;
@@ -1144,7 +1142,6 @@ export class DatabaseStorage implements IStorage {
         paymentStatus: 'paid',
         paymentReference: reference,
         orderStatus: sql`CASE
-          WHEN ${orders.orderStatus} IN ('cancelled', 'expired') THEN 'payment_review'
           WHEN ${orders.shippingEstimatedAmount} IS NOT NULL AND ${orders.shippingFinalAmount} IS NULL
             THEN 'awaiting_shipping_quote'
           ELSE 'pending'
@@ -1154,7 +1151,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(orders.id, id),
         eq(orders.paymentStatus, 'pending'),
-        eq(orders.paymentReference, reference),
+        sql`${orders.orderStatus} <> 'cancelled'`,
       ))
       .returning({ id: orders.id });
     return result.length > 0;

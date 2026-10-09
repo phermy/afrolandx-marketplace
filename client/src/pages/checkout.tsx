@@ -195,7 +195,7 @@ const canonicalAddressFingerprint = (address: ShippingAddress) => JSON.stringify
 
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { cartItems, cartTotal, isCartLoading, isCartError, refetchCart } = useCart();
+  const { cartItems, cartTotal } = useCart();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -299,7 +299,7 @@ export default function Checkout() {
 
   // Redirect if cart is empty
   useEffect(() => {
-    if (isAuthenticated && cartItems.length === 0 && !isLoading && !isCartLoading && !isCartError) {
+    if (cartItems.length === 0 && !isLoading) {
       toast({
         title: 'Empty Cart',
         description: 'Your cart is empty. Add some items first!',
@@ -307,7 +307,7 @@ export default function Checkout() {
       });
       window.location.href = '/products';
     }
-  }, [cartItems, isLoading, isAuthenticated, isCartLoading, isCartError, toast]);
+  }, [cartItems, isLoading, toast]);
 
   // Pre-fill user data
   useEffect(() => {
@@ -460,18 +460,11 @@ export default function Checkout() {
         return;
       }
       const msg = (error as any)?.message || '';
-      if (/checkout.*(closed|expired)|checkout price changed/i.test(msg)) {
-        // Only replace an idempotency key after the server definitively closed
-        // the checkout or rejected a changed price, never after a timeout.
-        checkoutRequestId.current = crypto.randomUUID();
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/preview-total"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/shipping/quote"] });
-      }
       toast({
-        title: 'Checkout could not start',
+        title: 'Payment Failed',
         description: msg.includes('500')
           ? 'We could not process your payment. Please try again or contact support.'
-          : msg.replace(/^\d+:\s*/, '') || 'Please review your details and try again.',
+          : 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
     },
@@ -501,7 +494,6 @@ export default function Checkout() {
 
     const orderData = {
       shippingAddress,
-      expectedTotalAmount: serverTotal?.totalAmount,
       shippingMethod: selectedShipping.toLowerCase(),
       checkoutRequestId: checkoutRequestId.current,
       ...(selectedQuote.quoteRequired && selectedQuote.quoteRequestId
@@ -509,16 +501,12 @@ export default function Checkout() {
         : {}),
     };
 
-    if (!serverTotal || totalLoading || totalError) {
-      toast({ title: "Wait for the server total", description: "Review the calculated total before paying.", variant: "destructive" });
-      return;
-    }
     createOrderMutation.mutate(orderData);
   };
 
   // All prices are in NGN
   const formatPrice = (ngnAmount: number) =>
-    `₦${ngnAmount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `₦${ngnAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const requestMatchesAddress = (request: ShippingQuoteRequest) =>
     canonicalAddressFingerprint(request.shippingAddress) === canonicalAddressFingerprint(shippingAddress);
@@ -547,26 +535,7 @@ export default function Checkout() {
         };
   });
   const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
-  const { data: serverTotal, isFetching: totalLoading, isError: totalError, refetch: refetchTotal } = useQuery<{
-    subtotal: number; shippingAmount: number; totalAmount: number; currency: string; estimated: boolean;
-  }>({
-    queryKey: ["/api/orders/preview-total", cartItems, selectedShippingQuote?.carrier, selectedShippingQuote?.quoteRequestId, shippingAddress],
-    enabled: isAuthenticated && !!cartItems.length && !!selectedShippingQuote && isShippingAddressComplete(shippingAddress),
-    retry: false,
-    queryFn: async () => {
-      const response = await apiRequest("POST", "/api/orders/preview-total", {
-        shippingMethod: selectedShippingQuote?.carrier,
-        shippingQuoteId: selectedShippingQuote?.quoteRequestId,
-        shippingAddress,
-      });
-      const result = await response.json();
-      if (result.currency !== "NGN" || !Number.isFinite(result.totalAmount) || result.totalAmount <= 0) {
-        throw new Error("The server did not return a valid checkout total.");
-      }
-      return result;
-    },
-  });
-  const totalAmount = serverTotal?.totalAmount ?? 0;
+  const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
   const recommendedCarrier = shippingRecommendation?.ranked?.[0]?.carrier
     || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.recommendation : null)
     || '';
@@ -624,23 +593,10 @@ export default function Checkout() {
     }
   }, [effectiveShippingQuotes, selectedShipping]);
 
-  if (isLoading || (isAuthenticated && isCartLoading)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div role="status" aria-label="Loading checkout" className="spinner-nigerian"></div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated && isCartError) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div role="alert" className="max-w-xl mx-auto p-6 space-y-4">
-          <h1 className="text-2xl font-semibold">Your cart could not be loaded</h1>
-          <p>Please retry. No payment has been started.</p>
-          <Button onClick={refetchCart}>Retry loading cart</Button>
-        </div>
+        <div className="spinner-nigerian"></div>
       </div>
     );
   }
@@ -781,7 +737,7 @@ export default function Checkout() {
                           onValueChange={(value) => setShippingAddress(prev => ({ ...prev, state: value }))}
                           required
                         >
-                          <SelectTrigger id="state" className="input-nigerian">
+                          <SelectTrigger className="input-nigerian">
                             <SelectValue placeholder="Select…" />
                           </SelectTrigger>
                           <SelectContent className="max-h-60">
@@ -1069,14 +1025,14 @@ export default function Checkout() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span className="font-medium">{formatPrice(serverTotal?.subtotal ?? cartTotal)}</span>
+                      <span className="font-medium">{formatPrice(cartTotal)}</span>
                     </div>
                     
                     {selectedShippingQuote && (
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
                         <span className="font-medium">
-                          {serverTotal ? `${serverTotal.estimated ? 'Estimated deposit ' : ''}${formatPrice(serverTotal.shippingAmount)}` : 'Awaiting server calculation'}
+                          {selectedShippingQuote.price === null ? 'Calculated at payment' : `${(selectedShippingQuote as any).estimated ? 'Estimated ' : ''}${formatPrice(selectedShippingQuote.price)}`}
                         </span>
                       </div>
                     )}
@@ -1086,24 +1042,15 @@ export default function Checkout() {
                      <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
                        <span className="text-nigerian-green">
-                         {serverTotal && !totalLoading ? formatPrice(serverTotal.totalAmount)
-                           : totalLoading ? 'Calculating…' : 'Complete your shipping details'}
+                         {selectedShippingQuote ? formatPrice(totalAmount) : 'Select shipping'}
                        </span>
                     </div>
                   </div>
 
                   {/* Place Order Button */}
-                  {totalError && (
-                    <div role="alert" className="text-sm text-red-700">
-                      The server total could not be loaded. Payment is unavailable until it is confirmed.
-                      <Button type="button" variant="outline" className="mt-2" onClick={() => refetchTotal()}>
-                        Retry total
-                      </Button>
-                    </div>
-                  )}
                   <Button
                     type="submit"
-                    disabled={!selectedShipping || createOrderMutation.isPending || !serverTotal || totalLoading || totalError}
+                    disabled={!selectedShipping || createOrderMutation.isPending}
                     className="w-full btn-nigerian"
                   >
                     {createOrderMutation.isPending ? (

@@ -2,14 +2,10 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement, notifyOrderClosure } from "./payment-emails";
-import { closeUnpaidCheckout, unpaidCheckoutCanClose, startUnpaidCheckoutExpiry } from "./unpaid-checkouts";
-import { checkoutTotal, unpaidCheckoutExpired } from "../shared/checkout-lifecycle";
+import { notifyFinancialAdjustment, notifyOrderPayment, notifyVendorSettlement } from "./payment-emails";
 import { vendorOrdersHandler } from "./vendor-orders";
-import { VENDOR_DETAILS_ROUTE } from "./vendor-route-paths";
 import { requestRateLimit } from "./request-rate-limit";
 import { orderDetailsHandler } from "./order-details";
-import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
@@ -53,7 +49,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { getCloudStorageService, getCloudStorageConnectionStatus, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
+import { getCloudStorageService, isCloudStorageEnabled, reinitializeCloudStorage } from "./cloudStorage";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import {
@@ -71,8 +67,7 @@ import {
   recommendShippingCarriers,
 } from "./order-security";
 import { createVerifiedOrderCompleter } from "./order-processing";
-import { deleteStoredProductImage, isProductImageStorageEnabled, requiresDurableProductImageStorage, retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
-import { getR2ProductPhotoStatus, R2PhotoStorageError } from "./r2-product-photos";
+import { retouchProductImage, storeLocalProductImage, storeProductImage, suggestProductListing } from "./product-image";
 import { InvalidProfileImageError, isManagedProfileImage, MAX_PROFILE_IMAGE_BYTES, prepareProfileImage, PROFILE_IMAGE_TYPES } from "./profile-image";
 import { sendExperienceFeedbackNotification } from "./email";
 import {
@@ -514,14 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // The client route alone is not an access boundary; deny direct page loads too.
-  app.get('/discover', (req: any, res, next) => {
-    res.set("Cache-Control", "no-store");
-    if (!req.isAuthenticated() || !req.user?.emailVerified || req.user?.closedAt) {
-      return res.redirect('/login?returnTo=%2Fdiscover');
-    }
-    if (!hasSupportManagementAccess(req.user)) return res.redirect('/products');
-    next();
-  }, isAuthenticated, isAdmin, (_req, _res, next) => next());
+  app.get('/discover', isAuthenticated, isAdmin, (_req, _res, next) => next());
 
   // Ordinary admin tools cannot remove the owner-level role (including by
   // replacing all roles) or delete an account that holds it.
@@ -557,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const completeVerifiedOrder = createVerifiedOrderCompleter(storage, async orderId => {
     await createSaleLedger(orderId);
     await notifyOrderPayment(orderId);
-  }, ensureOrderShipments, orderId => notifyOrderClosure(orderId, "payment_review"));
+  }, ensureOrderShipments);
   const canAutomaticallyProcessOrder = async (orderId: number): Promise<boolean> => {
     const current = await storage.getOrder(orderId);
     if (!current
@@ -565,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       || current.stockReservationStatus !== 'reserved'
       || !['included', 'paid'].includes(current.shippingPaymentStatus)
       || (current.shippingEstimatedAmount && !current.shippingFinalAmount)
-      || ['cancelled', 'expired', 'payment_review'].includes(current.orderStatus || '')) {
+      || current.orderStatus === 'cancelled') {
       return false;
     }
     const items = await storage.getOrderItemsWithProducts(orderId);
@@ -1093,7 +1081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/vendors/orders', isAuthenticated, vendorOrdersHandler);
   app.get('/api/vendors/me/orders', isAuthenticated, vendorOrdersHandler);
 
-  app.get(VENDOR_DETAILS_ROUTE, isAuthenticated, isAdmin, async (req, res) => {
+  app.get('/api/vendors/:id', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const actor = await storage.getUser((req.user as any)?.id);
       if (!actor || !hasSupportManagementAccess(actor)) return res.status(403).json({ message: 'Verified Admin access is required.' });
@@ -1197,7 +1185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/admin/vendors/:vendorId/products', isAuthenticated, isAdmin, upload.array('images', 5), async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
     try {
@@ -1218,7 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         imageUrls = await Promise.all(files.map(file => storeProductImage(file.buffer, 'products')));
       } catch (error) {
-        if (requiresDurableProductImageStorage()) {
+        if (process.env.NODE_ENV === 'production') {
           console.error('Admin product image upload failed; refusing temporary local storage:', error);
           return res.status(503).json({ message: 'Product image storage is unavailable. The product was not saved. Please try again later.' });
         }
@@ -1253,10 +1241,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products', isAuthenticated, isVendor, async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
-    const uploadHandler = isProductImageStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
+    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 5) : localUpload.array('images', 5);
     
     uploadHandler(req, res, async (err) => {
       if (err) {
@@ -1298,9 +1286,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // retained only for development when cloud storage is unavailable.
         if (files && files.length > 0) {
           try {
-            if (isProductImageStorageEnabled()) {
+            if (isCloudStorageEnabled()) {
+              const cloudStorage = getCloudStorageService();
               const uploadPromises = files.map(file => 
-                storeProductImage(file.buffer, 'products')
+                cloudStorage.uploadImage(file.buffer, file.mimetype, 'products')
               );
               imageUrls = await Promise.all(uploadPromises);
               console.log('Successfully uploaded images to cloud storage');
@@ -1311,7 +1300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Saved ${imageUrls.length} image(s) locally for development`);
             }
           } catch (error: any) {
-            if (requiresDurableProductImageStorage()) {
+            if (process.env.NODE_ENV === 'production') {
               console.error('Product image upload failed; refusing temporary local storage:', error);
               return res.status(503).json({ message: 'Product image storage is unavailable. Your product was not saved. Please try again later.' });
             }
@@ -1420,10 +1409,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const importKeyConflict = (databaseError?.code === '23505' && databaseError.constraint === 'products_client_import_key_unique')
           || (databaseError?.cause?.code === '23505' && databaseError.cause.constraint === 'products_client_import_key_unique');
         if (importKeyConflict && req.body.clientImportKey) {
-          if (isProductImageStorageEnabled()) {
-            await Promise.all(imageUrls.map(imageUrl => deleteStoredProductImage(imageUrl).catch(() => {
-              console.error("Could not clean up an unused product photo.");
-            })));
+          if (isCloudStorageEnabled()) {
+            await Promise.all(imageUrls.map(imageUrl => getCloudStorageService().deleteImage(imageUrl)));
           }
           const existing = await getProductByClientImportKey(String(req.body.clientImportKey).toLowerCase());
           const retry = resolveClientImportRetry(existing, req.vendor.id, req.body);
@@ -1592,7 +1579,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/products/:id', createPublicProductHandler(storage));
+  app.get('/api/products/:id', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      if (product.status !== 'approved') return res.status(404).json({ message: 'Product not found' });
+      const vendor = await storage.getVendor(product.vendorId);
+      if (!vendor || vendor.status !== 'approved' || vendor.verificationStatus !== 'verified') {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      
+      res.json(product);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch product' });
+    }
+  });
 
   // Vendor: update their own product (name, description, price, stock, imageUrl, removeImages)
   app.patch('/api/products/:id', isAuthenticated, async (req: any, res) => {
@@ -1713,10 +1718,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Vendor: upload additional images to an existing product
   app.post('/api/products/:id/images', isAuthenticated, async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
-    const uploadHandler = isProductImageStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
+    const uploadHandler = isCloudStorageEnabled() ? upload.array('images', 10) : localUpload.array('images', 10);
     uploadHandler(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });
       try {
@@ -1736,15 +1741,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let newImageUrls: string[] = [];
         try {
-          if (isProductImageStorageEnabled()) {
-            newImageUrls = await Promise.all(files.map(f => storeProductImage(f.buffer, 'products')));
+          if (isCloudStorageEnabled()) {
+            const cloudStorage = getCloudStorageService();
+            newImageUrls = await Promise.all(files.map(f => cloudStorage.uploadImage(f.buffer, f.mimetype, 'products')));
           } else {
             for (const file of files) {
               if (file.buffer) newImageUrls.push(await storeLocalProductImage(file.buffer, 'products'));
             }
           }
         } catch (uploadErr: any) {
-          if (requiresDurableProductImageStorage()) {
+          if (process.env.NODE_ENV === 'production') {
             console.error('Product image upload failed; refusing temporary local storage:', uploadErr);
             return res.status(503).json({ message: 'Product image storage is unavailable. No images were added. Please try again later.' });
           }
@@ -1769,7 +1775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/products/:id/images/ai-retouch', isAuthenticated, upload.single('image'), async (req: any, res) => {
-    if (process.env.NODE_ENV === 'production' && !isProductImageStorageEnabled()) {
+    if (process.env.NODE_ENV === 'production' && !isCloudStorageEnabled()) {
       return res.status(503).json({ message: 'Product image storage is unavailable. Please try again later.' });
     }
     try {
@@ -1795,9 +1801,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('AI product image enhancement failed:', error);
-      if (error instanceof R2PhotoStorageError) {
-        return res.status(503).json({ message: 'Product image storage is unavailable. Your product was not changed. Please try again later.' });
-      }
       const unavailable = String(error?.message || '').includes('not configured');
       res.status(unavailable ? 503 : 502).json({
         message: unavailable ? 'AI image enhancement is not configured' : 'AI could not enhance this image. Your product was not changed.',
@@ -2531,53 +2534,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Initialize Paystack payment
-  // Read-only pricing: cart, shipping and payable NGN total come from the
-  // server. This does not create an order or contact the payment provider.
-  app.post('/api/orders/preview-total', isAuthenticated, requestRateLimit("checkout-pricing", 60, 60), async (req: any, res) => {
-    try {
-      const address = shippingAddressSchema.parse(req.body.shippingAddress);
-      const carrier = getShippingQuote(req.body.shippingMethod);
-      if (!carrier) return res.status(400).json({ message: "Choose a valid shipping method." });
-      const cart = await storage.getCartItems(req.user.id);
-      if (!cart.length) return res.status(400).json({ message: "Your cart is empty." });
-      const subtotal = calculateCheckoutSubtotal(cart);
-      let shippingAmount: number | null = carrier.price;
-      let estimated = false;
-      if (carrier.quoteRequired || shippingAmount === null) {
-        const requests = await storage.getShippingQuoteRequestsForUser(req.user.id);
-        const matches = (quote: any) => quote.carrier.toLowerCase() === carrier.carrier.toLowerCase()
-          && quote.cartFingerprint === createCartFingerprint(cart) && addressesMatch(quote.shippingAddress, address);
-        const quote = req.body.shippingQuoteId
-          ? requests.find(item => item.id === Number(req.body.shippingQuoteId))
-          : requests.find(item => matches(item) && item.status === "quoted" && item.expiresAt && item.expiresAt > new Date());
-        if (quote && (!matches(quote) || !["pending", "quoted"].includes(quote.status))) {
-          return res.status(409).json({ message: "Your quote no longer matches this checkout. Request a new shipping quote." });
-        }
-        if (quote?.status === "quoted") {
-          if (!quote.expiresAt || quote.expiresAt <= new Date() || quote.currency !== "NGN") {
-            return res.status(409).json({ message: "Your shipping quote expired. Request a new quote." });
-          }
-          shippingAmount = Number(quote.quotedAmount);
-          if (!Number.isFinite(shippingAmount) || shippingAmount <= 0) {
-            return res.status(409).json({ message: "The confirmed shipping amount is invalid. Request a new quote." });
-          }
-        } else {
-          if (req.body.shippingQuoteId && !quote) return res.status(409).json({ message: "Shipping quote unavailable." });
-          shippingAmount = calculateEstimatedShippingAmount(subtotal, carrier.carrier);
-          estimated = true;
-        }
-      }
-      const totalAmount = checkoutTotal(subtotal, Number(shippingAmount));
-      res.set("Cache-Control", "no-store");
-      res.json({ subtotal, shippingAmount, totalAmount, currency: "NGN", estimated });
-    } catch (error) {
-      if (error instanceof z.ZodError || error instanceof CheckoutValidationError) {
-        return res.status(400).json({ message: "Check your cart and complete the shipping address." });
-      }
-      res.status(503).json({ message: "The checkout total could not be calculated. Please retry." });
-    }
-  });
-
   app.post('/api/orders/initialize-payment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
@@ -2602,22 +2558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(orders.checkoutRequestId, checkoutRequestId),
       ));
       if (existingCheckout) {
-        if (unpaidCheckoutExpired(existingCheckout)) {
-          if (!await unpaidCheckoutCanClose(existingCheckout, completeVerifiedOrder)) {
-            return res.status(409).json({ message: 'Payment status is being checked. Do not pay again. Check My Orders.' });
-          }
-          if (await closeUnpaidCheckout(existingCheckout.id, userId, "expired", new Date(Date.now() - 24 * 60 * 60 * 1000))) {
-            await notifyOrderClosure(existingCheckout.id, "expired");
-          }
-          return res.status(409).json({ message: 'This unpaid checkout expired. Start a new checkout from your saved cart.' });
-        }
-        if (existingCheckout.paymentStatus !== 'pending' || !existingCheckout.paymentReference
-          || ['cancelled', 'expired', 'payment_review'].includes(existingCheckout.orderStatus || '')) {
+        if (existingCheckout.paymentStatus !== 'pending' || !existingCheckout.paymentReference) {
           return res.status(409).json({ message: 'This checkout request has already been completed or closed' });
-        }
-        if (req.body.expectedTotalAmount !== undefined
-          && Math.round(Number(req.body.expectedTotalAmount) * 100) !== Math.round(Number(existingCheckout.totalAmount) * 100)) {
-          return res.status(409).json({ message: 'The checkout price changed. Review the refreshed server total before paying.' });
         }
         if (existingCheckout.paymentUrl) {
           return res.json({
@@ -2743,11 +2685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (error instanceof CheckoutValidationError) return res.status(409).json({ message: error.message });
         throw error;
       }
-      const totalAmount = checkoutTotal(subtotal, shippingPrice);
-      if (req.body.expectedTotalAmount !== undefined
-        && Math.round(Number(req.body.expectedTotalAmount) * 100) !== Math.round(totalAmount * 100)) {
-        return res.status(409).json({ message: "The checkout price changed. Review the refreshed server total before paying." });
-      }
+      const totalAmount = subtotal + shippingPrice;
 
       const reference = `order_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
@@ -2857,15 +2795,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mismatch = paymentVerificationError(order, verificationResult, reference);
       if (mismatch) return res.status(400).json({ message: mismatch });
       const newlyCompleted = await completeVerifiedOrder(order, reference);
-      const confirmedOrder = await storage.getOrder(order.id);
-      const needsReview = confirmedOrder?.orderStatus === "payment_review";
 
       res.json({ 
         success: true, 
         orderId: order.id,
         alreadyProcessed: !newlyCompleted,
-        needsReview,
-        message: needsReview ? 'Payment received after checkout closed. Afrolandx must review it before fulfillment.' : 'Payment verified and order confirmed',
+        message: 'Payment verified and order confirmed',
       });
     } catch (error) {
       console.error('Error verifying payment:', error);
@@ -2972,9 +2907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mismatch = paymentVerificationError(order, verificationResult, paymentReference);
       if (mismatch) return res.redirect('/checkout?error=payment_verification_failed');
       await completeVerifiedOrder(order, paymentReference);
-      if ((await storage.getOrder(order.id))?.orderStatus === "payment_review") {
-        return res.redirect("/my-orders?payment=review");
-      }
 
       // Redirect to order success page after payment
       res.redirect(`/order-success?order_id=${orderId}&reference=${encodeURIComponent(paymentReference)}`);
@@ -3016,9 +2948,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied: Approved vendor account required' });
       }
       if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Order payment has not been confirmed' });
-      if (['cancelled', 'expired', 'payment_review'].includes(order.orderStatus || '')) {
-        return res.status(409).json({ message: 'This checkout is closed or requires Afrolandx payment review before fulfillment.' });
-      }
       if (!['included', 'paid'].includes(order.shippingPaymentStatus)) {
         return res.status(409).json({ message: 'Shipping must be quoted and paid before fulfillment can begin' });
       }
@@ -3164,15 +3093,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
       if (order.userId !== userId) return res.status(403).json({ message: 'Forbidden' });
-      if (order.paymentStatus === 'pending') {
-        if (!await unpaidCheckoutCanClose(order, completeVerifiedOrder)) {
-          return res.status(409).json({ message: 'Payment is confirmed or still being checked. Do not pay again. Refresh My Orders.' });
-        }
-        const closed = await closeUnpaidCheckout(orderId, userId, "cancelled");
-        if (!closed) return res.status(409).json({ message: 'Payment or order status changed. Refresh your orders before trying again.' });
-        await notifyOrderClosure(orderId, "cancelled");
-        return res.json({ message: 'Unpaid checkout cancelled. Any payment already in progress will require review.' });
-      }
       if (!['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus || '')) {
         return res.status(400).json({ message: 'Order cannot be cancelled at this stage' });
       }
@@ -3914,9 +3834,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.getOrder(orderId);
       if (!order) return res.status(404).json({ message: 'Order not found' });
       const [managedShipment] = await db.select({ id: shipments.id }).from(shipments).where(eq(shipments.orderId, orderId)).limit(1);
-      if (['cancelled', 'expired', 'payment_review'].includes(order.orderStatus || '')) {
-        return res.status(409).json({ message: 'Closed checkouts cannot be reopened through ordinary status controls. Resolve any received payment before fulfillment.' });
-      }
       if (managedShipment) return res.status(409).json({ message: 'Update tracking on the individual shipment in Shipping operations so its timeline stays accurate.' });
       if (!['shipped', 'delivered'].includes(order.orderStatus || '')) {
         return res.status(409).json({ message: 'Tracking can be added once an order is shipped' });
@@ -4239,12 +4156,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reinitializeCloudStorage();
       
       const isEnabled = isCloudStorageEnabled();
-      const connection = await getCloudStorageConnectionStatus();
+      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
       res.json({ 
         message: 'Cloud storage reinitialization completed',
         cloudStorageEnabled: isEnabled,
         ...connection,
-        productPhotoStorage: await getR2ProductPhotoStatus(),
       });
     } catch (error) {
       console.error('Error reinitializing cloud storage:', error);
@@ -4257,13 +4173,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const isEnabled = isCloudStorageEnabled();
       const hasCredentials = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_S3_BUCKET);
-      const connection = await getCloudStorageConnectionStatus();
+      const connection = isEnabled ? await getCloudStorageService().checkConnection() : { connectionReady: false, status: 'Storage is not configured.' };
       res.json({
         cloudStorageEnabled: isEnabled,
         hasCredentials,
         hasSessionToken: !!process.env.AWS_SESSION_TOKEN,
         ...connection,
-        productPhotoStorage: await getR2ProductPhotoStatus(),
       });
     } catch (error) {
       console.error('Error checking cloud storage status:', error);
@@ -5973,7 +5888,5 @@ Return ONLY valid JSON:
   });
 
   const httpServer = createServer(app);
-  const stopCheckoutExpiry = startUnpaidCheckoutExpiry(completeVerifiedOrder);
-  httpServer.once("close", stopCheckoutExpiry);
   return httpServer;
 }

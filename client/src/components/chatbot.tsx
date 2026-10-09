@@ -67,7 +67,6 @@ export function Chatbot() {
         <Button
           onClick={() => setIsOpen(true)}
           data-testid="button-open-chat"
-          aria-label="Open Afrolandx assistant"
           className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 z-50"
           size="icon"
         >
@@ -88,7 +87,6 @@ export function Chatbot() {
             <Button
               onClick={() => setIsOpen(false)}
               data-testid="button-close-chat"
-              aria-label="Close Afrolandx assistant"
               size="icon"
               variant="ghost"
               className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
@@ -145,7 +143,6 @@ export function Chatbot() {
                 className="flex-1"
               />
               <Button
-                aria-label="Send message"
                 onClick={sendMessage}
                 data-testid="button-send-message"
                 disabled={!input.trim() || isLoading}

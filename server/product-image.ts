@@ -5,14 +5,12 @@ import sharp from "sharp";
 import OpenAI, { toFile } from "openai";
 import { getCloudStorageService, isCloudStorageEnabled } from "./cloudStorage";
 import { optimizeProductImage } from "./product-image-processing";
-import { deleteR2ProductPhoto, isR2PhotoStorageSelected, uploadR2ProductPhoto, useR2ForFolder } from "./r2-product-photos";
 
 export async function enhanceProductImage(buffer: Buffer): Promise<Buffer> {
   return optimizeProductImage(buffer);
 }
 
 export async function storeProductImage(buffer: Buffer, folder = "products"): Promise<string> {
-  if (useR2ForFolder(folder)) return uploadR2ProductPhoto(buffer);
   if (isCloudStorageEnabled()) {
     return getCloudStorageService().uploadImage(buffer, "image/jpeg", folder);
   }
@@ -21,21 +19,6 @@ export async function storeProductImage(buffer: Buffer, folder = "products"): Pr
   }
 
   return storeLocalProductImage(buffer, folder);
-}
-
-export function isProductImageStorageEnabled(): boolean {
-  return isR2PhotoStorageSelected() || isCloudStorageEnabled();
-}
-
-export function requiresDurableProductImageStorage(): boolean {
-  return process.env.NODE_ENV === "production" || isR2PhotoStorageSelected();
-}
-
-export async function deleteStoredProductImage(url: string): Promise<void> {
-  if (isR2PhotoStorageSelected() && await deleteR2ProductPhoto(url)) return;
-  // Never send an R2 URL to AWS's key-based deletion implementation.
-  try { if (new URL(url).hostname.endsWith(".r2.dev")) return; } catch { return; }
-  if (isCloudStorageEnabled()) await getCloudStorageService().deleteImage(url);
 }
 
 export async function storeLocalProductImage(buffer: Buffer, folder = "products"): Promise<string> {

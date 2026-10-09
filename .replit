@@ -45,13 +45,9 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 
 [userenv.shared]
 FROM_EMAIL = "management@afrolandx.com"
-TURNSTILE_REGISTER_ENABLED = "true"
 
 [userenv.development]
-PRODUCT_PHOTO_STORAGE = "r2"
-R2_PHOTO_ACCOUNT_ID = "fd643e7f189999a0b316d38cfe340f33"
-R2_PHOTO_BUCKET = "afrolandx"
-R2_PHOTO_PUBLIC_URL = "https://pub-5c56f26363f24893aada0fe313f61f45.r2.dev"
+TURNSTILE_REGISTER_ENABLED = "false"
 
 [postMerge]
 path = "scripts/post-merge.sh"

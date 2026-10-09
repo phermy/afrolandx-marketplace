@@ -26,43 +26,9 @@ export async function notifyOrderPayment(orderId: number, kind: "order" | "shipp
     const reference = shipping ? order.shippingPaymentReference : order.paymentReference;
     const amount = refund ? order.shippingRefundAmount : shipping ? order.shippingFinalAmount : order.totalAmount;
     const title = refund ? "Shipping refund update" : shipping ? "Shipping payment confirmed" : "Payment confirmed";
-    await notify(() => sendPaymentEmail(user?.email, `${title} — order #${orderId}`,
+    await sendPaymentEmail(user?.email, `${title} — order #${orderId}`,
       `Order: #${orderId}\nAmount: ${ngn(amount)}\nStatus: ${status}\nPayment reference: ${reference || "See your order"}`,
-      `${kind}:${orderId}:${reference}:${status}:${amount}`));
-    if (kind === "order") {
-      const vendorTotals = new Map<number, number>();
-      for (const item of await storage.getOrderItemsWithProducts(orderId)) {
-        const product = await storage.getProduct(item.productId);
-        if (product) vendorTotals.set(product.vendorId,
-          (vendorTotals.get(product.vendorId) || 0) + Number(item.priceAtTime) * item.quantity);
-      }
-      for (const [vendorId, merchandise] of Array.from(vendorTotals)) {
-        // Each maker receives only their own merchandise total, never another
-        // maker's revenue or the customer's entire multi-vendor order total.
-        await notify(async () => {
-          const vendor = await storage.getVendor(vendorId);
-          const owner = vendor ? await storage.getUser(vendor.userId) : undefined;
-          if (!owner?.email) return;
-          await sendPaymentEmail(owner.email, `New paid order — order #${orderId}`,
-            `Order: #${orderId}\nYour merchandise total: ${ngn(merchandise)}\nPayment confirmed. Open your vendor dashboard to review your items. Do not dispatch until Afrolandx confirms shipping.`,
-            `vendor-order:${orderId}:${vendorId}:${reference}`);
-        });
-      }
-    }
-  });
-}
-
-export async function notifyOrderClosure(orderId: number, status: "cancelled" | "expired" | "payment_review") {
-  await notify(async () => {
-    const order = await storage.getOrder(orderId);
-    if (!order || order.orderStatus !== status) return;
-    const user = await storage.getUser(order.userId);
-    if (!user?.email) return;
-    const message = status === "payment_review"
-      ? "Payment was received after this checkout closed. Afrolandx must review it before fulfillment. This is not an automatic refund."
-      : `Your unpaid checkout was ${status}. Its record and your cart are retained. Start a new checkout when ready. No refund or payout was initiated.`;
-    await sendPaymentEmail(user.email, `Order #${orderId}: ${status.replaceAll("_", " ")}`,
-      `Order: #${orderId}\n${message}`, `order-closure:${orderId}:${status}`);
+      `${kind}:${orderId}:${reference}:${status}:${amount}`);
   });
 }
 

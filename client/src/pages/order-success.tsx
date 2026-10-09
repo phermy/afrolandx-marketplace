@@ -25,7 +25,7 @@ export default function OrderSuccess() {
   });
 
   useEffect(() => {
-    if (!order || ["payment_review", "cancelled", "expired"].includes(order.orderStatus)) return;
+    if (!order) return;
     if (processedOrderRef.current === order.id) return;
     processedOrderRef.current = order.id;
     sessionStorage.removeItem('checkout_request_id');
@@ -49,14 +49,6 @@ export default function OrderSuccess() {
       <p className="text-gray-600 mb-6">We could not confirm a paid order from this link yet. Do not pay again. Check My Orders or contact payments@afrolandx.com with your payment reference.</p>
       <Button onClick={() => window.location.href = '/my-orders'}>View My Orders</Button>
       <Button className="ml-3" variant="outline" onClick={() => refetch()}>Check confirmation again</Button>
-    </div></div>
-  );
-
-  if (["payment_review", "cancelled", "expired"].includes(order.orderStatus)) return (
-    <div className="min-h-screen bg-gray-50"><Navbar /><div className="max-w-xl mx-auto px-4 py-20 text-center">
-      <h1 className="text-2xl font-bold mb-3">Payment received for a closed checkout</h1>
-      <p className="text-gray-600 mb-6">Afrolandx must review order #{order.id} before fulfillment. Do not pay again. No automatic refund has been made. Check My Orders or contact payments@afrolandx.com.</p>
-      <Button onClick={() => { window.location.href = "/my-orders"; }}>View My Orders</Button>
     </div></div>
   );
 

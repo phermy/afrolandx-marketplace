@@ -363,18 +363,6 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
         )}
 
         {/* Actions */}
-        {["expired", "payment_review"].includes(order.orderStatus) && (
-          <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            {order.orderStatus === "payment_review"
-              ? "Payment was received after this checkout closed. Afrolandx must review it before fulfillment. No automatic refund has been made."
-              : "This unpaid checkout expired after 24 hours. Its record and your cart are retained."}
-            {order.orderStatus === "expired" && (
-              <Button type="button" variant="outline" className="mt-2" onClick={() => { window.location.href = "/checkout"; }}>
-                Start a new checkout
-              </Button>
-            )}
-          </div>
-        )}
         <div className="flex flex-wrap gap-2 pt-1">
           {canCancel && (
             <Button
@@ -536,7 +524,7 @@ export default function MyOrders() {
               { label: 'All', filter: null },
               { label: 'Active', filter: (o: any) => ['pending','processing','shipped'].includes(o.orderStatus) },
               { label: 'Delivered', filter: (o: any) => o.orderStatus === 'delivered' },
-              { label: 'Cancelled', filter: (o: any) => ['cancelled', 'expired'].includes(o.orderStatus) },
+              { label: 'Cancelled', filter: (o: any) => o.orderStatus === 'cancelled' },
             ].map(({ label, filter }) => {
               const count = filter ? orders.filter(filter).length : orders.length;
               return (

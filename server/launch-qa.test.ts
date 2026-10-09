@@ -9,10 +9,8 @@ import { requestRateLimit } from "./request-rate-limit";
 import { fetchPaymentConfirmation, PaymentConfirmationError } from "../client/src/lib/payment-confirmation";
 import { securityHeaders } from "./security-headers";
 import { vendorStatusMessage, notifyVendorStatus } from "./account-notifications";
-import { CloudStorageService, cloudStorageConfigProblem, normalizeCloudStorageRegion } from "./cloudStorage";
+import { CloudStorageService } from "./cloudStorage";
 import { S3Client } from "@aws-sdk/client-s3";
-import express from "express";
-import { VENDOR_DETAILS_ROUTE } from "./vendor-route-paths";
 
 function response() {
   return {
@@ -96,42 +94,8 @@ test("QA vendor orders: paid historical products remain visible, other vendors' 
 });
 test("QA route precedence: vendor order literals precede vendor :id", () => {
   const source = readFileSync("server/routes.ts", "utf8");
-  const details = source.indexOf("app.get(VENDOR_DETAILS_ROUTE");
-  assert.ok(details >= 0);
-  for (const path of ["/api/vendors/orders", "/api/vendors/me/orders"]) {
-    const literal = source.indexOf(`app.get('${path}'`);
-    assert.ok(literal >= 0 && literal < details);
-  }
-});
-test("QA vendor routing: ID details cannot swallow later orders or measurements endpoints", async () => {
-  const app = express();
-  let detailReads = 0;
-  app.get(VENDOR_DETAILS_ROUTE, (req, res) => {
-    detailReads++;
-    res.json({ vendorId: Number(req.params.id) });
-  });
-  for (const path of ["/api/vendors/orders", "/api/vendors/measurements", "/api/vendors/me"]) {
-    app.get(path, (_req, res) => res.json({ path }));
-  }
-  const server = app.listen(0, "127.0.0.1");
-  await new Promise<void>(resolve => server.once("listening", resolve));
-  const address = server.address() as { port: number };
-  try {
-    for (const path of ["/api/vendors/orders", "/api/vendors/measurements", "/api/vendors/me"]) {
-      const result = await fetch(`http://127.0.0.1:${address.port}${path}`);
-      assert.equal(result.status, 200);
-      assert.deepEqual(await result.json(), { path });
-    }
-    assert.equal(detailReads, 0, "Literal paths reached the admin details handler.");
-    const details = await fetch(`http://127.0.0.1:${address.port}/api/vendors/14`);
-    assert.deepEqual(await details.json(), { vendorId: 14 });
-    for (const id of ["14junk", "0", "-1"]) {
-      assert.equal((await fetch(`http://127.0.0.1:${address.port}/api/vendors/${id}`)).status, 404);
-    }
-    assert.equal(detailReads, 1);
-  } finally {
-    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-  }
+  assert.ok(source.indexOf("app.get('/api/vendors/orders'") < source.indexOf("app.get('/api/vendors/:id'"));
+  assert.ok(source.indexOf("app.get('/api/vendors/me/orders'") < source.indexOf("app.get('/api/vendors/:id'"));
 });
 test("QA request limits: return 429 and Retry-After after the limit", async () => {
   let count = 0, passed = 0;
@@ -201,71 +165,4 @@ test("QA storage: configured SDK is not reported as a verified connection with i
   assert.equal(result.connectionReady, false);
   assert.match(result.status, /invalid or expired/);
   assert.doesNotMatch(result.status, /private provider details/);
-});
-
-test("QA storage: long-lived IAM keys do not send a stale session token", async () => {
-  const service = new CloudStorageService({
-    accessKeyId: `AKIA${"A".repeat(16)}`, secretAccessKey: "fixture",
-    sessionToken: "old-fixture-token", region: "eu-west-1", bucketName: "fixture",
-  });
-  const credentials = await (service as any).s3Client.config.credentials();
-  assert.equal(credentials.sessionToken, undefined);
-});
-
-test("QA storage: temporary credentials retain their matching session token", async () => {
-  const service = new CloudStorageService({
-    accessKeyId: `ASIA${"A".repeat(16)}`, secretAccessKey: "fixture",
-    sessionToken: "matching-fixture-token", region: "eu-west-1", bucketName: "fixture",
-  });
-  const credentials = await (service as any).s3Client.config.credentials();
-  assert.equal(credentials.sessionToken, "matching-fixture-token");
-});
-
-test("QA storage: missing bucket is distinguished from invalid credentials", async t => {
-  t.mock.method(S3Client.prototype, "send", async () => { throw Object.assign(new Error("private details"), { name: "NoSuchBucket" }); });
-  const service = new CloudStorageService({ accessKeyId: "fixture", secretAccessKey: "fixture", region: "eu-west-1", bucketName: "fixture" });
-  const result = await service.checkConnection();
-  assert.equal(result.connectionReady, false);
-  assert.match(result.status, /bucket was not found/);
-  assert.doesNotMatch(result.status, /private details|credentials are invalid/);
-});
-
-test("QA storage: ARN and URL settings are rejected without echoing their values", () => {
-  const invalidRegion = "arn:aws:s3:::private-fixture";
-  const problem = cloudStorageConfigProblem({ region: invalidRegion, bucketName: "fixture" });
-  assert.match(problem!, /region code/);
-  assert.ok(!problem?.includes(invalidRegion));
-  for (const bucketName of ["arn:aws:s3:::private-fixture", "https://private-fixture.example", "127.0.0.1", "bad..bucket"]) {
-    const error = cloudStorageConfigProblem({ region: "af-south-1", bucketName });
-    assert.match(error!, /bucket name/);
-    assert.ok(!error?.includes(bucketName));
-  }
-  assert.equal(cloudStorageConfigProblem({ region: "af-south-1", bucketName: "fixture-media" }), null);
-});
-
-test("QA storage: malformed configuration never reaches the SDK", t => {
-  let requests = 0;
-  t.mock.method(S3Client.prototype, "send", async () => { requests++; return {}; });
-  assert.throws(() => new CloudStorageService({
-    accessKeyId: "fixture", secretAccessKey: "fixture", region: "arn:aws:s3:::private-fixture", bucketName: "fixture",
-  }), /region code/);
-  assert.equal(requests, 0);
-});
-
-test("QA storage: explicit region codes in console display labels are normalized without guessing", () => {
-  assert.equal(normalizeCloudStorageRegion("Africa (Cape Town) af-south-1"), "af-south-1");
-  assert.equal(normalizeCloudStorageRegion("US-EAST-1"), "us-east-1");
-  assert.equal(normalizeCloudStorageRegion("af-south-1 (Africa, Cape Town)"), "af-south-1");
-  assert.equal(normalizeCloudStorageRegion("arn:aws:s3:af-south-1::fixture"), "arn:aws:s3:af-south-1::fixture");
-  assert.equal(normalizeCloudStorageRegion("us-east-1 or af-south-1"), "us-east-1 or af-south-1");
-  assert.equal(normalizeCloudStorageRegion("Africa Cape Town"), "Africa Cape Town");
-});
-
-test("QA storage: denied permissions are not reported as invalid credentials", async t => {
-  t.mock.method(S3Client.prototype, "send", async () => { throw Object.assign(new Error("private details"), { name: "AccessDenied" }); });
-  const service = new CloudStorageService({ accessKeyId: "fixture", secretAccessKey: "fixture", region: "af-south-1", bucketName: "fixture" });
-  const result = await service.checkConnection();
-  assert.equal(result.connectionReady, false);
-  assert.match(result.status, /permissions/);
-  assert.doesNotMatch(result.status, /private details|credentials are invalid/);
 });
