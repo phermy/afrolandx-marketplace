@@ -87,9 +87,9 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center min-h-16 py-2">
           {/* Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center flex-1 min-w-0">
             <Link href="/">
               <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian cursor-pointer">
                 <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
@@ -98,7 +98,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:ml-8 lg:flex lg:space-x-2">
+            <div className="hidden lg:ml-4 lg:flex lg:flex-wrap lg:gap-x-1">
               <Link href="/" className={navLinkClass('/')}>Home</Link>
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
               <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
@@ -109,7 +109,7 @@ export default function Navbar() {
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
               )}
-              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} className={navLinkClass('/vendor')}>
+              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} className={`${navLinkClass('/vendor')} whitespace-nowrap`}>
                 {isAuthenticated && isVendor(user) ? "Vendor" : "Become a Vendor"}
               </Link>
               {isAuthenticated && isAdmin(user) && (
@@ -122,10 +122,11 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden lg:flex flex-1 max-w-lg mx-8">
+          <div className="hidden lg:flex w-48 xl:w-56 shrink-0 mx-3">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
+                aria-label="Search products"
                 placeholder="Search traditional wear, Aso Oke, beads..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -135,7 +136,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Shopping Cart */}
             {isAuthenticated && (
               <Button
