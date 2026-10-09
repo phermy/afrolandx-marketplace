@@ -4,6 +4,7 @@ import { ArrowRight, Mail, MessageCircle, Ruler, PackageCheck, RotateCcw, Circle
 import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
 import { policies } from "@/lib/policies";
+import { SUPPORT_HOURS, REFUND_TIMELINE } from "@shared/customer-support";
 
 function SupportLayout({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children: ReactNode }) {
   return <div className="min-h-screen bg-[#fbf8f2]"><Navbar />
@@ -49,7 +50,12 @@ export function ContactPage() {
         <span>Include the order or transaction reference</span>
       </a>
     </div>
-    <p className="support-note">Never send a password, card security code or full bank account details by email.</p>
+    <section className="support-callout" aria-labelledby="support-hours-title">
+      <h2 id="support-hours-title" className="font-semibold">Customer support hours</h2>
+      <p>{SUPPORT_HOURS}.</p>
+      <p>You can send an email or WhatsApp message outside these hours. Our support team responds during support hours.</p>
+    </section>
+    <p className="support-note">Never send a password, card security code or full bank account details by email or WhatsApp.</p>
     <div className="support-next-links"><Link href="/faq">Browse common questions <ArrowRight aria-hidden="true" /></Link><Link href="/policies">Visit the trust centre <ArrowRight aria-hidden="true" /></Link></div>
   </SupportLayout>;
 }
@@ -64,6 +70,8 @@ const faqItems = [
   { q: "How do I know whether a product can be returned?", a: "Each product displays a return classification approved by Afrolandx. It explains eligibility when you change your mind; it does not remove rights relating to faulty, unsafe, damaged, counterfeit or materially misdescribed goods. Review the listing and Returns page before buying." },
   { q: "How can I choose the right size?", a: "Each vendor uses their own sizing and measurements, not a universal chart. Read the individual listing carefully and compare its garment measurements with a similar item that fits you. See the Size guide for how to measure and contact the vendor through the product page if a detail is unclear." },
   { q: "Who can help with a payment or refund question?", a: "For a payment, refund or payout question, email payments@afrolandx.com and include the order or transaction reference. The payments team can help with the status of an approved refund." },
+  { q: "When is customer support available?", a: `${SUPPORT_HOURS}. You can send an email or WhatsApp message outside these hours; our support team responds during support hours.` },
+  { q: "How long does a refund take?", a: REFUND_TIMELINE },
   { q: "How are automated suggestions and previews made?", a: "Some tools use AI to suggest outfits, draft listing details or generate visual previews. Review the results before relying on them. A generated preview does not guarantee fit or an exact match to the product. Read the privacy information shown by a photo tool before uploading an image." },
 ];
 

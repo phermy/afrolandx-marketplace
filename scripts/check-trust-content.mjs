@@ -98,6 +98,7 @@ try {
         assert.ok(page.links.includes("https://wa.me/2347082427348"), "Wrong WhatsApp destination");
         assert.ok(page.links.includes("mailto:support@afrolandx.com"), "Support email is missing");
         assert.ok(page.text.includes("+2347082427348") || page.text.includes("+234 708 242 7348"), "WhatsApp number is not visible");
+        assert.match(page.text, /Monday to Saturday, 8:00 AM to 6:00 PM WAT \(UTC\+1\)/, "Support hours must include their timezone");
       }
       if (path === "/faq") {
         const question = await evaluate(`(() => {
@@ -113,6 +114,18 @@ try {
         await send("Input.dispatchMouseEvent", { type: "mousePressed", x: question.x, y: question.y, button: "left", clickCount: 1 }, sessionId);
         await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: question.x, y: question.y, button: "left", clickCount: 1 }, sessionId);
         assert.equal(await evaluate(`document.querySelectorAll("main details")[${question.index}].open`), true, "FAQ answer did not open");
+        const refundAnswer = await evaluate(`(() => {
+          const items = [...document.querySelectorAll("main details")];
+          return items.find(item => item.querySelector("summary")?.textContent.includes("How long does a refund take?"))?.textContent || "";
+        })()`);
+        assert.match(refundAnswer, /5 to 14 business days/);
+        assert.match(refundAnswer, /approved and initiated/);
+      }
+      if (path === "/returns") {
+        assert.match(page.text, /5 to 14 business days/);
+        assert.match(page.text, /approved and initiated/);
+        assert.match(page.text, /not a guaranteed completion date/);
+        assert.match(page.text, /payment providers and banks may take longer/);
       }
       if (path.includes("prohibited-and-restricted")) {
         assert.match(page.text, /Antiquities, cultural heritage and provenance/);

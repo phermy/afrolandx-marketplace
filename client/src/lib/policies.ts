@@ -1,4 +1,5 @@
 import { PAYMENT_EMAIL } from "@shared/payment-contact";
+import { REFUND_TIMELINE } from "@shared/customer-support";
 
 export type Policy = {
   slug: string;
@@ -171,10 +172,13 @@ const additionalSections: Record<string, { heading: string; body: string }[]> = 
 
 export const policies: Policy[] = basePolicies.map((policy) => ({
   ...policy,
-  ...(policy.slug === "prohibited-and-restricted-products" ? { lastUpdated: "2026-10-09" } : {}),
+  ...(["prohibited-and-restricted-products", "return-policy"].includes(policy.slug) ? { lastUpdated: "2026-10-09" } : {}),
   sections: [
     ...policy.sections,
     ...(additionalSections[policy.slug] || []),
+    ...(policy.slug === "return-policy"
+      ? [{ heading: "Refund timing", body: REFUND_TIMELINE }]
+      : []),
     ...(["marketplace-terms", "return-policy", "vendor-orders-shipping-returns-and-settlement"].includes(policy.slug)
       ? [{ heading: "Payment support", body: `For payment, refund and payout questions, contact ${PAYMENT_EMAIL}. Include the order or transaction reference. Never email your password, card security code or full bank account details.` }]
       : []),
