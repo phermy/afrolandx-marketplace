@@ -58,12 +58,10 @@ export default function SiteFooter() {
           <p className="site-footer__label">Help and support</p>
           <Link href="/policies/marketplace-terms">Marketplace Terms</Link>
           <Link href="/policies/privacy-and-cookie-policy">Privacy</Link>
-          <Link href="/faq">Frequently asked questions</Link>
-          <Link href="/size-guide">Size guide</Link>
-          <Link href="/shipping-information">Shipping information</Link>
-          <Link href="/returns">Returns</Link>
+          <Link href="/policies/shipping-policy">Shipping information</Link>
+          <Link href="/policies/return-policy">Returns</Link>
           <Link href="/policies/complaints-and-dispute-resolution">Complaints</Link>
-          <Link href="/contact">Contact support</Link>
+          <a href="mailto:support@afrolandx.com">Contact support</a>
         </div>
         <div>
           <p className="site-footer__label">Vendor resources</p>

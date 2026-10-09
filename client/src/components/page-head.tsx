@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { pageMetadata, publicNumericId, PUBLIC_SITE_ORIGIN, type MetadataProduct, type MetadataEntity } from "@shared/page-metadata";
+import { pageMetadata, publicNumericId, PUBLIC_SITE_ORIGIN, type MetadataProduct } from "@shared/page-metadata";
 import { policies } from "@/lib/policies";
 
 export default function PageHead() {
@@ -12,19 +12,8 @@ export default function PageHead() {
     queryKey: ["/api/products", id], enabled: !!id, retry: false,
   });
   const product = productQuery.isError ? null : productQuery.data;
-  const entityMatch = path.match(/^\/(vendors|collab-drops|quizzes)\/([^/]+)$/);
-  const entityId = publicNumericId(entityMatch?.[2]);
-  const entityKind = entityMatch?.[1];
-  const entityQuery = useQuery<any>({
-    queryKey: [entityKind === "vendors" ? "/api/public/vendors" : `/api/${entityKind}`, entityId],
-    enabled: !!entityId, retry: false,
-  });
-  const entityRecord = entityKind === "vendors" ? entityQuery.data?.vendor : entityQuery.data;
-  const entity: MetadataEntity | null | undefined = entityQuery.isError ? null : entityRecord
-    ? { id: entityId!, name: entityRecord.businessName || entityRecord.name || entityRecord.title,
-      description: entityRecord.description, imageUrl: entityRecord.coverImage } : undefined;
   useEffect(() => {
-    const metadata = pageMetadata(path, product, policies.find(policy => path === `/policies/${policy.slug}`), entity);
+    const metadata = pageMetadata(path, product, policies.find(policy => path === `/policies/${policy.slug}`));
     document.title = metadata.title;
     const setMeta = (attribute: "name" | "property", name: string, content?: string) => {
       let element = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${name}"]`);
@@ -37,7 +26,6 @@ export default function PageHead() {
     setMeta("property", "og:title", metadata.title);
     setMeta("property", "og:description", metadata.description);
     setMeta("property", "og:type", "website");
-    setMeta("property", "og:site_name", "Afrolandx");
     setMeta("property", "og:image", metadata.image);
     setMeta("name", "twitter:card", metadata.image ? "summary_large_image" : "summary");
     setMeta("name", "twitter:title", metadata.title);
@@ -57,6 +45,6 @@ export default function PageHead() {
       script.textContent = JSON.stringify(metadata.structuredData);
       document.head.append(script);
     }
-  }, [path, product, entityQuery.data, entityQuery.isError]);
+  }, [path, product]);
   return null;
 }

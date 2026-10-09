@@ -1,16 +1,16 @@
 ---
-name: Shipping checkout requirements
-description: Aggregator checkout requirements replacing manual shipping estimates and deposits.
+name: Shipping quote payment lifecycle
+description: Policy for quote expiry, single use, and Paystack initialization failures.
 ---
 
-New checkout must use shipping aggregator API rates, delivery dates, labels and tracking instead of manual quotes. Compare Shipbubble and Terminal Africa, use one as primary and keep the other as backup. Show 2 to 3 genuine shipping options with a price and expected date, and charge one complete total with no deposit.
+Every configured carrier requires a final quote, but testing checkout may charge merchandise plus a server-generated shipping estimate immediately. The order stays held until the final quote is reconciled: collect only a positive balance or queue an exact refund for an overestimate. Quotes remain tied to the buyer's exact cart and destination.
 
-**Why:** The user replaced the earlier temporary testing-deposit model with marketplace aggregator checkout and asked to remove the test shipping option and “Testing mode” banner from shopper view.
+**Why:** Buyers need to test payment without waiting for manual carrier confirmation, while payment differences must never overcharge them or let fulfillment start early. Quote decisions, payment attempts, cancellation, and refund retries can race, so cross-row locking and durable reconciliation are required.
 
-**How to apply:** Bind final server-priced rates to the exact cart, destination and package details. Do not relabel a manual estimate as an API rate or a final total. Preserve historical quote, balance and refund records; the new direction does not authorize deleting old obligations. A carrier response must establish the complete payable amount before payment.
+**How to apply:** Keep estimates server-controlled and stored separately from final price, balance, and refund state. A successful main payment moves the order to active preparation immediately; block dispatch, not preparation, until final shipping reconciliation. Use the shared quote-ID advisory lock for admin decisions and shipping-payment claims, and recover uncertain refunds by querying Paystack before retrying.
 
-Checkout must stay pay-first with no cash on delivery. For UK, US and Canada, require DDP with duties paid up front. Offer guest checkout with account creation after payment, and show the full total from the first checkout view. Vendors must see only paid orders, with shipping status on their Orders tab. Require a tracking number before an order can be marked shipped.
+The user requested a temporary ₦1 shipping method while testing. Treat this as a clearly labeled testing deposit, not a real carrier rate or booked delivery, and retain the final quote requirement before dispatch.
 
-**Why:** These are the user's explicit checkout and shipping requirements.
+**Why:** This permits the requested inexpensive checkout tests without making a ₦1 payment look like confirmed international shipping.
 
-**How to apply:** Derive the complete total on the server and verify payment before fulfillment. Never label a service DDP without provider confirmation of prepaid duties. Show that a final total is unavailable while required address or rate data is missing, rather than displaying a merchandise subtotal as the full total. Preserve approval and authentication boundaries while implementing guest ownership and optional post-payment account creation.
+**How to apply:** Derive the ₦1 amount on the server, exclude the testing option from real carrier recommendations, and reconcile shipping before any real dispatch. Remove the temporary option when testing ends.

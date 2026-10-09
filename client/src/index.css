@@ -90,11 +90,6 @@
 }
 .heritage-notice svg { flex: 0 0 auto; color: #a45336; margin-top: .15rem; }
 .heritage-notice strong { color: #183d36; }
-.ssr-nav { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; padding:1.2rem max(1rem,calc((100vw - 1200px)/2)); background:#173c2e; color:#fbf8f2; }
-.ssr-nav a { text-decoration:underline; text-underline-offset:.2em; }
-.ssr-nav p { width:100%; }
-.ssr-catalog { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; padding:0; list-style:none; margin:1.5rem 0; }
-.ssr-catalog li { padding:1rem; border:1px solid #e1d6c4; }
 .heritage-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -285,39 +280,6 @@
 @media (max-width: 760px) { .site-footer__inner, .policy-grid { grid-template-columns: 1fr; } .experience-feedback { grid-template-columns: 1fr; gap: 1rem; } .site-footer__bottom { display:block; }.site-footer__bottom a { margin-top: .6rem; }.policy-shell, .policy-detail { padding-top: 3rem; }.policy-layout { display:block; }.policy-toc { position:static; margin-bottom:2rem; }.policy-toc a { display:inline-block; margin-right:1rem; }.policy-related { display:block; }.policy-related a { display:block; margin:.6rem 0; } }
 @media (max-width: 640px) { .policy-group__heading { flex-direction: column; align-items: flex-start; gap: .4rem; } }
 @media (max-width: 440px) { .experience-feedback__moods { gap: .35rem; } .experience-feedback__mood { padding-right: .55rem; } .experience-feedback__mood > span:last-child { display: none; } .experience-feedback__entry { display: grid; grid-template-columns: 1fr; } }
-
-.support-contact-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr)); gap:1rem; margin:2.5rem 0 1rem; }
-.support-contact-card { min-height:14rem; display:flex; flex-direction:column; align-items:flex-start; padding:1.35rem; border:1px solid #e1d6c4; background:#f7f1e6; color:#172d29; text-decoration:none; transition:transform .2s ease,border-color .2s ease; }
-.support-contact-card:hover,.support-contact-card:focus-visible { transform:translateY(-3px); border-color:#b7864f; outline:2px solid transparent; }
-.support-icon { color:#9a6036; width:2.7rem; height:2.7rem; display:grid; place-items:center; background:#eee3d1; border-radius:50%; margin-bottom:1.25rem; }
-.support-icon svg,.support-policy-lead svg,.support-measure-intro>svg { width:1.25rem; height:1.25rem; }
-.support-card-label,.support-step { color:#9a6036; font:700 .68rem/1 "Space Grotesk",sans-serif; letter-spacing:.13em; text-transform:uppercase; }
-.support-contact-card strong { overflow-wrap:anywhere; margin:.5rem 0; font:600 1.15rem/1.25 "Space Grotesk",sans-serif; }
-.support-contact-card>span:last-child { color:#64756d; font-size:.85rem; line-height:1.45; }
-.support-note { max-width:54rem; color:#68786f; font-size:.85rem; line-height:1.65; margin:1.4rem 0 2rem; }
-.support-next-links { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; margin:2.3rem 0; padding-top:1.25rem; border-top:1px solid #d9cfbf; }
-.support-next-links a,.support-callout a { color:#8e512e; display:inline-flex; align-items:center; gap:.45rem; text-decoration:none; font-weight:700; }
-.support-next-links a:hover,.support-callout a:hover { text-decoration:underline; }
-.support-next-links svg,.support-callout svg { width:1rem; height:1rem; }
-.support-faq-list { margin:2.5rem 0; border-top:1px solid #d9cfbf; }
-.support-faq-item { border-bottom:1px solid #d9cfbf; }
-.support-faq-item summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:1rem; padding:1.15rem .1rem; color:#172d29; font:600 1rem/1.4 "Space Grotesk",sans-serif; }
-.support-faq-item summary::-webkit-details-marker { display:none; }
-.support-faq-item summary span { color:#9a6036; font-size:1.3rem; transition:transform .2s ease; }
-.support-faq-item[open] summary span { transform:rotate(45deg); }
-.support-faq-item p { max-width:51rem; margin:0; padding:0 .1rem 1.25rem; color:#53665f; line-height:1.7; }
-.support-callout,.support-policy-lead,.support-measure-intro { display:flex; align-items:flex-start; gap:1rem; max-width:58rem; padding:1.2rem 1.3rem; background:#f3ead8; border-left:3px solid #d29a4a; color:#40564e; line-height:1.6; margin:2rem 0; }
-.support-callout { display:block; }
-.support-callout p,.support-policy-lead p,.support-measure-intro p { margin:.35rem 0 0; }
-.support-policy-lead svg,.support-measure-intro>svg { flex:none; color:#9a6036; margin-top:.25rem; }
-.support-measure-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin:2.3rem 0 1rem; }
-.support-measure-grid section { padding:1.4rem; background:#f7f1e6; border-top:2px solid #c49459; }
-.support-measure-grid h2 { margin:.8rem 0; color:#172d29; font:600 1.2rem/1.3 "Space Grotesk",sans-serif; }
-.support-measure-grid ul { margin:0; padding-left:1.2rem; color:#53665f; line-height:1.7; }
-.support-measure-grid li+li { margin-top:.45rem; }
-.support-policy { margin-top:2.5rem; }
-.support-policy section:first-child { border-top:1px solid #d9cfbf; }
-@media(max-width:650px) { .support-measure-grid { grid-template-columns:1fr; } .support-faq-item summary { font-size:.95rem; } }
 
 /* Nigerian cultural patterns */
 .pattern-bg {

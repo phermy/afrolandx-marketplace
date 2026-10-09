@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,14 +27,16 @@ import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
-  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus, UserRound, FileText,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus,
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import { AdminUserDetails } from '@/components/admin-user-details';
 import { cacBusinessNamesMatch } from '@shared/cac-review';
-
-const AdminAnalyticsCharts = lazy(() => import('@/components/admin-analytics-charts'));
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
 const MAX_FEATURED = 8;
 const PENDING_PRODUCTS_PAGE_SIZE = 50;
@@ -916,9 +918,72 @@ export default function AdminDashboard() {
                 <div className="flex justify-center py-16"><div className="spinner-nigerian"></div></div>
               ) : analytics ? (
                 <>
-                  <Suspense fallback={<div className="py-10 text-center text-sm text-gray-600" role="status" aria-live="polite" aria-busy="true">Loading analytics charts…</div>}>
-                    <AdminAnalyticsCharts analytics={analytics} />
-                  </Suspense>
+                  {/* Revenue Trend */}
+                  <Card>
+                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Actual Sales Revenue — Last 30 Days</CardTitle></CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <AreaChart data={analytics.revenueTrend}>
+                          <defs>
+                            <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₦${Number(v).toLocaleString()}`} />
+                          <Tooltip formatter={(v: any) => [`₦${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
+                          <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="url(#revGrad)" strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Orders by Status */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">Orders by Status</CardTitle></CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie data={analytics.ordersByStatus.filter((d: any) => d.count > 0)} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={70} label={({ status, count }) => `${status} (${count})`} labelLine={false}>
+                              {analytics.ordersByStatus.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {analytics.ordersByStatus.map((d: any, i: number) => (
+                            <div key={d.status} className="flex items-center gap-1 text-xs">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                              <span className="capitalize">{d.status}: {d.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Geographic Distribution */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Globe className="w-4 h-4" />Orders by Country</CardTitle></CardHeader>
+                      <CardContent>
+                        {analytics.geoDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={analytics.geoDistribution} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                              <XAxis type="number" tick={{ fontSize: 10 }} />
+                              <YAxis dataKey="country" type="category" tick={{ fontSize: 10 }} width={90} />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. The chart will update as orders come in.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Vendor Performance */}
@@ -952,14 +1017,14 @@ export default function AdminDashboard() {
                       <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Customer Insights</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                      {[
-                            { label: 'Total Customers', value: analytics.totalCustomers, icon: UserRound },
-                            { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: TrendingUp },
-                            { label: 'Avg Order Value', value: fmtCurrency(analytics.avgOrderValue), icon: ShoppingBag },
-                            { label: 'Inventory Value', value: fmtCurrency(analytics.totalInventoryValue), icon: Package },
-                          ].map(({ label, value, icon: MetricIcon }) => (
+                          {[
+                            { label: 'Total Customers', value: analytics.totalCustomers, icon: '👤' },
+                            { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: '✨' },
+                            { label: 'Avg Order Value', value: fmtCurrency(analytics.avgOrderValue), icon: '💰' },
+                            { label: 'Inventory Value', value: fmtCurrency(analytics.totalInventoryValue), icon: '📦' },
+                          ].map(({ label, value, icon }) => (
                             <div key={label} className="bg-gray-50 rounded-lg p-3">
-                              <MetricIcon className="mb-1 h-5 w-5 text-gray-500" aria-hidden="true" />
+                              <p className="text-lg mb-0.5">{icon}</p>
                               <p className="text-xl font-bold text-gray-900">{value}</p>
                               <p className="text-xs text-gray-500">{label}</p>
                             </div>
@@ -1275,11 +1340,11 @@ export default function AdminDashboard() {
                       disabled={generateRepListingMutation.isPending}
                       onClick={() => generateRepListingMutation.mutate(repProductImages[0])}
                     >
-                      <FileText className="mr-2 h-4 w-4" />
-                      {generateRepListingMutation.isPending ? 'Preparing suggestions…' : 'Suggest listing details'}
+                      <Zap className="mr-2 h-4 w-4" />
+                      {generateRepListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
                     </Button>
                   )}
-                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. AI-assisted suggestions use the first photo; review all details before saving. Originals are preserved during automatic processing.</p>
+                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. Originals are preserved during automatic processing.</p>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setRepProductOpen(false)}>Cancel</Button>
@@ -1657,7 +1722,7 @@ export default function AdminDashboard() {
                 </Card>
               )}
 
-              {/* Inventory-based recommendations */}
+              {/* AI-Recommended to Feature */}
               {recommendedToFeature.length > 0 && featuredProducts.length < MAX_FEATURED && (
                 <Card>
                   <CardHeader>

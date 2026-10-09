@@ -92,7 +92,6 @@ try {
     } else if (path === "/api/orders/my-orders" || path === "/api/orders") body = [order];
     else if (path === "/api/vendors/orders" || path === "/api/vendors/me/orders") body = [{ ...order, items: order.items.map(item => ({ ...item, productName: product.name, imageUrl: product.imageUrl })) }];
     else if (path === "/api/vendors/me") body = { id: 900001, userId: "browser-fixture", businessName: "Fixture maker", status: "approved", verificationStatus: "verified", email: "browser-fixture@example.test", description: "Browser fixture only" };
-    else if (path === "/api/vendors/me/shipping-profile") body = { address: {}, category_id: 1, processing_days: 1 };
     else if (path === "/api/vendors/me/finance") body = { summary: { pending: "0", available: "0", settled: "0" }, entries: [], settlements: [], payoutAccount: null };
     else if (path === "/api/geo") body = { country_code: "NG", country_name: "Nigeria", currency: "NGN" };
     else if (path === "/api/shipping/quote") body = [{ carrier: "Test shipping", service: "Fixture test shipping", price: null, estimatedPrice: 1, duration: "Test only", quoteRequired: true }];
@@ -294,7 +293,6 @@ try {
     for (const route of ["/", "/products", "/login", "/register", "/policies"]) {
       await check(`public controls and overflow: ${route} at ${width}px`, async () => {
         await open(route, {}, width); await wait(700);
-        for (let attempt = 0; attempt < 40 && !(await evaluate('!!document.querySelector(\'a[href="#main-content"]\')')); attempt++) await wait(200);
         const result = await evaluate(`(() => {
           const visible = el => !!el.getClientRects().length && getComputedStyle(el).visibility !== "hidden";
           const unnamed = [...document.querySelectorAll("button")].filter(el => visible(el) && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && !el.textContent.trim() && !el.title).map(el => el.outerHTML.slice(0, 180));
@@ -310,24 +308,6 @@ try {
     await wait(500);
     assert.equal(await evaluate("document.title"), "Event Planning | Afrolandx");
     assert.equal(await evaluate('document.querySelector(\'link[rel="canonical"]\').href'), "https://afrolandx.com/events");
-  });
-  await check("assistant and cart open correctly after interaction-only loading", async () => {
-    await open("/products", { role: "customer" }); await wait(700);
-    const click = async selector => {
-      const point = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) throw new Error("Missing control"); el.scrollIntoView({block:"center"}); const r = el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
-      await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
-      await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
-      await wait(900);
-    };
-    for (let attempt = 0; attempt < 40 && !(await evaluate('!!document.querySelector(\'[data-testid="button-open-chat"]\')')); attempt++) await wait(200);
-    assert.equal(await evaluate('!!document.querySelector(\'[data-testid="chatbot-window"]\')'), false);
-    await click('[data-testid="button-open-chat"]');
-    assert.equal(await evaluate('!!document.querySelector(\'[data-testid="chatbot-window"]\')'), true);
-    await click('[data-testid="button-close-chat"]');
-    assert.equal(await evaluate('!!document.querySelector(\'[data-testid="chatbot-window"]\')'), false);
-    await click('[data-testid="button-open-cart"]');
-    assert.equal(await evaluate('!!document.querySelector(\'[role="dialog"]\')'), true);
-    assert.ok(await evaluate('document.body.innerText.includes("Cart")'));
   });
   await check("skip link moves keyboard focus past navigation", async () => {
     await open("/products"); await wait(500);
@@ -363,11 +343,7 @@ try {
     const state = { role: "customer", pricingError: true };
     await open("/checkout", state); await wait(700);
     const click = async selector => {
-      let point;
-      for (let attempt = 0; attempt < 40 && !point; attempt++) {
-        point = await evaluate(`(() => { const el = ${selector}; if (!el) return null; el.scrollIntoView({block:"center"}); const r = el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
-        if (!point) await wait(200);
-      }
+      const point = await evaluate(`(() => { const el = ${selector}; if (!el) return null; el.scrollIntoView({block:"center"}); const r = el.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
       assert.ok(point, `Missing control: ${selector}`);
       await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
       await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
@@ -459,6 +435,6 @@ try {
       browser.kill("SIGTERM");
     });
   }
-  await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 150 });
+  await rm(profile, { recursive: true, force: true });
   await databasePool?.end();
 }

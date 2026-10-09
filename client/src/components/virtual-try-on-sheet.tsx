@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeftRight, Check, Download, ImagePlus, LoaderCircle, ShieldCheck, Shirt, Upload } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, Check, Download, ImagePlus, LoaderCircle, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -168,7 +168,7 @@ export default function VirtualTryOnSheet({
       >
         <SheetHeader className="shrink-0 border-b border-emerald-950/10 px-5 pb-4 pt-6 text-left sm:px-8">
           <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
-            <Shirt className="h-4 w-4" aria-hidden="true" />
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
             AfrolandX Virtual Try-On
           </div>
           <SheetTitle className="font-nigerian text-2xl font-bold leading-tight text-[#19342b] sm:text-3xl">
@@ -201,7 +201,7 @@ export default function VirtualTryOnSheet({
                 </figure>
               </div>
               <div className="rounded-xl border border-emerald-900/10 bg-white/70 px-4 py-3 text-xs leading-relaxed text-[#64756d]">
-                This AI-generated image is an approximation—not a live camera view, fit recommendation, or size guarantee.
+                This generated image is an approximation—not a live camera view, fit recommendation, or size guarantee.
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" onClick={downloadPreview} className="h-11 border-emerald-900/20 bg-transparent text-[#19342b] hover:bg-white">
@@ -315,7 +315,7 @@ export default function VirtualTryOnSheet({
               disabled={!photo || !consent || busy}
               className="h-12 w-full bg-[#19342b] text-white hover:bg-[#25483b]"
             >
-              {busy ? <><LoaderCircle className="animate-spin" aria-hidden="true" /> Creating your preview…</> : <><Shirt aria-hidden="true" /> Generate visual preview</>}
+              {busy ? <><LoaderCircle className="animate-spin" aria-hidden="true" /> Creating your preview…</> : <><Sparkles aria-hidden="true" /> Generate visual preview</>}
             </Button>
           )}
           <p className="mt-2 text-center text-[10px] text-[#849087]">Not live AR · Not a fit or size guarantee</p>

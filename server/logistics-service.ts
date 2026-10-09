@@ -33,11 +33,7 @@ export async function ensureOrderShipments(orderId: number, actorId?: string) {
       const historical = ["shipped", "delivered"].includes(order.orderStatus || "");
       const status = order.orderStatus === "delivered" ? "delivered" : historical ? "in_transit" : "preparing";
       const [created] = await tx.insert(shipments).values({
-        orderId, vendorId, items, deliveryAddress: {
-          ...(order.shippingAddress as any),
-          _aggregator: (order.shippingAddress as any)?._aggregator ? {provider:"shipbubble"} : undefined,
-          _paymentOwnerId: undefined,
-        },
+        orderId, vendorId, items, deliveryAddress: order.shippingAddress,
         status, ...(historical ? { trackingNumber: order.trackingNumber } : {}),
       }).returning();
       if (!created) continue;

@@ -15,7 +15,7 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  CircleHelp
+  Sparkles
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -279,7 +279,7 @@ export default function QuizPage() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-xl font-bold flex items-center gap-2">
-              <CircleHelp className="h-5 w-5 text-primary" />
+              <Sparkles className="h-5 w-5 text-primary" />
               {quiz.title}
             </h1>
             <Badge variant="outline">

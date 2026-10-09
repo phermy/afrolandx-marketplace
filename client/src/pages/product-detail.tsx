@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { Product } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 import { RETURN_POLICY_OPTIONS } from '@shared/schema';
-import { Expand, ImageOff, Shirt, Camera, Star } from 'lucide-react';
+import { Expand, ImageOff, Sparkles, Star } from 'lucide-react';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/products/:id');
@@ -89,6 +89,10 @@ export default function ProductDetail() {
   }, [product]);
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      setLocation('/login');
+      return;
+    }
     if (!product) return;
 
     // Require size selection if product has sizes defined
@@ -188,7 +192,7 @@ export default function ProductDetail() {
               )}
               {product.featured && (
                 <Badge className="absolute top-3 right-3 bg-nigerian-gold text-white">
-                  Featured
+                  ⭐ Featured
                 </Badge>
               )}
             </div>
@@ -213,7 +217,7 @@ export default function ProductDetail() {
               <Button variant="outline" size="lg"
                 className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
                 onClick={() => isAuthenticated ? setTryOnOpen(true) : setLocation('/login')}>
-                <Shirt className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-4 w-4" />
                 Try it on
               </Button>
             )}
@@ -221,7 +225,7 @@ export default function ProductDetail() {
               <Button variant="outline" size="lg"
                 className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
                 onClick={() => isAuthenticated ? setLiveArOpen(true) : setLocation('/login')}>
-                <Camera className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-4 w-4" />
                 Try live camera preview
               </Button>
             )}
@@ -343,6 +347,8 @@ export default function ProductDetail() {
                   </span>
                 ) : !isAvailable ? (
                   isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'
+                ) : !isAuthenticated ? (
+                  'Sign In to Buy'
                 ) : hasSizes && !selectedSize ? (
                   'Select a Size to Continue'
                 ) : (
@@ -357,7 +363,7 @@ export default function ProductDetail() {
                   className="w-full border-nigerian-green text-nigerian-green hover:bg-nigerian-green hover:text-white"
                   onClick={() => setLocation('/login')}
                 >
-                  Sign in to your account
+                  Sign In to Purchase
                 </Button>
               )}
             </div>

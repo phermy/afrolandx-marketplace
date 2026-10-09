@@ -6,11 +6,9 @@ import { getPublicProduct } from "./public-product";
 import { db } from "./db";
 import { products, vendors } from "../shared/schema";
 import { and, eq, asc } from "drizzle-orm";
-import { escapeHtml } from "./html-utils";
-import { renderPublicContent, type PublicContentData } from "./public-content";
-export { escapeHtml } from "./html-utils";
 
-export function renderPageHtml(template: string, metadata: PageMetadata, preview = false, content: PublicContentData = {}): string {
+export const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+export function renderPageHtml(template: string, metadata: PageMetadata, preview = false): string {
   const title = escapeHtml(metadata.title);
   const description = escapeHtml(metadata.description);
   const canonical = `${PUBLIC_SITE_ORIGIN}${metadata.path}`;
@@ -32,10 +30,9 @@ export function renderPageHtml(template: string, metadata: PageMetadata, preview
     `<link rel="manifest" href="/manifest.json">`,
     ...(metadata.structuredData ? [`<script type="application/ld+json" data-page-metadata>${JSON.stringify(metadata.structuredData).replace(/</g, "\\u003c")}</script>`] : []),
   ].join("\n");
-  const noScript = `<noscript><p>Enable JavaScript to manage your account and complete checkout. Public information and product links are available below.</p></noscript>`;
+  const noScript = `<noscript><section style="max-width:52rem;margin:2rem auto;padding:1rem;font-family:sans-serif"><h1>${title}</h1><p>${description}</p><p>Enable JavaScript to browse interactive features, manage your account and complete checkout.</p><nav><a href="/">Home</a> · <a href="/products">Shop</a> · <a href="/policies">Marketplace policies</a></nav></section></noscript>`;
   return template.replace(/<title>[\s\S]*?<\/title>/i, `<title>${title}</title>`)
-    .replace("<!--afrolandx:seo-->", head).replace('<div id="root"></div>',
-      `${noScript}<div id="root">${renderPublicContent(metadata, content)}</div>`);
+    .replace("<!--afrolandx:seo-->", head).replace('<div id="root"></div>', `${noScript}<div id="root"></div>`);
 }
 export function registerPublicPages(app: Express) {
   const preview = app.get("env") !== "production";
@@ -60,71 +57,22 @@ export function registerPublicPages(app: Express) {
     } catch { res.status(503).type("text/plain").send("Sitemap temporarily unavailable"); }
   });
   app.use(async (req, res, next) => {
-    if (!["GET", "HEAD"].includes(req.method) || /^\/(?:api(?:\/|$)|assets\/|src\/|images\/|uploads\/|downloads\/|node_modules\/|@)/.test(req.path)) return next();
+    if (!["GET", "HEAD"].includes(req.method) || req.path.includes(".") || /^\/(?:api|assets|src|uploads|downloads|node_modules|@)/.test(req.path)) return next();
     const path = req.path.replace(/\/+$/, "").toLowerCase() || "/";
-    const policy = policies.find(policy => path === `/policies/${policy.slug}`);
-    const content: PublicContentData = { policy };
-    let metadata = pageMetadata(path, undefined, policy);
+    let metadata = pageMetadata(path, undefined, policies.find(policy => path === `/policies/${policy.slug}`));
     if (metadata.status === 200 && req.path !== metadata.path) {
       const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
       return res.redirect(308, metadata.path + query);
     }
     const productId = path.match(/^\/products\/([^/]+)$/)?.[1];
     if (productId && publicNumericId(productId)) {
-      try {
-        const product = await getPublicProduct(storage, publicNumericId(productId)!);
-        metadata = pageMetadata(path, product || null);
-        if (product) content.product = product;
-      }
+      try { metadata = pageMetadata(path, await getPublicProduct(storage, publicNumericId(productId)!) || null); }
       catch {
         metadata = { ...metadata, title: "Temporarily Unavailable | Afrolandx", description: "This product could not be loaded. Please try again shortly.", status: 503, indexable: false };
         res.set("Retry-After", "30");
       }
     }
-    const dynamic = path.match(/^\/(vendors|collab-drops|quizzes)\/(\d+)$/);
-    if (dynamic && publicNumericId(dynamic[2])) {
-      try {
-        const id = publicNumericId(dynamic[2])!;
-        let entity;
-        if (dynamic[1] === "vendors") {
-          const vendor = await storage.getVendor(id);
-          if (vendor?.status === "approved") {
-            entity = { id, name: vendor.businessName, description: vendor.description };
-          }
-        } else if (dynamic[1] === "collab-drops") {
-          const drop = await storage.getCollabDrop(id);
-          if (drop && drop.status !== "cancelled") {
-            const designer = await storage.getVendor(drop.designerId);
-            if (designer?.status === "approved" && designer.verificationStatus === "verified") {
-              entity = { id, name: drop.name, description: drop.description, imageUrl: drop.coverImage };
-            }
-          }
-        } else {
-          const quiz = await storage.getQuiz(id);
-          if (quiz) entity = { id, name: quiz.title, description: quiz.description };
-        }
-        metadata = pageMetadata(path, undefined, undefined, entity || null);
-        if (entity && dynamic[1] !== "quizzes") content.entity = entity;
-      } catch {
-        metadata = { ...metadata, status: 503, indexable: false, title: "Temporarily Unavailable | Afrolandx" };
-        res.set("Retry-After", "30");
-      }
-    }
-    if (path === "/" || path === "/products") {
-      try {
-        content.catalog = await db.select({ id: products.id, name: products.name, description: products.description,
-          price: products.price, imageUrl: products.imageUrl, stock: products.stock })
-          .from(products).innerJoin(vendors, eq(products.vendorId, vendors.id))
-          .where(and(eq(products.status, "approved"), eq(vendors.status, "approved"), eq(vendors.verificationStatus, "verified")))
-          .orderBy(asc(products.id)).limit(24);
-      } catch {
-        metadata = { ...metadata, status: 503, indexable: false, title: "Temporarily Unavailable | Afrolandx" };
-        res.set("Retry-After", "30");
-      }
-    }
-    if (metadata.status !== 200) delete metadata.structuredData;
     res.locals.pageMetadata = metadata;
-    res.locals.publicContent = content;
     res.set("X-Robots-Tag", metadata.indexable && !preview ? "index, follow" : "noindex, follow");
     next();
   });

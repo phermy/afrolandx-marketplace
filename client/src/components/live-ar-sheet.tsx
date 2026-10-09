@@ -4,7 +4,7 @@ import simdLoader from "@mediapipe/tasks-vision/vision_wasm_internal.js?url";
 import simdBinary from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
 import basicLoader from "@mediapipe/tasks-vision/vision_wasm_nosimd_internal.js?url";
 import basicBinary from "@mediapipe/tasks-vision/vision_wasm_nosimd_internal.wasm?url";
-import { AlertCircle, Camera, Check, LoaderCircle, ShieldCheck, VideoOff } from "lucide-react";
+import { AlertCircle, Camera, Check, LoaderCircle, ShieldCheck, Sparkles, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -358,7 +358,7 @@ export default function LiveArSheet({
       >
         <SheetHeader className="shrink-0 border-b border-emerald-950/10 px-5 pb-4 pt-6 text-left sm:px-8">
           <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
-            <Camera className="h-4 w-4" aria-hidden="true" />
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
             AfrolandX Live Accessory Preview
           </div>
           <SheetTitle className="font-nigerian text-2xl font-bold leading-tight text-[#19342b] sm:text-3xl">

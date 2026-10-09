@@ -10,14 +10,8 @@ interface Message {
   content: string;
 }
 
-type ChatbotProps = {
-  initialOpen?: boolean;
-  hideLauncher?: boolean;
-  onClose?: () => void;
-};
-
-export function Chatbot({ initialOpen = false, hideLauncher = false, onClose }: ChatbotProps = {}) {
-  const [isOpen, setIsOpen] = useState(initialOpen);
+export function Chatbot() {
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -69,7 +63,7 @@ export function Chatbot({ initialOpen = false, hideLauncher = false, onClose }: 
 
   return (
     <>
-      {!isOpen && !hideLauncher && (
+      {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
           data-testid="button-open-chat"
@@ -92,10 +86,7 @@ export function Chatbot({ initialOpen = false, hideLauncher = false, onClose }: 
               <h3 className="font-semibold">Afrolandx Assistant</h3>
             </div>
             <Button
-              onClick={() => {
-                setIsOpen(false);
-                onClose?.();
-              }}
+              onClick={() => setIsOpen(false)}
               data-testid="button-close-chat"
               aria-label="Close Afrolandx assistant"
               size="icon"

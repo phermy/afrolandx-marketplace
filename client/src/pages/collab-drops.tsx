@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Calendar, Users, Clock, Crown, ListFilter, Bell, BellOff, PackageSearch,
-  CheckCircle, Loader2, Search, X, ArrowRight, ShoppingBag,
+  Calendar, Users, Clock, Crown, Sparkles, Bell, BellOff,
+  CheckCircle, Loader2, Search, X, ArrowRight,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -90,7 +90,7 @@ export default function CollabDropsPage() {
       setAiResult(data);
     },
     onError: () => {
-      toast({ title: "Matching unavailable", description: "Could not process your request. Try a different description.", variant: "destructive" });
+      toast({ title: "AI Error", description: "Could not process your request. Try a different description.", variant: "destructive" });
     },
   });
 
@@ -129,7 +129,7 @@ export default function CollabDropsPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Users className="h-8 w-8 text-primary" />
+            <Sparkles className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold">Designer Collaboration Hub</h1>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -146,7 +146,7 @@ export default function CollabDropsPage() {
           </Card>
         )}
 
-        {/* Search + assisted matching */}
+        {/* Search + AI bar */}
         <div className="mb-6 space-y-3">
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -171,8 +171,8 @@ export default function CollabDropsPage() {
               onClick={() => setShowAiPanel(v => !v)}
               className="gap-2 shrink-0"
             >
-              <ListFilter className="h-4 w-4" />
-              Find matching drops
+              <Sparkles className="h-4 w-4" />
+              AI Suggest
             </Button>
           </div>
 
@@ -181,11 +181,11 @@ export default function CollabDropsPage() {
             <Card className="border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <ListFilter className="h-4 w-4 text-primary" />
-                  Describe what you're looking for
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Tell AI what you're looking for
                 </CardTitle>
                 <CardDescription>
-                  AI-assisted matching uses your description to filter collaboration drops. Check the details and product listings before deciding.
+                  Describe your style, occasion, or preferences and our AI will find the best matching drops.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -197,7 +197,7 @@ export default function CollabDropsPage() {
                 />
                 {aiResult && (
                   <div className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded-md flex items-start gap-2">
-                    <ListFilter className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+                    <Sparkles className="h-4 w-4 mt-0.5 text-primary shrink-0" />
                     <span>{aiResult.explanation}</span>
                   </div>
                 )}
@@ -216,7 +216,7 @@ export default function CollabDropsPage() {
                   </Button>
                   {aiResult && (
                     <Button variant="ghost" size="sm" onClick={clearAi}>
-                      <X className="h-3 w-3 mr-1" />Clear matching filter
+                      <X className="h-3 w-3 mr-1" />Clear AI filter
                     </Button>
                   )}
                 </div>
@@ -228,7 +228,7 @@ export default function CollabDropsPage() {
           {aiResult && !showAiPanel && (
             <div className="flex items-center gap-2 text-sm">
               <Badge variant="secondary" className="gap-1">
-                <ListFilter className="h-3 w-3" />Matching filter active
+                <Sparkles className="h-3 w-3" />AI filter active
               </Badge>
               <button onClick={clearAi} className="text-muted-foreground hover:text-foreground text-xs underline">
                 Clear
@@ -287,7 +287,7 @@ export default function CollabDropsPage() {
             {displayedDrops.length === 0 && (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <PackageSearch className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
+                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
                   <h3 className="font-semibold mb-2">
                     {searchText || aiResult ? "No matching drops found" : "No Collaboration Drops Yet"}
                   </h3>
@@ -334,7 +334,7 @@ function DropCard({
     <Card className={`overflow-hidden transition-all ${isPast ? "opacity-70" : ""} ${highlighted ? "ring-2 ring-primary" : ""}`}>
       {highlighted && (
         <div className="bg-primary/10 px-4 py-1 text-xs text-primary font-medium flex items-center gap-1">
-          <ListFilter className="h-3 w-3" />Suggested match
+          <Sparkles className="h-3 w-3" />AI recommended match
         </div>
       )}
       <div className="md:flex">
@@ -348,7 +348,7 @@ function DropCard({
             />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-white">
-              <Users className="mb-2 h-8 w-8 opacity-80" aria-hidden="true" />
+              <div className="text-4xl mb-2 opacity-80">✦</div>
               <p className="text-xs font-semibold uppercase tracking-widest opacity-70 text-center">Designer Collab</p>
             </div>
           )}
@@ -441,7 +441,7 @@ function DropCard({
               {isLive ? (
                 <Button asChild>
                   <Link href={`/collab-drops/${drop.id}`}>
-                    <ShoppingBag className="h-4 w-4 mr-2" />Shop Collection
+                    <Sparkles className="h-4 w-4 mr-2" />Shop Collection
                   </Link>
                 </Button>
               ) : user ? (

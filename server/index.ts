@@ -21,19 +21,13 @@ import {
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { securityHeaders } from "./security-headers";
 import { registerPublicPages } from "./public-pages";
-import compression from "compression";
 
 const app = express();
 app.disable("x-powered-by");
 app.use(securityHeaders);
-// Compress public HTML and static text assets, never private API responses.
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/")) return next();
-  return compression({ threshold: 1024, level: 6 })(req, res, next);
-});
 app.use(express.json({
   verify: (req: any, _res, buffer) => {
-    if (req.path === "/api/webhooks/paystack" || req.path === "/api/checkout/shipbubble/webhook") req.rawBody = Buffer.from(buffer);
+    if (req.path === "/api/webhooks/paystack") req.rawBody = Buffer.from(buffer);
   },
 }));
 app.use(express.urlencoded({ extended: false }));

@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
-import { policies } from "@/lib/policies";
+import { policies, policyDate } from "@/lib/policies";
 
 export default function Policies() {
   const groups = [
@@ -14,9 +14,8 @@ export default function Policies() {
       <p className="eyebrow">Afrolandx / Trust centre</p>
       <h1 className="policy-title">Clear rules for a considered marketplace.</h1>
       <p className="policy-intro">A practical directory of the policies that guide customers, independent vendors and Afrolandx. Start with the group that matches your role.</p>
-      <p className="policy-date">Effective dates and updates are shown on each policy.</p>
+      <p className="policy-date">{policyDate}</p>
       <div className="policy-notice"><strong>Looking for refunds?</strong> Refunds are handled under the <Link href="/policies/return-policy">Return Policy</Link> and <Link href="/policies/complaints-and-dispute-resolution">Complaints Policy</Link> until an approved standalone Refund Policy is published.</div>
-      <div className="policy-notice"><strong>Need a buying answer?</strong> <Link href="/faq">Browse FAQs</Link>, <Link href="/size-guide">check the size guide</Link>, read <Link href="/shipping-information">shipping information</Link>, or see <Link href="/returns">how returns work</Link>. For help, <Link href="/contact">contact support</Link>.</div>
       {groups.map((group) => <section className="policy-group" key={group.label}>
         <div className="policy-group__heading"><span>{group.label}</span><div>{group.description}</div></div>
         <div className="policy-grid">{group.slugs.map((slug) => {

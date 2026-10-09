@@ -27,6 +27,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
 
   const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      window.location.href = '/login';
+      return;
+    }
     addToCart(product.id, 1);
     setIsAddedToCart(true);
     window.setTimeout(() => {
@@ -93,7 +97,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             data-testid="button-add-to-cart"
           >
             <ShoppingBag size={15} aria-hidden="true" />
-            {isAddingToCart ? 'Adding…' : isAddedToCart ? 'Added to bag' : !isAvailable ? (isOutOfStock ? 'Out of stock' : 'Unavailable') : 'Add to bag'}
+            {isAddingToCart ? 'Adding…' : isAddedToCart ? 'Added to bag' : !isAvailable ? (isOutOfStock ? 'Out of stock' : 'Unavailable') : !isAuthenticated ? 'Log in to buy' : 'Add to bag'}
           </Button>
           <button type="button" className="catalog-details-link" onClick={() => setLocation(`/products/${product.id}`)}>
             Details <ArrowUpRight size={14} aria-hidden="true" />

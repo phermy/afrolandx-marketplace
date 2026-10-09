@@ -16,6 +16,7 @@ import {
   Calendar,
   Users,
   ShoppingBag,
+  Sparkles,
   Star,
   Heart,
   Loader2,
@@ -32,14 +33,14 @@ import EventServices from "@/components/event-services";
 const eventTypes = [
   { value: "wedding", label: "Wedding / Traditional Marriage", icon: Heart },
   { value: "naming_ceremony", label: "Naming Ceremony", icon: Star },
-  { value: "festival", label: "Festival / Cultural Event", icon: Calendar },
+  { value: "festival", label: "Festival / Cultural Event", icon: Sparkles },
   { value: "party", label: "Party / Celebration", icon: Calendar },
   { value: "burial", label: "Burial / Memorial", icon: Calendar },
   { value: "chieftaincy", label: "Chieftaincy Title", icon: Star },
   { value: "graduation", label: "Graduation Ceremony", icon: Star },
   { value: "engagement", label: "Engagement / Courtship", icon: Heart },
   { value: "corporate", label: "Corporate / Business Event", icon: Users },
-  { value: "religious", label: "Religious / Church Event", icon: Calendar },
+  { value: "religious", label: "Religious / Church Event", icon: Sparkles },
   { value: "others", label: "Others / Custom Event", icon: Calendar },
 ];
 

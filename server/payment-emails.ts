@@ -26,7 +26,7 @@ export async function notifyOrderPayment(orderId: number, kind: "order" | "shipp
     const reference = shipping ? order.shippingPaymentReference : order.paymentReference;
     const amount = refund ? order.shippingRefundAmount : shipping ? order.shippingFinalAmount : order.totalAmount;
     const title = refund ? "Shipping refund update" : shipping ? "Shipping payment confirmed" : "Payment confirmed";
-    await notify(() => sendPaymentEmail((order.shippingAddress as any)?.contactEmail || user?.email, `${title} — order #${orderId}`,
+    await notify(() => sendPaymentEmail(user?.email, `${title} — order #${orderId}`,
       `Order: #${orderId}\nAmount: ${ngn(amount)}\nStatus: ${status}\nPayment reference: ${reference || "See your order"}`,
       `${kind}:${orderId}:${reference}:${status}:${amount}`));
     if (kind === "order") {

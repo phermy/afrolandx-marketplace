@@ -15,7 +15,7 @@ export default function PolicyDetail() {
     trackEvent("policy_viewed", {
       policy_slug: policy.slug,
       policy_group: policyGroup,
-      policy_version: policy.lastUpdated || "2026-09-04",
+      policy_version: "2026-09-04",
     });
   }, [policy]);
   if (!policy) return <div className="min-h-screen bg-[#fbf8f2]"><Navbar /><main className="policy-shell"><p className="eyebrow">404 / Policy</p><h1 className="policy-title">That policy is not available.</h1><Link href="/policies" className="policy-back">Return to policies →</Link></main><SiteFooter /></div>;
@@ -24,7 +24,7 @@ export default function PolicyDetail() {
   const next = policies[index + 1];
   return <div className="min-h-screen bg-[#fbf8f2]"><Navbar /><main className="policy-detail">
      <Link href="/policies" className="policy-back">← All policies</Link>
-     <header className="policy-detail__head"><p className="eyebrow">Afrolandx / Policy</p><h1 className="policy-title">{policy.title}</h1><p className="policy-intro">{policy.summary}</p><p className="policy-date">{policy.lastUpdated ? `Effective date: September 4, 2026 · Last updated: ${new Date(`${policy.lastUpdated}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}` : policyDate}</p></header>
+     <header className="policy-detail__head"><p className="eyebrow">Afrolandx / Policy</p><h1 className="policy-title">{policy.title}</h1><p className="policy-intro">{policy.summary}</p><p className="policy-date">{policyDate}</p></header>
      <div className="policy-layout">
        <nav className="policy-toc" aria-label="On this page"><p className="policy-toc__label">On this page</p>{policy.sections.map((section, sectionIndex) => <a key={section.heading} href={`#section-${sectionIndex + 1}`}>{sectionIndex + 1}. {section.heading}</a>)}</nav>
        <div><article className="policy-article">{policy.sections.map((section, sectionIndex) => <section id={`section-${sectionIndex + 1}`} key={section.heading}><h2>{sectionIndex + 1}. {section.heading}</h2><p>{section.body}</p></section>)}</article>

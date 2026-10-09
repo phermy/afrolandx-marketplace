@@ -1,6 +1,14 @@
 import crypto from "crypto";
 
 export const SHIPPING_QUOTES = [
+  {
+    carrier: 'Test shipping',
+    service: 'Test checkout shipping — ₦1',
+    price: null,
+    duration: 'Testing only, no carrier booking',
+    quoteRequired: true,
+    notes: '₦1 test shipping deposit. A real delivery quote is required before dispatch.',
+  },
   { carrier: 'UPS', service: 'UPS Standard', price: null, duration: 'Rate on request', quoteRequired: true },
   { carrier: 'FedEx', service: 'FedEx Express', price: null, duration: 'Rate on request', quoteRequired: true },
   { carrier: 'DHL', service: 'DHL Express', price: null, duration: 'Rate on request', quoteRequired: true },
@@ -71,7 +79,7 @@ export function recommendShippingCarriers(input: {
   const weight = Math.max(0, Number(input.totalWeight) || 0);
   const subtotal = Math.max(0, Number(input.subtotal) || 0);
   const domestic = country === 'nigeria' || country === 'ng';
-  const ranked = SHIPPING_QUOTES.map((carrier, index) => {
+  const ranked = SHIPPING_QUOTES.filter(carrier => carrier.carrier !== 'Test shipping').map((carrier, index) => {
     let score = 50 - index;
     const reasons: string[] = [];
     const routes = 'routes' in carrier ? carrier.routes?.toLowerCase() : '';
@@ -178,6 +186,7 @@ export function calculateEstimatedShippingAmount(subtotal: number, shippingMetho
   const shippingQuote = getShippingQuote(shippingMethod);
   if (!shippingQuote) throw new CheckoutValidationError('Invalid shipping method');
   if (!Number.isFinite(subtotal) || subtotal <= 0) throw new CheckoutValidationError('Cart subtotal is invalid');
+  if (shippingQuote.carrier === 'Test shipping') return 1;
   const multiplier = SHIPPING_ESTIMATE_MULTIPLIERS[shippingQuote.carrier.toLowerCase()] ?? 1;
   const estimate = (7500 + subtotal * 0.06) * multiplier;
   return Math.min(50000, Math.max(7500, Math.ceil(estimate / 500) * 500));
@@ -213,12 +222,8 @@ export function paymentVerificationError(order: any, verification: any, referenc
   if (!Number.isSafeInteger(metadataOrderId) || metadataOrderId !== order.id) {
     return 'Payment metadata mismatch';
   }
-  if (data.metadata?.userId !== undefined && data.metadata.userId !== (order.shippingAddress?._paymentOwnerId || order.userId)) {
+  if (data.metadata?.userId !== undefined && data.metadata.userId !== order.userId) {
     return 'Payment metadata mismatch';
-  }
-  const email = order.shippingAddress?.contactEmail;
-  if (email && String(data.customer?.email || '').toLowerCase() !== String(email).toLowerCase()) {
-    return 'Payment customer mismatch';
   }
   return null;
 }
