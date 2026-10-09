@@ -43,11 +43,23 @@ export function r2PhotoConfig() {
 async function request(path: string, method: string, body?: Buffer) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    const token = process.env.R2_PHOTO_API_TOKEN?.trim();
     const response = await Promise.race([
-      new ReplitConnectors().proxy("cloudflare", path, {
-        method,
-        ...(body ? { body, headers: { "Content-Type": "image/jpeg" } } : {}),
-      }),
+      token
+        ? fetch(`https://api.cloudflare.com/client${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(body ? { "Content-Type": "image/jpeg" } : {}),
+          },
+          ...(body ? { body: new Uint8Array(body) } : {}),
+          signal: AbortSignal.timeout(20_000),
+          redirect: "error",
+        })
+        : new ReplitConnectors().proxy("cloudflare", path, {
+          method,
+          ...(body ? { body, headers: { "Content-Type": "image/jpeg" } } : {}),
+        }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new R2PhotoStorageError()), 20_000);
       }),
@@ -67,7 +79,7 @@ export async function uploadR2ProductPhoto(buffer: Buffer): Promise<string> {
   const config = r2PhotoConfig();
   const image = await optimizeProductImage(buffer);
   const key = `products/${Date.now()}-${crypto.randomBytes(16).toString("hex")}.jpg`;
-  const path = `/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${key}`;
+  const path = `/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${encodeURIComponent(key)}`;
   await request(path, "PUT", image);
   const url = `${config.publicUrl}/${key}`;
   try {
@@ -93,7 +105,7 @@ export async function deleteR2ProductPhoto(url: string): Promise<boolean> {
   try { parsed = new URL(url); } catch { return false; }
   if (parsed.origin !== config.publicUrl || parsed.username || parsed.password || parsed.search || parsed.hash
     || !/^\/products\/\d+-[a-f0-9]{32}\.jpg$/.test(parsed.pathname)) return false;
-  await request(`/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects${parsed.pathname}`, "DELETE");
+  await request(`/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}/objects/${encodeURIComponent(parsed.pathname.slice(1))}`, "DELETE");
   return true;
 }
 
@@ -104,6 +116,6 @@ export async function getR2ProductPhotoStatus() {
     await request(`/v4/accounts/${config.accountId}/r2/buckets/${config.bucket}`, "GET");
     return { selected: true, connectionReady: true, status: "R2 connection verified. Upload and image delivery still need testing." };
   } catch {
-    return { selected: true, connectionReady: false, status: "R2 access could not be verified. Check the Cloudflare app connection and bucket settings." };
+    return { selected: true, connectionReady: false, status: "R2 access could not be verified. Check the product photo credential and bucket settings." };
   }
 }

@@ -14,6 +14,7 @@ function configure(t: any) {
     NODE_ENV: "development", PRODUCT_PHOTO_STORAGE: "r2",
     R2_PHOTO_ACCOUNT_ID: "a".repeat(32), R2_PHOTO_BUCKET: "fixture-photos",
     R2_PHOTO_PUBLIC_URL: `https://pub-${"b".repeat(32)}.r2.dev`,
+    R2_PHOTO_API_TOKEN: "",
   };
   const before = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
   Object.assign(process.env, values);
@@ -68,12 +69,12 @@ test("product storage uploads optimized binary JPEG then verifies unsigned deliv
     assert.ok(Buffer.isBuffer(options.body));
     image = options.body;
     path = endpoint;
-    assert.match(path, /\/v4\/accounts\/[a-f0-9]{32}\/r2\/buckets\/fixture-photos\/objects\/products\/\d+-[a-f0-9]{32}\.jpg$/);
+    assert.match(path, /\/v4\/accounts\/[a-f0-9]{32}\/r2\/buckets\/fixture-photos\/objects\/products%2F\d+-[a-f0-9]{32}\.jpg$/);
     return envelope(true);
   });
   mock.method(globalThis, "fetch", async (url: string, options: any) => {
     assert.ok(image);
-    assert.equal(new URL(url).pathname, path.split("/objects")[1]);
+    assert.equal(new URL(url).pathname, `/${decodeURIComponent(path.split("/objects/")[1])}`);
     assert.ok(options.signal);
     assert.equal(options.headers, undefined);
     return new Response(image, { headers: { "Content-Type": "image/jpeg" } });
@@ -131,6 +132,61 @@ test("R2 status labels read access separately from working uploads", async t => 
   const status = await getR2ProductPhotoStatus();
   assert.equal(status.connectionReady, true);
   assert.ok(status.status.includes("still need testing"));
+});
+
+test("a dedicated token uploads binary JPEG directly, without sending credentials to public retrieval", async t => {
+  configure(t);
+  process.env.R2_PHOTO_API_TOKEN = "fixture-token-not-a-real-credential";
+  const proxy = mock.method(ReplitConnectors.prototype, "proxy", async () => {
+    throw new Error("The configured direct credential must not use the connector");
+  });
+  let image: Buffer | undefined;
+  mock.method(globalThis, "fetch", async (url: string, options: any) => {
+    if (url.startsWith("https://api.cloudflare.com/client/v4/")) {
+      assert.equal(options.method, "PUT");
+      assert.equal(options.headers.Authorization, "Bearer fixture-token-not-a-real-credential");
+      assert.equal(options.headers["Content-Type"], "image/jpeg");
+      assert.equal(options.redirect, "error");
+      assert.ok(options.signal);
+      assert.ok(options.body instanceof Uint8Array);
+      image = Buffer.from(options.body);
+      return envelope(true);
+    }
+    assert.equal(new URL(url).origin, r2PhotoConfig().publicUrl);
+    assert.equal(options.headers, undefined);
+    assert.ok(image);
+    return new Response(image, { headers: { "Content-Type": "image/jpeg" } });
+  });
+  assert.match(await storeProductImage(await sourceImage()), /^https:\/\/pub-[a-f0-9]+\.r2\.dev\/products\//);
+  assert.equal(proxy.mock.callCount(), 0);
+});
+
+test("a rejected dedicated credential stays sanitized and cannot fall back to the connector", async t => {
+  configure(t);
+  process.env.R2_PHOTO_API_TOKEN = "fixture-token-not-a-real-credential";
+  const proxy = mock.method(ReplitConnectors.prototype, "proxy", async () => envelope(true));
+  mock.method(globalThis, "fetch", async () => {
+    throw new Error("Provider details fixture-token-not-a-real-credential");
+  });
+  await assert.rejects(storeProductImage(await sourceImage()), error => {
+    assert.ok(error instanceof R2PhotoStorageError);
+    assert.ok(!error.message.includes("fixture-token"));
+    return true;
+  });
+  assert.equal(proxy.mock.callCount(), 0);
+  assert.equal((await getR2ProductPhotoStatus()).connectionReady, false);
+});
+
+test("a dedicated photo credential is never used when the development rollout is disabled", async t => {
+  configure(t);
+  process.env.R2_PHOTO_API_TOKEN = "fixture-token-not-a-real-credential";
+  const network = mock.method(globalThis, "fetch", async () => { throw new Error("Must not make a request"); });
+  for (const mode of ["production", "test"]) {
+    process.env.NODE_ENV = mode;
+    await assert.rejects(uploadR2ProductPhoto(await sourceImage()), R2PhotoStorageError);
+    assert.equal((await getR2ProductPhotoStatus()).selected, false);
+  }
+  assert.equal(network.mock.callCount(), 0);
 });
 
 test("configured R2 failures cannot enter development local fallback on create or add images", () => {

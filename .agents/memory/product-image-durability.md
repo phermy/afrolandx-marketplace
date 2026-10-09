@@ -19,7 +19,13 @@ Cloudflare's agent connection and application connector have separate authorizat
 
 **Why:** An agent connection with account and user read scopes could list R2 buckets, but bucket creation remained denied after reconnection. The separate application connector also rejected its supplied credential; an attached connection is not proof of authenticated API access.
 
-**How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair credentials only through the existing integration's secure settings, never through chat.
+**How to apply:** After one failed reconnect retry, stop reconnecting the same authorization. Check the actual scopes and credential type. The Cloudflare application connector uses a Cloudflare REST API bearer token, not an R2 S3 Access Key ID or Secret Access Key. Repair connector credentials through the existing integration's secure settings, never through chat.
+
+A separate securely stored REST token is an approved fallback for development product photos when connector recovery remains blocked.
+
+**Why:** Repeated connector recovery attempts did not authenticate, while a correctly supplied token authenticated directly and could read the intended bucket. A development-only direct connection avoids making this rollout depend on that connector configuration without replacing the rest of storage.
+
+**How to apply:** Collect the token only through Replit Secrets and validate direct authentication before wiring the fallback. Keep it restricted to the development product-photo rollout. If the selected direct credential is rejected, fail explicitly rather than silently retrying a different credential or storage provider. Do not mistake successful token verification and bucket reads for upload permission: actual object PUT and unsigned retrieval are still required.
 
 Cloudflare token verification depends on token ownership: account-owned tokens use the account-specific verification endpoint, while user-owned tokens use the user endpoint.
 
