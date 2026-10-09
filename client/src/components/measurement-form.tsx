@@ -236,16 +236,16 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
 
   return (
     <div className="space-y-6">
-      {/* AI Scan CTA */}
+      {/* Assisted measurement option */}
       <div className="rounded-2xl border-2 border-dashed border-nigerian-green/30 bg-nigerian-green/5 p-5">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-nigerian-green flex items-center justify-center shrink-0">
             <Scan className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm">AI Body Scan</h3>
+            <h3 className="font-semibold text-gray-900 text-sm">Camera-assisted measurements</h3>
             <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-              Use your phone camera to get accurate measurements in 60 seconds. No tape measure needed.
+              AI-assisted estimates use your camera. They may be inaccurate; compare and correct every measurement manually before saving. You can also enter measurements with a tape.
             </p>
             {scanStatus === "completed" && (
               <p className="text-xs text-green-600 font-medium mt-1.5">✓ Measurements loaded! Review below and submit.</p>
@@ -440,7 +440,7 @@ export function MeasurementForm({ vendorId, productId, orderId, onSuccess }: Mea
               <Scan className="w-5 h-5 text-nigerian-green" /> Body Scan Setup
             </DialogTitle>
             <DialogDescription>
-              We need a couple of details so the AI can give you accurate measurements.
+              We need a couple of details to prepare AI-assisted measurement estimates. Review and correct the results before saving.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

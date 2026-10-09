@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { Product } from '@/types';
 import { trackEvent, valueBand } from '@/lib/analytics';
 import { RETURN_POLICY_OPTIONS } from '@shared/schema';
-import { Expand, ImageOff, Sparkles, Star } from 'lucide-react';
+import { Expand, ImageOff, Shirt, Camera, Star } from 'lucide-react';
 
 export default function ProductDetail() {
   const [, params] = useRoute('/products/:id');
@@ -188,7 +188,7 @@ export default function ProductDetail() {
               )}
               {product.featured && (
                 <Badge className="absolute top-3 right-3 bg-nigerian-gold text-white">
-                  ⭐ Featured
+                  Featured
                 </Badge>
               )}
             </div>
@@ -213,7 +213,7 @@ export default function ProductDetail() {
               <Button variant="outline" size="lg"
                 className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
                 onClick={() => isAuthenticated ? setTryOnOpen(true) : setLocation('/login')}>
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Shirt className="mr-2 h-4 w-4" />
                 Try it on
               </Button>
             )}
@@ -221,7 +221,7 @@ export default function ProductDetail() {
               <Button variant="outline" size="lg"
                 className="w-full border-nigerian-green bg-white text-nigerian-green hover:bg-green-50"
                 onClick={() => isAuthenticated ? setLiveArOpen(true) : setLocation('/login')}>
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Camera className="mr-2 h-4 w-4" />
                 Try live camera preview
               </Button>
             )}

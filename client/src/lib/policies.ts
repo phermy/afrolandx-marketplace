@@ -4,6 +4,7 @@ export type Policy = {
   slug: string;
   title: string;
   summary: string;
+  lastUpdated?: string;
   sections: { heading: string; body: string }[];
 };
 
@@ -133,6 +134,7 @@ const additionalSections: Record<string, { heading: string; body: string }[]> = 
   ],
   "prohibited-and-restricted-products": [
     { heading: "Products that are prohibited", body: "Prohibited listings include counterfeit, stolen, illegal, unsafe, recalled or unlawfully imported goods; weapons and controlled substances; exploitative material; goods infringing rights; and products that cannot lawfully be offered or delivered." },
+    { heading: "Antiquities, cultural heritage and provenance", body: "Stolen or looted antiquities, archaeological finds, illegally excavated objects and cultural heritage items obtained, exported or imported unlawfully are prohibited. Before offering an antiquity or cultural heritage object, a vendor must provide verifiable provenance, evidence of lawful ownership and any required export and import permits for Afrolandx review and approval. An unsupported claim of age, origin or authenticity is not sufficient. Items with unverifiable provenance must not be listed. Contemporary crafts and reproductions must be accurately identified and must not be presented as genuine antiquities. Afrolandx may request supporting records, remove listings or refer suspected unlawful trade to the appropriate authorities." },
     { heading: "Restricted products", body: "A restricted product may require age, authenticity, safety, origin, licensing, destination, carrier or other approval. Vendors must supply truthful details and comply with instructions before listing or dispatch." },
     { heading: "Customer and vendor responsibilities", body: "Vendors must check legality, condition, authenticity, safety and destination restrictions. Customers must not misuse products, evade checks or ask a vendor to make a false declaration." },
     { heading: "Orders, reporting and contact", body: "Afrolandx may remove listings, hold or cancel orders, restrict accounts, request evidence or refer matters to an authority. Report a concern promptly at info@afrolandx.com with listing or order details." },
@@ -169,6 +171,7 @@ const additionalSections: Record<string, { heading: string; body: string }[]> = 
 
 export const policies: Policy[] = basePolicies.map((policy) => ({
   ...policy,
+  ...(policy.slug === "prohibited-and-restricted-products" ? { lastUpdated: "2026-10-09" } : {}),
   sections: [
     ...policy.sections,
     ...(additionalSections[policy.slug] || []),

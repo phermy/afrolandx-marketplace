@@ -45,6 +45,7 @@ import { Chatbot } from "@/components/chatbot";
 import AdminProtectedRoute from "@/components/AdminProtectedRoute";
 import { isVendor } from "@/lib/roleUtils";
 import SessionTimeout from "@/components/session-timeout";
+import { ContactPage, FaqPage, SizeGuidePage, ShippingInformationPage, ReturnsPage } from "@/pages/support-pages";
 import { useEffect } from "react";
 
 function SessionKickoutGuard() {
@@ -101,6 +102,11 @@ function Router() {
       </Route>
 
       {/* Public pages */}
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/faq" component={FaqPage} />
+      <Route path="/size-guide" component={SizeGuidePage} />
+      <Route path="/shipping-information" component={ShippingInformationPage} />
+      <Route path="/returns" component={ReturnsPage} />
       <Route path="/products/:id" component={ProductDetail} />
       <Route path="/products" component={Products} />
       <Route path="/vendors/:id" component={PublicVendor} />

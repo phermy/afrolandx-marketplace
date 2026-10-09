@@ -17,7 +17,7 @@ import {
   TrendingUp,
   Award,
   Loader2,
-  Sparkles
+  BookOpen
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -271,7 +271,7 @@ export default function LoyaltyPage() {
               <Card className="mt-4">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
+                    <BookOpen className="h-5 w-5" />
                     Cultural Quizzes
                   </CardTitle>
                   <CardDescription>Learn about African heritage and earn bonus points!</CardDescription>

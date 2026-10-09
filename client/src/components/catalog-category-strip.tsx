@@ -1,5 +1,5 @@
 import type { Category } from '@/types';
-import { ArrowUpRight, Gem, House, Scissors, Shirt, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Gem, House, Scissors, Shirt, Flower2 } from 'lucide-react';
 import textilesImage from '@/assets/catalog/category-textiles.jpg';
 import craftImage from '@/assets/catalog/category-craft.jpg';
 import fashionImage from '@/assets/catalog/category-fashion.jpg';
@@ -24,7 +24,7 @@ const categoryArt = [
   'catalog-art--plum',
   'catalog-art--sand',
 ];
-const categoryIcons = [Shirt, Scissors, Gem, House, Sparkles];
+const categoryIcons = [Shirt, Scissors, Gem, House, Flower2];
 const categoryInspiration: Record<string, string> = {
   'ankara-kente': textilesImage,
   'aso-oke': asoOkeImage,

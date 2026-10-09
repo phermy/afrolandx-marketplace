@@ -27,7 +27,7 @@ import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
-  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus, UserRound, FileText,
 } from 'lucide-react';
 import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
 import { trackEvent } from '@/lib/analytics';
@@ -1017,14 +1017,14 @@ export default function AdminDashboard() {
                       <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Customer Insights</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                          {[
-                            { label: 'Total Customers', value: analytics.totalCustomers, icon: '👤' },
-                            { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: '✨' },
-                            { label: 'Avg Order Value', value: fmtCurrency(analytics.avgOrderValue), icon: '💰' },
-                            { label: 'Inventory Value', value: fmtCurrency(analytics.totalInventoryValue), icon: '📦' },
-                          ].map(({ label, value, icon }) => (
+                      {[
+                            { label: 'Total Customers', value: analytics.totalCustomers, icon: UserRound },
+                            { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: TrendingUp },
+                            { label: 'Avg Order Value', value: fmtCurrency(analytics.avgOrderValue), icon: ShoppingBag },
+                            { label: 'Inventory Value', value: fmtCurrency(analytics.totalInventoryValue), icon: Package },
+                          ].map(({ label, value, icon: MetricIcon }) => (
                             <div key={label} className="bg-gray-50 rounded-lg p-3">
-                              <p className="text-lg mb-0.5">{icon}</p>
+                              <MetricIcon className="mb-1 h-5 w-5 text-gray-500" aria-hidden="true" />
                               <p className="text-xl font-bold text-gray-900">{value}</p>
                               <p className="text-xs text-gray-500">{label}</p>
                             </div>
@@ -1340,11 +1340,11 @@ export default function AdminDashboard() {
                       disabled={generateRepListingMutation.isPending}
                       onClick={() => generateRepListingMutation.mutate(repProductImages[0])}
                     >
-                      <Zap className="mr-2 h-4 w-4" />
-                      {generateRepListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
+                      <FileText className="mr-2 h-4 w-4" />
+                      {generateRepListingMutation.isPending ? 'Preparing suggestions…' : 'Suggest listing details'}
                     </Button>
                   )}
-                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. Originals are preserved during automatic processing.</p>
+                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. AI-assisted suggestions use the first photo; review all details before saving. Originals are preserved during automatic processing.</p>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setRepProductOpen(false)}>Cancel</Button>
@@ -1722,7 +1722,7 @@ export default function AdminDashboard() {
                 </Card>
               )}
 
-              {/* AI-Recommended to Feature */}
+              {/* Inventory-based recommendations */}
               {recommendedToFeature.length > 0 && featuredProducts.length < MAX_FEATURED && (
                 <Card>
                   <CardHeader>

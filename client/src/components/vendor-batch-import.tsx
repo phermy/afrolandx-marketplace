@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
-import { AlertCircle, ArrowDownToLine, Check, CheckCircle2, ChevronRight, FileSpreadsheet, ImagePlus, LoaderCircle, RotateCcw, Sparkles, Upload, X } from "lucide-react";
+import { AlertCircle, ArrowDownToLine, Check, CheckCircle2, ChevronRight, FileSpreadsheet, ImagePlus, LoaderCircle, RotateCcw, FileText, Upload, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
@@ -452,7 +452,7 @@ export default function VendorBatchImport({ open, onOpenChange, onComplete }: Pr
             ) : (
               <section aria-label="Photo listing drafts" className="rounded-xl border border-[#dce5dc] bg-white/70 p-4 sm:p-5">
                 <div className="flex items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#e7efe3] text-[#48715a]"><Sparkles className="h-4 w-4" /></span>
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#e7efe3] text-[#48715a]"><FileText className="h-4 w-4" /></span>
                   <div>
                     <h3 className="font-semibold text-[#23463b]">Start with product photos</h3>
                     <p className="mt-1 max-w-2xl text-sm leading-5 text-[#708279]">Select up to 10 photos. On your explicit request, Afrolandx will suggest listing wording and a category one image at a time. Price and stock remain yours to enter.</p>
@@ -469,11 +469,11 @@ export default function VendorBatchImport({ open, onOpenChange, onComplete }: Pr
                     </button>
                     <button type="button" disabled={!rows.some((row) => !row.aiSuggested) || aiRunning} onClick={() => void generateSuggestions()}
                       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#245b47] px-4 text-sm font-semibold text-white transition hover:bg-[#194a39] disabled:cursor-not-allowed disabled:opacity-45">
-                      {aiRunning ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Preparing suggestions</> : <><Sparkles className="h-4 w-4" /> Suggest listing details</>}
+                      {aiRunning ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Preparing suggestions</> : <><FileText className="h-4 w-4" /> Suggest listing details</>}
                     </button>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-[#78877e]">AI suggestions do not set price, stock, origin country, or material. Confirm every field before saving.</p>
+                <p className="mt-3 text-xs leading-5 text-[#78877e]">AI-assisted suggestions do not set price, stock, origin country, or material. Confirm every field before saving.</p>
               </section>
             )}
 

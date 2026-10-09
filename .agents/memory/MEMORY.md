@@ -33,3 +33,4 @@
 - [Browser interaction checks](browser-interaction-checks.md) — use real input and assert active state; synthetic clicks can leave Radix tabs unchanged
 - [Live vendor testing](live-vendor-testing.md) — preserve approval gates during QA and obtain inbox consent before replacing an existing vendor session
 - [Unpaid checkout safety](unpaid-checkout-safety.md) — verify provider status before 24-hour expiry; retain closed records and hold late payments for explicit financial review
+- [Assisted feature copy](assisted-feature-copy.md) — plain task labels and neutral icons, with truthful AI disclosures retained nearby

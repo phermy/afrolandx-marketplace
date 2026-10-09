@@ -93,7 +93,7 @@ export default function OrderSuccess() {
                 </div>}
                 <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                   <h2 className="text-2xl font-bold text-green-800 mb-3">
-                    Your Payment Was Successful! ✨
+                    Your payment was successful
                   </h2>
                   <p className="text-green-700 leading-relaxed">
                     We've received your payment for your items.
@@ -166,7 +166,7 @@ export default function OrderSuccess() {
             Questions about your order? Contact our support team.
           </p>
           <p className="text-sm">
-            Thank you for supporting African artisans and celebrating our rich cultural heritage! 🌍
+            Thank you for supporting African artisans and celebrating our rich cultural heritage.
           </p>
         </div>
       </div>

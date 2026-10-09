@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
-  Crown, Sparkles, Users, Clock, ShoppingBag, ArrowLeft, Loader2, Bell
+  Crown, PackageSearch, Users, Clock, ShoppingBag, ArrowLeft, Loader2, Bell
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -204,7 +204,7 @@ export default function CollabDropDetailPage() {
           {drop.products.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Sparkles className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <PackageSearch className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                 <p className="text-muted-foreground">
                   {isUpcoming ? "Products will be revealed when the drop goes live." : "No products in this collection."}
                 </p>

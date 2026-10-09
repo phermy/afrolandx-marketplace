@@ -501,7 +501,7 @@ export default function MegaMenu() {
               onClick={() => handleLinkClick('/collab-drops')}
               className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-600 whitespace-nowrap transition-colors"
             >
-              ⭐ Collab Drops
+              Collab Drops
             </button>
           </div>
         </div>
@@ -613,18 +613,18 @@ export default function MegaMenu() {
               {/* Right promo block */}
               <div className="flex-shrink-0 w-44 hidden lg:block">
                 <div className="bg-gradient-to-br from-nigerian-green/10 to-nigerian-gold/10 rounded-2xl p-5 text-center">
-                  <p className="text-2xl mb-2">🌍</p>
+                  <p className="mb-2 text-sm font-semibold text-nigerian-green">AFRICAN MAKERS</p>
                   <p className="text-xs font-bold text-nigerian-green mb-1">Authentic African fashion</p>
                   <p className="text-xs text-gray-500 mb-3">54 countries, one marketplace</p>
                   <button
                     onClick={() => handleLinkClick('/lookbook')}
                     className="text-xs font-semibold text-nigerian-green border border-nigerian-green rounded-full px-3 py-1.5 hover:bg-nigerian-green hover:text-white transition-colors"
                   >
-                    Get Styled ✨
+                    Browse outfit suggestions
                   </button>
                 </div>
                 <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
-                  <p className="text-xs font-bold text-amber-700 mb-1">⭐ Collab Drops</p>
+                  <p className="text-xs font-bold text-amber-700 mb-1">Collab Drops</p>
                   <p className="text-xs text-amber-600 mb-2">Limited edition designer collaborations are available now.</p>
                   <button
                     onClick={() => handleLinkClick('/collab-drops')}

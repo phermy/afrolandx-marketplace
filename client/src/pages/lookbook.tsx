@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Loader2, Sparkles, CheckCircle, ShoppingBag, Palette, RefreshCw, Star, MapPin
+  Loader2, Shirt, CheckCircle, ShoppingBag, Palette, RefreshCw, Star, MapPin
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -111,7 +111,7 @@ export default function LookbookPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lookbooks"] });
-      toast({ title: "Lookbook ready!", description: "Your outfit, chosen by AI, is ready below." });
+      toast({ title: "Outfit suggestions ready", description: "Your suggested collection is ready below." });
     },
     onError: () => {
       toast({ title: "Lookbook unavailable", description: "We could not find a matching outfit right now. Try a different budget or try again shortly.", variant: "destructive" });
@@ -161,7 +161,7 @@ export default function LookbookPage() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-sm w-full">
           <CardContent className="py-8 text-center">
-            <p className="mb-4">Sign in to use the AI Lookbook Studio</p>
+            <p className="mb-4">Sign in to get outfit suggestions</p>
             <Button asChild><a href="/login">Sign In</a></Button>
           </CardContent>
         </Card>
@@ -177,11 +177,11 @@ export default function LookbookPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">AI Lookbook Studio</h1>
+            <Shirt className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold">Outfit suggestions</h1>
           </div>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Describe any outfit in your own words. Our AI stylist will pick the perfect pieces from our collection.
+            Describe an outfit and get AI-assisted suggestions from the collection. Suggestions are not a guarantee of fit or availability; check each product listing before buying.
           </p>
         </div>
 
@@ -313,7 +313,7 @@ export default function LookbookPage() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="mr-2 h-5 w-5" />
+                  <Shirt className="mr-2 h-5 w-5" />
                   Generate My Lookbook
                 </>
               )}
@@ -332,7 +332,7 @@ export default function LookbookPage() {
           ) : lookbooks.length === 0 ? (
             <Card>
               <CardContent className="py-14 text-center">
-                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
+                <ShoppingBag className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
                 <p className="text-muted-foreground">No lookbooks yet. Describe your style above, then select Generate My Lookbook to get started.</p>
               </CardContent>
             </Card>
@@ -352,7 +352,7 @@ export default function LookbookPage() {
                         <Badge variant={lb.status === "accepted" ? "default" : "secondary"}>
                           {lb.status === "accepted" ? (
                             <><CheckCircle className="h-3 w-3 mr-1" />Saved</>
-                          ) : "AI Generated"}
+                          ) : "Suggested outfit"}
                         </Badge>
                       </div>
                       {lb.createdAt && (

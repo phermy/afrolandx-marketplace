@@ -14,7 +14,7 @@ import {
   Search, MapPin, Phone, Globe, Clock, Hotel, ShoppingBag,
   Utensils, Landmark, Car, Plane, Coffee, Music, Navigation,
   X, ExternalLink, CheckCircle2, PhoneCall, ChevronRight,
-  Star, TrendingUp, Users, Crown, Briefcase, Tag, Sparkles,
+  Star, TrendingUp, Users, Crown, Briefcase, Tag, BookOpen,
   BadgePercent, Building2, ArrowRight, Loader2, PartyPopper,
 } from "lucide-react";
 import { africaLocations, getCountriesByRegion, africanRegions } from "@shared/africaLocations";
@@ -1365,7 +1365,7 @@ export default function DiscoverAfrica() {
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
                 {[
-                  { icon: <Sparkles className="h-5 w-5 text-yellow-400" />, title: "Curated City Guides", desc: "Expert-written guides for 20+ African cities" },
+                  { icon: <BookOpen className="h-5 w-5 text-yellow-400" />, title: "Curated City Guides", desc: "Expert-written guides for 20+ African cities" },
                   { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Exclusive Member Deals", desc: "Exclusive discounts you won't find anywhere else" },
                   { icon: <TrendingUp className="h-5 w-5 text-emerald-400" />, title: "Trending Alerts", desc: "Get notified when hot new places open nearby" },
                   { icon: <Star className="h-5 w-5 text-sky-400" />, title: "Priority Listings", desc: "Your business listed at the top of every search" },

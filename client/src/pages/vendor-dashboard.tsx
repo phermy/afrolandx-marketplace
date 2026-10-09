@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images, Sparkles } from "lucide-react";
+import { X, Package, Truck, CheckCircle, Clock, Bell, Trash2, Pencil, Save, RefreshCw, ImageIcon, Plus, Upload, Link as LinkIcon, AlertCircle, Images, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { AFRICAN_COUNTRIES, getFashionItemsByCountry } from "@shared/africanFashion";
 import { selectedSubcategory, subcategoriesFor } from "@shared/product-subcategories";
@@ -375,7 +375,7 @@ export default function VendorDashboard() {
       setEditNewPreviews(current => current.filter((_, index) => index !== variables.index));
       setEditCurrentImages((data.product?.images as string[]) || []);
       queryClient.invalidateQueries({ queryKey: ["/api/vendors/me/products"] });
-      toast({ title: 'AI retouch complete', description: data.message });
+      toast({ title: 'Image enhancement complete', description: data.message });
     },
     onError: (error: any) => toast({
       title: 'Could not enhance image',
@@ -1640,7 +1640,7 @@ export default function VendorDashboard() {
                 }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green"
               >
-                <option value="">🌍 Select a country…</option>
+                <option value="">Select a country…</option>
                 {AFRICAN_COUNTRIES.map(c => (
                   <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
                 ))}
@@ -2050,11 +2050,11 @@ export default function VendorDashboard() {
                       disabled={generateListingMutation.isPending}
                       onClick={() => generateListingMutation.mutate(addFiles[0])}
                     >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      {generateListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
+                      <FileText className="mr-2 h-4 w-4" />
+                      {generateListingMutation.isPending ? 'Preparing suggestions…' : 'Suggest listing details'}
                     </Button>
                   )}
-                  <p className="text-xs text-gray-500">AI uses only the first photo to suggest listing details. Review the suggestions and enter your own price.</p>
+                  <p className="text-xs text-gray-500">AI-assisted suggestions use only the first photo. Review every suggestion and enter your own price before saving.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2180,7 +2180,7 @@ export default function VendorDashboard() {
                 }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nigerian-green mb-2"
               >
-                <option value="">🌍 Select a country…</option>
+                <option value="">Select a country…</option>
                 {AFRICAN_COUNTRIES.map(c => (
                   <option key={c.name} value={c.name}>{c.flag} {c.name}</option>
                 ))}
@@ -2320,7 +2320,7 @@ export default function VendorDashboard() {
                           className="absolute bottom-1 right-1 rounded-full bg-purple-700 px-2 py-1 text-[10px] font-medium text-white shadow disabled:opacity-50"
                           title="Add both the original and a version enhanced with AI"
                         >
-                          <Sparkles className="mr-1 inline h-3 w-3" />AI enhance
+                          <ImageIcon className="mr-1 inline h-3 w-3" />Enhance image
                         </button>
                       </div>
                     ))}
@@ -2346,7 +2346,7 @@ export default function VendorDashboard() {
                 onChange={handleEditFileChange}
               />
               <p className="text-xs text-gray-500">
-                Every upload receives safe automatic lighting, orientation, sharpness, size, and compression improvements. AI enhancement is optional and always keeps an original copy for comparison.
+                Every upload receives safe automatic lighting, orientation, sharpness, size, and compression improvements. Optional AI-assisted enhancement keeps an original copy for comparison.
               </p>
 
               {editRemovedImages.length > 0 && (
