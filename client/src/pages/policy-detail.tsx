@@ -4,6 +4,7 @@ import Navbar from "@/components/navbar";
 import SiteFooter from "@/components/site-footer";
 import { policies, policyDate } from "@/lib/policies";
 import { trackEvent } from "@/lib/analytics";
+import { COMPANY_ADDRESS } from "@shared/company-contact";
 
 export default function PolicyDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -29,6 +30,7 @@ export default function PolicyDetail() {
        <nav className="policy-toc" aria-label="On this page"><p className="policy-toc__label">On this page</p>{policy.sections.map((section, sectionIndex) => <a key={section.heading} href={`#section-${sectionIndex + 1}`}>{sectionIndex + 1}. {section.heading}</a>)}</nav>
        <div><article className="policy-article">{policy.sections.map((section, sectionIndex) => <section id={`section-${sectionIndex + 1}`} key={section.heading}><h2>{sectionIndex + 1}. {section.heading}</h2><p>{section.body}</p></section>)}</article>
        <p className="policy-contact">Questions? <a href="mailto:info@afrolandx.com">info@afrolandx.com</a></p>
+        <address className="policy-contact not-italic"><strong>Company address:</strong> {COMPANY_ADDRESS}</address>
        <nav className="policy-related" aria-label="Related policies">{previous ? <Link href={`/policies/${previous.slug}`}>← {previous.title}</Link> : <span />}{next ? <Link href={`/policies/${next.slug}`}>{next.title} →</Link> : <span />}</nav></div>
      </div>
    </main><SiteFooter /></div>;

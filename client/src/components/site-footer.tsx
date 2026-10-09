@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
 import { apiRequest } from "@/lib/queryClient";
 import { Frown, Meh, Smile, type LucideIcon } from "lucide-react";
+import { COMPANY_ADDRESS } from "@shared/company-contact";
 
 type Mood = "sad" | "indifferent" | "happy";
 
@@ -45,6 +46,10 @@ export default function SiteFooter() {
           <Link href="/" className="site-footer__brand">Afrolandx</Link>
           <p className="site-footer__tagline">African stories, made tangible.</p>
           <p className="site-footer__meta">CAC REG: 7039498</p>
+          <address className="site-footer__meta not-italic leading-relaxed">
+            <span className="block font-semibold">Company address</span>
+            {COMPANY_ADDRESS}
+          </address>
           <a className="site-footer__email" href="mailto:info@afrolandx.com">info@afrolandx.com</a>
         </div>
         <div>
