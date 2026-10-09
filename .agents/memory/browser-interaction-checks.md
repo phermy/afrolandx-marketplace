@@ -15,18 +15,6 @@ Wait for the actual control or active panel before interacting with a freshly lo
 
 **How to apply:** Use bounded polling with an explicit assertion and timeout. Maintain accurate response shapes for browser fixtures when newly added profile forms are mounted.
 
-For server-rendered public routes, an existing heading is not proof that React has mounted. Wait for the actual interactive component or its new state before asserting client navigation.
-
-**Why:** A homepage check repeatedly inspected the server-rendered fallback before the redesigned client header and hero loaded, reporting missing links that were present after mounting.
-
-**How to apply:** Anchor readiness checks inside the client root and assert the specific heading/control under test rather than any document heading.
-
-Raw browser-protocol Enter input must include the character event for a native form submission, not only key-down and key-up.
-
-**Why:** Trusted key-down reached the focused search input but did not perform native form submission until a carriage-return character event was sent.
-
-**How to apply:** Send the complete key sequence and assert the resulting URL; do not treat a missing character event as an application search failure.
-
 If the testing callback rejects the documented testing configuration as an unknown kind, use the project's headless Chromium/CDP checks rather than retrying that unavailable configuration.
 
 **Why:** The runtime rejected the configuration even though the local testing instructions advertised it.

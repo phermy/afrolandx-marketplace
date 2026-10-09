@@ -155,8 +155,8 @@ export default function EventPlannerPage() {
 
   const getFitScoreColor = (score: number) => {
     if (score >= 85) return "text-green-600 bg-green-50";
-    if (score >= 70) return "text-yellow-800 bg-yellow-50";
-    return "text-orange-800 bg-orange-50";
+    if (score >= 70) return "text-yellow-600 bg-yellow-50";
+    return "text-orange-600 bg-orange-50";
   };
 
   const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({

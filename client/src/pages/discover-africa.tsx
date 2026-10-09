@@ -182,8 +182,8 @@ function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; ope
             </Badge>
             <h2 className="text-white text-xl font-bold drop-shadow">{place.displayName.text}</h2>
           </div>
-          <Button variant="ghost" size="icon" className="absolute top-3 right-3 bg-black/30 hover:bg-black/50 text-white rounded-full" onClick={onClose} aria-label={`Close details for ${place.displayName.text}`}>
-            <X className="h-4 w-4" aria-hidden="true" />
+          <Button variant="ghost" size="icon" className="absolute top-3 right-3 bg-black/30 hover:bg-black/50 text-white rounded-full" onClick={onClose}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
         <ScrollArea className="max-h-[calc(90vh-192px)]">
@@ -240,14 +240,12 @@ function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; ope
               </Button>
               {place.internationalPhoneNumber && (
                 <Button variant="outline" className="border-emerald-200 text-emerald-700 rounded-xl" onClick={() => window.open(`tel:${place.internationalPhoneNumber}`, "_self")}>
-                  <PhoneCall className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Call {place.displayName.text}</span>
+                  <PhoneCall className="h-4 w-4" />
                 </Button>
               )}
               {place.websiteUri && (
                 <Button variant="outline" className="border-emerald-200 text-emerald-700 rounded-xl" onClick={() => window.open(place.websiteUri, "_blank")}>
-                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Visit website for {place.displayName.text}</span>
+                  <ExternalLink className="h-4 w-4" />
                 </Button>
               )}
             </div>
@@ -1201,7 +1199,7 @@ export default function DiscoverAfrica() {
               </div>
               <div className="flex flex-col gap-2">
                 <Button
-                  className="bg-white text-orange-800 hover:bg-white/90 font-bold rounded-xl shadow-lg px-6"
+                  className="bg-white text-orange-600 hover:bg-white/90 font-bold rounded-xl shadow-lg px-6"
                   onClick={() => { selectCountry("NG"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 >
                   Explore Now <ArrowRight className="h-4 w-4 ml-1" />

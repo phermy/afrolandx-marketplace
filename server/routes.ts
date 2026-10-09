@@ -11,18 +11,14 @@ import { requestRateLimit } from "./request-rate-limit";
 import { checkoutAccess } from "./guest-checkout";
 import { ensureShippingProfileTable, registerMarketplaceCheckout } from "./marketplace-checkout";
 import { orderDetailsHandler } from "./order-details";
-import { loadOwnedOrder } from "./owned-order";
 import { createPublicProductHandler } from "./public-product";
 import { queueAccountEmail } from "./account-notifications";
 import { findSubcategory, subcategoryTag, SUBCATEGORY_TAG_PREFIX } from "@shared/product-subcategories";
 import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
-import { RoleManagementError, updateManagedRoles, lockVerifiedAdminAndTarget } from "./superadmin-role-management";
+import { RoleManagementError, updateManagedRoles } from "./superadmin-role-management";
 import { vendorStatusHandler } from "./admin-vendor-status";
 import { canReviewVendorApplication, vendorApplicationForReviewer } from "./vendor-application-access";
 import { cacReviewNotes, cacReviewSchema, hasManualCacReview } from "./cac-review";
-import { registerVendorOnboardingRoutes } from "./vendor-onboarding-routes";
-import { invalidateOnboarding, recordFirstVendorReview, OnboardingError, lockCacReview, ensureOnboardingState } from "./vendor-onboarding-state";
-import { cacNumberInput } from "../shared/vendor-onboarding";
 import { lockApprovedProductReferences } from "./product-reference-lock";
 import {
   approveSelectedProducts, getPendingAdminProducts, getProductByClientImportKey,
@@ -216,12 +212,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!fs.existsSync(photoPath)) return res.status(404).send('Photo not available');
     res.download(photoPath, 'femi-elegbeleye-profile.jpg');
   });
-  app.get('/downloads/afrolandx-qa-completion-checklist.pdf', (_req, res) => {
-    const publicRoot = app.get('env') === 'development' ? 'client/public' : 'dist/public';
-    const filePath = path.resolve(process.cwd(), publicRoot, 'downloads/afrolandx-qa-completion-checklist.pdf');
-    if (!fs.existsSync(filePath)) return res.status(404).send('Checklist not available');
-    res.download(filePath, 'afrolandx-qa-completion-checklist.pdf');
-  });
 
   // Optimized image serving route
   app.get('/uploads/:filename', async (req, res) => {
@@ -303,7 +293,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   registerMarketplaceCheckout(app);
   app.use('/api/admin', isAuthenticated, managementGuard);
-  await registerVendorOnboardingRoutes(app);
   app.use(['/api/categories/init', '/api/discover/inquiries', '/api/discover/premium', '/api/places'], isAuthenticated, requireFullManagement);
   registerLogisticsRoutes(app);
   registerReviewRoutes(app);
@@ -889,7 +878,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return phone;
         }),
-        cacNumber: cacNumberInput,
+        cacNumber: z.preprocess(
+          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
+          z.string().trim().min(3).max(60).nullable().optional(),
+        ),
         description: z.string().trim().min(10).max(2000),
       }).parse(req.body);
       const vendorData = insertVendorSchema.parse({
@@ -898,12 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'pending',
       });
 
-      const vendor = await db.transaction(async tx => {
-        await lockCacReview(tx, vendorData.cacNumber || null);
-        const [created] = await tx.insert(vendors).values(vendorData).returning();
-        await ensureOnboardingState(tx, created.id);
-        return created;
-      });
+      const vendor = await storage.createVendor(vendorData);
       await storage.addUserRole(userId, 'vendor');
       const applicant = await storage.getUser(userId);
       await queueAccountEmail(applicant?.email, "Vendor application received",
@@ -951,7 +938,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contactName: z.string().trim().min(2).max(120).optional(),
         businessName: z.string().trim().min(2).max(160).optional(),
         phone: z.string().trim().min(7).max(30).optional(),
-        cacNumber: cacNumberInput.optional(),
+        cacNumber: z.preprocess(
+          (value) => typeof value === 'string' && value.trim() === '' ? null : value,
+          z.string().trim().min(3).max(60).nullable().optional(),
+        ),
         description: z.string().trim().min(10).max(2000).optional(),
       }).parse(req.body);
       if (Object.keys(profile).length === 0) return res.status(400).json({ message: 'At least one profile field is required' });
@@ -963,13 +953,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           || (profile.businessName !== undefined && profile.businessName !== current.businessName);
         if (registrationChanged && current.verificationStatus === 'verified') {
           throw new RoleManagementError('A verified CAC number or business name cannot be changed here. Contact support for a new verification review.');
-        }
-        if (registrationChanged) {
-          await lockCacReview(tx, profile.cacNumber || current.cacNumber);
-        }
-        const applicationChanged = Object.entries(profile).some(([key, value]) => (current as any)[key] !== value);
-        if (applicationChanged && !["approved","suspended"].includes(current.status || "")) {
-          await invalidateOnboarding(tx, vendor.id);
         }
         const [saved] = await tx.update(vendors).set({ ...profile, updatedAt: new Date() })
           .where(eq(vendors.id, vendor.id)).returning();
@@ -1151,18 +1134,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const vendorId = Number(req.params.id);
       if (!Number.isSafeInteger(vendorId) || vendorId <= 0) return res.status(400).json({ message: 'Invalid vendor ID' });
       const input = cacReviewSchema.parse(req.body);
-      const { updated, userId, actor, applicant } = await db.transaction(async tx => {
-        const [record] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
-        if (!record) throw new RoleManagementError('Vendor not found', 404);
-        const lockedAccounts = await lockVerifiedAdminAndTarget(tx, (req.user as any).id, record.userId);
-        const actor = { ...lockedAccounts.actor, emailVerified: lockedAccounts.actor.email_verified, roles: lockedAccounts.actor.roles as string[] };
-        const applicant = { ...lockedAccounts.target, emailVerified: lockedAccounts.target.email_verified, roles: lockedAccounts.target.roles as string[] };
+      const { updated, userId } = await db.transaction(async tx => {
         await tx.execute(sql`SELECT id FROM vendors WHERE id = ${vendorId} FOR UPDATE`);
         const [vendor] = await tx.select().from(vendors).where(eq(vendors.id, vendorId));
         if (!vendor) throw new RoleManagementError('Vendor not found', 404);
-        if (!canReviewVendorApplication(actor, applicant)) throw new RoleManagementError('Vendor not found', 404);
-        await recordFirstVendorReview(tx, vendor, (req.user as any).id, input.decision === 'verified',
-          input.decision === 'verified' ? input.duplicateResolutionNotes : "");
         const now = new Date();
         let reviewNotes: string;
         try {
@@ -1177,22 +1152,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           identityVerifiedAt: verified ? now : null,
           businessVerifiedAt: verified ? now : null,
           verificationNotes: [vendor.verificationNotes, reviewNotes].filter(Boolean).join('\n\n---\n\n'),
-          status: vendor.status === 'approved' ? 'suspended' : vendor.status,
+          status: !verified && vendor.status === 'approved' ? 'suspended' : vendor.status,
           updatedAt: now,
         }).where(eq(vendors.id, vendorId)).returning();
-        return { updated, userId: vendor.userId, actor, applicant };
+        return { updated, userId: vendor.userId };
       });
       await storage.createNotification({
         userId,
         type: 'vendor_verification',
-        title: input.decision === 'verified' ? 'First vendor review recorded' : 'Vendor verification needs attention',
+        title: input.decision === 'verified' ? 'Vendor verification completed' : 'Vendor verification needs attention',
         message: input.decision === 'verified'
-          ? 'The first CAC, identity, and business review is complete. A different authorised reviewer must approve the application before you can sell.'
+          ? 'Your CAC, identity, and business checks are complete. Afrolandx can now approve your vendor account.'
           : `Your verification was not approved. ${input.notes || 'Contact support for the required corrections.'}`,
       });
-      res.json(vendorApplicationForReviewer(updated, applicant, actor));
+      res.json(updated);
     } catch (error) {
-      if (error instanceof RoleManagementError || error instanceof OnboardingError) return res.status(error.status).json({ message: error.message });
+      if (error instanceof RoleManagementError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: 'Complete the verification checklist' });
       console.error('Error reviewing vendor verification:', error);
       res.status(500).json({ message: 'Failed to update vendor verification' });
@@ -2026,8 +2001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = Number(req.params.id);
       const userId = req.user.id;
-      const order = await loadOwnedOrder(req, res, req.params.id, storage);
-      if (!order) return;
+      const order = await storage.getOrder(orderId);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
       const items = await storage.getOrderItemsWithProducts(orderId);
       const added: any[] = [], skipped: any[] = [], adjusted: any[] = [];
       for (const item of items) {
@@ -2287,8 +2262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req.user as any)?.id;
       if (!Number.isSafeInteger(orderId) || orderId <= 0) return res.status(400).json({ message: 'Invalid order ID' });
 
-      const order = await loadOwnedOrder(req, res, req.params.id, storage);
-      if (!order) return;
+      const order = await storage.getOrder(orderId);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
       if (order.paymentStatus !== 'paid' || order.shippingPaymentStatus !== 'rejected' || order.orderStatus !== 'awaiting_shipping_quote') {
         return res.status(409).json({ message: 'This order is not waiting for a replacement shipping quote' });
       }
@@ -2910,9 +2885,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isSafeInteger(orderId)) return res.status(400).json({ message: 'Invalid order ID' });
       if (!isPaystackInitialized()) return res.status(503).json({ message: 'Payment service not configured' });
 
-      const order = await loadOwnedOrder(req, res, req.params.id, storage);
-      if (!order) return;
-      const user = await storage.getUser(userId);
+      const [order, user] = await Promise.all([storage.getOrder(orderId), storage.getUser(userId)]);
+      if (!order || order.userId !== userId) return res.status(404).json({ message: 'Order not found' });
       if (!user?.email) return res.status(400).json({ message: 'User email required for payment' });
       if (order.paymentStatus !== 'paid') return res.status(409).json({ message: 'Pay for the order items before paying shipping' });
       if (order.shippingPaymentStatus !== 'pending') {
@@ -3192,8 +3166,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const orderId = parseInt(req.params.id);
       const userId = (req.user as any)?.id;
-      const order = await loadOwnedOrder(req, res, req.params.id, storage);
-      if (!order) return;
+      const order = await storage.getOrder(orderId);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+      if (order.userId !== userId) return res.status(403).json({ message: 'Forbidden' });
       if (order.paymentStatus === 'pending') {
         if (!await unpaidCheckoutCanClose(order, completeVerifiedOrder)) {
           return res.status(409).json({ message: 'Payment is confirmed or still being checked. Do not pay again. Refresh My Orders.' });
@@ -3242,8 +3217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       if (measurementData.orderId) {
-        const order = await loadOwnedOrder(req, res, measurementData.orderId, storage);
-        if (!order) return;
+        const order = await storage.getOrder(measurementData.orderId);
+        if (!order || order.userId !== userId) return res.status(400).json({ message: 'Invalid order' });
         const items = await storage.getOrderItemsWithProducts(order.id);
         if (measurementData.productId && !items.some(item => item.productId === measurementData.productId)) {
           return res.status(400).json({ message: 'Product is not part of this order' });

@@ -2,7 +2,6 @@ import { escapeHtml as escape } from "./html-utils";
 import { policies, type Policy } from "../client/src/lib/policies";
 import { SUPPORT_HOURS } from "../shared/customer-support";
 import { faqItems } from "../shared/support-faq";
-import { accessibilityStatement } from "../shared/accessibility-statement";
 import { publicPages, type MetadataProduct, type MetadataEntity, type PageMetadata } from "../shared/page-metadata";
 
 export interface PublicContentData {
@@ -55,12 +54,6 @@ export function renderPublicContent(metadata: PageMetadata, data: PublicContentD
     content = `<ul>${policies.map(policy => `<li>${link(`/policies/${policy.slug}`, policy.title)}${paragraph(policy.summary)}</li>`).join("")}</ul>`;
   } else if (path === "/faq") {
     content = faqItems.map(item => `<section><h2>${escape(item.q)}</h2>${paragraph(item.a)}</section>`).join("");
-  } else if (path === "/accessibility") {
-    title = accessibilityStatement.title;
-    content = `${paragraph(accessibilityStatement.intro)}${paragraph(`Last updated: ${accessibilityStatement.updated}`)}
-      ${accessibilityStatement.sections.map(section => `<section><h2>${escape(section.heading)}</h2>${paragraph(section.body)}</section>`).join("")}
-      <h2>Accessibility support</h2>${link("mailto:support@afrolandx.com", "support@afrolandx.com")} ·
-      ${link("https://wa.me/2347082427348", "WhatsApp: +234 708 242 7348")}${paragraph(`Support hours: ${SUPPORT_HOURS}.`)}`;
   } else if (path === "/contact") {
     content = `<h2>Email support</h2>${link("mailto:support@afrolandx.com", "support@afrolandx.com")}
       <h2>WhatsApp</h2>${link("https://wa.me/2347082427348", "+234 708 242 7348")}
@@ -83,6 +76,5 @@ export function renderPublicContent(metadata: PageMetadata, data: PublicContentD
     <header class="ssr-nav">${link("/", "Afrolandx")} ${link("/products", "Products")} ${link("/policies", "Policies")} ${link("/contact", "Contact")}</header>
     <main class="policy-shell"><h1 class="policy-title">${escape(title)}</h1>${content}</main>
     <footer class="ssr-nav">${link("/faq", "FAQ")} ${link("/size-guide", "Size guide")} ${link("/shipping-information", "Shipping")} ${link("/returns", "Returns")}
-    ${link("/accessibility", "Accessibility")}
     ${paragraph("Afrolandx · CAC REG: 7039498")}</footer></div>`;
 }

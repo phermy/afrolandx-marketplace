@@ -1,16 +1,21 @@
-import { useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import Navbar from "@/components/navbar";
-import HomeHero from "@/components/home-hero";
 import SiteFooter from "@/components/site-footer";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/lib/roleUtils";
+import { ChevronLeft, ChevronRight, Menu, X, Package, Calendar, Zap, MapPin, Info, Pause, Play } from "lucide-react";
 import type { Product } from "@/types";
+import logoImage from '@assets/Group 1000002646_1749631956471.png';
+import useEmblaCarousel from 'embla-carousel-react';
 import HeritageEditorial from "@/components/heritage-editorial";
 import HeritageCarousel from "@/components/heritage-carousel";
+
+const homeImage = (basename: string) => `/images/home/${basename}`;
 
 type PublicMarketplaceStats = {
   verifiedVendors: number;
@@ -20,8 +25,54 @@ type PublicMarketplaceStats = {
   interactionWindow: '24h';
 };
 
+const culturalSlides = [
+  { image: homeImage("pan_african_diversity"), country: "Across Africa", label: "Unity in Diversity", flag: "AF" },
+  { image: homeImage("maasai_warriors_kenya"), country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
+  { image: homeImage("african_leader_mandela_tribute"), country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
+  { image: homeImage("ethiopian_traditional_timkat"), country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
+  { image: homeImage("ghanaian_ashanti_chief"), country: "Ghana", label: "Ashanti Royal Heritage", flag: "GH" },
+  { image: homeImage("moroccan_berber_culture"), country: "Morocco", label: "Berber Tradition", flag: "MA" },
+  { image: homeImage("ndebele_south_africa"), country: "South Africa", label: "Ndebele Cultural Art", flag: "ZA" },
+  { image: homeImage("rwandan_intore_dancer"), country: "Rwanda", label: "Intore Ceremony", flag: "RW" },
+  { image: homeImage("african_kente_cloth__8cfc9c20"), country: "West Africa", label: "Kente Cloth", flag: "AF" },
+];
+
 export default function Landing() {
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedSlide, setSelectedSlide] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+  const [isCarouselFocused, setIsCarouselFocused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelectedSlide(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  useEffect(() => {
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setPrefersReducedMotion(motionPreference.matches);
+    motionPreference.addEventListener("change", updateMotionPreference);
+    return () => motionPreference.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (!emblaApi || isCarouselPaused || isCarouselHovered || isCarouselFocused || prefersReducedMotion) return;
+    const autoplay = window.setInterval(() => {
+      if (!document.hidden) emblaApi.scrollNext();
+    }, 6500);
+    return () => window.clearInterval(autoplay);
+  }, [emblaApi, isCarouselPaused, isCarouselHovered, isCarouselFocused, prefersReducedMotion]);
 
   // Fetch only approved products for display on landing page
   const { data: products = [], isPending: productsLoading, isError: productsError } = useQuery<Product[]>({
@@ -67,10 +118,245 @@ export default function Landing() {
     }
   }, [toast]);
 
+  useEffect(() => {
+    if (!isVendorModalOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsVendorModalOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isVendorModalOpen]);
+
+  const handleLogin = () => {
+    window.location.href = "/login";
+  };
+
+  const handleAdminPortalClick = () => {
+    // Redirect to login with admin intent
+    window.location.href = '/login';
+  };
+
+  const handleMobileMenuLink = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const destination = event.currentTarget.getAttribute("href");
+    setIsMobileMenuOpen(false);
+    if (!destination) return;
+    if (destination.startsWith("#")) {
+      window.history.pushState({}, "", destination);
+      document.querySelector(destination)?.scrollIntoView();
+    } else {
+      window.location.assign(destination);
+    }
+  };
+
   return (
     <div className="landing-page min-h-screen bg-gray-50 text-left">
-      <Navbar />
-      <HomeHero variant="guest" />
+      {/* Navigation */}
+      <nav className="bg-white shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian">
+                <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
+                <span className="hidden sm:block">Afrolandx</span>
+              </div>
+            </div>
+
+            {/* Desktop Nav Links */}
+            <div className="hidden lg:flex items-center space-x-6">
+              <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-products">Products</a>
+              <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
+              <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
+              {isAuthenticated && isAdmin(user) && <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>}
+              <Link href="/policies" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">Policies</Link>
+              <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">About</a>
+            </div>
+
+            {/* Right actions */}
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden lg:flex border-green-700 text-green-700 hover:bg-green-50">
+                Sign In
+              </Button>
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4 hidden lg:flex">
+                Sign Up
+              </Button>
+              {/* Mobile Hamburger */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="landing-mobile-menu"
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div id="landing-mobile-menu" className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+            <div className="px-4 py-4 space-y-1 pb-24">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Explore</p>
+              <a href="/products" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-products">
+                <Package className="w-5 h-5" /><span>Products</span>
+              </a>
+              <a href="/events" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-events">
+                <Calendar className="w-5 h-5" /><span>Events</span>
+              </a>
+              <a href="/collab-drops" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-collab-drops">
+                <Zap className="w-5 h-5" /><span>Collab Drops</span>
+              </a>
+              {isAuthenticated && isAdmin(user) && <a href="/discover" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-discover">
+                <MapPin className="w-5 h-5" /><span>Discover Africa</span>
+              </a>}
+              <a href="#about" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
+                <Info className="w-5 h-5" /><span>About</span>
+              </a>
+              <a href="/policies" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
+                <Info className="w-5 h-5" /><span>Policies</span>
+              </a>
+              <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
+                <Button onClick={() => { setIsMobileMenuOpen(false); handleLogin(); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
+                  Sign In
+                </Button>
+                <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
+                  Sign Up: Create Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Hero Section with Cultural Carousel */}
+      <section
+        className="relative min-h-[calc(100svh-64px)] overflow-hidden"
+        aria-label="African fashion gallery"
+        aria-roledescription="carousel"
+        onMouseEnter={() => setIsCarouselHovered(true)}
+        onMouseLeave={() => setIsCarouselHovered(false)}
+        onFocusCapture={() => setIsCarouselFocused(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setIsCarouselFocused(false);
+        }}
+      >
+        {/* Cultural Images Carousel */}
+        <div className="absolute inset-0" ref={emblaRef}>
+          <div className="flex h-full">
+            {culturalSlides.map((slide, index) => (
+              <div key={index} className="flex-[0_0_100%] min-w-0 relative" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${culturalSlides.length}: ${slide.label}`} aria-hidden={index !== selectedSlide}>
+                <img
+                  src={`${slide.image}-1280.webp`}
+                  srcSet={`${slide.image}-640.webp 640w, ${slide.image}-1280.webp 1280w`}
+                  sizes="100vw"
+                  alt={`${slide.label} — ${slide.country}`}
+                  className="w-full h-full object-cover"
+                  loading={index === 0 ? "eager" : "lazy"}
+                  {...{ fetchpriority: index === 0 ? "high" : "auto" }}
+                  decoding="async"
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-green-900/75 to-emerald-800/80"></div>
+                {/* Slide culture badge */}
+                <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
+                  <span className="text-base sm:text-xl">{slide.flag}</span>
+                  <div>
+              <p className="text-white font-semibold text-sm leading-tight">{slide.label}</p>
+              <p className="text-amber-200 text-sm mt-0.5">{slide.country}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pattern Overlay */}
+         <div className="pointer-events-none absolute inset-0 z-10" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.06'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundSize: '60px 60px'
+        }}></div>
+
+        {/* Hero Content */}
+        <div className="relative z-20 max-w-7xl mx-auto px-4 py-20 sm:px-6 sm:py-24 lg:px-8 min-h-[calc(100svh-64px)] flex items-center">
+          <div className="text-center w-full">
+            <h1 className="text-2xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-3 sm:mb-6 md:mb-8 text-white">
+              <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
+                Discover Authentic
+              </span>
+              <span className="block text-amber-300 mt-1 sm:mt-2">
+                African Fashion
+              </span>
+            </h1>
+            {/* Full description — hidden on small screens to save space */}
+            <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-white leading-relaxed px-4">
+              From Nigerian Aso Oke and Ghanaian Kente to Ethiopian Habesha clothing and Maasai beadwork, celebrate the rich cultural heritage of communities across Africa.
+            </p>
+            {/* Compact description — only on mobile */}
+            <p className="block sm:hidden text-base mb-6 max-w-xs mx-auto text-white leading-relaxed px-2">
+              Discover African fashion and the makers behind it.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+              <Button
+                onClick={() => window.location.href = "/register"}
+                size="lg"
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-black font-bold text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200 w-full sm:w-auto max-w-xs sm:max-w-none"
+              >
+                Create Free Account
+              </Button>
+              <Button
+                size="lg"
+                className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 font-semibold border border-white/30 hover:border-white/50 text-base px-6 py-3 sm:py-4 rounded-full shadow-xl transform hover:scale-105 transition-all duration-200 w-full sm:w-auto max-w-xs sm:max-w-none"
+                onClick={() => setIsVendorModalOpen(true)}
+              >
+                Become a Vendor
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel Indicators */}
+        <button
+          type="button"
+          className="absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => setIsCarouselPaused(value => !value)}
+          aria-label={prefersReducedMotion ? "Automatic slide advance disabled by reduced motion preference" : isCarouselPaused ? "Play image carousel" : "Pause image carousel"}
+          aria-pressed={isCarouselPaused}
+          disabled={prefersReducedMotion}
+        >
+          {isCarouselPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+        </button>
+        <div className="absolute bottom-2 left-2 right-2 z-30 flex items-center justify-center gap-1 sm:gap-2" aria-label="Carousel controls">
+          <button type="button" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous image">
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          {culturalSlides.map((slide, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => emblaApi?.scrollTo(index)}
+              className="flex h-10 w-6 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-7"
+              aria-label={`Show ${slide.label}, image ${index + 1} of ${culturalSlides.length}`}
+              aria-current={index === selectedSlide ? "true" : undefined}
+            >
+              <span aria-hidden="true" className={`h-2.5 rounded-full transition-all ${index === selectedSlide ? "w-4 bg-white" : "w-2.5 bg-white/60 hover:bg-white"}`} />
+            </button>
+          ))}
+          <button type="button" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => emblaApi?.scrollNext()} aria-label="Next image">
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      </section>
 
       {/* Live marketplace proof points */}
       <section id="marketplace-stats" className="border-b-[6px] border-emerald-500 bg-white" aria-label="Afrolandx marketplace statistics">
@@ -308,7 +594,7 @@ export default function Landing() {
               <div className="flex justify-center items-center space-x-8 mb-4">
                 <Badge variant="outline" className="text-lg font-bold text-blue-600 px-3 py-2">UPS</Badge>
                 <Badge variant="outline" className="text-lg font-bold text-purple-600 px-3 py-2">FedEx</Badge>
-                <Badge variant="outline" className="text-lg font-bold text-yellow-800 px-3 py-2">DHL</Badge>
+                <Badge variant="outline" className="text-lg font-bold text-yellow-600 px-3 py-2">DHL</Badge>
               </div>
               <p className="text-base text-gray-700">
                 Availability and shipping cost are confirmed for your destination.
@@ -360,11 +646,11 @@ export default function Landing() {
               Start Shopping Now
             </Button>
             <Button
-              asChild
               size="lg"
               className="bg-white text-nigerian-green hover:bg-gray-100 font-semibold border-2 border-white w-full sm:w-auto max-w-xs sm:max-w-none"
+              onClick={() => setIsVendorModalOpen(true)}
             >
-              <Link href="/vendor/apply">Sell your work</Link>
+              Become a Vendor
             </Button>
           </div>
         </div>
@@ -373,6 +659,63 @@ export default function Landing() {
       {/* Footer */}
       <SiteFooter />
 
+      {/* Vendor Modal */}
+      {isVendorModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <Card role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title" className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle id="vendor-modal-title" className="text-xl font-bold">Become a Vendor</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setIsVendorModalOpen(false)}
+                  aria-label="Close vendor information"
+                  autoFocus
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-6">
+                Join our community of African artisans and designers. Share your authentic 
+                fashion creations with customers worldwide.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Access to global customers
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Secure payment processing
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Marketing support
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Product verification assistance
+                </div>
+              </div>
+              <div className="mt-6 space-y-3">
+                <Button onClick={() => window.location.href = "/register?as=vendor"} className="w-full btn-nigerian">
+                  Get Started as Vendor
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => setIsVendorModalOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

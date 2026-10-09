@@ -26,7 +26,6 @@ const Profile = lazyWithRetry(() => import("@/pages/profile"));
 const MyOrders = lazyWithRetry(() => import("@/pages/my-orders"));
 const OrderSuccess = lazyWithRetry(() => import("@/pages/order-success"));
 const VendorDashboard = lazyWithRetry(() => import("@/pages/vendor-dashboard"));
-const VendorApply = lazyWithRetry(() => import("@/pages/vendor-apply"));
 const AdminDashboard = lazyWithRetry(() => import("@/pages/admin-dashboard"));
 const AdminProductReview = lazyWithRetry(() => import("@/pages/admin-product-review"));
 const AdminFinance = lazyWithRetry(() => import("@/pages/admin-finance"));
@@ -53,7 +52,6 @@ const FaqPage = lazyWithRetry(() => import("@/pages/support-pages").then(module 
 const SizeGuidePage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.SizeGuidePage })));
 const ShippingInformationPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ShippingInformationPage })));
 const ReturnsPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ReturnsPage })));
-const AccessibilityPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.AccessibilityPage })));
 
 class RouteChunkErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -137,10 +135,10 @@ function Router() {
     <Switch>
       {/* Auth pages — always accessible, redirect home if already logged in */}
       <Route path="/login">
-        {isAuthenticated ? <AuthRedirect to={user?.signupIntent === "vendor" ? "/vendor/apply" : "/"} /> : <Login />}
+        {isAuthenticated ? <AuthRedirect to={user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Login />}
       </Route>
       <Route path="/register">
-        {isAuthenticated ? <AuthRedirect to={new URLSearchParams(window.location.search).get("as") === "vendor" || user?.signupIntent === "vendor" ? "/vendor/apply" : "/"} /> : <Register />}
+        {isAuthenticated ? <AuthRedirect to={new URLSearchParams(window.location.search).get("as") === "vendor" || user?.signupIntent === "vendor" ? "/vendor" : "/"} /> : <Register />}
       </Route>
       <Route path="/forgot-password">
         <ForgotPassword />
@@ -152,7 +150,6 @@ function Router() {
       <Route path="/size-guide" component={SizeGuidePage} />
       <Route path="/shipping-information" component={ShippingInformationPage} />
       <Route path="/returns" component={ReturnsPage} />
-      <Route path="/accessibility" component={AccessibilityPage} />
       <Route path="/products/:id" component={ProductDetail} />
       <Route path="/products" component={Products} />
       <Route path="/vendors/:id" component={PublicVendor} />
@@ -197,7 +194,6 @@ function Router() {
       <Route path="/vendor/finance">
         {!isAuthenticated ? <AuthRedirect to="/login" /> : isVendor(user) ? <VendorFinance /> : <AuthRedirect to="/vendor" />}
       </Route>
-      <Route path="/vendor/apply" component={VendorApply} />
       <Route path="/checkout">
         <Checkout />
       </Route>

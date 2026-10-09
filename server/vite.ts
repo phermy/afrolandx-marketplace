@@ -7,7 +7,6 @@ import viteConfig from "../vite.config";
 import { nanoid } from "nanoid";
 import { renderPageHtml } from "./public-pages";
 import { pageMetadata } from "../shared/page-metadata";
-import { withCspNonce } from "./security-headers";
 
 const viteLogger = createLogger();
 
@@ -63,7 +62,7 @@ export async function setupVite(app: Express, server: Server) {
       );
       const metadata = res.locals.pageMetadata || pageMetadata(req.originalUrl.split("?")[0]);
       const page = await vite.transformIndexHtml(url, renderPageHtml(template, metadata, true, res.locals.publicContent));
-      res.status(metadata.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(withCspNonce(page, res.locals.cspNonce));
+      res.status(metadata.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -88,7 +87,7 @@ export function serveStatic(app: Express, distPath = path.resolve(import.meta.di
     try {
       const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf8");
       const metadata = res.locals.pageMetadata || pageMetadata(req.originalUrl.split("?")[0]);
-      res.status(metadata.status).type("html").set("Cache-Control", "no-store").send(withCspNonce(renderPageHtml(template, metadata, false, res.locals.publicContent), res.locals.cspNonce));
+      res.status(metadata.status).type("html").set("Cache-Control", "no-store").send(renderPageHtml(template, metadata, false, res.locals.publicContent));
     } catch (error) { next(error); }
   });
 }

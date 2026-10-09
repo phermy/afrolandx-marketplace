@@ -6,7 +6,6 @@ import SiteFooter from "@/components/site-footer";
 import { policies } from "@/lib/policies";
 import { SUPPORT_HOURS } from "@shared/customer-support";
 import { faqItems } from "@shared/support-faq";
-import { accessibilityStatement } from "@shared/accessibility-statement";
 
 function SupportLayout({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro: string; children: ReactNode }) {
   return <div className="min-h-screen bg-[#fbf8f2]"><Navbar />
@@ -59,23 +58,6 @@ export function ContactPage() {
     </section>
     <p className="support-note">Never send a password, card security code or full bank account details by email or WhatsApp.</p>
     <div className="support-next-links"><Link href="/faq">Browse common questions <ArrowRight aria-hidden="true" /></Link><Link href="/policies">Visit the trust centre <ArrowRight aria-hidden="true" /></Link></div>
-  </SupportLayout>;
-}
-
-export function AccessibilityPage() {
-  return <SupportLayout eyebrow="Accessibility" title={accessibilityStatement.title} intro={accessibilityStatement.intro}>
-    <p className="support-note">Last updated: {accessibilityStatement.updated}</p>
-    <div className="policy-article">
-      {accessibilityStatement.sections.map(section => <section key={section.heading}>
-        <h2>{section.heading}</h2><p>{section.body}</p>
-      </section>)}
-    </div>
-    <section className="support-callout" aria-labelledby="accessibility-support">
-      <h2 id="accessibility-support">Accessibility support</h2>
-      <p>Email <a href="mailto:support@afrolandx.com">support@afrolandx.com</a> or message us on <a href="https://wa.me/2347082427348" target="_blank" rel="noreferrer">WhatsApp: +234 708 242 7348</a>.</p>
-      <p>Support hours: {SUPPORT_HOURS}.</p>
-    </section>
-    <div className="support-next-links"><Link href="/contact">Contact support <ArrowRight aria-hidden="true" /></Link><Link href="/faq">Browse common questions <ArrowRight aria-hidden="true" /></Link></div>
   </SupportLayout>;
 }
 

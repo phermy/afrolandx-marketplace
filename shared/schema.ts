@@ -10,7 +10,6 @@ import {
   decimal,
   boolean,
   serial,
-  customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -128,38 +127,6 @@ export const vendors = pgTable("vendors", {
 ]);
 
 // Categories table
-const evidenceBytes = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
-export const vendorOnboardingState = pgTable("vendor_onboarding_state", {
-  vendorId: integer("vendor_id").primaryKey().references(() => vendors.id),
-  revision: integer("revision").notNull().default(1),
-  submittedAt: timestamp("submitted_at", { withTimezone: true }),
-  firstReviewerId: varchar("first_reviewer_id").references(() => users.id),
-  firstReviewedAt: timestamp("first_reviewed_at", { withTimezone: true }),
-  duplicateFingerprint: text("duplicate_fingerprint"),
-  duplicateResolutionNotes: text("duplicate_resolution_notes"),
-  secondReviewerId: varchar("second_reviewer_id").references(() => users.id),
-  secondReviewedAt: timestamp("second_reviewed_at", { withTimezone: true }),
-  nextReviewAt: timestamp("next_review_at", { withTimezone: true }),
-  lastMonitoredAt: timestamp("last_monitored_at", { withTimezone: true }),
-});
-export const vendorApplicationEvidence = pgTable("vendor_application_evidence", {
-  id: serial("id").primaryKey(),
-  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
-  kind: varchar("kind", { length: 32 }).notNull(),
-  originalName: varchar("original_name", { length: 160 }).notNull(),
-  mimeType: varchar("mime_type", { length: 64 }).notNull(),
-  content: evidenceBytes("content").notNull(),
-  bytes: integer("bytes").notNull(),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-}, table => [uniqueIndex("vendor_evidence_kind_unique").on(table.vendorId, table.kind)]);
-export const vendorMonitoringReviews = pgTable("vendor_monitoring_reviews", {
-  id: serial("id").primaryKey(),
-  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
-  reviewerId: varchar("reviewer_id").notNull().references(() => users.id),
-  notes: text("notes").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export const vendorShippingProfiles = pgTable("vendor_shipping_profiles", {
   vendorId: integer("vendor_id").primaryKey().references(() => vendors.id),
   address: jsonb("address").notNull(),

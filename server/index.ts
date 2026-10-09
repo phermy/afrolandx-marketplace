@@ -20,7 +20,6 @@ import {
 } from "@shared/schema";
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { securityHeaders } from "./security-headers";
-import { rejectClientAmounts } from "./server-amounts";
 import { registerPublicPages } from "./public-pages";
 import compression from "compression";
 
@@ -38,14 +37,6 @@ app.use(express.json({
   },
 }));
 app.use(express.urlencoded({ extended: false }));
-app.use((req, res, next) => {
-  const paymentInput = req.method === "POST" && (
-    /^\/api\/orders\/(preview-total|initialize-payment|[^/]+\/initialize-shipping-payment)\/?$/.test(req.path)
-    || req.path === "/api/discover/premium/initialize"
-  );
-  if (paymentInput) return rejectClientAmounts(req, res, next);
-  next();
-});
 
 app.use((req, res, next) => {
   const start = Date.now();

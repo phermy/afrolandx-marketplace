@@ -58,9 +58,9 @@ const MENU: Record<string, MenuSection> = {
           { label: 'Yoruba Styles', href: '/products?search=yoruba' },
           { label: 'Igbo Fashion', href: '/products?search=igbo' },
           { label: 'Hausa Fashion', href: '/products?search=hausa' },
-          { label: 'Ghanaian Kente', href: '/products?originCountry=Ghana' },
-          { label: 'Kenyan Styles', href: '/products?originCountry=Kenya' },
-          { label: 'Senegalese Wear', href: '/products?originCountry=Senegal' },
+          { label: '🇬🇭 Ghanaian Kente', href: '/products?originCountry=Ghana' },
+          { label: '🇰🇪 Kenyan Styles', href: '/products?originCountry=Kenya' },
+          { label: '🇸🇳 Senegalese Wear', href: '/products?originCountry=Senegal' },
         ],
       },
     ],
@@ -111,8 +111,8 @@ const MENU: Record<string, MenuSection> = {
           { label: 'Yoruba Agbada', href: '/products?search=yoruba+agbada' },
           { label: 'Igbo Isi-Agu', href: '/products?search=isi+agu' },
           { label: 'Hausa Babban Riga', href: '/products?search=babban+riga' },
-          { label: 'Ghanaian Kente', href: '/products?originCountry=Ghana' },
-          { label: 'Ethiopian Habesha', href: '/products?originCountry=Ethiopia' },
+          { label: '🇬🇭 Ghanaian Kente', href: '/products?originCountry=Ghana' },
+          { label: '🇪🇹 Ethiopian Habesha', href: '/products?originCountry=Ethiopia' },
         ],
       },
     ],
@@ -357,40 +357,40 @@ const MENU: Record<string, MenuSection> = {
       {
         heading: 'West Africa',
         links: [
-          { label: 'Nigeria', href: '/products?originCountry=Nigeria' },
-          { label: 'Ghana', href: '/products?originCountry=Ghana' },
-          { label: 'Senegal', href: '/products?originCountry=Senegal' },
-          { label: 'Côte d\'Ivoire', href: '/products?originCountry=C%C3%B4te+d%27Ivoire' },
-          { label: 'Mali', href: '/products?originCountry=Mali' },
-          { label: 'Benin', href: '/products?originCountry=Benin' },
+          { label: '🇳🇬 Nigeria', href: '/products?originCountry=Nigeria' },
+          { label: '🇬🇭 Ghana', href: '/products?originCountry=Ghana' },
+          { label: '🇸🇳 Senegal', href: '/products?originCountry=Senegal' },
+          { label: '🇨🇮 Côte d\'Ivoire', href: '/products?originCountry=C%C3%B4te+d%27Ivoire' },
+          { label: '🇲🇱 Mali', href: '/products?originCountry=Mali' },
+          { label: '🇧🇯 Benin', href: '/products?originCountry=Benin' },
         ],
       },
       {
         heading: 'East Africa',
         links: [
-          { label: 'Kenya', href: '/products?originCountry=Kenya' },
-          { label: 'Ethiopia', href: '/products?originCountry=Ethiopia' },
-          { label: 'Tanzania', href: '/products?originCountry=Tanzania' },
-          { label: 'Uganda', href: '/products?originCountry=Uganda' },
-          { label: 'Rwanda', href: '/products?originCountry=Rwanda' },
+          { label: '🇰🇪 Kenya', href: '/products?originCountry=Kenya' },
+          { label: '🇪🇹 Ethiopia', href: '/products?originCountry=Ethiopia' },
+          { label: '🇹🇿 Tanzania', href: '/products?originCountry=Tanzania' },
+          { label: '🇺🇬 Uganda', href: '/products?originCountry=Uganda' },
+          { label: '🇷🇼 Rwanda', href: '/products?originCountry=Rwanda' },
         ],
       },
       {
         heading: 'North Africa',
         links: [
-          { label: 'Morocco', href: '/products?originCountry=Morocco' },
-          { label: 'Egypt', href: '/products?originCountry=Egypt' },
-          { label: 'Tunisia', href: '/products?originCountry=Tunisia' },
-          { label: 'Algeria', href: '/products?originCountry=Algeria' },
+          { label: '🇲🇦 Morocco', href: '/products?originCountry=Morocco' },
+          { label: '🇪🇬 Egypt', href: '/products?originCountry=Egypt' },
+          { label: '🇹🇳 Tunisia', href: '/products?originCountry=Tunisia' },
+          { label: '🇩🇿 Algeria', href: '/products?originCountry=Algeria' },
         ],
       },
       {
         heading: 'Southern Africa',
         links: [
-          { label: 'South Africa', href: '/products?originCountry=South+Africa' },
-          { label: 'Zimbabwe', href: '/products?originCountry=Zimbabwe' },
-          { label: 'Zambia', href: '/products?originCountry=Zambia' },
-          { label: 'Botswana', href: '/products?originCountry=Botswana' },
+          { label: '🇿🇦 South Africa', href: '/products?originCountry=South+Africa' },
+          { label: '🇿🇼 Zimbabwe', href: '/products?originCountry=Zimbabwe' },
+          { label: '🇿🇲 Zambia', href: '/products?originCountry=Zambia' },
+          { label: '🇧🇼 Botswana', href: '/products?originCountry=Botswana' },
         ],
       },
     ],
@@ -462,10 +462,9 @@ export default function MegaMenu() {
       className="relative bg-gray-50 border-b border-gray-200"
       onMouseLeave={isHoverDevice ? scheduleClose : undefined}
     >
-      <style>{`.mega-menu__tab-scroll { scrollbar-width: none; -ms-overflow-style: none; } .mega-menu__tab-scroll::-webkit-scrollbar { display: none; }`}</style>
       {/* ── Tab row ─────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-        <div className="mega-menu__tab-scroll flex items-center gap-0 overflow-x-auto">
+        <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
           {TABS.map(tab => (
             <button
               key={tab}
@@ -500,7 +499,7 @@ export default function MegaMenu() {
             </button>
             <button
               onClick={() => handleLinkClick('/collab-drops')}
-              className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-800 whitespace-nowrap transition-colors"
+              className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-600 whitespace-nowrap transition-colors"
             >
               Collab Drops
             </button>
@@ -616,7 +615,7 @@ export default function MegaMenu() {
                 <div className="bg-gradient-to-br from-nigerian-green/10 to-nigerian-gold/10 rounded-2xl p-5 text-center">
                   <p className="mb-2 text-sm font-semibold text-nigerian-green">AFRICAN MAKERS</p>
                   <p className="text-xs font-bold text-nigerian-green mb-1">Authentic African fashion</p>
-                    <p className="text-xs text-gray-500 mb-3">African makers, one marketplace</p>
+                  <p className="text-xs text-gray-500 mb-3">54 countries, one marketplace</p>
                   <button
                     onClick={() => handleLinkClick('/lookbook')}
                     className="text-xs font-semibold text-nigerian-green border border-nigerian-green rounded-full px-3 py-1.5 hover:bg-nigerian-green hover:text-white transition-colors"
@@ -626,7 +625,7 @@ export default function MegaMenu() {
                 </div>
                 <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
                   <p className="text-xs font-bold text-amber-700 mb-1">Collab Drops</p>
-                  <p className="text-xs text-amber-800 mb-2">Limited edition designer collaborations are available now.</p>
+                  <p className="text-xs text-amber-600 mb-2">Limited edition designer collaborations are available now.</p>
                   <button
                     onClick={() => handleLinkClick('/collab-drops')}
                     className="text-xs font-semibold text-amber-700 hover:underline"

@@ -168,9 +168,8 @@ export default function Messages() {
                   className="md:hidden"
                   onClick={() => setSelectedConversation(null)}
                   data-testid="button-back-to-conversations"
-                  aria-label="Back to conversations"
                 >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <CardTitle>
                   {conversations?.find(c => c.otherUser.id === selectedConversation) &&
@@ -225,9 +224,8 @@ export default function Messages() {
                     data-testid="button-send-message"
                     disabled={!messageInput.trim() || sendMessageMutation.isPending}
                     size="icon"
-                    aria-label="Send message"
                   >
-                    <Send className="h-4 w-4" aria-hidden="true" />
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

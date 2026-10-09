@@ -182,9 +182,8 @@ function PlaceDetailsDialog({
             size="icon"
             className="absolute top-2 right-2 bg-white/80 hover:bg-white"
             onClick={onClose}
-            aria-label={`Close details for ${fullPlace.displayName.text}`}
           >
-            <X className="h-4 w-4" aria-hidden="true" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
         

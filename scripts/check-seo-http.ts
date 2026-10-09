@@ -21,13 +21,11 @@ const port = (server.address() as { port: number }).port;
 const base = `http://127.0.0.1:${port}`;
 try {
   for (const route of ["/", "/products", "/contact", "/faq", "/size-guide", "/returns",
-    "/accessibility",
     "/shipping-information", "/policies", "/policies/prohibited-and-restricted-products"]) {
     const response = await fetch(base + route);
     const html = await response.text();
     assert.equal(response.status, 200, route);
     assert.match(html, /data-server-rendered/, route);
-    assert.match(html, /<html lang="en-NG">/, route);
     assert.match(html, /property="og:image"/, route);
     assert.match(html, /rel="canonical"/, route);
     assert.match(html, /application\/ld\+json/, route);

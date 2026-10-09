@@ -600,29 +600,6 @@ export default function VendorDashboard() {
     );
   }
 
-  if (!vendor || vendor.status === "pending" || vendor.status === "rejected") {
-    const title = vendor?.status === "pending" ? "Your application is in review" : vendor?.status === "rejected" ? "Your application needs attention" : "Begin your maker application";
-    const description = vendor?.status === "pending"
-      ? "Your business is not approved to sell yet. Complete the evidence and review steps on your application page."
-      : vendor?.status === "rejected"
-        ? "Review the requested changes and update your documents or business details before submitting again."
-        : "Tell us about your business and provide the documents needed for a two step review.";
-    return (
-      <div className="min-h-[100dvh] bg-[#f5f1e8]">
-        <Navbar />
-        <main className="mx-auto flex max-w-3xl flex-col items-start px-4 py-16 sm:px-8">
-          <div className="rounded-2xl border border-[#e2dacb] bg-[#fffdf8] p-7 shadow-sm sm:p-10">
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-[#a35c3f]">Afrolandx maker application</p>
-            <h1 className="mt-3 font-['Space_Grotesk'] text-3xl font-semibold text-[#1b302c]">{title}</h1>
-            <p className="mt-3 max-w-xl leading-7 text-[#627067]">{description}</p>
-            {vendor?.status === "pending" && <p className="mt-5 rounded-lg bg-[#f5f0e5] p-4 text-sm leading-6 text-[#665c49]">Submitting an application does not activate selling. A first reviewer checks your CAC registration and a different authorised reviewer makes the final approval.</p>}
-            <Button asChild className="mt-6 bg-[#245c49] text-white hover:bg-[#1a493a]"><Link href="/vendor/apply">Continue to application</Link></Button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   if (!vendor && !isRegistering) {
     // Show vendor registration form
     return (
@@ -730,6 +707,51 @@ export default function VendorDashboard() {
     );
   }
 
+  if (vendor?.status === "pending") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <Card>
+            <CardContent className="text-center py-12">
+              <div className="text-6xl mb-4">⏳</div>
+              <h2 className="text-2xl font-bold mb-4">Application Under Review</h2>
+              <p className="text-gray-600 mb-6">
+                Thank you for your vendor application! Our admin team is reviewing your submission. 
+                You'll receive an email notification once your application is approved.
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                You must provide a CAC registration number and pass administrator verification before you can upload products or sell.
+              </p>
+              <form className="mb-6 space-y-2 text-left" onSubmit={event => {
+                event.preventDefault();
+                const value = String(new FormData(event.currentTarget).get("cacNumber") || "").trim();
+                if (value) updatePendingCacMutation.mutate(value);
+              }}>
+                <Label htmlFor="pendingCacNumber">Business registration / CAC number</Label>
+                <Input id="pendingCacNumber" name="cacNumber" defaultValue={vendor.cacNumber || ""} minLength={3} maxLength={60} required />
+                <Button type="submit" variant="outline" disabled={updatePendingCacMutation.isPending}>
+                  {updatePendingCacMutation.isPending ? "Saving…" : "Save registration number"}
+                </Button>
+              </form>
+              <Badge variant="secondary" className="badge-pending mb-6 block w-fit mx-auto">
+                Status: Pending Approval
+              </Badge>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/vendors/me"] })}
+              >
+                <RefreshCw className="w-4 h-4" />
+                Check Approval Status
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (vendor?.status === "suspended") {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -737,6 +759,7 @@ export default function VendorDashboard() {
         <div className="max-w-2xl mx-auto px-4 py-12">
           <Card>
             <CardContent className="text-center py-12">
+              <div className="text-6xl mb-4">⚠️</div>
               <h2 className="text-2xl font-bold mb-4">Account Suspended</h2>
               <p className="text-gray-600 mb-6">
                 Your vendor account has been suspended. Please contact our support team for more information.
@@ -797,6 +820,7 @@ export default function VendorDashboard() {
                     <div key={notification.id} className="flex items-start justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-start space-x-3">
                         <div className="text-green-600 text-lg">
+                          {notification.type === 'order' ? '🎉' : '📢'}
                         </div>
                         <div className="flex-1">
                           <h4 className="font-semibold text-green-800">{notification.title}</h4>
@@ -812,9 +836,8 @@ export default function VendorDashboard() {
                         onClick={() => dismissNotificationMutation.mutate(notification.id)}
                         className="h-8 w-8 p-0 hover:bg-green-200"
                         disabled={dismissNotificationMutation.isPending}
-                        aria-label={`Dismiss notification: ${notification.title}`}
                       >
-                        <X className="w-4 h-4 text-green-600" aria-hidden="true" />
+                        <X className="w-4 h-4 text-green-600" />
                       </Button>
                     </div>
                   ))}
@@ -947,7 +970,7 @@ export default function VendorDashboard() {
                       const statusColor = product.status === 'approved'
                         ? 'text-green-700 bg-green-50 border-green-200'
                         : product.status === 'pending'
-                        ? 'text-yellow-800 bg-yellow-50 border-yellow-200'
+                        ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
                         : product.status === 'draft'
                         ? 'text-gray-700 bg-gray-50 border-gray-200'
                         : 'text-red-700 bg-red-50 border-red-200';
@@ -977,7 +1000,7 @@ export default function VendorDashboard() {
                               <span className="text-gray-500 text-sm">{product.stock} in stock</span>
                             </div>
                             {product.status === 'pending' && (
-                              <p className="text-xs text-yellow-800 mt-1 flex items-center gap-1">
+                              <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Awaiting administrator approval, usually within 24 hours.
                               </p>
                             )}
@@ -1127,7 +1150,7 @@ export default function VendorDashboard() {
                           <div className="flex flex-wrap justify-between items-start gap-3">
                             <div className="text-sm text-gray-600">
                               <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                              <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-800'}>
+                              <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}>
                                 {order.paymentStatus}
                               </span></p>
                             </div>
@@ -1585,9 +1608,9 @@ export default function VendorDashboard() {
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { value: '',       label: 'All / Unisex' },
-                  { value: 'women',  label: 'Women' },
-                  { value: 'men',    label: 'Men' },
-                  { value: 'kids',   label: 'Kids' },
+                  { value: 'women',  label: '👩 Women' },
+                  { value: 'men',    label: '👨 Men' },
+                  { value: 'kids',   label: '🧒 Kids' },
                 ].map(opt => (
                   <button
                     key={opt.value}
@@ -1991,9 +2014,8 @@ export default function VendorDashboard() {
                         <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-nigerian-green bg-green-50">
                           <img src={src} alt={`Photo ${i+1}`} className="w-full h-full object-cover" />
                           <button type="button" onClick={() => removeAddFile(i)}
-                            aria-label={`Remove photo ${i + 1}`}
                             className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
-                            <X className="w-3 h-3" aria-hidden="true" />
+                            <X className="w-3 h-3" />
                           </button>
                           <div className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">✓</div>
                         </div>
@@ -2066,7 +2088,7 @@ export default function VendorDashboard() {
               </Button>
               <Button type="submit" name="submissionStatus" value="pending" className="btn-nigerian h-11 text-base" disabled={addProductMutation.isPending}>
                 {addProductMutation.isPending
-                  ? <><RefreshCw className="mr-2 inline h-4 w-4 animate-spin" /> Submitting…</>
+                  ? <><span className="animate-spin mr-2">⏳</span> Submitting…</>
                   : <><Plus className="w-4 h-4 mr-1" /> Submit for Review</>}
               </Button>
             </div>
@@ -2126,9 +2148,9 @@ export default function VendorDashboard() {
               <div className="grid grid-cols-2 gap-2 mt-1 sm:grid-cols-4">
                 {[
                   { value: '',       label: 'All / Unisex' },
-                  { value: 'women',  label: 'Women' },
-                  { value: 'men',    label: 'Men' },
-                  { value: 'kids',   label: 'Kids' },
+                  { value: 'women',  label: '👩 Women' },
+                  { value: 'men',    label: '👨 Men' },
+                  { value: 'kids',   label: '🧒 Kids' },
                 ].map(opt => (
                   <button
                     key={opt.value}
@@ -2328,7 +2350,7 @@ export default function VendorDashboard() {
               </p>
 
               {editRemovedImages.length > 0 && (
-                <p className="text-xs text-orange-800 flex items-center gap-1">
+                <p className="text-xs text-orange-600 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   {editRemovedImages.length} photo{editRemovedImages.length > 1 ? 's' : ''} will be removed when you save
                 </p>

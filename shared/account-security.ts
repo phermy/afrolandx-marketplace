@@ -8,10 +8,7 @@ export function passwordProblem(password: unknown, email?: string): string | nul
   if (typeof password !== "string" || password.length < 12) return "Use a password of at least 12 characters.";
   if (new TextEncoder().encode(password).length > 72) return "Use a password of no more than 72 bytes.";
   const normalized = password.toLowerCase();
-  const simple = normalized.replace(/[^a-z0-9]/g, "");
-  if (COMMON_PASSWORDS.has(normalized) || COMMON_PASSWORDS.has(simple)
-    || /^(password|qwerty|letmein|welcome|admin|iloveyou|afrolandx)\d*$/.test(simple)
-    || /^(.)\1+$/.test(normalized) || (email && normalized === email.toLowerCase())) {
+  if (COMMON_PASSWORDS.has(normalized) || /^(.)\1+$/.test(normalized) || (email && normalized === email.toLowerCase())) {
     return "Choose a less predictable password that is not your email address.";
   }
   return null;

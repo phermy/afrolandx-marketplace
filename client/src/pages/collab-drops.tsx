@@ -161,9 +161,8 @@ export default function CollabDropsPage() {
                 <button
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setSearchText("")}
-                  aria-label="Clear search"
                 >
-                  <X className="h-4 w-4" aria-hidden="true" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -367,7 +366,7 @@ function DropCard({
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   {drop.isExclusive && (
-                <Badge variant="outline" className="border-yellow-500 text-yellow-800 text-xs">
+                    <Badge variant="outline" className="border-yellow-500 text-yellow-600 text-xs">
                       <Crown className="h-3 w-3 mr-1" />Exclusive
                     </Badge>
                   )}
