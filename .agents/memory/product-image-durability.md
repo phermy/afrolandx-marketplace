@@ -31,7 +31,7 @@ Cloudflare token verification depends on token ownership: account-owned tokens u
 
 **Why:** The Account API tokens screen and My Profile API Tokens screen represent different ownership models. Confusing them can make diagnostic checks misleading.
 
-**How to apply:** Use `/accounts/{account_id}/tokens/verify` for an account-owned token and `/user/tokens/verify` for a user-owned token. Still test the actual bucket operation separately. An Active label or successful token verification does not establish object-write permission; a token showing Workers R2 Storage Bucket Item Read cannot upload photos.
+**How to apply:** Use `/accounts/{account_id}/tokens/verify` for an account-owned token and `/user/tokens/verify` for a user-owned token. Still test the actual bucket operation separately. An Active label or successful token verification does not establish object-write permission; a token showing Workers R2 Storage Bucket Item Read cannot upload photos. In the account token editor, open the account policy and search permission groups for R2 to expose the actual Workers R2 Storage checkboxes rather than relying on collapsed category counts. Confirm Edit is selected and the changes are saved before retrying a write. Saving this permission can repair authorization without rotating an otherwise valid token.
 
 Cloudflare token verification errors 6003 with nested 6111 indicate a malformed Authorization header, not a bucket permission failure.
 
