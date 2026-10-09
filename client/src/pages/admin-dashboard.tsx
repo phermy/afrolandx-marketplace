@@ -725,7 +725,7 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">Admin Access</Badge>
             {lowStockProducts.length > 0 && (
-              <Badge variant="outline" className="border-orange-400 text-orange-600 gap-1">
+              <Badge variant="outline" className="border-orange-400 text-orange-800 gap-1">
                 <AlertTriangle className="w-3 h-3" />{lowStockProducts.length} Low Stock
               </Badge>
             )}
@@ -758,8 +758,8 @@ export default function AdminDashboard() {
                         <p className="text-red-700 text-xs">{n.message}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => dismissNotificationMutation.mutate(n.id)}>
-                      <X className="w-3 h-3" />
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => dismissNotificationMutation.mutate(n.id)} aria-label={`Dismiss notification: ${n.title}`}>
+                      <X className="w-3 h-3" aria-hidden="true" />
                     </Button>
                   </div>
                 ))}
@@ -976,7 +976,7 @@ export default function AdminDashboard() {
                               {analytics.lowStockProducts.slice(0, 4).map((p: any) => (
                                 <div key={p.id} className="flex justify-between text-xs">
                                   <span className="truncate max-w-[160px] text-orange-800">{p.name}</span>
-                                  <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-600'}`}>{p.stock === 0 ? 'OUT' : `${p.stock} left`}</span>
+                                  <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-800'}`}>{p.stock === 0 ? 'OUT' : `${p.stock} left`}</span>
                                 </div>
                               ))}
                             </div>
@@ -1539,7 +1539,7 @@ export default function AdminDashboard() {
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="font-semibold">Order #{order.id}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-700'}`}>{order.orderStatus}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.paymentStatus}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>{order.paymentStatus}</span>
                                  {order.isHistoricalLegacy && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">historical · excluded from sales</span>}
                               </div>
                               <p className="text-sm text-gray-600">
@@ -1611,13 +1611,13 @@ export default function AdminDashboard() {
                       <Star className="w-4 h-4 text-yellow-500" />
                       Featured Slots Used
                     </span>
-                    <span className={`text-sm font-bold ${featuredProducts.length >= MAX_FEATURED ? 'text-orange-600' : 'text-green-600'}`}>
+                    <span className={`text-sm font-bold ${featuredProducts.length >= MAX_FEATURED ? 'text-orange-800' : 'text-green-600'}`}>
                       {featuredProducts.length} / {MAX_FEATURED}
                     </span>
                   </div>
                   <Progress value={(featuredProducts.length / MAX_FEATURED) * 100} className="h-2" />
                   {featuredProducts.length >= MAX_FEATURED && (
-                    <p className="text-orange-600 text-xs mt-2 flex items-center gap-1">
+                    <p className="text-orange-800 text-xs mt-2 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" />Maximum slots reached. Remove a product before featuring another.
                     </p>
                   )}
@@ -1644,7 +1644,7 @@ export default function AdminDashboard() {
                               <p className="font-medium text-sm truncate">{p.name}</p>
                               <p className="text-xs text-gray-500 truncate">by {p.vendor.businessName}</p>
                               <p className="text-xs font-semibold text-green-700">{formatPrice(p.price)}</p>
-                              {p.stock <= 5 && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 mt-1">Low Stock: {p.stock}</Badge>}
+                              {p.stock <= 5 && <Badge variant="outline" className="text-xs border-orange-400 text-orange-800 mt-1">Low Stock: {p.stock}</Badge>}
                             </div>
                           </div>
                           <Button size="sm" variant="outline" className="w-full mt-2 text-xs h-7" onClick={() => toggleFeaturedMutation.mutate({ productId: p.id, featured: false })} disabled={toggleFeaturedMutation.isPending}>
@@ -1706,13 +1706,13 @@ export default function AdminDashboard() {
                       {featuredProducts.filter(p => p.stock <= 5).map(p => (
                         <div key={p.id} className="flex justify-between items-center text-sm">
                           <span className="text-orange-800">{p.name}</span>
-                          <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                          <span className={`font-bold ${p.stock === 0 ? 'text-red-600' : 'text-orange-800'}`}>
                             {p.stock === 0 ? 'OUT OF STOCK' : `${p.stock} remaining`}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <p className="text-orange-600 text-xs mt-3">Consider replacing these with products that have adequate stock.</p>
+                    <p className="text-orange-800 text-xs mt-3">Consider replacing these with products that have adequate stock.</p>
                   </CardContent>
                 </Card>
               )}
@@ -2036,7 +2036,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Inquiries', value: discoverInquiries.length, color: 'text-blue-600' },
-                  { label: 'Pending Review', value: discoverInquiries.filter((i: any) => i.status === 'pending').length, color: 'text-yellow-600' },
+                  { label: 'Pending Review', value: discoverInquiries.filter((i: any) => i.status === 'pending').length, color: 'text-yellow-800' },
                   { label: 'Approved', value: discoverInquiries.filter((i: any) => i.status === 'approved').length, color: 'text-green-600' },
                   { label: 'Premium Subscriptions', value: discoverPremium.filter((p: any) => p.paymentStatus === 'active').length, color: 'text-violet-600' },
                 ].map(({ label, value, color }) => (
@@ -2248,7 +2248,7 @@ export default function AdminDashboard() {
                             <p className="font-medium truncate max-w-[200px]">{p.name}</p>
                             <p className="text-xs text-gray-400">{p.vendor.businessName}</p>
                           </div>
-                          <Badge variant="outline" className={p.stock === 0 ? 'border-red-400 text-red-600' : 'border-orange-400 text-orange-600'}>
+                          <Badge variant="outline" className={p.stock === 0 ? 'border-red-400 text-red-600' : 'border-orange-400 text-orange-800'}>
                             {p.stock === 0 ? 'Out of Stock' : `${p.stock} left`}
                           </Badge>
                         </div>

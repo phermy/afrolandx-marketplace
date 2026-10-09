@@ -335,7 +335,8 @@
 }
 
 .text-nigerian-gold {
-  color: var(--nigerian-gold);
+  /* Gold text is used on light storefront surfaces; reserve the brighter token for fills. */
+  color: #755400;
 }
 
 .bg-nigerian-gold {
@@ -471,7 +472,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-gold {
-  @apply bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+  @apply bg-nigerian-gold hover:bg-yellow-400 text-[#183b35] font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
 }
 
 /* Form styling */

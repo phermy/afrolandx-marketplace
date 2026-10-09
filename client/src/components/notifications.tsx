@@ -81,7 +81,7 @@ export default function NotificationPanel() {
                   {notification.createdAt ? new Date(String(notification.createdAt)).toLocaleString() : 'Unknown time'}
                 </div>
                 {notification.expiresAt && (
-                  <div className="text-xs text-yellow-600 mt-1">
+                  <div className="text-xs text-yellow-800 mt-1">
                     Expires: {notification.expiresAt ? new Date(String(notification.expiresAt)).toLocaleString() : 'Never'}
                   </div>
                 )}
@@ -93,8 +93,9 @@ export default function NotificationPanel() {
                   onClick={() => handleDismiss(notification.id)}
                   className="h-6 w-6 p-0 hover:bg-red-100"
                   disabled={dismissMutation.isPending}
+                  aria-label={`Dismiss notification: ${notification.title}`}
                 >
-                  <X className="w-4 h-4 text-red-500" />
+                  <X className="w-4 h-4 text-red-500" aria-hidden="true" />
                 </Button>
                 {!notification.isRead && (
                   <Button

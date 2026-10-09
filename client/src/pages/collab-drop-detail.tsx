@@ -134,7 +134,7 @@ export default function CollabDropDetailPage() {
           <div className="flex flex-col justify-center space-y-4">
             <div className="flex flex-wrap gap-2">
               {drop.isExclusive && (
-                <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                <Badge variant="outline" className="border-yellow-500 text-yellow-800">
                   <Crown className="h-3 w-3 mr-1" />Exclusive
                 </Badge>
               )}

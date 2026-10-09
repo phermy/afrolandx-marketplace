@@ -64,6 +64,7 @@ export default function SiteFooter() {
           <Link href="/returns">Returns</Link>
           <Link href="/policies/complaints-and-dispute-resolution">Complaints</Link>
           <Link href="/contact">Contact support</Link>
+          <Link href="/accessibility">Accessibility statement</Link>
         </div>
         <div>
           <p className="site-footer__label">Vendor resources</p>

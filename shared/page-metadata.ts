@@ -15,6 +15,7 @@ export const publicPages: Record<string, { title: string; description: string }>
   "/size-guide": { title: "Size Guide | Afrolandx", description: "Learn how to take body and garment measurements and compare them with each maker’s sizing information." },
   "/shipping-information": { title: "Shipping Information | Afrolandx", description: "Understand delivery quotes, tracking, preparation and shipping responsibilities before ordering on Afrolandx." },
   "/returns": { title: "Returns and Refunds | Afrolandx", description: "Learn how to request a return, follow approved return instructions and contact Afrolandx about refunds." },
+  "/accessibility": { title: "Accessibility Statement | Afrolandx", description: "Read about Afrolandx accessibility goals, areas being improved and how to report a barrier or request help." },
 };
 const privatePages: Record<string, string> = {
   "/login": "Sign In", "/register": "Create an Account", "/forgot-password": "Reset Password",

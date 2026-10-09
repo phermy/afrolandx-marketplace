@@ -42,7 +42,7 @@ export function FitScoreBadge({ productId }: { productId: number }) {
 
   const getScoreColor = (score: number) => {
     if (score >= 85) return "bg-green-100 text-green-700 border-green-300";
-    if (score >= 70) return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    if (score >= 70) return "bg-yellow-100 text-yellow-800 border-yellow-300";
     return "bg-orange-100 text-orange-700 border-orange-300";
   };
 

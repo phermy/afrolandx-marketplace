@@ -499,7 +499,7 @@ export default function MegaMenu() {
             </button>
             <button
               onClick={() => handleLinkClick('/collab-drops')}
-              className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-600 whitespace-nowrap transition-colors"
+              className="px-3 py-3 text-sm font-medium text-nigerian-gold hover:text-amber-800 whitespace-nowrap transition-colors"
             >
               Collab Drops
             </button>
@@ -625,7 +625,7 @@ export default function MegaMenu() {
                 </div>
                 <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
                   <p className="text-xs font-bold text-amber-700 mb-1">Collab Drops</p>
-                  <p className="text-xs text-amber-600 mb-2">Limited edition designer collaborations are available now.</p>
+                  <p className="text-xs text-amber-800 mb-2">Limited edition designer collaborations are available now.</p>
                   <button
                     onClick={() => handleLinkClick('/collab-drops')}
                     className="text-xs font-semibold text-amber-700 hover:underline"

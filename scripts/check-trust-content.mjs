@@ -66,7 +66,7 @@ try {
     if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
     return result.result.value;
   };
-  const paths = ["/contact", "/faq", "/size-guide", "/shipping-information", "/returns", "/policies/prohibited-and-restricted-products"];
+  const paths = ["/contact", "/faq", "/size-guide", "/shipping-information", "/returns", "/policies/prohibited-and-restricted-products", "/accessibility"];
   for (const width of [1280, 390]) {
     await send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 500 }, sessionId);
     for (const path of paths) {
@@ -76,6 +76,7 @@ try {
         await wait(200);
         page = await evaluate(`({
           title: document.title,
+           lang: document.documentElement.lang,
           path: location.pathname,
           heading: document.querySelector("main h1")?.textContent,
           text: document.querySelector("main")?.innerText || "",
@@ -88,6 +89,13 @@ try {
         if (page.path === path && page.heading && page.footerLinks.length) break;
       }
       assert.ok(page.heading, `${width} ${path}: main heading did not render`);
+       assert.equal(page.lang, "en-NG", `${path}: language declaration`);
+       assert.ok(page.footerLinks.includes("/accessibility"), `${path}: accessibility statement link`);
+       const unnamed = await evaluate(`Array.from(document.querySelectorAll("button")).filter(el => {
+         const visible = !!el.getClientRects().length && getComputedStyle(el).visibility !== "hidden";
+         return visible && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby") && !el.textContent.trim() && !el.title;
+       }).map(el => el.outerHTML.slice(0,180))`);
+       assert.deepEqual(unnamed, [], `${path}: unnamed icon buttons`);
       assert.ok(!/Page Not Found|not available/i.test(page.title), `${path}: incorrect metadata`);
       assert.ok(page.width <= page.viewport + 1, `${width} ${path}: horizontal overflow`);
       assert.equal(page.sparkles, 0, `${path}: sparkle branding remains`);
@@ -99,6 +107,12 @@ try {
         assert.ok(page.links.includes("mailto:support@afrolandx.com"), "Support email is missing");
         assert.ok(page.text.includes("+2347082427348") || page.text.includes("+234 708 242 7348"), "WhatsApp number is not visible");
         assert.match(page.text, /Monday to Saturday, 8:00 AM to 6:00 PM WAT \(UTC\+1\)/, "Support hours must include their timezone");
+      }
+      if (path === "/accessibility") {
+        assert.equal(page.heading, "Accessibility statement");
+        assert.ok(page.text.includes("WCAG"));
+        assert.ok(page.links.includes("mailto:support@afrolandx.com"));
+        assert.ok(page.text.includes("not a claim"));
       }
       if (path === "/faq") {
         const question = await evaluate(`(() => {

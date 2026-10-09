@@ -200,6 +200,8 @@ export default function ProductDetail() {
                   <button
                     key={idx}
                     onClick={() => { setSelectedImage(idx); setImgError(false); }}
+                    aria-label={`Show product image ${idx + 1}`}
+                    aria-pressed={selectedImage === idx}
                     className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
                       selectedImage === idx ? 'border-nigerian-green' : 'border-gray-200 hover:border-gray-400'
                     }`}

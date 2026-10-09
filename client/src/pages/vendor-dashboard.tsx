@@ -836,8 +836,9 @@ export default function VendorDashboard() {
                         onClick={() => dismissNotificationMutation.mutate(notification.id)}
                         className="h-8 w-8 p-0 hover:bg-green-200"
                         disabled={dismissNotificationMutation.isPending}
+                        aria-label={`Dismiss notification: ${notification.title}`}
                       >
-                        <X className="w-4 h-4 text-green-600" />
+                        <X className="w-4 h-4 text-green-600" aria-hidden="true" />
                       </Button>
                     </div>
                   ))}
@@ -970,7 +971,7 @@ export default function VendorDashboard() {
                       const statusColor = product.status === 'approved'
                         ? 'text-green-700 bg-green-50 border-green-200'
                         : product.status === 'pending'
-                        ? 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                        ? 'text-yellow-800 bg-yellow-50 border-yellow-200'
                         : product.status === 'draft'
                         ? 'text-gray-700 bg-gray-50 border-gray-200'
                         : 'text-red-700 bg-red-50 border-red-200';
@@ -1000,7 +1001,7 @@ export default function VendorDashboard() {
                               <span className="text-gray-500 text-sm">{product.stock} in stock</span>
                             </div>
                             {product.status === 'pending' && (
-                              <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                              <p className="text-xs text-yellow-800 mt-1 flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Awaiting administrator approval, usually within 24 hours.
                               </p>
                             )}
@@ -1150,7 +1151,7 @@ export default function VendorDashboard() {
                           <div className="flex flex-wrap justify-between items-start gap-3">
                             <div className="text-sm text-gray-600">
                               <p>Order Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                              <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}>
+                              <p>Payment Status: <span className={order.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-800'}>
                                 {order.paymentStatus}
                               </span></p>
                             </div>
@@ -2014,8 +2015,9 @@ export default function VendorDashboard() {
                         <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border-2 border-nigerian-green bg-green-50">
                           <img src={src} alt={`Photo ${i+1}`} className="w-full h-full object-cover" />
                           <button type="button" onClick={() => removeAddFile(i)}
+                            aria-label={`Remove photo ${i + 1}`}
                             className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
-                            <X className="w-3 h-3" />
+                            <X className="w-3 h-3" aria-hidden="true" />
                           </button>
                           <div className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">✓</div>
                         </div>
@@ -2350,7 +2352,7 @@ export default function VendorDashboard() {
               </p>
 
               {editRemovedImages.length > 0 && (
-                <p className="text-xs text-orange-600 flex items-center gap-1">
+                <p className="text-xs text-orange-800 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   {editRemovedImages.length} photo{editRemovedImages.length > 1 ? 's' : ''} will be removed when you save
                 </p>

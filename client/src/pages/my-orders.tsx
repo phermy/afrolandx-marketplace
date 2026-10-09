@@ -173,7 +173,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
     ? 'bg-green-100 text-green-700'
     : order.paymentStatus === 'failed'
     ? 'bg-red-100 text-red-700'
-    : 'bg-yellow-100 text-yellow-700';
+    : 'bg-yellow-100 text-yellow-800';
 
   return (
     <Card className={`overflow-hidden transition-shadow hover:shadow-md ${isCancelled ? 'border-red-200 opacity-80' : isDelivered ? 'border-green-200' : ''}`}>
@@ -187,7 +187,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                   order.orderStatus === 'shipped' ? 'bg-purple-100 text-purple-700' :
                   order.orderStatus === 'processing' ? 'bg-blue-100 text-blue-700' :
                   order.orderStatus === 'awaiting_shipping_quote' ? 'bg-amber-100 text-amber-700' :
-                  'bg-yellow-100 text-yellow-700'}`}>
+                  'bg-yellow-100 text-yellow-800'}`}>
                 {order.orderStatus === 'awaiting_shipping_quote' ? 'Awaiting shipping quote' : order.orderStatus}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${paymentColor}`}>

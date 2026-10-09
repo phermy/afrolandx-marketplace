@@ -317,7 +317,7 @@ export default function VendorWorkshopPage() {
                                 ) : (
                                   <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />
                                 )}
-                                <span className={isComplete ? "text-green-600" : isStarted ? "text-yellow-600" : "text-muted-foreground"}>
+                                <span className={isComplete ? "text-green-600" : isStarted ? "text-yellow-800" : "text-muted-foreground"}>
                                   {stageLabels[stage]}
                                 </span>
                                 {isComplete && (
@@ -510,7 +510,7 @@ export default function VendorWorkshopPage() {
                               {resource.quantity} {resource.unit}
                             </p>
                             {lowStockAlerts.some((a: any) => a.id === resource.id) && (
-                              <Badge variant="outline" className="text-orange-600 border-orange-400">
+                              <Badge variant="outline" className="text-orange-800 border-orange-400">
                                 Low Stock
                               </Badge>
                             )}

@@ -52,6 +52,7 @@ const FaqPage = lazyWithRetry(() => import("@/pages/support-pages").then(module 
 const SizeGuidePage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.SizeGuidePage })));
 const ShippingInformationPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ShippingInformationPage })));
 const ReturnsPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.ReturnsPage })));
+const AccessibilityPage = lazyWithRetry(() => import("@/pages/support-pages").then(module => ({ default: module.AccessibilityPage })));
 
 class RouteChunkErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -150,6 +151,7 @@ function Router() {
       <Route path="/size-guide" component={SizeGuidePage} />
       <Route path="/shipping-information" component={ShippingInformationPage} />
       <Route path="/returns" component={ReturnsPage} />
+      <Route path="/accessibility" component={AccessibilityPage} />
       <Route path="/products/:id" component={ProductDetail} />
       <Route path="/products" component={Products} />
       <Route path="/vendors/:id" component={PublicVendor} />

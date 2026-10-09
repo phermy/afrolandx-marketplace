@@ -594,7 +594,7 @@ export default function Landing() {
               <div className="flex justify-center items-center space-x-8 mb-4">
                 <Badge variant="outline" className="text-lg font-bold text-blue-600 px-3 py-2">UPS</Badge>
                 <Badge variant="outline" className="text-lg font-bold text-purple-600 px-3 py-2">FedEx</Badge>
-                <Badge variant="outline" className="text-lg font-bold text-yellow-600 px-3 py-2">DHL</Badge>
+                <Badge variant="outline" className="text-lg font-bold text-yellow-800 px-3 py-2">DHL</Badge>
               </div>
               <p className="text-base text-gray-700">
                 Availability and shipping cost are confirmed for your destination.
