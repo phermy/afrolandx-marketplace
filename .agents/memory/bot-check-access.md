@@ -12,3 +12,9 @@ Do not reintroduce a site-wide challenge that can lock legitimate people out of 
 Cloudflare account connections may list Turnstile widgets yet reject widget updates for lack of edit permission. **Why:** A successful read did not imply an authorized hostname change. **How to apply:** Read back the saved domains after any attempted change; if Cloudflare rejects the write, leave mandatory enforcement off and have a widget editor update Hostname Management directly.
 
 Do not infer that a managed Turnstile widget is broken solely because an automated headless browser leaves it blank. **Why:** After the exact hostname was authorized, automated browsers produced no token or error; the user confirmed the full registration flow, including the human check and email verification, worked in a normal Preview browser without publishing first. **How to apply:** Validate a real browser on the exact hostname before enabling enforcement; still verify the server-side check separately.
+
+The user subsequently chose to restore Cloudflare Turnstile on signup only, in both Preview and live, leaving sign-in unchanged.
+
+**Why:** The user wanted the existing signup verification restored, not a site-wide login challenge.
+
+**How to apply:** Keep signup enforcement enabled in both environments once hostnames are verified. Automated tests must use process-local fixtures or mocks, not a persistent Preview disable override. A Preview test override can hide the widget while production silently remains disabled if its enable flag is absent. Keep email verification independent.
