@@ -12,6 +12,7 @@ import { drainLogisticsEmails, queueLogisticsNotification } from "./logistics-no
 import { logisticsNoteSchema, partnerQuoteSchema } from "../shared/logistics";
 import { normalizeAccountPhone } from "../shared/account-registration";
 import { notifyAgencyPayment } from "./payment-emails";
+import { shippingProviderService } from "./shipping-providers";
 
 const id = (value: unknown) => z.coerce.number().int().positive().parse(value);
 const route = (handler: (req: any, res: Response) => Promise<unknown>) => async (req: Request, res: Response) => {
@@ -27,6 +28,10 @@ const route = (handler: (req: any, res: Response) => Promise<unknown>) => async 
 };
 export function registerLogisticsRoutes(app: Express) {
   app.get("/api/logistics/access", isAuthenticated, route(async (req, res) => res.json(await getLogisticsAccess(req.user.id))));
+  app.get("/api/logistics/providers", isAuthenticated, route(async (req, res) => {
+    await db.transaction(tx => lockLogisticsActor(tx, req.user.id, true));
+    res.json(await shippingProviderService.getConnections());
+  }));
   app.get("/api/logistics/shipments", isAuthenticated, route(async (req, res) => res.json(await listShipments(req.user.id, req.query.orderId === undefined ? undefined : id(req.query.orderId)))));
   app.get("/api/logistics/partners", isAuthenticated, route(async (req, res) => {
     await db.transaction(tx => lockLogisticsActor(tx, req.user.id, true));

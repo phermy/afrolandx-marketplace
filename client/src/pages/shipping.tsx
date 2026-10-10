@@ -11,6 +11,7 @@ import { isVendor } from "@/lib/roleUtils";
 import { hasShippingOperationsAccess } from "@shared/admin-access";
 import { useToast } from "@/hooks/use-toast";
 import SplitShipmentForm from "@/components/shipping/SplitShipmentForm";
+import ProviderConnections from "@/components/shipping/ProviderConnections";
 import { shipmentStatusLabels, shipmentStatuses, shipmentTransitions } from "@shared/logistics";
 import type { LogisticsAccess, LogisticsPartnerView, ShipmentView, ShipmentsResponse, ShipmentStatus } from "@shared/logistics";
 import { AlertTriangle, ArrowUpRight, Check, ChevronDown, CircleAlert, ClipboardCheck, ExternalLink, Package, Plus, RefreshCw, ShieldAlert, Truck, Users } from "lucide-react";
@@ -118,6 +119,7 @@ export default function Shipping() {
 
       {!access.admin && invitations.length > 0 && <section className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-semibold text-amber-950">Partner invitations</p><p className="mt-1 text-xs text-amber-800">Accept verified-email invitations to activate your partner access.</p></div><div className="flex flex-wrap gap-2">{invitations.map((invite) => <Button key={invite.id} size="sm" variant="outline" disabled={action.isPending} onClick={() => run({ method: "POST", path: `/api/logistics/invitations/${invite.id}/accept`, body: {}, success: `You joined ${invite.partnerName}.` })}>{invite.partnerName} · Accept</Button>)}</div></div></section>}
 
+      {access.admin && user && <ProviderConnections userId={user.id} />}
       {access.admin && <AdminPartnerDesk partners={partners} loading={partnersQuery.isLoading} error={partnersQuery.isError} run={run} pending={action.isPending} />}
       {access.admin && !!data?.eligibleOrders?.length && <section className="mb-6 rounded-2xl border border-[#dce7e2] bg-white p-5 shadow-sm">
         <SectionTitle eyebrow="Backfill" title="Import a paid order" detail="Bring an eligible older order into manual shipping operations." />
