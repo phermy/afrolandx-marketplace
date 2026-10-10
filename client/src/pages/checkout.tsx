@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { PAYMENT_EMAIL } from '@shared/payment-contact';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import { apiRequest } from '@/lib/queryClient';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
-import { useCurrency } from '@/hooks/useCurrency';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,17 +15,189 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { ShippingQuote, ShippingAddress } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { ShippingQuote, ShippingAddress, ShippingQuoteRequest, SavedAddress, ShippingRecommendationResponse, ShippingQuoteResponse } from '@/types';
+import { trackEvent, valueBand } from '@/lib/analytics';
 
-// Currencies Paystack can natively charge in
-const PAYSTACK_SUPPORTED = new Set(['NGN', 'GHS', 'ZAR', 'KES', 'USD', 'GBP', 'EUR', 'EGP', 'XOF']);
+
+// States / provinces per country
+const STATES_BY_COUNTRY: Record<string, string[]> = {
+  Nigeria: [
+    'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
+    'Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT – Abuja','Gombe',
+    'Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos',
+    'Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto',
+    'Taraba','Yobe','Zamfara',
+  ],
+  Ghana: [
+    'Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra',
+    'North East','Northern','Oti','Savannah','Upper East','Upper West',
+    'Volta','Western','Western North',
+  ],
+  Kenya: [
+    'Baringo','Bomet','Bungoma','Busia','Elgeyo-Marakwet','Embu','Garissa',
+    'Homa Bay','Isiolo','Kajiado','Kakamega','Kericho','Kiambu','Kilifi',
+    'Kirinyaga','Kisii','Kisumu','Kitui','Kwale','Laikipia','Lamu','Machakos',
+    'Makueni','Mandera','Marsabit','Meru','Migori','Mombasa','Muranga',
+    'Nairobi','Nakuru','Nandi','Narok','Nyamira','Nyandarua','Nyeri',
+    'Samburu','Siaya','Taita-Taveta','Tana River','Tharaka-Nithi',
+    'Trans Nzoia','Turkana','Uasin Gishu','Vihiga','Wajir','West Pokot',
+  ],
+  'South Africa': [
+    'Eastern Cape','Free State','Gauteng','KwaZulu-Natal','Limpopo',
+    'Mpumalanga','North West','Northern Cape','Western Cape',
+  ],
+  Egypt: [
+    'Alexandria','Aswan','Asyut','Beheira','Beni Suef','Cairo','Dakahlia',
+    'Damietta','Faiyum','Gharbia','Giza','Ismailia','Kafr el-Sheikh',
+    'Luxor','Matruh','Minya','Monufia','New Valley','North Sinai',
+    'Port Said','Qalyubia','Qena','Red Sea','Sharqia','Sohag','South Sinai',
+    'Suez',
+  ],
+  Senegal: [
+    'Dakar','Diourbel','Fatick','Kaffrine','Kaolack','Kédougou','Kolda',
+    'Louga','Matam','Saint-Louis','Sédhiou','Tambacounda','Thiès','Ziguinchor',
+  ],
+  'Ivory Coast': [
+    'Abidjan','Bas-Sassandra','Comoé','Denguélé','Gôh-Djiboua','Lacs','Lagunes',
+    'Montagnes','Sassandra-Marahoué','Savanes','Vallée du Bandama',
+    'Woroba','Yamoussoukro','Zanzan',
+  ],
+  Tanzania: [
+    'Arusha','Dar es Salaam','Dodoma','Geita','Iringa','Kagera','Katavi',
+    'Kigoma','Kilimanjaro','Lindi','Manyara','Mara','Mbeya','Morogoro',
+    'Mtwara','Mwanza','Njombe','Pemba North','Pemba South','Pwani','Rukwa',
+    'Ruvuma','Shinyanga','Simiyu','Singida','Songwe','Tabora','Tanga',
+    'Zanzibar North','Zanzibar South','Zanzibar West',
+  ],
+  Ethiopia: [
+    'Addis Ababa','Afar','Amhara','Benishangul-Gumuz','Dire Dawa','Gambela',
+    'Harari','Oromia','Sidama','Somali','South Ethiopia','Southwest Ethiopia',
+    'Tigray',
+  ],
+  Uganda: [
+    'Central','Eastern','Northern','Western',
+  ],
+  Rwanda: [
+    'Eastern','Kigali','Northern','Southern','Western',
+  ],
+  Cameroon: [
+    'Adamawa','Centre','East','Far North','Littoral','North',
+    'North West','South','South West','West',
+  ],
+  'United States': [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado',
+    'Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho',
+    'Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana',
+    'Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
+    'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey',
+    'New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma',
+    'Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+    'Tennessee','Texas','Utah','Vermont','Virginia','Washington',
+    'West Virginia','Wisconsin','Wyoming','District of Columbia',
+  ],
+  Canada: [
+    'Alberta','British Columbia','Manitoba','New Brunswick',
+    'Newfoundland and Labrador','Northwest Territories','Nova Scotia',
+    'Nunavut','Ontario','Prince Edward Island','Quebec','Saskatchewan','Yukon',
+  ],
+  'United Kingdom': [
+    'England','Scotland','Wales','Northern Ireland',
+  ],
+  Australia: [
+    'Australian Capital Territory','New South Wales','Northern Territory',
+    'Queensland','South Australia','Tasmania','Victoria','Western Australia',
+  ],
+  'New Zealand': [
+    'Auckland','Bay of Plenty','Canterbury','Gisborne','Hawke\'s Bay',
+    'Manawatu-Whanganui','Marlborough','Nelson','Northland','Otago',
+    'Southland','Taranaki','Tasman','Waikato','Wellington','West Coast',
+  ],
+  India: [
+    'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa',
+    'Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala',
+    'Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+    'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura',
+    'Uttar Pradesh','Uttarakhand','West Bengal',
+    'Delhi','Jammu & Kashmir','Ladakh',
+  ],
+  Brazil: [
+    'Acre','Alagoas','Amapá','Amazonas','Bahia','Ceará','Distrito Federal',
+    'Espírito Santo','Goiás','Maranhão','Mato Grosso','Mato Grosso do Sul',
+    'Minas Gerais','Pará','Paraíba','Paraná','Pernambuco','Piauí',
+    'Rio de Janeiro','Rio Grande do Norte','Rio Grande do Sul','Rondônia',
+    'Roraima','Santa Catarina','São Paulo','Sergipe','Tocantins',
+  ],
+  'United Arab Emirates': [
+    'Abu Dhabi','Ajman','Dubai','Fujairah','Ras Al Khaimah','Sharjah','Umm Al Quwain',
+  ],
+  'Saudi Arabia': [
+    'Al Bahah','Al Jawf','Al Madinah','Al Qassim','Asir','Eastern Province',
+    'Hail','Jizan','Makkah','Najran','Riyadh','Tabuk',
+  ],
+  Qatar: ['Ad Dawhah','Al Khor','Al Rayyan','Al Wakrah','Ash Shamal','Az Za\'ayin','Umm Salal'],
+};
+
+// All country names used in the dropdown, so we can match against geo detection
+const DROPDOWN_COUNTRIES = [
+  'Nigeria','Ghana','Kenya','South Africa','Egypt','Senegal','Ivory Coast',
+  'Tanzania','Ethiopia','Uganda','Rwanda','Cameroon',
+  'United States','United Kingdom','Canada','Australia','New Zealand',
+  'Germany','France','Netherlands','Sweden','Norway','Denmark','Ireland',
+  'Spain','Italy','Portugal','Belgium','Switzerland','Austria',
+  'United Arab Emirates','Saudi Arabia','Qatar',
+  'Brazil','Jamaica','Trinidad and Tobago','Barbados',
+  'India','China','Japan','Singapore',
+];
+
+// Map ipapi.co country_name variants → our dropdown value
+const COUNTRY_NAME_MAP: Record<string, string> = {
+  'United States of America': 'United States',
+  'USA': 'United States',
+  'UK': 'United Kingdom',
+  'Great Britain': 'United Kingdom',
+  "Côte d'Ivoire": 'Ivory Coast',
+  'Cote d\'Ivoire': 'Ivory Coast',
+  'South Korea': 'South Korea',
+  'UAE': 'United Arab Emirates',
+};
+
+function detectCountryFromGeo(): string {
+  try {
+    const raw = localStorage.getItem('afrolandx_geo_v2');
+    if (!raw) return 'Nigeria';
+    const { data } = JSON.parse(raw);
+    const name: string = data?.country_name || '';
+    if (!name) return 'Nigeria';
+    const mapped = COUNTRY_NAME_MAP[name] || name;
+    return DROPDOWN_COUNTRIES.includes(mapped) ? mapped : 'Nigeria';
+  } catch {
+    return 'Nigeria';
+  }
+}
+
+const isShippingAddressComplete = (address: ShippingAddress) =>
+  Boolean(
+    address.firstName.trim()
+    && address.address1.trim().length >= 3
+    && address.city.trim()
+    && address.state.trim()
+    && address.postalCode.trim()
+    && address.country.trim(),
+  );
+
+const canonicalAddressFingerprint = (address: ShippingAddress) => JSON.stringify(
+  Object.fromEntries(Object.entries(address).map(([key, value]) => [
+    key,
+    typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : value,
+  ])),
+);
 
 export default function Checkout() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { cartItems, cartTotal, clearCart } = useCart();
+  const { cartItems, cartTotal } = useCart();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { currencyInfo, formatLocal } = useCurrency();
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -35,18 +207,87 @@ export default function Checkout() {
     city: '',
     state: '',
     postalCode: '',
-    country: 'Nigeria',
+    country: detectCountryFromGeo(),
   });
 
   const [selectedShipping, setSelectedShipping] = useState<string>('');
-  const [paymentMethod] = useState('paystack'); // Only Paystack for now
+  const [countryTouched, setCountryTouched] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('manual');
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [addressLabel, setAddressLabel] = useState('Home');
+  const [makeDefault, setMakeDefault] = useState(false);
+  const shippingSelectionIsManual = useRef(false);
+  const addressInitialized = useRef(false);
+  const checkoutTracked = useRef(false);
+  const checkoutRequestId = useRef((() => {
+    const existing = sessionStorage.getItem('checkout_request_id');
+    if (existing) return existing;
+    const created = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `checkout_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem('checkout_request_id', created);
+    return created;
+  })());
+
+  useEffect(() => {
+    if (checkoutTracked.current || isLoading || !isAuthenticated || cartItems.length === 0) return;
+    checkoutTracked.current = true;
+    trackEvent('checkout_started', {
+      cart_item_count: cartItems.reduce((total, item) => total + item.quantity, 0),
+      cart_value_band: valueBand(cartTotal),
+      destination_country: shippingAddress.country,
+    });
+  }, [cartItems, cartTotal, isAuthenticated, isLoading, shippingAddress.country]);
+
+  // If geo cache was empty on mount, fetch it now and update country
+  useEffect(() => {
+    if (countryTouched) return;
+    const raw = localStorage.getItem('afrolandx_geo_v2');
+    if (raw) return; // already have cache, detectCountryFromGeo() handled it
+    fetch('/api/geo', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.local || data.error) return;
+        // Cache it for useCurrency too
+        try { localStorage.setItem('afrolandx_geo_v2', JSON.stringify({ data, ts: Date.now() })); } catch {}
+        const name: string = data.country_name || '';
+        const mapped = COUNTRY_NAME_MAP[name] || name;
+        const country = DROPDOWN_COUNTRIES.includes(mapped) ? mapped : null;
+        if (country) setShippingAddress(prev => ({ ...prev, country, state: '' }));
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Show error/cancelled message if Paystack redirected back with an error
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const cancelled = params.get('cancelled');
+    if (cancelled) {
+      toast({
+        title: 'Payment Cancelled',
+        description: 'Your payment was cancelled. Your cart is still saved. Complete your order when ready.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (error) {
+      toast({
+        title: 'Payment Failed',
+        description: decodeURIComponent(error) || 'Something went wrong with your payment. Please try again.',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       toast({
         title: 'Unauthorized',
-        description: 'Please sign in to checkout.',
+        description: 'Please sign in to check out.',
         variant: 'destructive',
       });
       setTimeout(() => {
@@ -79,70 +320,138 @@ export default function Checkout() {
     }
   }, [user]);
 
-  // Fetch shipping quotes — pass buyer's local currency so the API returns localPrice
-  const { data: shippingQuotes = [], isLoading: isLoadingShipping } = useQuery<ShippingQuote[]>({
-    queryKey: ['/api/shipping/quote', currencyInfo?.code, currencyInfo?.rate],
+  // Fetch shipping quotes (all prices in NGN)
+  const { data: savedAddresses = [], isLoading: isLoadingAddresses } = useQuery<SavedAddress[]>({
+    queryKey: ['/api/delivery-addresses'],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (currencyInfo) {
-        params.set('currency', currencyInfo.code);
-        params.set('rate', String(currencyInfo.rate));
-        params.set('symbol', currencyInfo.symbol);
-      }
-      const res = await fetch(`/api/shipping/quote?${params.toString()}`, { credentials: 'include' });
+      const response = await apiRequest('GET', '/api/delivery-addresses');
+      const payload = await response.json();
+      return Array.isArray(payload) ? payload : (payload.addresses || []);
+    },
+    enabled: isAuthenticated,
+    retry: false,
+  });
+
+  const saveAddressMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/delivery-addresses', {
+        ...shippingAddress,
+        label: addressLabel.trim() || 'Address',
+        isDefault: makeDefault,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setSaveAddress(false);
+      setMakeDefault(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/delivery-addresses'] });
+      toast({ title: 'Address saved', description: 'You can use it again on your next order.' });
+    },
+    onError: () => toast({ title: 'Could not save address', description: 'Please check the address and try again.', variant: 'destructive' }),
+  });
+
+  const { data: shippingQuoteResponse, isLoading: isLoadingShipping, isError: shippingError } = useQuery<ShippingQuote[] | ShippingQuoteResponse>({
+    queryKey: ['/api/shipping/quote'],
+    queryFn: async () => {
+      const res = await fetch('/api/shipping/quote', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch shipping quotes');
       return res.json();
     },
     enabled: !!cartItems.length,
     retry: false,
   });
+  const shippingQuotes = Array.isArray(shippingQuoteResponse)
+    ? shippingQuoteResponse
+    : shippingQuoteResponse?.quotes || [];
 
-  // Auto-select the cheapest (first) shipping option when quotes load
-  useEffect(() => {
-    if (shippingQuotes.length > 0 && !selectedShipping) {
-      setSelectedShipping(shippingQuotes[0].carrier);
+  const { data: shippingRecommendation } = useQuery<ShippingRecommendationResponse>({
+    queryKey: ['/api/shipping/recommendation', cartItems, shippingAddress],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/shipping/recommendation?country=${encodeURIComponent(shippingAddress.country)}`,
+      );
+      return response.json();
+    },
+    enabled: isAuthenticated && !!cartItems.length && isShippingAddressComplete(shippingAddress),
+    retry: false,
+  });
+
+  const { data: quoteRequests = [], isLoading: isLoadingQuoteRequests } = useQuery<ShippingQuoteRequest[]>({
+    queryKey: ['/api/shipping/quote-requests/mine'],
+    enabled: isAuthenticated && !!cartItems.length,
+    retry: false,
+    refetchInterval: 15000,
+  });
+
+  const requestQuoteMutation = useMutation({
+    mutationFn: async (carrier: string) => {
+      const response = await apiRequest('POST', '/api/shipping/quote-requests', { carrier, shippingAddress });
+      return response.json();
+    },
+    onSuccess: (request: ShippingQuoteRequest) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/shipping/quote-requests/mine'] });
+      trackEvent('shipping_quote_requested', {
+        carrier: request.carrier,
+        destination_country: shippingAddress.country,
+        quote_status: request.status,
+      });
+      toast({
+        title: request.status === 'quoted' ? 'Quote already available' : 'Quote requested',
+        description: request.status === 'quoted'
+          ? `Your ${request.carrier} quote is ready to select.`
+          : `Afrolandx will confirm the ${request.carrier} rate and notify you here.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not request quote',
+        description: error?.message || 'Check your shipping address and try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleRequestQuote = (carrier: string) => {
+    if (!isShippingAddressComplete(shippingAddress)) {
+      toast({
+        title: 'Complete your shipping address',
+        description: 'Enter your name, address, city, state, postal code, and country before requesting a quote.',
+        variant: 'destructive',
+      });
+      return;
     }
-  }, [shippingQuotes, selectedShipping]);
+    requestQuoteMutation.mutate(carrier);
+  };
 
   // Create order mutation with Paystack integration
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      try {
-        const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
-        return response.json();
-      } catch (error: any) {
-        // Only fall back to direct order creation if Paystack is not configured (503)
-        // For all other errors (500 = payment failure), surface the error to the user
-        if (error?.message?.startsWith('503')) {
-          const response = await apiRequest('POST', '/api/orders', orderData);
-          return response.json();
-        }
-        throw error;
-      }
+      const response = await apiRequest('POST', '/api/orders/initialize-payment', orderData);
+      return response.json();
     },
     onSuccess: (result) => {
       if (result.paymentUrl) {
+        const selectedQuote = effectiveShippingQuotes.find((quote) => quote.carrier === selectedShipping);
+        trackEvent('payment_initialized', {
+          payment_provider: 'paystack',
+          carrier: selectedShipping,
+          amount_band: valueBand(totalAmount),
+          quote_required: Boolean(selectedQuote?.quoteRequired),
+        });
         toast({
           title: 'Redirecting to Payment',
           description: 'You will be redirected to Paystack to complete your payment...',
         });
         localStorage.setItem('pending_payment_reference', result.reference);
         window.location.href = result.paymentUrl;
-      } else {
-        // Paystack not configured — direct order creation
-        toast({
-          title: 'Order Placed!',
-          description: `Order #${result.id} has been created. Our team will contact you to arrange payment.`,
-        });
-        clearCart();
-        setTimeout(() => { window.location.href = '/my-orders'; }, 1500);
-      }
+      } else throw new Error('Payment provider did not return a checkout URL');
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: 'Unauthorized',
-          description: 'Please sign in to place order.',
+          description: 'Please sign in to place an order.',
           variant: 'destructive',
         });
         setTimeout(() => {
@@ -173,7 +482,7 @@ export default function Checkout() {
       return;
     }
 
-    const selectedQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
+    const selectedQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
     if (!selectedQuote) {
       toast({
         title: 'Error',
@@ -183,41 +492,106 @@ export default function Checkout() {
       return;
     }
 
-    const usdTotal = cartTotal + selectedQuote.price;
-    const currency = currencyInfo?.code || 'USD';
-    const localTotal = currencyInfo ? usdTotal * currencyInfo.rate : null;
-
     const orderData = {
-      totalAmount: usdTotal.toString(),
-      shippingAmount: selectedQuote.price.toString(),
       shippingAddress,
       shippingMethod: selectedShipping.toLowerCase(),
-      paymentMethod,
-      currency,
-      localAmount: localTotal !== null ? localTotal.toFixed(2) : undefined,
+      checkoutRequestId: checkoutRequestId.current,
+      ...(selectedQuote.quoteRequired && selectedQuote.quoteRequestId
+        ? { shippingQuoteId: selectedQuote.quoteRequestId }
+        : {}),
     };
 
     createOrderMutation.mutate(orderData);
   };
 
-  // Format price in local currency (primary) with USD fallback
-  const formatPrice = (usdAmount: number) => {
-    if (currencyInfo) {
-      const local = usdAmount * currencyInfo.rate;
-      const formatted = local >= 1000
-        ? local.toLocaleString(undefined, { maximumFractionDigits: 0 })
-        : local.toLocaleString(undefined, { maximumFractionDigits: 2 });
-      return `${currencyInfo.symbol}${formatted}`;
-    }
-    return `$${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  // All prices are in NGN
+  const formatPrice = (ngnAmount: number) =>
+    `₦${ngnAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-  // Show USD as small secondary label
-  const formatUsdSub = (usdAmount: number) => `≈ $${usdAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const selectedShippingQuote = shippingQuotes.find(q => q.carrier === selectedShipping);
+  const requestMatchesAddress = (request: ShippingQuoteRequest) =>
+    canonicalAddressFingerprint(request.shippingAddress) === canonicalAddressFingerprint(shippingAddress);
+  const requestForCarrier = (carrier: string) =>
+    quoteRequests.find(request => request.carrier === carrier && requestMatchesAddress(request));
+  const effectiveShippingQuotes = shippingQuotes.map(quote => {
+    const request = requestForCarrier(quote.carrier);
+    const usable = quote.quoteRequired
+      && request?.status === 'quoted'
+      && request.cartMatches !== false
+      && !!request.quotedAmount
+      && !!request.expiresAt
+      && new Date(request.expiresAt) > new Date();
+    return usable
+      ? {
+          ...quote,
+          price: Number(request.quotedAmount),
+          duration: request.estimatedDelivery || quote.duration,
+          quoteRequestId: request.id,
+        }
+      : {
+          ...quote,
+          price: quote.estimatedPrice ?? null,
+          ...(request?.status === 'pending' && request.cartMatches !== false ? { quoteRequestId: request.id } : {}),
+          estimated: true,
+        };
+  });
+  const selectedShippingQuote = effectiveShippingQuotes.find(q => q.carrier === selectedShipping);
   const totalAmount = cartTotal + (selectedShippingQuote?.price || 0);
-  const isNativeCurrency = currencyInfo && PAYSTACK_SUPPORTED.has(currencyInfo.code);
+  const recommendedCarrier = shippingRecommendation?.ranked?.[0]?.carrier
+    || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.recommendation : null)
+    || '';
+  const recommendationReasons = shippingRecommendation?.ranked?.[0]?.reasons
+    || (!Array.isArray(shippingQuoteResponse) ? shippingQuoteResponse?.reasons : [])
+    || [];
+  const confirmedCarrier = effectiveShippingQuotes.find((quote) => {
+    const request = requestForCarrier(quote.carrier);
+    return request?.status === 'quoted' && request.cartMatches !== false && Boolean(quote.quoteRequestId);
+  })?.carrier || '';
+
+  useEffect(() => {
+    if (addressInitialized.current || !savedAddresses.length) return;
+    const preferred = savedAddresses.find(address => address.isDefault)
+      || [...savedAddresses].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0];
+    if (preferred) {
+      addressInitialized.current = true;
+      setSelectedAddressId(String(preferred.id));
+      setShippingAddress({
+        firstName: preferred.firstName,
+        lastName: preferred.lastName,
+        address1: preferred.address1,
+        address2: preferred.address2 || '',
+        city: preferred.city,
+        state: preferred.state,
+        postalCode: preferred.postalCode,
+        country: preferred.country,
+      });
+    }
+  }, [savedAddresses]);
+
+  useEffect(() => {
+    if (shippingSelectionIsManual.current) return;
+    if (confirmedCarrier) {
+      if (selectedShipping !== confirmedCarrier) setSelectedShipping(confirmedCarrier);
+      return;
+    }
+    if (isLoadingQuoteRequests || selectedShipping) return;
+    if (recommendedCarrier && effectiveShippingQuotes.some(quote => quote.carrier === recommendedCarrier)) {
+      setSelectedShipping(recommendedCarrier);
+    }
+  }, [recommendedCarrier, confirmedCarrier, effectiveShippingQuotes, selectedShipping, isLoadingQuoteRequests]);
+
+  const addressFingerprint = JSON.stringify(shippingAddress);
+  const cartFingerprint = cartItems.map(item => `${item.id}:${item.quantity}:${item.selectedSize || ''}`).join('|');
+  useEffect(() => {
+    setSelectedShipping(current => current && effectiveShippingQuotes.some(quote => quote.carrier === current) ? current : '');
+  }, [addressFingerprint, cartFingerprint, effectiveShippingQuotes]);
+
+  useEffect(() => {
+    if (!selectedShipping) return;
+    if (!effectiveShippingQuotes.some(quote => quote.carrier === selectedShipping)) {
+      shippingSelectionIsManual.current = false;
+      setSelectedShipping('');
+    }
+  }, [effectiveShippingQuotes, selectedShipping]);
 
   if (isLoading) {
     return (
@@ -250,7 +624,52 @@ export default function Checkout() {
                   <CardTitle>Shipping Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  {savedAddresses.length > 0 && (
+                    <div className="rounded-lg border border-green-200 bg-green-50/60 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-900">Saved addresses</p>
+                          <p className="text-xs text-gray-600">Choose a saved address to fill in the checkout form, then adjust any fields below.</p>
+                        </div>
+                        {isLoadingAddresses && <span className="text-xs text-gray-500">Loading…</span>}
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {savedAddresses.map((address) => (
+                          <button
+                            type="button"
+                            key={address.id}
+                            onClick={() => {
+                              setSelectedAddressId(String(address.id));
+                              setShippingAddress({
+                                firstName: address.firstName,
+                                lastName: address.lastName,
+                                address1: address.address1,
+                                address2: address.address2 || '',
+                                city: address.city,
+                                state: address.state,
+                                postalCode: address.postalCode,
+                                country: address.country,
+                              });
+                              setCountryTouched(true);
+                            }}
+                            className={`rounded-md border p-3 text-left transition-colors ${
+                              selectedAddressId === String(address.id)
+                                ? 'border-nigerian-green bg-white ring-1 ring-nigerian-green'
+                                : 'border-gray-200 bg-white hover:border-nigerian-green'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm">{address.label}</span>
+                              {address.isDefault && <Badge variant="outline" className="border-green-300 text-green-700">Default</Badge>}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-600">{address.address1}, {address.city}</p>
+                            <p className="text-xs text-gray-500">{address.state}, {address.country}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <Label htmlFor="firstName">First Name</Label>
                       <Input
@@ -262,7 +681,7 @@ export default function Checkout() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">Last Name (optional)</Label>
                       <Input
                         id="lastName"
                         value={shippingAddress.lastName}
@@ -294,7 +713,7 @@ export default function Checkout() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <Label htmlFor="city">City</Label>
                       <Input
@@ -306,14 +725,36 @@ export default function Checkout() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="state">State</Label>
-                      <Input
-                        id="state"
-                        value={shippingAddress.state}
-                        onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
-                        required
-                        className="input-nigerian"
-                      />
+                      <Label htmlFor="state">
+                        {shippingAddress.country === 'Canada' ? 'Province / Territory'
+                          : shippingAddress.country === 'United Kingdom' ? 'Country / Region'
+                          : shippingAddress.country === 'Australia' ? 'State / Territory'
+                          : 'State / Region'}
+                      </Label>
+                      {STATES_BY_COUNTRY[shippingAddress.country] ? (
+                        <Select
+                          value={shippingAddress.state}
+                          onValueChange={(value) => setShippingAddress(prev => ({ ...prev, state: value }))}
+                          required
+                        >
+                          <SelectTrigger className="input-nigerian">
+                            <SelectValue placeholder="Select…" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {STATES_BY_COUNTRY[shippingAddress.country].map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="state"
+                          value={shippingAddress.state}
+                          onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))}
+                          placeholder="State / Region"
+                          className="input-nigerian"
+                        />
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="postalCode">Postal Code</Label>
@@ -331,7 +772,7 @@ export default function Checkout() {
                     <Label htmlFor="country">Country</Label>
                     <Select
                       value={shippingAddress.country}
-                      onValueChange={(value) => setShippingAddress(prev => ({ ...prev, country: value }))}
+                      onValueChange={(value) => { setCountryTouched(true); setShippingAddress(prev => ({ ...prev, country: value, state: '' })); }}
                     >
                       <SelectTrigger className="input-nigerian">
                         <SelectValue />
@@ -381,6 +822,30 @@ export default function Checkout() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="rounded-lg border border-dashed border-gray-300 p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <Checkbox checked={saveAddress} onCheckedChange={(checked) => setSaveAddress(checked === true)} />
+                      <span>
+                        <span className="block text-sm font-medium text-gray-900">Save this address</span>
+                        <span className="block text-xs text-gray-500">Keep it ready for your next Afrolandx order.</span>
+                      </span>
+                    </label>
+                    {saveAddress && (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+                        <div>
+                          <Label htmlFor="addressLabel">Address label</Label>
+                          <Input id="addressLabel" value={addressLabel} onChange={(event) => setAddressLabel(event.target.value)} placeholder="Home, Office" className="input-nigerian" />
+                        </div>
+                        <label className="flex items-center gap-2 pb-3 text-sm">
+                          <Checkbox checked={makeDefault} onCheckedChange={(checked) => setMakeDefault(checked === true)} />
+                          Make default
+                        </label>
+                        <Button type="button" variant="outline" disabled={saveAddressMutation.isPending || !isShippingAddressComplete(shippingAddress)} onClick={() => saveAddressMutation.mutate()}>
+                          {saveAddressMutation.isPending ? 'Saving…' : 'Save address'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -395,38 +860,98 @@ export default function Checkout() {
                       <div className="spinner-nigerian"></div>
                       <span className="ml-2">Loading shipping options...</span>
                     </div>
+                  ) : shippingError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      Shipping options are temporarily unavailable. Please refresh and try again.
+                    </div>
+                  ) : shippingQuotes.length === 0 ? (
+                    <div className="rounded-lg border p-4 text-sm text-gray-600">No shipping options are currently available.</div>
                   ) : (
-                    <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
+                    <RadioGroup
+                      value={selectedShipping}
+                      onValueChange={(carrier) => {
+                        shippingSelectionIsManual.current = true;
+                        setSelectedShipping(carrier);
+                        const quote = effectiveShippingQuotes.find((item) => item.carrier === carrier);
+                        trackEvent('shipping_method_selected', {
+                          carrier,
+                          quote_required: Boolean(quote?.quoteRequired),
+                          quote_available: quote?.price !== null,
+                          price_band: valueBand(Number(quote?.price ?? 0)),
+                        });
+                      }}
+                      aria-label="Choose a shipping option"
+                    >
+                      <p className="mb-4 text-sm text-gray-600">
+                        Choose a delivery service. A server-generated testing estimate is included now, and Afrolandx will confirm the final carrier price after the order is placed.
+                      </p>
+                      {recommendedCarrier && effectiveShippingQuotes.some((quote) => quote.carrier === recommendedCarrier) && (
+                        <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                          <span className="font-semibold">Recommended: {recommendedCarrier}.</span>{' '}
+                          {recommendationReasons[0] || 'This option best matches your destination and cart.'}
+                        </div>
+                      )}
                       <div className="space-y-3">
-                        {shippingQuotes.map((quote) => (
-                          <div key={quote.carrier} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50">
-                            <RadioGroupItem value={quote.carrier} id={quote.carrier} />
-                            <Label htmlFor={quote.carrier} className="flex-1 cursor-pointer">
-                              <div className="flex justify-between items-center">
-                                <div>
+                        {effectiveShippingQuotes.map((quote) => {
+                          const request = requestForCarrier(quote.carrier);
+                          const canSelect = true;
+                          const awaitingQuote = request?.status === 'pending' && !!quote.quoteRequestId;
+                          const estimated = (quote as any).estimated === true;
+                          return (
+                          <div
+                            key={quote.carrier}
+                            className={`flex items-start space-x-3 p-4 border rounded-lg transition-colors ${
+                              selectedShipping === quote.carrier
+                                ? 'border-nigerian-green bg-green-50 ring-1 ring-nigerian-green'
+                                : canSelect ? 'hover:bg-gray-50' : 'bg-gray-50'
+                            }`}
+                          >
+                            <RadioGroupItem value={quote.carrier} id={quote.carrier} disabled={!canSelect} className="mt-1" />
+                            <Label htmlFor={quote.carrier} className={`min-w-0 flex-1 ${canSelect ? 'cursor-pointer' : 'cursor-default'}`}>
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
                                   <p className="font-semibold">{quote.service}</p>
                                   <p className="text-sm text-gray-600">{quote.duration}</p>
-                                </div>
-                                <div className="text-right">
-                                  {quote.localPrice && quote.localSymbol ? (
-                                    <>
-                                      <span className="font-bold text-nigerian-green">
-                                        {quote.localSymbol}{quote.localPrice.toLocaleString()}
-                                      </span>
-                                      <span className="block text-xs text-gray-400">≈ ${quote.price.toFixed(2)}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="font-bold text-nigerian-green">{formatPrice(quote.price)}</span>
-                                      {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(quote.price)}</span>}
-                                    </>
+                                  {quote.routes && <p className="text-xs text-gray-500 mt-1">{quote.routes}</p>}
+                                  {quote.notes && <p className="text-xs text-gray-500 mt-1">{quote.notes}</p>}
+                                  {quote.quoteRequired && request?.status === 'pending' && (
+                                     <div className="mt-2">
+                                       <Badge variant="outline" className="border-amber-300 text-amber-700">Final price pending</Badge>
+                                       <p className="mt-1 text-xs text-amber-700">The estimated shipping amount is included now. Only any difference will be collected after Afrolandx confirms the carrier price.</p>
+                                     </div>
                                   )}
+                                  {quote.quoteRequired && !request && (
+                                    <p className="mt-2 text-xs text-blue-700">The final carrier quote will be requested automatically when you place the order.</p>
+                                  )}
+                                  {quote.quoteRequired && request?.status === 'rejected' && (
+                                    <p className="mt-2 text-xs text-red-700">{request.adminNotes || 'This route could not be confirmed.'}</p>
+                                  )}
+                                  {quote.quoteRequestId && request?.expiresAt && (
+                                    <p className="mt-2 text-xs text-green-700">
+                                      Confirmed · valid until {new Date(request.expiresAt).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="shrink-0 text-left sm:text-right">
+                                  <span className={`break-words font-bold ${canSelect ? 'text-nigerian-green' : 'text-gray-600'}`}>
+                                    {quote.price === null ? 'Estimate at payment' : `${estimated || awaitingQuote ? 'Est. ' : ''}${formatPrice(quote.price)}`}
+                                  </span>
                                 </div>
                               </div>
                             </Label>
                           </div>
-                        ))}
+                        )})}
                       </div>
+                      {shippingQuotes.some(quote => quote.quoteRequired) && (
+                        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                          Testing mode: checkout includes an estimated shipping deposit so buyers can pay immediately. Afrolandx confirms the final rate afterward and collects only any remaining balance.
+                        </p>
+                      )}
+                      {!selectedShipping && (
+                        <p className="mt-4 text-sm font-medium text-amber-700">
+                          Select a shipping option to continue to payment.
+                        </p>
+                      )}
                     </RadioGroup>
                   )}
                 </CardContent>
@@ -446,6 +971,7 @@ export default function Checkout() {
                       <div>
                         <p className="font-semibold">Paystack</p>
                         <p className="text-sm text-gray-600">Secure payment with cards, bank transfer, or mobile money</p>
+                        <p className="mt-2 text-sm text-gray-600">Payment questions? <a className="underline break-all" href={`mailto:${PAYMENT_EMAIL}`}>{PAYMENT_EMAIL}</a></p>
                       </div>
                     </div>
                   </div>
@@ -482,7 +1008,6 @@ export default function Checkout() {
                         </div>
                         <div className="text-right">
                           <span className="font-semibold text-sm">{formatPrice(parseFloat(item.product.price) * item.quantity)}</span>
-                          {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(parseFloat(item.product.price) * item.quantity)}</span>}
                         </div>
                       </div>
                     ))}
@@ -491,54 +1016,34 @@ export default function Checkout() {
                   <Separator />
 
                   {/* Currency indicator */}
-                  {currencyInfo && (
-                    <div className={`text-xs px-3 py-2 rounded-md flex items-center gap-2 ${isNativeCurrency ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                      <span>{isNativeCurrency ? '✓' : 'ℹ'}</span>
-                      <span>
-                        {isNativeCurrency
-                          ? `Charging in ${currencyInfo.code} (${currencyInfo.country})`
-                          : `${currencyInfo.code} not supported by Paystack — charging in USD`}
-                      </span>
-                    </div>
-                  )}
+                  <div className="text-xs px-3 py-2 rounded-md flex items-center gap-2 bg-green-50 text-green-700 border border-green-200">
+                    <span>✓</span>
+                    <span>All prices are in Nigerian Naira (₦) and are charged via Paystack</span>
+                  </div>
 
                   {/* Pricing Breakdown */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <div className="text-right">
-                        <span className="font-medium">{formatPrice(cartTotal)}</span>
-                        {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(cartTotal)}</span>}
-                      </div>
+                      <span className="font-medium">{formatPrice(cartTotal)}</span>
                     </div>
                     
                     {selectedShippingQuote && (
                       <div className="flex justify-between text-sm">
                         <span>Shipping ({selectedShippingQuote.carrier})</span>
-                        <div className="text-right">
-                          {selectedShippingQuote.localPrice && selectedShippingQuote.localSymbol ? (
-                            <>
-                              <span className="font-medium">{selectedShippingQuote.localSymbol}{selectedShippingQuote.localPrice.toLocaleString()}</span>
-                              <span className="block text-xs text-gray-400">≈ ${selectedShippingQuote.price.toFixed(2)}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="font-medium">{formatPrice(selectedShippingQuote.price)}</span>
-                              {currencyInfo && <span className="block text-xs text-gray-400">{formatUsdSub(selectedShippingQuote.price)}</span>}
-                            </>
-                          )}
-                        </div>
+                        <span className="font-medium">
+                          {selectedShippingQuote.price === null ? 'Calculated at payment' : `${(selectedShippingQuote as any).estimated ? 'Estimated ' : ''}${formatPrice(selectedShippingQuote.price)}`}
+                        </span>
                       </div>
                     )}
                     
                     <Separator />
                     
-                    <div className="flex justify-between text-lg font-bold">
+                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <div className="text-right">
-                        <span className="text-nigerian-green">{formatPrice(totalAmount)}</span>
-                        {currencyInfo && <span className="block text-xs text-gray-400 font-normal">{formatUsdSub(totalAmount)}</span>}
-                      </div>
+                       <span className="text-nigerian-green">
+                         {selectedShippingQuote ? formatPrice(totalAmount) : 'Select shipping'}
+                       </span>
                     </div>
                   </div>
 
@@ -553,12 +1058,16 @@ export default function Checkout() {
                         <div className="spinner-nigerian w-4 h-4 mr-2"></div>
                         Processing...
                       </div>
-                    ) : (
+                     ) : !selectedShipping ? (
+                       'Select shipping method'
+                     ) : (
                       <>
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Pay {formatPrice(totalAmount)}
+                        {selectedShippingQuote?.price === null
+                          ? 'Continue to calculated payment'
+                          : `Pay ${formatPrice(totalAmount)}`}
                       </>
                     )}
                   </Button>
@@ -575,7 +1084,7 @@ export default function Checkout() {
 
                   {/* Trust Badges */}
                   <div className="text-center pt-4">
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-1 gap-2 text-xs min-[375px]:grid-cols-3">
                       <Badge variant="outline" className="flex items-center justify-center py-2">
                         <span className="mr-1">🔒</span>
                         SSL Secure

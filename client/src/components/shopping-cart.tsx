@@ -28,9 +28,7 @@ export default function ShoppingCart() {
     return null;
   }
 
-  const formatPrice = (price: string) => {
-    return `$${parseFloat(price).toLocaleString()}`;
-  };
+  const formatPrice = (price: string) => `₦${parseFloat(price).toLocaleString()}`;
 
   const handleQuantityChange = (cartItemId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -111,13 +109,13 @@ export default function ShoppingCart() {
                             if (parent) {
                               parent.style.background = 'linear-gradient(135deg, var(--nigerian-green), var(--nigerian-gold))';
                               parent.classList.add('flex', 'items-center', 'justify-center');
-                              parent.innerHTML = '<span class="text-white text-xs">No Image</span>';
+                              parent.innerHTML = '<span class="text-white text-xs">Image unavailable</span>';
                             }
                           }}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
-                          <span className="text-white text-xs">No Image</span>
+                          <span className="text-white text-xs">Image unavailable</span>
                         </div>
                       )}
                     </div>
@@ -125,10 +123,16 @@ export default function ShoppingCart() {
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-gray-900 truncate">{item.product.name}</h4>
+                      {item.selectedSize && (
+                        <span className="inline-block text-xs font-medium bg-nigerian-green/10 text-nigerian-green border border-nigerian-green/20 rounded px-1.5 py-0.5 mb-1">
+                          Size: {item.selectedSize}
+                        </span>
+                      )}
                       <p className="text-sm text-gray-600 truncate">{item.product.description}</p>
                       <p className="text-lg font-bold text-nigerian-green mt-1">
                         {formatPrice(item.product.price)}
                       </p>
+                      <LocalPrice ngnAmount={parseFloat(item.product.price)} />
                     </div>
 
                     {/* Quantity Controls */}
@@ -150,7 +154,7 @@ export default function ShoppingCart() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          disabled={isUpdatingQuantity || item.quantity >= item.product.quantity}
+                          disabled={isUpdatingQuantity || item.quantity >= item.product.stock}
                           className="w-8 h-8 p-0"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,7 +187,7 @@ export default function ShoppingCart() {
                     disabled={isClearingCart}
                     className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700"
                   >
-                    {isClearingCart ? 'Clearing...' : 'Clear Cart'}
+                    {isClearingCart ? 'Clearing…' : 'Clear cart'}
                   </Button>
                 </div>
               )}
@@ -196,11 +200,11 @@ export default function ShoppingCart() {
                   <span>Total</span>
                   <div className="text-right">
                     <span className="text-nigerian-green">{formatPrice(cartTotal.toString())}</span>
-                    <LocalPrice usdAmount={cartTotal} className="block" size="md" />
+                    <div><LocalPrice ngnAmount={cartTotal} size="md" /></div>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Shipping cost will be calculated at checkout
+                  Shipping costs will be calculated at checkout.
                 </p>
               </div>
 
@@ -229,21 +233,25 @@ export default function ShoppingCart() {
                         <span className="text-blue-600 mr-2">🚚</span>
                         UPS Express
                       </span>
-                      <span className="text-gray-600">5-7 days</span>
+                      <span className="text-gray-600">5 to 7 days</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center">
                         <span className="text-purple-600 mr-2">✈️</span>
                         FedEx International
                       </span>
-                      <span className="text-gray-600">3-5 days</span>
+                      <span className="text-gray-600">3 to 5 days</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center">
                         <span className="text-yellow-600 mr-2">📦</span>
                         DHL Express
                       </span>
-                      <span className="text-gray-600">2-4 days</span>
+                      <span className="text-gray-600">2 to 4 days</span>
+                    </div>
+                    <div className="pt-2 mt-2 border-t text-xs text-gray-600">
+                      <p className="font-semibold text-gray-800 mb-1">International partners (rates available on request)</p>
+                      <p>CargoNaija · Terminal Africa · Haulam · African Import Export Solutions · Hezelinks</p>
                     </div>
                   </div>
                 </div>

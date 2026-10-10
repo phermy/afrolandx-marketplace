@@ -1,30 +1,56 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/CartContext';
 import Navbar from '@/components/navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { trackEvent, valueBand } from '@/lib/analytics';
+import { fetchPaymentConfirmation, PaymentConfirmationError } from '@/lib/payment-confirmation';
 
 
 export default function OrderSuccess() {
-  const { user } = useAuth();
   const { clearCart } = useCart();
-  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const processedOrderRef = useRef<number | null>(null);
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get('order_id');
+  const reference = params.get('reference') || params.get('trxref');
+  const { data: order, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ['/api/orders', orderId, reference],
+    queryFn: async () => {
+      return fetchPaymentConfirmation(orderId || '', reference || '');
+    },
+    enabled: Boolean(orderId && reference),
+    retry: (count, error) => count < 12 && (error instanceof PaymentConfirmationError ? error.pending : true),
+    retryDelay: 2000,
+  });
 
   useEffect(() => {
-    // Clear cart after successful payment
+    if (!order) return;
+    if (processedOrderRef.current === order.id) return;
+    processedOrderRef.current = order.id;
+    sessionStorage.removeItem('checkout_request_id');
     clearCart();
+    const eventKey = `analytics_payment_succeeded_${order.id}`;
+    if (sessionStorage.getItem(eventKey)) return;
+    sessionStorage.setItem(eventKey, '1');
+    trackEvent('payment_succeeded', {
+      order_id: order.id,
+      amount_band: valueBand(Number(order.totalAmount ?? order.total ?? 0)),
+      shipping_status: order.orderStatus === 'awaiting_shipping_quote' ? 'awaiting_quote' : 'confirmed',
+      item_count: Array.isArray(order.items) ? order.items.length : 0,
+      payment_provider: 'paystack',
+    });
+  }, [clearCart, order]);
 
-    // Get order details from URL params or localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('order_id');
-    const reference = urlParams.get('reference');
-    
-    if (orderId && reference) {
-      setOrderDetails({ orderId, reference });
-    }
-  }, [clearCart]);
+  if (isLoading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="min-h-[60vh] flex flex-col gap-4 items-center justify-center" role="status"><div className="spinner-nigerian" /><p>Confirming your payment. Please do not pay again.</p></div></div>;
+  if (isError || !order) return (
+    <div className="min-h-screen bg-gray-50"><Navbar /><div className="max-w-xl mx-auto px-4 py-20 text-center">
+      <h1 className="text-2xl font-bold mb-3">Payment confirmation unavailable</h1>
+      <p className="text-gray-600 mb-6">We could not confirm a paid order from this link yet. Do not pay again. Check My Orders or contact payments@afrolandx.com with your payment reference.</p>
+      <Button onClick={() => window.location.href = '/my-orders'}>View My Orders</Button>
+      <Button className="ml-3" variant="outline" onClick={() => refetch()}>Check confirmation again</Button>
+    </div></div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
@@ -43,7 +69,7 @@ export default function OrderSuccess() {
             🎉 Order Placed Successfully!
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Thank you for celebrating African heritage with us
+            Thank you for celebrating African heritage with us.
           </p>
         </div>
 
@@ -56,17 +82,19 @@ export default function OrderSuccess() {
                     Your Payment Was Successful! ✨
                   </h2>
                   <p className="text-green-700 leading-relaxed">
-                    We've received your payment and your order is now being processed. Our skilled artisans and vendors 
-                    are already preparing your authentic African fashion pieces with the utmost care and attention to detail.
+                    We've received your payment for your items.
+                    {order.orderStatus === 'awaiting_shipping_quote'
+                      ? ' Your estimated shipping deposit is included. Afrolandx is now confirming the final carrier rate and will collect only any remaining difference from My Orders.'
+                      : ' Your shipping is confirmed and the order can now move to fulfillment.'}
                   </p>
                 </div>
 
-                {orderDetails && (
+                {order && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-800 mb-2">Order Details</h3>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <p><span className="font-medium">Order ID:</span> #{orderDetails.orderId}</p>
-                      <p><span className="font-medium">Payment Reference:</span> {orderDetails.reference}</p>
+                      <p><span className="font-medium">Order ID:</span> #{order.id}</p>
+                      <p><span className="font-medium">Payment Reference:</span> {order.paymentReference}</p>
                     </div>
                   </div>
                 )}
@@ -76,15 +104,15 @@ export default function OrderSuccess() {
                   <div className="text-left space-y-3 text-blue-700">
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                      <p>Our vendors have been notified and will begin preparing your items</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Afrolandx confirms the final rate with your selected shipping company.' : 'Our vendors have been notified and will begin preparing your items.'}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
-                      <p>You'll receive email updates as your order progresses through each stage</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'You will receive a notification in the app when the final shipping price is ready.' : "You'll receive updates as your order progresses through each stage."}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
-                      <p>Once shipped, you'll get tracking information and delivery updates</p>
+                      <p>{order.orderStatus === 'awaiting_shipping_quote' ? 'Pay any remaining shipping difference securely from My Orders.' : "Once shipped, you'll get tracking information and delivery updates."}</p>
                     </div>
                     <div className="flex items-start space-x-3">
                       <span className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
@@ -95,8 +123,7 @@ export default function OrderSuccess() {
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-yellow-800 text-sm">
-                    <span className="font-semibold">Note:</span> Both vendors and our admin team have been automatically 
-                    notified about your order. Expect processing to begin within 1-2 business hours.
+                    <span className="font-semibold">Note:</span> The relevant vendors and our admin team have been notified automatically about your order. Processing is expected to begin within one to two business hours.
                   </p>
                 </div>
               </div>

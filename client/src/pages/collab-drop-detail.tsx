@@ -77,6 +77,13 @@ export default function CollabDropDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/collab-drops", id] });
       toast({ title: "RSVP Confirmed!", description: "You'll be notified when the drop goes live." });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "RSVP failed",
+        description: error.message || "Could not complete your RSVP.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -101,8 +108,8 @@ export default function CollabDropDetailPage() {
   const now = new Date();
   const start = new Date(drop.dropStartTime);
   const end = drop.dropEndTime ? new Date(drop.dropEndTime) : null;
-  const isLive = now >= start && (!end || now <= end);
-  const isUpcoming = now < start;
+  const isLive = drop.status === 'live' || (drop.status !== 'cancelled' && now >= start && (!end || now <= end));
+  const isUpcoming = drop.status === 'upcoming' && now < start;
   const spotsLeft = drop.rsvpCap ? drop.rsvpCap - (drop.rsvpCount || 0) : null;
   const hasRsvped = myRsvps.some(r => r.dropId === drop.id);
   const displayTitle = drop.title || drop.name;
@@ -148,7 +155,7 @@ export default function CollabDropDetailPage() {
               </p>
             )}
 
-            <p className="text-muted-foreground leading-relaxed">{drop.description}</p>
+            <p className="reading-copy text-muted-foreground leading-relaxed">{drop.description}</p>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -214,7 +221,7 @@ export default function CollabDropDetailPage() {
                         <img
                           src={img}
                           alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?auto=format&fit=crop&w=400&h=400&q=60"; }}
                         />
                       ) : (

@@ -21,9 +21,14 @@ import {
   Heart,
   Loader2,
   MapPin,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import Navbar from "@/components/navbar";
+import EventServices from "@/components/event-services";
 
 const eventTypes = [
   { value: "wedding", label: "Wedding / Traditional Marriage", icon: Heart },
@@ -40,16 +45,16 @@ const eventTypes = [
 ];
 
 const eventSizes = [
-  { value: "1", label: "Solo — Just me (1)" },
+  { value: "1", label: "Solo: Just me (1)" },
   { value: "2", label: "Couple (2)" },
   { value: "4", label: "Small family (3–4)" },
   { value: "6", label: "Family (5–6)" },
   { value: "10", label: "Extended family (7–10)" },
   { value: "15", label: "Wedding party / Bridal train (10–20)" },
-  { value: "25", label: "Small group / Aso-ebi (20–30)" },
+  { value: "25", label: "Small group / Aso Ebi (20–30)" },
   { value: "50", label: "Large group (30–60)" },
   { value: "100", label: "Corporate / Community event (60+)" },
-  { value: "others", label: "Others — custom size" },
+  { value: "others", label: "Others: custom size" },
 ];
 
 // Country → currency mapping
@@ -119,13 +124,18 @@ interface EventCollection {
 
 export default function EventPlannerPage() {
   const { user } = useAuth();
+  const { addToCart, openCart } = useCart();
+  const { toast } = useToast();
   const [selectedEvent, setSelectedEvent] = useState("");
   const [budget, setBudget] = useState("");
   const [eventSize, setEventSize] = useState("");
   const [customSize, setCustomSize] = useState("");
   const [eventLocation, setEventLocation] = useState("NG");
+  const [addedCollections, setAddedCollections] = useState<Set<number>>(new Set());
 
-  const currency = LOCATION_CURRENCIES[eventLocation] ?? LOCATION_CURRENCIES.OTHER;
+  // Product and planner-service prices are stored in NGN; location is not a
+  // currency converter and must not relabel an NGN price as a foreign price.
+  const currency = { code: "NGN", symbol: "₦" };
   const familySizeParam = eventSize === "others" ? customSize : eventSize;
 
   const { data: collections = [], isLoading } = useQuery<EventCollection[]>({
@@ -135,14 +145,10 @@ export default function EventPlannerPage() {
       if (selectedEvent) params.append("eventType", selectedEvent);
       if (budget) params.append("budget", budget);
       if (familySizeParam) params.append("familySize", familySizeParam);
-
       const res = await fetch(`/api/events/recommend?${params.toString()}`, {
         credentials: "include",
       });
-      if (!res.ok) {
-        const fallbackRes = await fetch(`/api/events/collections?eventType=${selectedEvent}`);
-        return fallbackRes.json();
-      }
+      if (!res.ok) throw new Error("Failed to load collections");
       return res.json();
     },
     enabled: !!selectedEvent,
@@ -156,27 +162,77 @@ export default function EventPlannerPage() {
 
   const locationOptions = Object.entries(LOCATION_CURRENCIES).map(([key, val]) => ({
     key,
-    label: `${val.name} (${val.symbol})`,
+    label: val.name,
   }));
 
+  function handleAddAllToCart(collection: EventCollection) {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to add items to your cart.", variant: "destructive" });
+      return;
+    }
+    collection.products.forEach(p => addToCart(p.id, 1));
+    setAddedCollections(prev => new Set(prev).add(collection.id));
+    toast({
+      title: "Collection added!",
+      description: `${collection.products.length} item${collection.products.length !== 1 ? "s" : ""} from "${collection.title}" added to your cart.`,
+    });
+    openCart();
+  }
+
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Calendar className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Event Outfit Planner</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+
+      {/* Hero Banner */}
+      <div className="bg-gradient-to-br from-green-800 via-emerald-700 to-yellow-600 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-12 md:py-16">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-white/80 font-medium text-sm uppercase tracking-wider">AfrolandX Event Planner</span>
           </div>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Planning a special African event? We'll help you find the perfect traditional outfits for every attendee.
+          <h1 className="text-3xl md:text-4xl font-black mb-3">Events, planned your way</h1>
+          <p className="text-white/80 max-w-2xl text-base leading-relaxed">
+            Work with an approved planner for your occasion, or explore traditional outfit collections for everyone attending.
           </p>
+          <div className="flex flex-wrap gap-3 mt-6">
+            {[
+              { label: "Wedding", value: "wedding" },
+              { label: "Naming Ceremony", value: "naming_ceremony" },
+              { label: "Festival", value: "festival" },
+              { label: "Chieftaincy", value: "chieftaincy" },
+              { label: "Engagement", value: "engagement" },
+              { label: "Party", value: "party" },
+            ].map(tag => (
+              <button
+                key={tag.value}
+                onClick={() => setSelectedEvent(tag.value)}
+                className={`px-3 py-1 border rounded-full text-sm transition-all ${
+                  selectedEvent === tag.value
+                    ? "bg-white text-green-800 font-semibold border-white"
+                    : "bg-white/15 border-white/25 text-white/90 hover:bg-white/25"
+                }`}
+              >
+                {tag.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <EventServices />
+
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="text-center mb-8 sr-only">
+          <h2 className="text-2xl font-bold">Find Your Collection</h2>
         </div>
 
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Tell Us About Your Event</CardTitle>
             <CardDescription>
-              Select your event type and we'll show you curated outfit collections
+              Choose an event type to explore curated outfit collections.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -202,7 +258,7 @@ export default function EventPlannerPage() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                  Event Location (sets budget currency)
+                  Event location
                 </Label>
                 <Select value={eventLocation} onValueChange={setEventLocation}>
                   <SelectTrigger>
@@ -317,7 +373,7 @@ export default function EventPlannerPage() {
                     </div>
                     {collection.avgFitScore && (
                       <Badge className={getFitScoreColor(collection.avgFitScore)}>
-                        {Math.round(collection.avgFitScore)}% Fit Match
+                        Fit score: {Math.round(collection.avgFitScore)}%
                       </Badge>
                     )}
                   </div>
@@ -331,7 +387,7 @@ export default function EventPlannerPage() {
                             <img
                               src={product.imageUrl}
                               alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              className="w-full h-full object-contain bg-white group-hover:scale-105 transition-transform"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -371,9 +427,16 @@ export default function EventPlannerPage() {
                           View Details
                         </Link>
                       </Button>
-                      <Button data-testid={`button-add-collection-${collection.id}`}>
-                        <ShoppingBag className="h-4 w-4 mr-2" />
-                        Add All to Cart
+                      <Button
+                        data-testid={`button-add-collection-${collection.id}`}
+                        onClick={() => handleAddAllToCart(collection)}
+                        className={addedCollections.has(collection.id) ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
+                        {addedCollections.has(collection.id) ? (
+                          <><CheckCircle2 className="h-4 w-4 mr-2" />Added to Cart</>
+                        ) : (
+                          <><ShoppingBag className="h-4 w-4 mr-2" />Add All to Cart</>
+                        )}
                       </Button>
                     </div>
                   </div>

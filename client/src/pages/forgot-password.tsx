@@ -1,229 +1,171 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { AuthShell, authInputClass } from "@/components/auth-shell";
+import { passwordProblem } from "@shared/account-security";
 
-const emailSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-});
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const resetSchema = z.object({
-  otp: z.string().length(6, "Please enter the full 6-digit code"),
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-}).refine((d) => d.newPassword === d.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type EmailForm = z.infer<typeof emailSchema>;
-type ResetForm = z.infer<typeof resetSchema>;
+async function responseMessage(response: Response, fallback: string) {
+  const text = await response.text();
+  try {
+    const body = JSON.parse(text);
+    return typeof body?.message === "string" ? body.message : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function ForgotPasswordPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState<"email" | "otp" | "done">("email");
+  const [step, setStep] = useState<"email" | "code" | "done">("email");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const emailForm = useForm<EmailForm>({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { email: "" },
-  });
-
-  const resetForm = useForm<ResetForm>({
-    resolver: zodResolver(resetSchema),
-    defaultValues: { otp: "", newPassword: "", confirmPassword: "" },
-  });
-
-  async function onEmailSubmit(data: EmailForm) {
+  async function requestReset(event: React.FormEvent) {
+    event.preventDefault();
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      setError("Enter the email address on your account.");
+      return;
+    }
+    setEmail(normalizedEmail);
+    setError("");
     setIsLoading(true);
     try {
-      const res = await fetch("/api/forgot-password", {
+      const response = await fetch("/api/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
-      setEmail(data.email);
-      setStep("otp");
-      toast({ title: "Code sent!", description: "Check your email for the 6-digit reset code." });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to send reset code", variant: "destructive" });
+      if (!response.ok) throw new Error(await responseMessage(response, "We couldn't send a reset code."));
+      setStep("code");
+      toast({ title: "Check your email", description: "If that email is registered, a reset code will arrive shortly." });
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't send a reset code. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function onResetSubmit(data: ResetForm) {
+  async function resetPassword(event: React.FormEvent) {
+    event.preventDefault();
+    if (code.length !== 6) {
+      setError("Enter all six digits from the code in your email.");
+      return;
+    }
+    const passwordError = passwordProblem(newPassword, email);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Your passwords do not match.");
+      return;
+    }
+    setError("");
     setIsLoading(true);
     try {
-      const res = await fetch("/api/reset-password", {
+      const response = await fetch("/api/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp: data.otp, newPassword: data.newPassword }),
+        body: JSON.stringify({ email, otp: code, newPassword }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message);
+      if (!response.ok) throw new Error(await responseMessage(response, "That code is invalid or expired."));
       setStep("done");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to reset password", variant: "destructive" });
+    } catch (submitError: any) {
+      setError(submitError.message || "That code is invalid or expired.");
     } finally {
       setIsLoading(false);
     }
   }
 
   async function resendCode() {
+    setError("");
     setIsLoading(true);
     try {
-      await fetch("/api/forgot-password", {
+      const response = await fetch("/api/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      toast({ title: "Code resent!", description: "A new code has been sent to your email." });
-    } catch {
-      toast({ title: "Error", description: "Failed to resend code", variant: "destructive" });
+      if (!response.ok) throw new Error(await responseMessage(response, "We couldn't resend the reset code."));
+      toast({ title: "Code requested", description: "If your email is registered, a new code will arrive shortly." });
+    } catch (submitError: any) {
+      setError(submitError.message || "We couldn't resend the code. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }
 
+  if (step === "done") {
+    return (
+      <AuthShell title="Password updated" description="Your password has been changed successfully." headerLink={{ href: "/login", label: "Log in" }}>
+        <div className="text-center">
+          <CheckCircle className="mx-auto h-14 w-14 text-green-600" />
+          <p className="mt-4 text-sm text-gray-600">You can now sign in with your new password.</p>
+          <button type="button" onClick={() => setLocation("/login")} className="mt-6 flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2">
+            Go to sign in
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-amber-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex items-center mb-2">
-            <Link href="/login">
-              <Button variant="ghost" size="icon" className="mr-auto">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+    <AuthShell
+      title={step === "email" ? "Reset your password" : "Create a new password"}
+      description={step === "email" ? "Enter your email and we’ll send a reset code." : `Enter the code sent to ${email}, then choose a new password.`}
+      headerLink={{ href: "/login", label: "Log in" }}
+    >
+      <Link href="/login" className="mb-5 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 focus:outline-none focus:underline">
+        <ArrowLeft className="h-4 w-4" /> Back to login
+      </Link>
+      {error && <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-5 text-red-700" role="alert">{error}</div>}
+      {step === "email" ? (
+        <form onSubmit={requestReset} className="space-y-5">
+          <label className="block text-sm font-medium text-gray-700">
+            Email address
+            <input value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} type="email" autoComplete="email" inputMode="email" placeholder="you@example.com" className={authInputClass} autoFocus required />
+          </label>
+          <button type="submit" disabled={isLoading} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending code...</> : "Send reset code"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={resetPassword} className="space-y-5">
+          <div className="flex justify-center py-1">
+            <InputOTP maxLength={6} value={code} onChange={setCode} aria-label="Enter the six digits of your password reset code" autoComplete="one-time-code" autoFocus required>
+              <InputOTPGroup>
+                <InputOTPSlot index={0} /><InputOTPSlot index={1} /><InputOTPSlot index={2}
+                /><InputOTPSlot index={3} /><InputOTPSlot index={4} /><InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
           </div>
-          {step === "done" ? (
-            <>
-              <div className="flex justify-center mb-4">
-                <CheckCircle className="h-16 w-16 text-green-600" />
-              </div>
-              <CardTitle className="text-2xl font-bold text-green-800">Password Reset!</CardTitle>
-              <CardDescription>Your password has been changed successfully.</CardDescription>
-            </>
-          ) : (
-            <>
-              <CardTitle className="text-2xl font-bold text-green-800">Forgot Password?</CardTitle>
-              <CardDescription>
-                {step === "email"
-                  ? "Enter your email and we'll send you a reset code"
-                  : `Enter the 6-digit code sent to ${email}`}
-              </CardDescription>
-            </>
-          )}
-        </CardHeader>
-        <CardContent>
-          {step === "done" ? (
-            <div className="space-y-4">
-              <Button className="w-full bg-green-700 hover:bg-green-800" onClick={() => setLocation("/login")}>
-                Sign In Now
-              </Button>
-            </div>
-          ) : step === "email" ? (
-            <Form {...emailForm}>
-              <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
-                <FormField
-                  control={emailForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input {...field} type="email" placeholder="you@example.com" className="pl-10" />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isLoading}>
-                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : "Send Reset Code"}
-                </Button>
-              </form>
-            </Form>
-          ) : (
-            <Form {...resetForm}>
-              <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-5">
-                <FormField
-                  control={resetForm.control}
-                  name="otp"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col items-center">
-                      <FormLabel>Verification Code</FormLabel>
-                      <FormControl>
-                        <InputOTP maxLength={6} value={field.value} onChange={field.onChange}>
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                          </InputOTPGroup>
-                        </InputOTP>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={resetForm.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>New Password</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="password" placeholder="At least 8 characters" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={resetForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm New Password</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="password" placeholder="Confirm your password" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isLoading}>
-                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resetting...</> : "Reset Password"}
-                </Button>
-                <div className="text-center text-sm text-gray-500">
-                  Didn't get the code?{" "}
-                  <button type="button" onClick={resendCode} className="text-green-700 hover:underline font-medium" disabled={isLoading}>
-                    Resend
-                  </button>
-                </div>
-              </form>
-            </Form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          <label className="block text-sm font-medium text-gray-700">
+            New password
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="At least 12 characters" className={authInputClass} minLength={12} required />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            Confirm new password
+            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" placeholder="Enter it again" className={authInputClass} minLength={12} required />
+          </label>
+          <button type="submit" disabled={isLoading || code.length !== 6} className="flex h-11 w-full items-center justify-center rounded-md bg-[#087f4f] px-4 text-sm font-semibold text-white transition hover:bg-[#06683f] focus:outline-none focus:ring-2 focus:ring-[#087f4f] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
+            {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating password...</> : "Update password"}
+          </button>
+          <p className="text-center text-sm text-gray-500">
+            Didn’t get the code?{" "}
+            <button type="button" onClick={resendCode} disabled={isLoading} className="font-medium text-[#087f4f] hover:underline disabled:opacity-50">Resend code</button>
+          </p>
+        </form>
+      )}
+    </AuthShell>
   );
 }

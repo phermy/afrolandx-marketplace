@@ -12,6 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/navbar";
+import { lengthBand, trackEvent } from "@/lib/analytics";
 
 interface User {
   id: string;
@@ -63,7 +64,11 @@ export default function Messages() {
     mutationFn: async (data: { recipientId: string; content: string }) => {
       await apiRequest('POST', '/api/messages', data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      trackEvent("message_sent", {
+        message_length_band: lengthBand(variables.content.trim().length),
+        has_active_conversation: Boolean(selectedConversation),
+      });
       setMessageInput('');
       queryClient.invalidateQueries({ queryKey: ['/api/messages/conversations'] });
       queryClient.invalidateQueries({ queryKey: ['/api/messages/conversation', selectedConversation] });
@@ -146,7 +151,7 @@ export default function Messages() {
                     ))
                   ) : (
                     <div className="p-4 text-center text-muted-foreground">
-                      No conversations yet. Message a vendor to get started!
+                      No conversations yet. Start a conversation with a vendor!
                     </div>
                   )}
                 </ScrollArea>

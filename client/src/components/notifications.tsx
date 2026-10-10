@@ -19,7 +19,7 @@ export default function NotificationPanel() {
 
   const dismissMutation = useMutation({
     mutationFn: async (notificationId: number) => {
-      return await apiRequest(`/api/notifications/${notificationId}`, "DELETE");
+      return await apiRequest("DELETE", `/api/notifications/${notificationId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -28,7 +28,7 @@ export default function NotificationPanel() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: number) => {
-      return await apiRequest(`/api/notifications/${notificationId}/read`, "PATCH");
+      return await apiRequest("PATCH", `/api/notifications/${notificationId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -104,7 +104,7 @@ export default function NotificationPanel() {
                     className="text-xs px-2 py-1 h-6 hover:bg-blue-100"
                     disabled={markAsReadMutation.isPending}
                   >
-                    Mark Read
+                      Mark as read
                   </Button>
                 )}
               </div>

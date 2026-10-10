@@ -1,12 +1,18 @@
 // Type definitions for the Nigerian Fashion E-commerce Platform
 
 export interface User {
+  isShippingPartner?: boolean;
+  phone?: string | null;
+  signupIntent?: "customer" | "vendor" | null;
   id: string;
   email?: string;
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
   roles: string[];
+  emailVerified?: boolean;
+  closedAt?: string | null;
+  roleManagementLocked?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -14,9 +20,13 @@ export interface User {
 export interface Vendor {
   id: number;
   userId: string;
+  contactName?: string;
   businessName: string;
+  phone?: string;
+  cacNumber?: string;
   description?: string;
-  status: 'pending' | 'approved' | 'suspended';
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  verificationStatus: 'pending' | 'submitted' | 'verified' | 'rejected';
   createdAt: string;
   updatedAt: string;
 }
@@ -34,14 +44,37 @@ export interface Product {
   vendorId: number;
   categoryId: number;
   name: string;
+  shortDescription?: string | null;
   description: string;
   price: string;
+  compareAtPrice?: string | null;
+  sku?: string | null;
   stock: number;
   weight?: string;
+  dimensions?: string | null;
+  shippingClass?: string | null;
+  processingTime?: string | null;
+  careInstructions?: string | null;
+  returnPolicy?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  requiresMeasurements?: boolean | null;
+  tags?: string[];
+  variants?: Array<{
+    size?: string;
+    color?: string;
+    pattern?: string;
+    sku?: string;
+    stock: number;
+  }>;
   imageUrl?: string;
   images: string[];
-  status: 'pending' | 'approved' | 'rejected';
+  sizes?: string[]; // available sizes e.g. ["XS","S","M","L","XL"]
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
   featured: boolean;
+  gender?: string | null;
+  originCountry?: string | null;
+  traditionalName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +89,7 @@ export interface CartItem {
   userId: string;
   productId: number;
   quantity: number;
+  selectedSize?: string | null;
   createdAt: string;
   updatedAt: string;
   product: Product;
@@ -67,10 +101,17 @@ export interface Order {
   totalAmount: string;
   shippingAmount: string;
   paymentStatus: 'pending' | 'paid' | 'failed';
-  orderStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  orderStatus: 'awaiting_shipping_quote' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
   paymentReference?: string;
-  shippingMethod?: 'ups' | 'fedex' | 'dhl';
+  shippingMethod?: string;
+  shippingQuoteRequestId?: number | null;
+  shippingPaymentStatus: 'included' | 'awaiting_quote' | 'pending' | 'paid' | 'rejected';
+  shippingPaymentReference?: string | null;
+  shippingEstimatedAmount?: string | null;
+  shippingFinalAmount?: string | null;
+  shippingRefundAmount?: string | null;
+  shippingRefundStatus?: string | null;
   trackingNumber?: string;
   createdAt: string;
   updatedAt: string;
@@ -82,6 +123,7 @@ export interface OrderItem {
   productId: number;
   quantity: number;
   priceAtTime: string;
+  selectedSize?: string | null;
   createdAt: string;
 }
 
@@ -96,14 +138,71 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface SavedAddress extends ShippingAddress {
+  id: number;
+  label: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ShippingRecommendationResponse {
+  basis: 'static_catalog_rules';
+  liveRates: false;
+  ranked: Array<{
+    carrier: string;
+    score: number;
+    reasons: string[];
+  }>;
+}
+
+export interface ShippingQuoteResponse {
+  quotes: ShippingQuote[];
+  recommendation: string | null;
+  reasons: string[];
+}
+
 export interface ShippingQuote {
-  carrier: 'UPS' | 'FedEx' | 'DHL';
+  carrier: string;
   service: string;
-  price: number;
+  price: number | null;
+  estimatedPrice?: number | null;
   duration: string;
+  quoteRequired?: boolean;
+  routes?: string;
+  notes?: string;
   localPrice?: number;
   localCurrency?: string;
   localSymbol?: string;
+  quoteRequestId?: number;
+}
+
+export interface ShippingQuoteRequest {
+  id: number;
+  userId: string;
+  carrier: string;
+  status: 'pending' | 'quoted' | 'rejected' | 'expired' | 'reserved' | 'used';
+  shippingAddress: ShippingAddress;
+  cartSnapshot: Array<{
+    productId: number;
+    name: string;
+    quantity: number;
+    selectedSize?: string | null;
+    unitPrice: string;
+    weight?: string | null;
+  }>;
+  cartFingerprint: string;
+  totalWeight: string;
+  quotedAmount?: string | null;
+  currency: 'NGN';
+  estimatedDelivery?: string | null;
+  adminNotes?: string | null;
+  confirmedBy?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cartMatches?: boolean;
+  customer?: User;
 }
 
 export interface AdminStats {

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
+import { hasFullManagementAccess, hasShippingOperationsAccess } from '@shared/admin-access';
 import { useCart } from '@/contexts/CartContext';
+import MegaMenu from '@/components/mega-menu';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { isAdmin, isVendor, getUserRoleDisplay } from '@/lib/roleUtils';
@@ -16,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap } from 'lucide-react';
+import { ShoppingCart, Menu, X, Search, Home, Package, Calendar, Star, MapPin, BookOpen, Gift, MessageSquare, Ruler, ClipboardList, User, Settings, LogOut, Palette, Zap, FileText, CreditCard, Truck } from 'lucide-react';
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 
 export default function Navbar() {
@@ -69,9 +71,11 @@ export default function Navbar() {
   const navLinkClass = (path: string) =>
     `px-3 py-2 font-medium transition-colors ${
       location === path
-        ? 'text-nigerian-green border-b-2 border-nigerian-green'
+        ? 'text-nigerian-green'
         : 'text-gray-700 hover:text-nigerian-green'
     }`;
+  const fullManagement = hasFullManagementAccess(user);
+  const canAccessShipping = !!(isAuthenticated && user && (hasShippingOperationsAccess(user) || isVendor(user) || user.isShippingPartner));
 
   const mobileNavLinkClass = (path: string) =>
     `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -83,9 +87,9 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center min-h-16 py-2">
           {/* Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center flex-1 min-w-0">
             <Link href="/">
               <div className="flex items-center text-xl font-bold text-nigerian-green font-nigerian cursor-pointer">
                 <img src={logoImage} alt="Afrolandx Logo" className="w-8 h-8 mr-2" />
@@ -94,31 +98,35 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:ml-8 md:flex md:space-x-2">
+            <div className="hidden lg:ml-4 lg:flex lg:flex-wrap lg:gap-x-1">
               <Link href="/" className={navLinkClass('/')}>Home</Link>
               <Link href="/products" className={navLinkClass('/products')}>Products</Link>
+              <Link href="/reviews" className={navLinkClass('/reviews')}>Reviews</Link>
               <Link href="/events" className={navLinkClass('/events')}>Events</Link>
               <Link href="/collab-drops" className={navLinkClass('/collab-drops')}>Collabs</Link>
-              <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>
+              {isAuthenticated && isAdmin(user) && <Link href="/discover" className={navLinkClass('/discover')}>Discover</Link>}
+              <Link href="/policies" className={navLinkClass('/policies')}>Policies</Link>
               {isAuthenticated && (
                 <Link href="/lookbook" className={navLinkClass('/lookbook')}>Lookbook</Link>
               )}
-              {isAuthenticated && isVendor(user) && (
-                <Link href="/vendor" className={navLinkClass('/vendor')}>Vendor</Link>
-              )}
+              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} className={`${navLinkClass('/vendor')} whitespace-nowrap`}>
+                {isAuthenticated && isVendor(user) ? "Vendor" : "Become a Vendor"}
+              </Link>
               {isAuthenticated && isAdmin(user) && (
                 <Link href="/admin" className={`px-3 py-2 font-medium transition-colors ${
-                  location === '/admin' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-red-600'
+                  location === '/admin' ? 'text-red-600' : 'text-gray-700 hover:text-red-600'
                 }`}>Admin</Link>
               )}
+              {canAccessShipping && <Link href="/shipping" className={navLinkClass('/shipping')}>Shipping</Link>}
             </div>
           </div>
 
           {/* Desktop Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8">
+          <div className="hidden lg:flex w-48 xl:w-56 shrink-0 mx-3">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
+                aria-label="Search products"
                 placeholder="Search traditional wear, Aso Oke, beads..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -128,7 +136,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Shopping Cart */}
             {isAuthenticated && (
               <Button
@@ -148,7 +156,7 @@ export default function Navbar() {
 
             {/* Desktop User Menu */}
             {isAuthenticated && user ? (
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -187,14 +195,21 @@ export default function Navbar() {
                     {isVendor(user) && (
                       <>
                         <DropdownMenuSeparator />
+                         <DropdownMenuItem>
+                           <Link href="/products"><span className="cursor-pointer">Shop as buyer</span></Link>
+                         </DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor"><span className="cursor-pointer">Vendor Dashboard</span></Link></DropdownMenuItem>
                         <DropdownMenuItem><Link href="/vendor/workshop"><span className="cursor-pointer">Workshop</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/vendor/finance"><span className="cursor-pointer">Finance & Statements</span></Link></DropdownMenuItem>
+                        <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>
                       </>
                     )}
                     {isAdmin(user) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Link href="/admin"><span className="cursor-pointer">Admin Panel</span></Link></DropdownMenuItem>
+                        {fullManagement && <DropdownMenuItem><Link href="/admin/finance"><span className="cursor-pointer">Finance Administration</span></Link></DropdownMenuItem>}
+                        {hasShippingOperationsAccess(user) && <DropdownMenuItem><Link href="/shipping"><span className="cursor-pointer">Shipping operations</span></Link></DropdownMenuItem>}
                       </>
                     )}
                     <DropdownMenuSeparator />
@@ -203,7 +218,7 @@ export default function Navbar() {
                 </DropdownMenu>
               </div>
             ) : (
-              <Button onClick={handleLogin} className="btn-nigerian hidden md:flex">
+              <Button onClick={handleLogin} className="btn-nigerian hidden lg:flex">
                 Sign In
               </Button>
             )}
@@ -212,7 +227,10 @@ export default function Navbar() {
             <Button
               variant="ghost"
               size="sm"
-              className="md:hidden"
+              className="lg:hidden"
+              aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation-menu"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -221,9 +239,12 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* Mega Menu - desktop category bar */}
+      <MegaMenu />
+
       {/* Mobile Menu - Full Screen Overlay */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+        <div id="mobile-navigation-menu" className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
           <div className="px-4 py-4 space-y-1 pb-24">
             {/* Mobile Search */}
             <form onSubmit={handleSearch} className="mb-4">
@@ -247,15 +268,24 @@ export default function Navbar() {
             <Link href="/products" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/products')}><Package className="w-5 h-5" /><span>Products</span></div>
             </Link>
+            <Link href="/reviews" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/reviews')}><Star className="w-5 h-5" /><span>Reviews</span></div>
+            </Link>
             <Link href="/events" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/events')}><Calendar className="w-5 h-5" /><span>Events</span></div>
             </Link>
             <Link href="/collab-drops" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/collab-drops')}><Zap className="w-5 h-5" /><span>Collab Drops</span></div>
             </Link>
-            <Link href="/discover" onClick={closeMobileMenu}>
+            {isAuthenticated && isAdmin(user) && <Link href="/discover" onClick={closeMobileMenu}>
               <div className={mobileNavLinkClass('/discover')}><MapPin className="w-5 h-5" /><span>Discover Africa</span></div>
+            </Link>}
+            <Link href="/policies" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/policies')}><FileText className="w-5 h-5" /><span>Policies</span></div>
             </Link>
+            {canAccessShipping && <Link href="/shipping" onClick={closeMobileMenu}>
+              <div className={mobileNavLinkClass('/shipping')}><Truck className="w-5 h-5" /><span>Shipping operations</span></div>
+            </Link>}
 
             {/* Account Section - only if logged in */}
             {isAuthenticated && user && (
@@ -291,14 +321,25 @@ export default function Navbar() {
             )}
 
             {/* Vendor Section */}
+            {!isVendor(user) && (
+              <Link href={isAuthenticated ? "/vendor" : "/register?as=vendor"} onClick={closeMobileMenu}>
+                <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Become a Vendor</span></div>
+              </Link>
+            )}
             {isAuthenticated && isVendor(user) && (
               <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-4 pb-1">Vendor</p>
+                 <Link href="/products" onClick={closeMobileMenu}>
+                   <div className={mobileNavLinkClass('/products')}><ShoppingCart className="w-5 h-5" /><span>Shop as buyer</span></div>
+                 </Link>
                 <Link href="/vendor" onClick={closeMobileMenu}>
                   <div className={mobileNavLinkClass('/vendor')}><Star className="w-5 h-5" /><span>Vendor Dashboard</span></div>
                 </Link>
                 <Link href="/vendor/workshop" onClick={closeMobileMenu}>
                   <div className={mobileNavLinkClass('/vendor/workshop')}><Palette className="w-5 h-5" /><span>Workshop</span></div>
+                </Link>
+                <Link href="/vendor/finance" onClick={closeMobileMenu}>
+                  <div className={mobileNavLinkClass('/vendor/finance')}><CreditCard className="w-5 h-5" /><span>Finance & Statements</span></div>
                 </Link>
               </>
             )}
@@ -312,6 +353,11 @@ export default function Navbar() {
                     <User className="w-5 h-5" /><span>Admin Panel</span>
                   </div>
                 </Link>
+                {fullManagement && <Link href="/admin/finance" onClick={closeMobileMenu}>
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-red-600 hover:bg-red-50">
+                    <CreditCard className="w-5 h-5" /><span>Finance Administration</span>
+                  </div>
+                </Link>}
               </>
             )}
 

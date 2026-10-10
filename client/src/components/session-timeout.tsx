@@ -26,7 +26,11 @@ export default function SessionTimeout() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const logout = useCallback(async () => {
-    try { await apiRequest("POST", "/api/auth/logout"); } catch (_) {}
+    try {
+      await apiRequest("POST", "/api/logout");
+    } catch (error) {
+      console.error("Automatic sign-out failed", error);
+    }
     window.location.href = "/login";
   }, []);
 
@@ -89,9 +93,9 @@ export default function SessionTimeout() {
     <AlertDialog open={showWarning}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Session About to Expire</AlertDialogTitle>
+          <AlertDialogTitle>Your session is about to expire</AlertDialogTitle>
           <AlertDialogDescription>
-            You have been inactive for a while. For your security, you will be automatically signed out in{" "}
+            You have been inactive for a while. For your security, you will be signed out automatically in{" "}
             <span className="font-bold text-destructive">{timeStr}</span>.
             <br /><br />
             Click "Stay Signed In" to continue your session.

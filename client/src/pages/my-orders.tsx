@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import Navbar from '@/components/navbar';
+import OrderReviewDialog from '@/components/order-review-dialog';
+import ShipmentTimeline from '@/components/shipping/ShipmentTimeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +16,7 @@ import {
   ShoppingBag, MapPin, CreditCard, AlertCircle, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import type { Order } from '@/types';
+import { orderPaidTotal } from '@shared/order-totals';
 
 // Order lifecycle stages
 const STAGES = [
@@ -89,9 +92,82 @@ function OrderTimeline({ status }: { status: string }) {
 
 function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id: number) => void; cancelling: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<{ id: number; name: string } | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isCancelled = order.orderStatus === 'cancelled';
   const isDelivered = order.orderStatus === 'delivered';
-  const canCancel = ['pending', 'processing'].includes(order.orderStatus) && order.paymentStatus === 'paid';
+  const canCancel = ['awaiting_shipping_quote', 'pending', 'processing'].includes(order.orderStatus) && ['paid', 'pending'].includes(order.paymentStatus);
+  const canBuyAgain = !isCancelled && Array.isArray(order.items) && order.items.length > 0;
+  const displayedTotal = orderPaidTotal(order);
+  const payShippingMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/orders/${order.id}/initialize-shipping-payment`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      if (!result.paymentUrl) throw new Error('Shipping checkout URL was not returned');
+      window.location.href = result.paymentUrl;
+    },
+    onError: (error: any) => toast({
+      title: 'Could not start shipping payment',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
+  const retryShippingQuoteMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/orders/${order.id}/shipping-quote/retry`, {});
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({
+        title: 'Replacement quote requested',
+        description: `We’ll review ${result.carrier} for your order.`,
+      });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not request another quote',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
+  const buyAgainMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/cart/restore-order/${order.id}`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      const added = Array.isArray(result?.added)
+        ? result.added.length
+        : Number(result?.added ?? result?.restored ?? result?.restoredCount ?? 0);
+      const skipped = Array.isArray(result?.skipped)
+        ? result.skipped.length
+        : Number(result?.skipped ?? result?.skippedCount ?? 0);
+      const adjusted = Array.isArray(result?.adjusted)
+        ? result.adjusted.length
+        : Number(result?.quantityAdjusted ?? result?.adjusted ?? result?.adjustedCount ?? 0);
+      const restored = added + adjusted;
+      const summary = [
+        added ? `${added} added` : '',
+        adjusted ? `${adjusted} quantity adjusted` : '',
+        skipped ? `${skipped} unavailable` : '',
+      ].filter(Boolean).join(' · ');
+      toast({
+        title: restored > 0 ? 'Items added to cart' : 'Nothing added to cart',
+        description: summary || result?.message || 'The items from this order are no longer available.',
+        variant: restored > 0 ? 'default' : 'destructive',
+      });
+      if (restored > 0) window.location.href = '/checkout';
+    },
+    onError: (error: any) => toast({
+      title: 'Could not buy this order again',
+      description: error?.message || 'Please try again.',
+      variant: 'destructive',
+    }),
+  });
 
   const paymentColor = order.paymentStatus === 'paid' || order.paymentStatus === 'completed'
     ? 'bg-green-100 text-green-700'
@@ -103,15 +179,16 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
     <Card className={`overflow-hidden transition-shadow hover:shadow-md ${isCancelled ? 'border-red-200 opacity-80' : isDelivered ? 'border-green-200' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-base">Order #{order.id}</CardTitle>
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize
                 ${isCancelled ? 'bg-red-100 text-red-700' : isDelivered ? 'bg-green-100 text-green-700' :
                   order.orderStatus === 'shipped' ? 'bg-purple-100 text-purple-700' :
                   order.orderStatus === 'processing' ? 'bg-blue-100 text-blue-700' :
+                  order.orderStatus === 'awaiting_shipping_quote' ? 'bg-amber-100 text-amber-700' :
                   'bg-yellow-100 text-yellow-700'}`}>
-                {order.orderStatus}
+                {order.orderStatus === 'awaiting_shipping_quote' ? 'Awaiting shipping quote' : order.orderStatus}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${paymentColor}`}>
                 {order.paymentStatus}
@@ -122,8 +199,8 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
               {order.shippingMethod && ` · ${order.shippingMethod.toUpperCase()}`}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-xl font-bold text-green-700">${parseFloat(order.totalAmount).toFixed(2)}</p>
+          <div className="min-w-0 text-left sm:text-right">
+            <p className="text-xl font-bold text-green-700">₦{displayedTotal.toLocaleString()}</p>
             {!isCancelled && (
               <p className="text-xs text-gray-400">Est. delivery: {getEstimatedDelivery(order.shippingMethod, order.createdAt)}</p>
             )}
@@ -134,6 +211,65 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
       <CardContent className="space-y-4">
         {/* Timeline */}
         <OrderTimeline status={order.orderStatus} />
+        <ShipmentTimeline orderId={Number(order.id)} />
+
+        {order.paymentStatus === 'paid' && (order.shippingPaymentStatus === 'awaiting_quote' || order.orderStatus === 'awaiting_shipping_quote' && order.shippingPaymentStatus === 'included') && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-3">
+            <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-800 text-sm">Payment received. We are confirming the final shipping price.</p>
+              <p className="text-xs text-amber-700">Your estimated shipping deposit is included. Afrolandx is confirming the {order.shippingMethod?.toUpperCase()} rate; only any remaining difference will be collected.</p>
+            </div>
+          </div>
+        )}
+
+        {order.paymentStatus === 'paid' && order.shippingPaymentStatus === 'pending' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-medium text-blue-800 text-sm">Shipping quote confirmed</p>
+              <p className="text-xs text-blue-700">Pay ₦{Number(order.shippingAmount).toLocaleString()} shipping to release this order for fulfillment.</p>
+            </div>
+            <Button
+              size="sm"
+              disabled={payShippingMutation.isPending}
+              onClick={() => payShippingMutation.mutate()}
+              className="bg-blue-700 hover:bg-blue-800 text-white"
+            >
+              <CreditCard className="w-3.5 h-3.5 mr-1" />
+              {payShippingMutation.isPending ? 'Opening payment…' : `Pay shipping ₦${Number(order.shippingAmount).toLocaleString()}`}
+            </Button>
+          </div>
+        )}
+
+        {order.shippingPaymentStatus === 'paid' && order.orderStatus !== 'awaiting_shipping_quote' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+            Shipping payment confirmed. Your order is ready for fulfillment.
+          </div>
+        )}
+
+        {Number(order.shippingRefundAmount || 0) > 0 && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+            A ₦{Number(order.shippingRefundAmount).toLocaleString()} shipping adjustment refund is {order.shippingRefundStatus === 'processed' ? 'complete' : 'being processed'} to your original payment method.
+          </div>
+        )}
+
+        {order.shippingPaymentStatus === 'rejected' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-medium text-red-800">This carrier could not confirm the route.</p>
+              <p className="text-xs text-red-700">Request a quote from the next available carrier without paying for your items again.</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={retryShippingQuoteMutation.isPending}
+              onClick={() => retryShippingQuoteMutation.mutate()}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${retryShippingQuoteMutation.isPending ? 'animate-spin' : ''}`} />
+              {retryShippingQuoteMutation.isPending ? 'Requesting…' : 'Request another quote'}
+            </Button>
+          </div>
+        )}
 
         {/* Shipped info banner */}
         {order.orderStatus === 'shipped' && (
@@ -152,7 +288,7 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
             <div>
-              <p className="font-medium text-green-800 text-sm">Order delivered successfully! 🎉</p>
+          <p className="font-medium text-green-800 text-sm">Order delivered successfully.</p>
               <p className="text-xs text-green-600">Thank you for shopping with AfrolandX.</p>
             </div>
           </div>
@@ -188,10 +324,26 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.productName}</p>
                       <p className="text-xs text-gray-500">by {item.vendorName}</p>
+                       {item.selectedSize && (
+                         <p className="text-xs text-gray-500 mt-0.5">Size: {item.selectedSize}</p>
+                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-green-700">${parseFloat(item.priceAtTime).toFixed(2)}</p>
+                    <div className="min-w-0 shrink-0 text-left sm:text-right">
+                      <p className="text-sm font-bold text-green-700">₦{parseFloat(item.priceAtTime).toLocaleString()}</p>
                       <p className="text-xs text-gray-400">×{item.quantity}</p>
+                      {isDelivered && order.paymentStatus === 'paid' && (
+                        item.reviewStatus ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {item.reviewStatus === 'approved' ? 'Review published' :
+                              item.reviewStatus === 'rejected' ? 'Review not approved' : 'Review awaiting approval'}
+                          </p>
+                        ) : (
+                          <Button size="sm" variant="outline" className="mt-2" onClick={() =>
+                            setReviewProduct({ id: item.productId, name: item.productName || 'this item' })}>
+                            Review item
+                          </Button>
+                        )
+                      )}
                     </div>
                   </div>
                 ))}
@@ -223,12 +375,24 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
               {cancelling ? 'Cancelling…' : 'Cancel Order'}
             </Button>
           )}
-          {isDelivered && (
+          {isDelivered && order.paymentStatus === 'paid' && order.items?.some((item: any) => !item.reviewStatus) && (
             <Button size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50"
-              onClick={() => window.location.href = '/products'}>
-              Leave a Review
+              onClick={() => setExpanded(true)}>
+              Review your items
             </Button>
           )}
+           {canBuyAgain && (
+             <Button
+               size="sm"
+               variant="outline"
+               disabled={buyAgainMutation.isPending}
+               onClick={() => buyAgainMutation.mutate()}
+               className="text-nigerian-green border-green-200 hover:bg-green-50"
+             >
+               <RefreshCw className={`w-3 h-3 mr-1 ${buyAgainMutation.isPending ? 'animate-spin' : ''}`} />
+               {buyAgainMutation.isPending ? 'Adding items…' : 'Buy again'}
+             </Button>
+           )}
           {order.paymentStatus === 'failed' && (
             <Button size="sm" className="bg-nigerian-green hover:bg-green-700 text-white"
               onClick={() => window.location.href = '/checkout'}>
@@ -236,6 +400,10 @@ function OrderCard({ order, onCancel, cancelling }: { order: any; onCancel: (id:
             </Button>
           )}
         </div>
+        {reviewProduct && (
+          <OrderReviewDialog orderId={order.id} productId={reviewProduct.id}
+            productName={reviewProduct.name} onClose={() => setReviewProduct(null)} />
+        )}
       </CardContent>
     </Card>
   );
@@ -248,7 +416,7 @@ export default function MyOrders() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const prevStatusRef = useRef<Record<number, string>>({});
 
-  const { data: orders = [], isLoading, isFetching, dataUpdatedAt } = useQuery<any[]>({
+  const { data: orders = [], isLoading, isFetching, isError, refetch, dataUpdatedAt } = useQuery<any[]>({
     queryKey: ['/api/orders/my-orders'],
     enabled: isAuthenticated,
     retry: false,
@@ -261,12 +429,25 @@ export default function MyOrders() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('payment') === 'success' && urlParams.get('orderId')) {
       toast({
-        title: '🎉 Payment Successful!',
+        title: 'Payment Successful',
         description: `Your order #${urlParams.get('orderId')} has been confirmed.`,
       });
       window.history.replaceState({}, '', '/my-orders');
     }
   }, [toast]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shipping = params.get('shipping');
+    if (shipping === 'success') {
+      toast({ title: 'Shipping payment successful', description: `Shipping for order #${params.get('orderId') || ''} is confirmed.` });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders/my-orders'] });
+      window.history.replaceState({}, '', '/my-orders');
+    } else if (shipping === 'failed') {
+      toast({ title: 'Shipping payment was not completed', description: 'No shipping charge was accepted. Please try again.', variant: 'destructive' });
+      window.history.replaceState({}, '', '/my-orders');
+    }
+  }, [queryClient, toast]);
 
   // Detect status changes on live poll → notify customer
   useEffect(() => {
@@ -276,10 +457,10 @@ export default function MyOrders() {
       const old = prev[order.id];
       if (old && old !== order.orderStatus) {
         const messages: Record<string, string> = {
-          processing: `Order #${order.id} is now being processed! 🔄`,
-          shipped: `Order #${order.id} has shipped! 🚚`,
-          delivered: `Order #${order.id} has been delivered! ✅`,
-          cancelled: `Order #${order.id} was cancelled. ❌`,
+          processing: `Order #${order.id} is now being processed.`,
+          shipped: `Order #${order.id} has shipped.`,
+          delivered: `Order #${order.id} has been delivered.`,
+          cancelled: `Order #${order.id} was cancelled.`,
         };
         if (messages[order.orderStatus]) {
           toast({ title: 'Order Update', description: messages[order.orderStatus] });
@@ -327,11 +508,11 @@ export default function MyOrders() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 font-nigerian">My Orders</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Live tracking — auto-refreshes every 30 seconds
+              Live tracking refreshes every 30 seconds
               {isFetching && <RefreshCw className="inline w-3 h-3 ml-1 animate-spin text-green-500" />}
             </p>
           </div>
-          <div className="text-right text-xs text-gray-400 flex items-center gap-1">
+          <div className="min-w-0 break-words text-left text-xs text-gray-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />Last updated: {lastUpdated}
           </div>
         </div>
@@ -356,12 +537,21 @@ export default function MyOrders() {
         )}
 
         {/* Order list */}
-        {orders.length === 0 ? (
+        {isError ? (
+          <Card>
+            <CardContent className="text-center py-16">
+              <AlertCircle className="w-12 h-12 mx-auto text-red-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">We couldn’t load your orders</h3>
+              <p className="text-gray-500 mb-6 text-sm">Check your connection and try again.</p>
+              <Button onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" />Try Again</Button>
+            </CardContent>
+          </Card>
+        ) : orders.length === 0 ? (
           <Card>
             <CardContent className="text-center py-16">
               <ShoppingBag className="w-16 h-16 mx-auto text-gray-200 mb-4" />
               <h3 className="text-lg font-semibold text-gray-700 mb-2">No orders yet</h3>
-              <p className="text-gray-500 mb-6 text-sm">You haven't placed any orders yet. Explore our African fashion collection!</p>
+              <p className="text-gray-500 mb-6 text-sm">Explore our African fashion collection to find something you love.</p>
               <Button onClick={() => window.location.href = '/products'} className="btn-nigerian">
                 Start Shopping
               </Button>
@@ -383,7 +573,7 @@ export default function MyOrders() {
         {/* Help note */}
         <div className="mt-8 text-center text-xs text-gray-400">
           <AlertCircle className="inline w-3 h-3 mr-1" />
-          Need help with an order? Contact our support team via the chat button.
+          Need help with an order? Use the chat button to contact our support team.
         </div>
       </div>
     </div>

@@ -44,7 +44,7 @@ export function ProductStories({ productId }: { productId: number }) {
     <div className="space-y-4">
       <h3 className="font-semibold flex items-center gap-2">
         <BookOpen className="h-5 w-5 text-primary" />
-        Cultural Story
+        Cultural stories
       </h3>
       
       {stories.map((story) => (
@@ -91,7 +91,7 @@ export function ProductStories({ productId }: { productId: number }) {
             <h4 className="font-medium text-lg mb-2">{story.title}</h4>
             
             {story.content && (
-              <p className="text-muted-foreground mb-4 leading-relaxed">
+              <p className="reading-copy text-muted-foreground mb-4 leading-relaxed">
                 {story.content}
               </p>
             )}

@@ -1,12 +1,15 @@
+import type { AccountCommerceItem } from "../shared/account-commerce";
 import {
   users,
   vendors,
   categories,
   products,
   cartItems,
+  savedDeliveryAddresses,
   orders,
   orderItems,
   notifications,
+  shippingQuoteRequests,
   measurements,
   messages,
   occasionProfiles,
@@ -35,12 +38,16 @@ import {
   type InsertProduct,
   type CartItem,
   type InsertCartItem,
+  type SavedDeliveryAddress,
+  type InsertSavedDeliveryAddress,
   type Order,
   type InsertOrder,
   type OrderItem,
   type InsertOrderItem,
   type Notification,
   type InsertNotification,
+  type ShippingQuoteRequest,
+  type InsertShippingQuoteRequest,
   type Measurement,
   type InsertMeasurement,
   type Message,
@@ -77,7 +84,10 @@ import {
   type InsertDropRsvp,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, lt } from "drizzle-orm";
+import { isDesignatedOwnerEmail } from "./admin-role-bootstrap";
+import { lockApprovedProductReferences } from "./product-reference-lock";
+import { subcategoryTag } from "@shared/product-subcategories";
+import { eq, and, desc, sql, like, or, gte, lte, ilike, isNotNull, isNull, lt, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -87,19 +97,23 @@ export interface IStorage {
   updateUserRoles(userId: string, roles: string[]): Promise<void>;
   addUserRole(userId: string, role: string): Promise<void>;
   removeUserRole(userId: string, role: string): Promise<void>;
-  updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined>;
+  updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; profileImageUrl?: string | null }): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  deleteUser(userId: string, actorId: string): Promise<boolean>;
+  closeUser(userId: string, actorId: string, confirmation: string): Promise<boolean>;
   updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updatePasswordResetOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   updateLoginOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void>;
   verifyUserEmail(userId: string): Promise<void>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  updateActiveSession(userId: string, sessionId: string | null): Promise<void>;
   
   // Vendor operations
   createVendor(vendor: InsertVendor): Promise<Vendor>;
   getVendor(id: number): Promise<Vendor | undefined>;
   getVendorByUserId(userId: string): Promise<Vendor | undefined>;
   updateVendorStatus(id: number, status: string): Promise<void>;
+  updateVendorProfile(id: number, data: { contactName?: string; businessName?: string; phone?: string; cacNumber?: string | null; description?: string }): Promise<void>;
   getAllVendors(): Promise<Vendor[]>;
   
   // Category operations
@@ -109,37 +123,94 @@ export interface IStorage {
   // Product operations
   createProduct(product: InsertProduct): Promise<Product>;
   getProduct(id: number): Promise<Product | undefined>;
-  getProducts(filters?: { status?: string; categoryId?: number; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; }): Promise<Product[]>;
+  getProducts(filters?: { status?: string; categoryId?: number; subcategory?: string; vendorId?: number; featured?: boolean; search?: string; minPrice?: number; maxPrice?: number; gender?: string; originCountry?: string; }): Promise<Product[]>;
   updateProductStatus(id: number, status: string): Promise<void>;
   updateProductFeatured(id: number, featured: boolean): Promise<void>;
   updateProductStock(id: number, stock: number): Promise<void>;
   updateProductImages(id: number, images: string[], name?: string, description?: string): Promise<void>;
+  updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string; gender?: string | null }): Promise<Product>;
+  deleteProduct(id: number): Promise<void>;
   getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]>;
   
   // Cart operations
   addToCart(cartItem: InsertCartItem): Promise<CartItem>;
   getCartItems(userId: string): Promise<(CartItem & { product: Product })[]>;
-  updateCartItemQuantity(id: number, quantity: number): Promise<void>;
-  removeFromCart(id: number): Promise<void>;
+  updateCartItemQuantity(id: number, userId: string, quantity: number): Promise<boolean>;
+  removeFromCart(id: number, userId: string): Promise<boolean>;
   clearCart(userId: string): Promise<void>;
+  getSavedDeliveryAddresses(userId: string): Promise<SavedDeliveryAddress[]>;
+  createSavedDeliveryAddress(address: InsertSavedDeliveryAddress): Promise<SavedDeliveryAddress>;
+  updateSavedDeliveryAddress(id: number, userId: string, data: Partial<InsertSavedDeliveryAddress>): Promise<SavedDeliveryAddress | undefined>;
+  deleteSavedDeliveryAddress(id: number, userId: string): Promise<boolean>;
   
   // Order operations
   createOrder(order: InsertOrder): Promise<Order>;
+  createOrderWithItems(
+    order: InsertOrder,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order>;
+  createOrderWithReservedShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined>;
+  createOrderAwaitingShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined>;
+  releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void>;
   createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem>;
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersForUser(userId: string): Promise<Order[]>;
   getAllOrders(): Promise<Order[]>;
+  getOrdersForVendor(vendorId: number): Promise<Order[]>;
   getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]>;
+  getAccountPurchaseItems(userId: string): Promise<AccountCommerceItem[]>;
+  getAccountSalesItems(vendorId: number): Promise<AccountCommerceItem[]>;
   updateOrderStatus(id: number, status: string): Promise<void>;
+  transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean>;
+  markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean>;
+  updateOrderTracking(id: number, trackingNumber: string): Promise<boolean>;
+  cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean>;
   updatePaymentStatus(id: number, status: string, reference?: string): Promise<void>;
+  markOrderPaid(id: number, reference: string): Promise<boolean>;
+  reserveOrderStock(id: number): Promise<boolean>;
+  getOrderByShippingQuoteRequestId(quoteId: number): Promise<Order | undefined>;
+  updateOrderShippingQuote(
+    quoteId: number,
+    amount: string,
+    status: string,
+    orderStatus?: string,
+    reconciliation?: { finalAmount?: string; refundAmount?: string; refundStatus?: string },
+  ): Promise<Order | undefined>;
+  claimShippingPaymentReference(id: number, userId: string, reference: string): Promise<'claimed' | 'busy' | 'unavailable'>;
+  saveShippingPaymentUrl(id: number, reference: string, url: string): Promise<boolean>;
+  clearShippingPaymentAttempt(id: number, userId: string, reference: string): Promise<void>;
+  markShippingPaid(id: number, reference: string): Promise<boolean>;
+  claimShippingRefund(id: number, finalAmount: string, refundAmount: string): Promise<boolean>;
+  completeShippingRefundClaim(id: number, status: string): Promise<void>;
+  releaseShippingRefundClaim(id: number): Promise<void>;
+  decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean>;
   
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
   getUserNotifications(userId: string): Promise<Notification[]>;
-  markNotificationAsRead(id: number): Promise<void>;
+  markNotificationAsRead(id: number, userId: string): Promise<boolean>;
   dismissNotification(id: number, userId: string): Promise<void>;
   cleanupExpiredNotifications(): Promise<void>;
   getAdminUsers(): Promise<User[]>;
+
+  // Shipping quote request operations
+  createShippingQuoteRequest(request: InsertShippingQuoteRequest): Promise<ShippingQuoteRequest>;
+  getShippingQuoteRequest(id: number): Promise<ShippingQuoteRequest | undefined>;
+  getShippingQuoteRequestsForUser(userId: string): Promise<ShippingQuoteRequest[]>;
+  getAllShippingQuoteRequests(): Promise<ShippingQuoteRequest[]>;
+  updateShippingQuoteRequest(id: number, data: Partial<Pick<ShippingQuoteRequest, 'status' | 'quotedAmount' | 'currency' | 'estimatedDelivery' | 'adminNotes' | 'confirmedBy' | 'expiresAt'>>): Promise<ShippingQuoteRequest | undefined>;
+  claimShippingQuoteDecision(id: number, expectedStatus: string): Promise<boolean>;
+  releaseShippingQuoteDecision(id: number, originalStatus: string): Promise<void>;
   
   // Measurement operations
   createMeasurement(measurement: InsertMeasurement): Promise<Measurement>;
@@ -163,7 +234,7 @@ export interface IStorage {
   getOccasion(id: number): Promise<OccasionProfile | undefined>;
   createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation>;
   getUserLookbooks(userId: string): Promise<LookbookRecommendation[]>;
-  updateLookbookStatus(id: number, status: string): Promise<void>;
+  updateLookbookStatus(id: number, userId: string, status: string): Promise<boolean>;
 
   // Fit metrics & feedback operations
   getProductFitMetrics(productId: number): Promise<ProductFitMetric | undefined>;
@@ -178,6 +249,7 @@ export interface IStorage {
 
   // Production steps operations
   createProductionStep(step: InsertProductionStep): Promise<OrderProductionStep>;
+  getProductionStep(id: number): Promise<OrderProductionStep | undefined>;
   getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]>;
   updateProductionStep(id: number, completedAt: Date, notes?: string): Promise<void>;
   getVendorOrders(vendorId: number): Promise<Order[]>;
@@ -239,18 +311,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const canonicalEmail = email.trim().toLowerCase();
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${canonicalEmail}`);
     return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const normalizedUserData = {
+      ...userData,
+      ...(userData.email ? { email: userData.email.trim().toLowerCase() } : {}),
+    };
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(normalizedUserData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...normalizedUserData,
           updatedAt: new Date(),
         },
       })
@@ -266,29 +346,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addUserRole(userId: string, role: string): Promise<void> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user) {
-      const currentRoles = user.roles as string[] || [];
-      if (!currentRoles.includes(role)) {
-        const newRoles = [...currentRoles, role];
-        await this.updateUserRoles(userId, newRoles);
+    await db.transaction(async tx => {
+      const locked = await tx.execute(sql`SELECT roles FROM users WHERE id = ${userId} FOR UPDATE`);
+      if (!locked.rows.length) return;
+      const roles = Array.isArray(locked.rows[0].roles) ? locked.rows[0].roles as string[] : [];
+      if (!roles.includes(role)) {
+        await tx.update(users).set({ roles: [...roles, role], updatedAt: new Date() }).where(eq(users.id, userId));
       }
-    }
+    });
   }
 
   async removeUserRole(userId: string, role: string): Promise<void> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user) {
-      const currentRoles = user.roles as string[] || [];
-      const newRoles = currentRoles.filter(r => r !== role);
-      if (newRoles.length === 0) {
-        newRoles.push("customer"); // Always keep at least customer role
-      }
-      await this.updateUserRoles(userId, newRoles);
-    }
+    await db.transaction(async tx => {
+      const locked = await tx.execute(sql`SELECT roles FROM users WHERE id = ${userId} FOR UPDATE`);
+      if (!locked.rows.length) return;
+      const roles = Array.isArray(locked.rows[0].roles) ? locked.rows[0].roles as string[] : [];
+      const next = roles.filter(r => r !== role);
+      if (!next.length) next.push("customer");
+      await tx.update(users).set({ roles: next, updatedAt: new Date() }).where(eq(users.id, userId));
+    });
   }
 
-  async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string }): Promise<User | undefined> {
+  async updateUserProfile(userId: string, data: { firstName?: string; lastName?: string; profileImageUrl?: string | null }): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ ...data, updatedAt: new Date() })
@@ -299,6 +378,87 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async deleteUser(userId: string, actorId: string): Promise<boolean> {
+    return await db.transaction(async (tx) => {
+      // Only unused accounts can be hard-deleted. Keep orders, payouts, catalog
+      // and other linked history intact for a separate, reviewed closure flow.
+      const locked = await tx.execute(sql`
+        SELECT id, email, email_verified, roles, closed_at FROM users
+        WHERE id IN (${userId}, ${actorId}) ORDER BY id FOR UPDATE
+      `);
+      const account = locked.rows.find(row => row.id === userId);
+      const actor = locked.rows.find(row => row.id === actorId);
+      if (!account) return false;
+      if (!actor || actorId === userId || !Array.isArray(actor.roles) || !actor.roles.includes("admin")) {
+        throw new Error("ACCOUNT_DELETION_FORBIDDEN");
+      }
+      if (account.closed_at || isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
+        (Array.isArray(account.roles) && account.roles.includes("superadmin"))) {
+        throw new Error("PROTECTED_ACCOUNT");
+      }
+      if (Array.isArray(account.roles) && account.roles.includes("admin") &&
+        (!actor.email_verified || !actor.roles.includes("superadmin"))) {
+        throw new Error("SUPERADMIN_REQUIRED");
+      }
+      const vendor = await tx.execute(sql`SELECT id FROM vendors WHERE user_id = ${userId} LIMIT 1`);
+      const order = await tx.execute(sql`SELECT id FROM orders WHERE user_id = ${userId} LIMIT 1`);
+      const shippingHistory = await tx.execute(sql`
+        SELECT 1 FROM logistics_partner_members WHERE user_id = ${userId} OR invited_by = ${userId}
+        UNION ALL SELECT 1 FROM shipment_events WHERE actor_id = ${userId}
+        UNION ALL SELECT 1 FROM shipment_quotes WHERE submitted_by = ${userId} OR reviewed_by = ${userId}
+        UNION ALL SELECT 1 FROM shipment_agency_payments WHERE recorded_by = ${userId}
+        LIMIT 1
+      `);
+      if (vendor.rows.length || order.rows.length || shippingHistory.rows.length) {
+        throw new Error('ACCOUNT_HAS_LINKED_RECORDS');
+      }
+      await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
+      const result = await tx.execute(sql`DELETE FROM users WHERE id = ${userId} RETURNING id`);
+      return result.rows.length > 0;
+    });
+  }
+
+  async closeUser(userId: string, actorId: string, confirmation: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      const locked = await tx.execute(sql`
+        SELECT id, email, email_verified, roles, closed_at FROM users
+        WHERE id IN (${userId}, ${actorId}) ORDER BY id FOR UPDATE
+      `);
+      const account = locked.rows.find(row => row.id === userId);
+      const actor = locked.rows.find(row => row.id === actorId);
+      if (!actor || !actor.email_verified || actor.closed_at ||
+        !Array.isArray(actor.roles) || !actor.roles.includes("admin") || !actor.roles.includes("superadmin")) {
+        throw new Error("SUPERADMIN_REQUIRED");
+      }
+      if (!account) return false;
+      if (userId === actorId || isDesignatedOwnerEmail(typeof account.email === "string" ? account.email : null) ||
+        (Array.isArray(account.roles) && account.roles.includes("superadmin"))) {
+        throw new Error("PROTECTED_ACCOUNT");
+      }
+      if (account.closed_at) throw new Error("ACCOUNT_ALREADY_CLOSED");
+      const expected = typeof account.email === "string" && account.email ? account.email : userId;
+      if (confirmation.trim().toLowerCase() !== expected.toLowerCase()) {
+        throw new Error("ACCOUNT_CONFIRMATION_REQUIRED");
+      }
+
+      const now = new Date();
+      await tx.update(users).set({
+        closedAt: now, activeSessionId: null, password: null,
+        emailOtp: null, emailOtpExpiry: null, loginOtp: null, loginOtpExpiry: null,
+        passwordResetOtp: null, passwordResetOtpExpiry: null, updatedAt: now,
+      }).where(eq(users.id, userId));
+      await tx.update(vendors).set({ status: "suspended", updatedAt: now })
+        .where(eq(vendors.userId, userId));
+      await tx.update(products).set({ status: "suspended", featured: false, updatedAt: now })
+        .where(and(
+          sql`${products.vendorId} IN (SELECT id FROM vendors WHERE user_id = ${userId})`,
+          eq(products.status, "approved"),
+        ));
+      await tx.execute(sql`DELETE FROM sessions WHERE sess->'passport'->>'user' = ${userId}`);
+      return true;
+    });
   }
 
   async updateEmailOtp(userId: string, otp: string | null, expiry: Date | null): Promise<void> {
@@ -319,6 +479,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
     await db.update(users).set({ password: hashedPassword, passwordResetOtp: null, passwordResetOtpExpiry: null, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+
+  async updateActiveSession(userId: string, sessionId: string | null): Promise<void> {
+    const updated = await db.update(users).set({ activeSessionId: sessionId, updatedAt: new Date() })
+      .where(and(eq(users.id, userId), sessionId ? isNull(users.closedAt) : undefined))
+      .returning({ id: users.id });
+    if (sessionId && !updated.length) throw new Error("ACCOUNT_CLOSED");
   }
 
   // Vendor operations
@@ -344,6 +511,19 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(vendors)
       .set({ status, updatedAt: new Date() })
+      .where(eq(vendors.id, id));
+  }
+
+  async updateVendorProfile(id: number, data: { contactName?: string; businessName?: string; phone?: string; cacNumber?: string | null; description?: string }): Promise<void> {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.contactName !== undefined) updates.contactName = data.contactName;
+    if (data.businessName !== undefined) updates.businessName = data.businessName;
+    if (data.phone !== undefined) updates.phone = data.phone;
+    if (data.cacNumber !== undefined) updates.cacNumber = data.cacNumber;
+    if (data.description !== undefined) updates.description = data.description;
+    await db
+      .update(vendors)
+      .set(updates)
       .where(eq(vendors.id, id));
   }
 
@@ -381,11 +561,14 @@ export class DatabaseStorage implements IStorage {
   async getProducts(filters?: { 
     status?: string; 
     categoryId?: number; 
+    subcategory?: string;
     vendorId?: number; 
     featured?: boolean;
     search?: string;
     minPrice?: number;
     maxPrice?: number;
+    gender?: string;
+    originCountry?: string;
   }): Promise<Product[]> {
     const conditions = [];
     
@@ -394,6 +577,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.categoryId) {
       conditions.push(eq(products.categoryId, filters.categoryId));
+    }
+    if (filters?.subcategory) {
+      conditions.push(sql`${products.tags} @> ${JSON.stringify([subcategoryTag(filters.subcategory)])}::jsonb`);
     }
     if (filters?.vendorId) {
       conditions.push(eq(products.vendorId, filters.vendorId));
@@ -404,8 +590,8 @@ export class DatabaseStorage implements IStorage {
     if (filters?.search) {
       conditions.push(
         or(
-          like(products.name, `%${filters.search}%`),
-          like(products.description, `%${filters.search}%`)
+          ilike(products.name, `%${filters.search}%`),
+          ilike(products.description, `%${filters.search}%`)
         )
       );
     }
@@ -414,6 +600,12 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.maxPrice !== undefined) {
       conditions.push(lte(products.price, filters.maxPrice.toString()));
+    }
+    if (filters?.gender) {
+      conditions.push(eq(products.gender, filters.gender));
+    }
+    if (filters?.originCountry) {
+      conditions.push(eq(products.originCountry, filters.originCountry));
     }
     
     const query = db.select().from(products);
@@ -451,6 +643,21 @@ export class DatabaseStorage implements IStorage {
     await db.update(products).set(updates).where(eq(products.id, id));
   }
 
+  async updateProduct(id: number, data: { name?: string; description?: string; price?: string; stock?: number; imageUrl?: string }): Promise<Product> {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.price !== undefined) updates.price = data.price;
+    if (data.stock !== undefined) updates.stock = data.stock;
+    if (data.imageUrl !== undefined) updates.imageUrl = data.imageUrl;
+    const [updated] = await db.update(products).set(updates).where(eq(products.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
   async getProductsWithVendor(): Promise<(Product & { vendor: Vendor; category: Category })[]> {
     const result = await db
       .select()
@@ -468,36 +675,35 @@ export class DatabaseStorage implements IStorage {
 
   // Cart operations
   async addToCart(cartItem: InsertCartItem): Promise<CartItem> {
-    // Check if item already exists in cart
-    const [existingItem] = await db
-      .select()
-      .from(cartItems)
-      .where(
-        and(
-          eq(cartItems.userId, cartItem.userId),
-          eq(cartItems.productId, cartItem.productId)
-        )
-      );
+    return db.transaction(async tx => {
+      // Serialize additions for this buyer/product so simultaneous Buy again
+      // and Add to cart requests cannot create duplicates or exceed stock.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${cartItem.userId}), ${cartItem.productId})`);
+      const conditions = [
+        eq(cartItems.userId, cartItem.userId),
+        eq(cartItems.productId, cartItem.productId),
+      ];
+      if (cartItem.selectedSize) conditions.push(eq(cartItems.selectedSize, cartItem.selectedSize));
+      else conditions.push(isNull(cartItems.selectedSize));
 
-    if (existingItem) {
-      // Update quantity
-      const [updatedItem] = await db
-        .update(cartItems)
-        .set({ 
-          quantity: (existingItem.quantity || 0) + (cartItem.quantity || 1),
-          updatedAt: new Date()
-        })
-        .where(eq(cartItems.id, existingItem.id))
-        .returning();
-      return updatedItem;
-    } else {
-      // Create new cart item
-      const [newItem] = await db
-        .insert(cartItems)
-        .values(cartItem)
-        .returning();
+      const [[product], [existingItem]] = await Promise.all([
+        tx.select().from(products).where(eq(products.id, cartItem.productId)).limit(1),
+        tx.select().from(cartItems).where(and(...conditions)).limit(1),
+      ]);
+      if (!product || product.status !== 'approved') throw new Error('Product is not available');
+      const nextQuantity = (existingItem?.quantity || 0) + (cartItem.quantity || 1);
+      if (nextQuantity > product.stock) throw new Error('Requested quantity exceeds available stock');
+
+      if (existingItem) {
+        const [updatedItem] = await tx.update(cartItems)
+          .set({ quantity: nextQuantity, updatedAt: new Date() })
+          .where(eq(cartItems.id, existingItem.id))
+          .returning();
+        return updatedItem;
+      }
+      const [newItem] = await tx.insert(cartItems).values(cartItem).returning();
       return newItem;
-    }
+    });
   }
 
   async getCartItems(userId: string): Promise<(CartItem & { product: Product })[]> {
@@ -514,19 +720,78 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async updateCartItemQuantity(id: number, quantity: number): Promise<void> {
-    await db
+  async updateCartItemQuantity(id: number, userId: string, quantity: number): Promise<boolean> {
+    const result = await db
       .update(cartItems)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(cartItems.id, id));
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .returning({ id: cartItems.id });
+    return result.length > 0;
   }
 
-  async removeFromCart(id: number): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.id, id));
+  async removeFromCart(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(cartItems)
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .returning({ id: cartItems.id });
+    return result.length > 0;
   }
 
   async clearCart(userId: string): Promise<void> {
     await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  }
+
+  async getSavedDeliveryAddresses(userId: string): Promise<SavedDeliveryAddress[]> {
+    return db.select().from(savedDeliveryAddresses)
+      .where(eq(savedDeliveryAddresses.userId, userId))
+      .orderBy(desc(savedDeliveryAddresses.isDefault), desc(savedDeliveryAddresses.updatedAt));
+  }
+
+  async createSavedDeliveryAddress(address: InsertSavedDeliveryAddress): Promise<SavedDeliveryAddress> {
+    return db.transaction(async tx => {
+      if (address.isDefault) {
+        await tx.update(savedDeliveryAddresses).set({ isDefault: false, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.userId, address.userId));
+      }
+      const [created] = await tx.insert(savedDeliveryAddresses).values(address).returning();
+      return created;
+    });
+  }
+
+  async updateSavedDeliveryAddress(id: number, userId: string, data: Partial<InsertSavedDeliveryAddress>): Promise<SavedDeliveryAddress | undefined> {
+    return db.transaction(async tx => {
+      const [ownedAddress] = await tx.select({ id: savedDeliveryAddresses.id })
+        .from(savedDeliveryAddresses)
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .limit(1);
+      if (!ownedAddress) return undefined;
+      if (data.isDefault) {
+        await tx.update(savedDeliveryAddresses).set({ isDefault: false, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.userId, userId));
+      }
+      const [updated] = await tx.update(savedDeliveryAddresses)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .returning();
+      return updated;
+    });
+  }
+
+  async deleteSavedDeliveryAddress(id: number, userId: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      const [deleted] = await tx.delete(savedDeliveryAddresses)
+        .where(and(eq(savedDeliveryAddresses.id, id), eq(savedDeliveryAddresses.userId, userId)))
+        .returning();
+      if (!deleted) return false;
+      if (deleted.isDefault) {
+        const [replacement] = await tx.select().from(savedDeliveryAddresses)
+          .where(eq(savedDeliveryAddresses.userId, userId))
+          .orderBy(desc(savedDeliveryAddresses.updatedAt)).limit(1);
+        if (replacement) await tx.update(savedDeliveryAddresses)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(savedDeliveryAddresses.id, replacement.id));
+      }
+      return true;
+    });
   }
 
   // Order operations
@@ -536,6 +801,92 @@ export class DatabaseStorage implements IStorage {
       .values(order)
       .returning();
     return newOrder;
+  }
+
+  async createOrderWithItems(
+    order: InsertOrder,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order> {
+    return await db.transaction(async tx => {
+      const [newOrder] = await tx.insert(orders).values(order).returning();
+      if (items.length > 0) {
+        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
+      }
+      return newOrder;
+    });
+  }
+
+  async createOrderWithReservedShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined> {
+    return await db.transaction(async tx => {
+      const [reserved] = await tx.update(shippingQuoteRequests)
+        .set({ status: 'reserved', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, quoteId),
+          eq(shippingQuoteRequests.userId, userId),
+          eq(shippingQuoteRequests.status, 'quoted'),
+          sql`${shippingQuoteRequests.expiresAt} > NOW()`,
+        ))
+        .returning({ id: shippingQuoteRequests.id });
+      if (!reserved) return undefined;
+
+      const [newOrder] = await tx.insert(orders)
+        .values({ ...order, shippingQuoteRequestId: quoteId })
+        .returning();
+      if (items.length > 0) {
+        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
+      }
+      return newOrder;
+    });
+  }
+
+  async createOrderAwaitingShippingQuote(
+    order: InsertOrder,
+    quoteId: number,
+    userId: string,
+    items: Array<Omit<InsertOrderItem, 'orderId'>>,
+  ): Promise<Order | undefined> {
+    return await db.transaction(async tx => {
+      const [request] = await tx.select({ id: shippingQuoteRequests.id })
+        .from(shippingQuoteRequests)
+        .where(and(
+          eq(shippingQuoteRequests.id, quoteId),
+          eq(shippingQuoteRequests.userId, userId),
+          eq(shippingQuoteRequests.status, 'pending'),
+        ));
+      if (!request) return undefined;
+
+      const [newOrder] = await tx.insert(orders)
+        .values({ ...order, shippingQuoteRequestId: quoteId })
+        .returning();
+      if (items.length > 0) {
+        await tx.insert(orderItems).values(items.map(item => ({ ...item, orderId: newOrder.id })));
+      }
+      return newOrder;
+    });
+  }
+
+  async releaseReservedShippingQuoteOrder(orderId: number, quoteId: number, userId: string): Promise<void> {
+    await db.transaction(async tx => {
+      await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+      await tx.delete(orders).where(and(
+        eq(orders.id, orderId),
+        eq(orders.userId, userId),
+        eq(orders.shippingQuoteRequestId, quoteId),
+        eq(orders.paymentStatus, 'pending'),
+      ));
+      await tx.update(shippingQuoteRequests)
+        .set({ status: 'quoted', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, quoteId),
+          eq(shippingQuoteRequests.userId, userId),
+          eq(shippingQuoteRequests.status, 'reserved'),
+        ));
+    });
   }
 
   async createOrderItem(orderItem: InsertOrderItem): Promise<OrderItem> {
@@ -549,6 +900,141 @@ export class DatabaseStorage implements IStorage {
   async getOrder(id: number): Promise<Order | undefined> {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     return order;
+  }
+
+  async getOrderByShippingQuoteRequestId(quoteId: number): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.shippingQuoteRequestId, quoteId));
+    return order;
+  }
+
+  async updateOrderShippingQuote(
+    quoteId: number,
+    amount: string,
+    status: string,
+    orderStatus?: string,
+    reconciliation?: { finalAmount?: string; refundAmount?: string; refundStatus?: string },
+  ): Promise<Order | undefined> {
+    const update: any = { shippingAmount: amount, shippingPaymentStatus: status, updatedAt: new Date() };
+    if (orderStatus) {
+      update.orderStatus = sql`CASE
+        WHEN ${orders.orderStatus} IN ('pending', 'awaiting_shipping_quote') THEN ${orderStatus}
+        ELSE ${orders.orderStatus}
+      END`;
+    }
+    if (reconciliation?.finalAmount !== undefined) update.shippingFinalAmount = reconciliation.finalAmount;
+    if (reconciliation?.refundAmount !== undefined) update.shippingRefundAmount = reconciliation.refundAmount;
+    if (reconciliation?.refundStatus !== undefined) update.shippingRefundStatus = reconciliation.refundStatus;
+    const [order] = await db.update(orders)
+      .set(update)
+      .where(and(
+        eq(orders.shippingQuoteRequestId, quoteId),
+        sql`${orders.orderStatus} <> 'cancelled'`,
+      ))
+      .returning();
+    return order;
+  }
+
+  async claimShippingPaymentReference(id: number, userId: string, reference: string): Promise<'claimed' | 'busy' | 'unavailable'> {
+    const updated = await db.transaction(async tx => {
+      const [current] = await tx.select({ quoteId: orders.shippingQuoteRequestId })
+        .from(orders)
+        .where(and(eq(orders.id, id), eq(orders.userId, userId)));
+      if (!current?.quoteId) return [];
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${current.quoteId})`);
+      return await tx.update(orders)
+        .set({ shippingPaymentReference: reference, shippingPaymentUrl: null, updatedAt: new Date() })
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.userId, userId),
+          eq(orders.paymentStatus, 'paid'),
+          eq(orders.shippingPaymentStatus, 'pending'),
+          eq(orders.orderStatus, 'awaiting_shipping_quote'),
+          isNull(orders.shippingPaymentReference),
+          sql`EXISTS (
+            SELECT 1 FROM ${shippingQuoteRequests}
+            WHERE ${shippingQuoteRequests.id} = ${orders.shippingQuoteRequestId}
+              AND ${shippingQuoteRequests.status} = 'quoted'
+          )`,
+        ))
+        .returning({ id: orders.id });
+    });
+    if (updated.length > 0) return 'claimed';
+    const current = await this.getOrder(id);
+    if (current?.userId === userId && current.paymentStatus === 'paid' && current.shippingPaymentStatus === 'pending' && current.shippingPaymentReference) {
+      return 'busy';
+    }
+    return 'unavailable';
+  }
+
+  async saveShippingPaymentUrl(id: number, reference: string, url: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({ shippingPaymentUrl: url, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.shippingPaymentReference, reference), eq(orders.shippingPaymentStatus, 'pending')))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async clearShippingPaymentAttempt(id: number, userId: string, reference: string): Promise<void> {
+    await db.update(orders)
+      .set({ shippingPaymentReference: null, shippingPaymentUrl: null, updatedAt: new Date() })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.userId, userId),
+        eq(orders.shippingPaymentStatus, 'pending'),
+        eq(orders.shippingPaymentReference, reference),
+      ));
+  }
+
+  async markShippingPaid(id: number, reference: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({
+        shippingPaymentStatus: 'paid',
+        orderStatus: 'pending',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.paymentStatus, 'paid'),
+        eq(orders.shippingPaymentStatus, 'pending'),
+        eq(orders.shippingPaymentReference, reference),
+        eq(orders.orderStatus, 'awaiting_shipping_quote'),
+      ))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async claimShippingRefund(id: number, finalAmount: string, refundAmount: string): Promise<boolean> {
+    const updated = await db.update(orders)
+      .set({
+        shippingFinalAmount: finalAmount,
+        shippingRefundAmount: refundAmount,
+        shippingRefundStatus: 'processing',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.paymentStatus, 'paid'),
+        isNull(orders.shippingRefundStatus),
+      ))
+      .returning({ id: orders.id });
+    return updated.length > 0;
+  }
+
+  async completeShippingRefundClaim(id: number, status: string): Promise<void> {
+    await db.update(orders)
+      .set({ shippingRefundStatus: status, updatedAt: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.shippingRefundStatus, 'processing')));
+  }
+
+  async releaseShippingRefundClaim(id: number): Promise<void> {
+    await db.update(orders)
+      .set({
+        shippingFinalAmount: null,
+        shippingRefundAmount: null,
+        shippingRefundStatus: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(orders.id, id), eq(orders.shippingRefundStatus, 'processing')));
   }
 
   async getOrdersForUser(userId: string): Promise<Order[]> {
@@ -566,11 +1052,76 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(orders.createdAt));
   }
 
+  async getOrdersForVendor(vendorId: number): Promise<Order[]> {
+    return db.select().from(orders).where(and(
+      eq(orders.paymentStatus, "paid"),
+      inArray(orders.id, db.select({ id: orderItems.orderId }).from(orderItems)
+        .innerJoin(products, eq(products.id, orderItems.productId))
+        .where(eq(products.vendorId, vendorId))),
+    )).orderBy(desc(orders.createdAt));
+  }
+
   async updateOrderStatus(id: number, status: string): Promise<void> {
     await db
       .update(orders)
       .set({ orderStatus: status, updatedAt: new Date() })
       .where(eq(orders.id, id));
+  }
+
+  async transitionOrderStatus(id: number, expectedStatus: string, status: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: status, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus),
+          ['shipped', 'delivered'].includes(status) ? sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})` : undefined))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
+  }
+
+  async markOrderShipped(id: number, expectedStatus: string, trackingNumber: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: 'shipped', trackingNumber, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), eq(orders.orderStatus, expectedStatus),
+          sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})`))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
+  }
+
+  async updateOrderTracking(id: number, trackingNumber: string): Promise<boolean> {
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const result = await tx.update(orders)
+        .set({ trackingNumber, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), sql`NOT EXISTS (SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id})`))
+        .returning({ id: orders.id });
+      return result.length > 0;
+    });
+  }
+
+  async cancelOrderIfNoActiveShippingPayment(id: number, userId?: string): Promise<boolean> {
+    const conditions = [
+      eq(orders.id, id),
+      sql`NOT EXISTS (
+        SELECT 1 FROM shipments s WHERE s.order_id = ${orders.id}
+        AND (s.booking_accepted_at IS NOT NULL OR s.collected_at IS NOT NULL OR s.status IN ('delivered', 'returned'))
+      )`,
+      sql`${orders.paymentStatus} <> 'pending'`,
+      or(sql`${orders.shippingPaymentStatus} <> 'pending'`, isNull(orders.shippingPaymentReference)),
+    ];
+    if (userId) conditions.push(eq(orders.userId, userId));
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${id} FOR UPDATE`);
+      const updated = await tx.update(orders)
+        .set({ orderStatus: 'cancelled', updatedAt: new Date() })
+        .where(and(...conditions))
+        .returning({ id: orders.id });
+      return updated.length > 0;
+    });
   }
 
   async updatePaymentStatus(id: number, status: string, reference?: string): Promise<void> {
@@ -585,6 +1136,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id));
   }
 
+  async markOrderPaid(id: number, reference: string): Promise<boolean> {
+    const result = await db.update(orders)
+      .set({
+        paymentStatus: 'paid',
+        paymentReference: reference,
+        orderStatus: sql`CASE
+          WHEN ${orders.shippingEstimatedAmount} IS NOT NULL AND ${orders.shippingFinalAmount} IS NULL
+            THEN 'awaiting_shipping_quote'
+          ELSE 'pending'
+        END`,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(orders.id, id),
+        eq(orders.paymentStatus, 'pending'),
+        sql`${orders.orderStatus} <> 'cancelled'`,
+      ))
+      .returning({ id: orders.id });
+    return result.length > 0;
+  }
+
+  async reserveOrderStock(id: number): Promise<boolean> {
+    try {
+      return await db.transaction(async tx => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${9300000 + id})`);
+        const [order] = await tx.select().from(orders).where(eq(orders.id, id));
+        if (!order || order.paymentStatus !== 'paid') return false;
+        if (order.stockReservationStatus === 'reserved') return true;
+        const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, id));
+        if (items.length === 0) return false;
+        for (const item of items) {
+          const updated = await tx.update(products)
+            .set({ stock: sql`${products.stock} - ${item.quantity}`, updatedAt: new Date() })
+            .where(and(eq(products.id, item.productId), gte(products.stock, item.quantity)))
+            .returning({ id: products.id });
+          if (updated.length === 0) throw new Error(`Insufficient stock for product ${item.productId}`);
+        }
+        await tx.update(orders)
+          .set({ stockReservationStatus: 'reserved', updatedAt: new Date() })
+          .where(eq(orders.id, id));
+        return true;
+      });
+    } catch (error) {
+      console.error(`Could not reserve stock for paid order ${id}:`, error);
+      await db.update(orders)
+        .set({ stockReservationStatus: 'failed', updatedAt: new Date() })
+        .where(and(
+          eq(orders.id, id),
+          eq(orders.paymentStatus, 'paid'),
+          sql`${orders.stockReservationStatus} <> 'reserved'`,
+        ));
+      return false;
+    }
+  }
+
+  async decrementProductStockIfAvailable(id: number, quantity: number): Promise<boolean> {
+    const result = await db.update(products)
+      .set({ stock: sql`${products.stock} - ${quantity}`, updatedAt: new Date() })
+      .where(and(eq(products.id, id), gte(products.stock, quantity)))
+      .returning({ id: products.id });
+    return result.length > 0;
+  }
+
   async getOrderItemsWithProducts(orderId: number): Promise<OrderItem[]> {
     return await db
       .select()
@@ -592,18 +1206,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orderItems.orderId, orderId));
   }
 
+  async getAccountPurchaseItems(userId: string): Promise<AccountCommerceItem[]> {
+    return db.select({
+      orderId: orders.id, productId: orderItems.productId, productName: products.name,
+      quantity: orderItems.quantity, unitPrice: orderItems.priceAtTime,
+      paymentStatus: orders.paymentStatus, orderStatus: orders.orderStatus, createdAt: orders.createdAt,
+    }).from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(products.id, orderItems.productId))
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt), desc(orders.id));
+  }
+
+  async getAccountSalesItems(vendorId: number): Promise<AccountCommerceItem[]> {
+    return db.select({
+      orderId: orders.id, productId: orderItems.productId, productName: products.name,
+      quantity: orderItems.quantity, unitPrice: orderItems.priceAtTime,
+      paymentStatus: orders.paymentStatus, orderStatus: orders.orderStatus, createdAt: orders.createdAt,
+    }).from(products)
+      .innerJoin(orderItems, eq(orderItems.productId, products.id))
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .where(and(eq(products.vendorId, vendorId), eq(orders.paymentStatus, "paid")))
+      .orderBy(desc(orders.createdAt), desc(orders.id));
+  }
+
   // Notification operations
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    // Set expiration time to 2 minutes from now for order notifications
-    const expirationTime = notification.type === 'order' 
-      ? new Date(Date.now() + 2 * 60 * 1000) // 2 minutes
-      : null;
-
     const [newNotification] = await db
       .insert(notifications)
       .values({
         ...notification,
-        expiresAt: expirationTime
+        // Lifecycle notifications are durable. Callers that need a transient
+        // alert may provide an explicit expiresAt.
+        expiresAt: notification.expiresAt ?? null,
       })
       .returning();
     return newNotification;
@@ -620,11 +1255,13 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(notifications.createdAt));
   }
 
-  async markNotificationAsRead(id: number): Promise<void> {
-    await db
+  async markNotificationAsRead(id: number, userId: string): Promise<boolean> {
+    const result = await db
       .update(notifications)
       .set({ isRead: true })
-      .where(eq(notifications.id, id));
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+    return result.length > 0;
   }
 
   async dismissNotification(id: number, userId: string): Promise<void> {
@@ -652,11 +1289,75 @@ export class DatabaseStorage implements IStorage {
     return adminUsers;
   }
 
+  // Shipping quote request operations
+  async createShippingQuoteRequest(request: InsertShippingQuoteRequest): Promise<ShippingQuoteRequest> {
+    return db.transaction(async tx => {
+      if (!Array.isArray(request.cartSnapshot)) throw new Error("Invalid shipping quote cart");
+      await lockApprovedProductReferences(tx, request.cartSnapshot.map((item: any) => item?.productId));
+      const [created] = await tx.insert(shippingQuoteRequests).values(request).returning();
+      return created;
+    });
+  }
+
+  async getShippingQuoteRequest(id: number): Promise<ShippingQuoteRequest | undefined> {
+    const [request] = await db.select().from(shippingQuoteRequests).where(eq(shippingQuoteRequests.id, id));
+    return request;
+  }
+
+  async getShippingQuoteRequestsForUser(userId: string): Promise<ShippingQuoteRequest[]> {
+    return await db.select().from(shippingQuoteRequests)
+      .where(eq(shippingQuoteRequests.userId, userId))
+      .orderBy(desc(shippingQuoteRequests.createdAt));
+  }
+
+  async getAllShippingQuoteRequests(): Promise<ShippingQuoteRequest[]> {
+    return await db.select().from(shippingQuoteRequests).orderBy(desc(shippingQuoteRequests.createdAt));
+  }
+
+  async updateShippingQuoteRequest(
+    id: number,
+    data: Partial<Pick<ShippingQuoteRequest, 'status' | 'quotedAmount' | 'currency' | 'estimatedDelivery' | 'adminNotes' | 'confirmedBy' | 'expiresAt'>>,
+  ): Promise<ShippingQuoteRequest | undefined> {
+    const [updated] = await db.update(shippingQuoteRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(shippingQuoteRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async claimShippingQuoteDecision(id: number, expectedStatus: string): Promise<boolean> {
+    const claimed = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${id})`);
+      return await tx.update(shippingQuoteRequests)
+        .set({ status: 'reconciling', updatedAt: new Date() })
+        .where(and(
+          eq(shippingQuoteRequests.id, id),
+          eq(shippingQuoteRequests.status, expectedStatus),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${orders}
+            WHERE ${orders.shippingQuoteRequestId} = ${id}
+              AND ${orders.shippingPaymentReference} IS NOT NULL
+          )`,
+        ))
+        .returning({ id: shippingQuoteRequests.id });
+    });
+    return claimed.length > 0;
+  }
+
+  async releaseShippingQuoteDecision(id: number, originalStatus: string): Promise<void> {
+    await db.update(shippingQuoteRequests)
+      .set({ status: originalStatus, updatedAt: new Date() })
+      .where(and(
+        eq(shippingQuoteRequests.id, id),
+        eq(shippingQuoteRequests.status, 'reconciling'),
+      ));
+  }
+
   // Measurement operations
   async createMeasurement(measurementData: InsertMeasurement): Promise<Measurement> {
     const [measurement] = await db
       .insert(measurements)
-      .values(measurementData)
+      .values(measurementData as any)
       .returning();
     return measurement;
   }
@@ -817,16 +1518,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLookbookRecommendation(rec: InsertLookbookRecommendation): Promise<LookbookRecommendation> {
-    const [lookbook] = await db.insert(lookbookRecommendations).values(rec).returning();
-    return lookbook;
+    return db.transaction(async tx => {
+      if (!Array.isArray(rec.bundleItems)) throw new Error("Invalid lookbook products");
+      await lockApprovedProductReferences(tx, rec.bundleItems.map((item: any) => item?.productId));
+      const [lookbook] = await tx.insert(lookbookRecommendations).values(rec).returning();
+      return lookbook;
+    });
   }
 
   async getUserLookbooks(userId: string): Promise<LookbookRecommendation[]> {
     return await db.select().from(lookbookRecommendations).where(eq(lookbookRecommendations.userId, userId)).orderBy(desc(lookbookRecommendations.createdAt));
   }
 
-  async updateLookbookStatus(id: number, status: string): Promise<void> {
-    await db.update(lookbookRecommendations).set({ status }).where(eq(lookbookRecommendations.id, id));
+  async updateLookbookStatus(id: number, userId: string, status: string): Promise<boolean> {
+    const [updated] = await db.update(lookbookRecommendations).set({ status })
+      .where(and(eq(lookbookRecommendations.id, id), eq(lookbookRecommendations.userId, userId)))
+      .returning({ id: lookbookRecommendations.id });
+    return !!updated;
   }
 
   // Fit metrics & feedback operations
@@ -900,6 +1608,11 @@ export class DatabaseStorage implements IStorage {
     return newStep;
   }
 
+  async getProductionStep(id: number): Promise<OrderProductionStep | undefined> {
+    const [step] = await db.select().from(orderProductionSteps).where(eq(orderProductionSteps.id, id));
+    return step;
+  }
+
   async getOrderProductionSteps(orderId: number): Promise<OrderProductionStep[]> {
     return await db.select().from(orderProductionSteps).where(eq(orderProductionSteps.orderId, orderId)).orderBy(orderProductionSteps.createdAt);
   }
@@ -921,7 +1634,14 @@ export class DatabaseStorage implements IStorage {
     
     if (orderIds.length === 0) return [];
     
-    return await db.select().from(orders).where(sql`${orders.id} IN ${orderIds}`).orderBy(desc(orders.createdAt));
+    return await db.select().from(orders)
+      .where(and(
+        sql`${orders.id} IN ${orderIds}`,
+        eq(orders.paymentStatus, 'paid'),
+        or(eq(orders.shippingPaymentStatus, 'included'), eq(orders.shippingPaymentStatus, 'paid')),
+        sql`${orders.orderStatus} <> 'awaiting_shipping_quote'`,
+      ))
+      .orderBy(desc(orders.createdAt));
   }
 
   // Vendor resources operations
@@ -949,8 +1669,11 @@ export class DatabaseStorage implements IStorage {
 
   // Event collections operations
   async createEventCollection(collection: InsertEventCollection): Promise<EventCollection> {
-    const [newCollection] = await db.insert(eventCollections).values(collection).returning();
-    return newCollection;
+    return db.transaction(async tx => {
+      await lockApprovedProductReferences(tx, collection.productIds ?? []);
+      const [newCollection] = await tx.insert(eventCollections).values(collection).returning();
+      return newCollection;
+    });
   }
 
   async getEventCollections(eventType?: string): Promise<EventCollection[]> {
@@ -1121,8 +1844,11 @@ export class DatabaseStorage implements IStorage {
 
   // Collaboration drops operations
   async createCollabDrop(drop: InsertCollabDrop): Promise<CollabDrop> {
-    const [newDrop] = await db.insert(collabDrops).values(drop).returning();
-    return newDrop;
+    return db.transaction(async tx => {
+      await lockApprovedProductReferences(tx, drop.productIds ?? [], drop.designerId);
+      const [newDrop] = await tx.insert(collabDrops).values(drop).returning();
+      return newDrop;
+    });
   }
 
   async getCollabDrops(status?: string): Promise<CollabDrop[]> {
@@ -1138,27 +1864,46 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDropRsvp(rsvp: InsertDropRsvp): Promise<DropRsvp> {
-    const [newRsvp] = await db.insert(dropRsvps).values(rsvp).returning();
-    
-    // Increment RSVP count
-    await db.update(collabDrops).set({ 
-      rsvpCount: sql`${collabDrops.rsvpCount} + 1` 
-    }).where(eq(collabDrops.id, rsvp.dropId));
-    
-    return newRsvp;
+    return await db.transaction(async tx => {
+      const [updatedDrop] = await tx.update(collabDrops)
+        .set({ rsvpCount: sql`coalesce(${collabDrops.rsvpCount}, 0) + 1` })
+        .where(and(
+          eq(collabDrops.id, rsvp.dropId),
+          sql`(${collabDrops.rsvpCap} IS NULL OR coalesce(${collabDrops.rsvpCount}, 0) < ${collabDrops.rsvpCap})`,
+        ))
+        .returning({ id: collabDrops.id });
+      if (!updatedDrop) throw new Error('RSVP_CAPACITY_REACHED');
+
+      const [newRsvp] = await tx.insert(dropRsvps)
+        .values(rsvp)
+        .onConflictDoNothing({ target: [dropRsvps.dropId, dropRsvps.userId] })
+        .returning();
+      if (!newRsvp) throw new Error('RSVP_ALREADY_EXISTS');
+      return newRsvp;
+    });
   }
 
   async getDropRsvps(dropId: number): Promise<DropRsvp[]> {
-    return await db.select().from(dropRsvps).where(eq(dropRsvps.dropId, dropId));
+    return await db.select().from(dropRsvps).where(and(
+      eq(dropRsvps.dropId, dropId),
+      eq(dropRsvps.status, 'confirmed'),
+    ));
   }
 
   async getUserDropRsvps(userId: string): Promise<DropRsvp[]> {
-    return await db.select().from(dropRsvps).where(eq(dropRsvps.userId, userId));
+    return await db.select().from(dropRsvps).where(and(
+      eq(dropRsvps.userId, userId),
+      eq(dropRsvps.status, 'confirmed'),
+    ));
   }
 
   async hasUserRsvped(userId: string, dropId: number): Promise<boolean> {
     const [rsvp] = await db.select().from(dropRsvps).where(
-      and(eq(dropRsvps.userId, userId), eq(dropRsvps.dropId, dropId))
+      and(
+        eq(dropRsvps.userId, userId),
+        eq(dropRsvps.dropId, dropId),
+        eq(dropRsvps.status, 'confirmed'),
+      )
     );
     return !!rsvp;
   }

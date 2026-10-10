@@ -1,15 +1,15 @@
 import { useCurrency } from "@/hooks/useCurrency";
 
 interface LocalPriceProps {
-  usdAmount: number;
+  ngnAmount: number;
   className?: string;
   size?: "sm" | "md";
 }
 
-export default function LocalPrice({ usdAmount, className = "", size = "sm" }: LocalPriceProps) {
-  const { currencyInfo, formatLocal } = useCurrency();
+export default function LocalPrice({ ngnAmount, className = "", size = "sm" }: LocalPriceProps) {
+  const { currencyInfo, formatNGN } = useCurrency();
 
-  const localFormatted = formatLocal(usdAmount);
+  const localFormatted = formatNGN(ngnAmount);
   if (!localFormatted || !currencyInfo) return null;
 
   const textSize = size === "sm" ? "text-xs" : "text-sm";

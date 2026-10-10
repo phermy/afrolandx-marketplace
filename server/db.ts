@@ -24,4 +24,12 @@ const connectionConfig = process.env.PGHOST && process.env.PGUSER && process.env
   : { connectionString: process.env.DATABASE_URL, ssl: isProduction ? { rejectUnauthorized: false } : false };
 
 export const pool = new Pool(connectionConfig as pg.PoolConfig);
+// pg emits an error when an idle connection is terminated by the database.
+// Without a listener, Node exits even though the pool can replace that client.
+// Never log the error/client objects: they may contain connection credentials.
+pool.on("error", (error: Error & { code?: string }) => {
+  const code = typeof error.code === "string" && /^[A-Z0-9]{5}$/.test(error.code)
+    ? error.code : "unknown";
+  console.error(`Database pool connection interrupted (${code}). New requests will reconnect.`);
+});
 export const db = drizzle({ client: pool, schema });

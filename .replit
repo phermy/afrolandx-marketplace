@@ -1,9 +1,10 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web", "python-base-3.13", "postgresql-16"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf", "openjpeg", "swig", "xcbuild"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -40,7 +41,16 @@ integrations = ["javascript_openai_ai_integrations:1.0.0"]
 
 [userenv]
 
-[userenv.shared]
-FROM_EMAIL = "femi.elegbeleye@afrolandx.com"
-
 [userenv.production]
+
+[userenv.shared]
+FROM_EMAIL = "management@afrolandx.com"
+R2_ACCOUNT_ID = "fd643e7f189999a0b316d38cfe340f33"
+R2_BUCKET = "afrolandx"
+TURNSTILE_REGISTER_ENABLED = "true"
+
+[userenv.development]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000

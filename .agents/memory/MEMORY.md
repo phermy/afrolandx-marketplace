@@ -1,0 +1,34 @@
+- [Currency & payment model](currency-payment.md) — prices stored in NGN (Naira), always charge via Paystack in NGN; never treat product.price as USD
+- [Auth availability vs verification](auth-availability.md) — email-provider outages must never bypass verification or auto-login newly registered users
+- [Inbound mail routing](inbound-mail-routing.md) — Titan relay rejections are recipient-specific; support and info were confirmed by inbox receipt
+- [Resend sender domain](resend-sender-domain.md) — transactional delivery requires the configured sender domain to be verified in Resend before auth-flow testing
+- [Shipping quote payment lifecycle](shipping-quote-lifecycle.md) — every carrier requires a confirmed quote before payment, then locks into one server-priced order
+- [Public policy source handling](public-policy-sources.md) — normalize approved identity details, but never turn unresolved DOCX placeholders into published obligations
+- [Product image enhancement](product-image-enhancement.md) — automatic cleanup is standard; AI retouching is optional and must preserve an original for vendor review
+- [Product image durability](product-image-durability.md) — production uploads must not claim success by falling back to temporary local storage
+- [Safe development schema sync](safe-schema-sync.md) — a broad schema push can offer to truncate populated tables for unrelated constraints; never accept that shortcut
+- [Vendor settlement accounting](vendor-settlement-accounting.md) — commission is 8% of merchandise only; immutable vendor ledger entries drive refunds, availability, and payouts
+- [Identity-preserving portraits](identity-preserving-portraits.md) — for real-person edits, keep original subject pixels; generative edits can redraw faces despite strict prompts
+- [Hyphen-free website copy](hyphen-free-copy.md) — rewrite visible phrases grammatically instead of just deleting hyphens; keep technical values and proper names intact
+- [File download handoff](file-download-handoff.md) — asset cards and file-tree downloads failed for this user; provide a verified browser download link instead
+- [Bot-check access](bot-check-access.md) — broken Turnstile locked out sign-in; only add an image challenge with a provider that supports it and verified hostnames
+- [Event planner commission](event-planner-commission.md) — user chose 8% of planner fee only; do not include outside supplier charges or enable fee collection without safe settlement
+- [Discover release gate](discover-release-gate.md) — keep Discover admin-only until reservations and payments are implemented and ready for a public launch
+- [Admin scope and delegation](superadmin-delegation.md) — Admins have customer/vendor support and full shipping operations; platform, staff-profile and role controls stay restricted
+- [Account closure semantics](account-closure.md) — close access for accounts with business records; keep historical orders, payouts, and catalog intact
+- [Virtual try-on scope and privacy](virtual-try-on.md) — photo-based clothing previews are not live AR; avoid app-side photo storage and disclose provider retention
+- [Abort timeout tests](abort-timeout-tests.md) — Node timeout signals may not keep the test process alive; use a separate referenced timer in stalled-request tests
+- [Subcategory assignment](subcategory-assignment.md) — new shopping labels require explicit seller assignment, not guesses from old names or free-text keywords
+- [CAC vendor verification](cac-verification.md) — use official public search with documented admin review until authorized CAC VAS access exists
+- [Verified review provenance](verified-review-provenance.md) — historical feedback is not automatically trusted as a purchase review; verify and moderate before publication
+- [Batch listing retry safety](batch-listing-retry-safety.md) — a lost import response can hide a successful create; retries must be server-idempotent and preserve draft versus submitted status
+- [Registration visual direction](registration-visual-direction.md) — user likes the editorial Afrolandx split layout; prioritize readable copy over decorative overlap
+- [Responsive copy alignment](responsive-copy-alignment.md) — avoid forced justification in narrow columns or short cards; reserve it for wide long-form reading
+- [Account signup requirements](account-signup-requirements.md) — require phones for new accounts; vendor signup leads to an application, not automatic selling permission
+- [Managed shipping model](managed-shipping-model.md) — Afrolandx coordinates and pays agencies; invited partners operate assigned packages, with automation added later
+- [Public team visibility](public-team-visibility.md) — keep the leadership section hidden from the public until the user requests its return
+- [Payment communications](payment-communications.md) — finance mail uses the payments mailbox for sender, replies and internal alerts; keep customer receipt recipients unchanged
+- [Landing page carousel preference](landing-page-preference.md) — preserve the previous homepage carousel and all its display images; do not treat restoration as storage or payment work
+- [Profile photo storage](profile-photo-storage.md) — use R2 links for new avatars; failed writes must preserve the old photo and cleanup must remain scoped
+- [Cloudflare instead of AWS](cloudflare-storage-direction.md) — switch only features still blocked by AWS; leave working features and existing content unchanged
+- [Navbar active-page style](navbar-active-style.md) — user disliked the line under Home; use text colour without an active-link underline

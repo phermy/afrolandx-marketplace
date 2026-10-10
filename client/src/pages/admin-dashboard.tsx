@@ -1,36 +1,45 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
+import { getApiErrorMessage } from '@/lib/api-error-message';
+import { orderPaidTotal } from '@shared/order-totals';
 import { isUnauthorizedError } from '@/lib/authUtils';
 import { useToast } from '@/hooks/use-toast';
 import { isAdmin, hasRole } from '@/lib/roleUtils';
 import Navbar from '@/components/navbar';
+import EventPlannerAdmin from '@/components/event-planner-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminScopeTab as TabsContent } from '@/components/admin-scope-tab';
+import { hasFullManagementAccess, hasSupportManagementAccess, isCustomerOrVendorAccount } from '@shared/admin-access';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   X, Eye, ChevronDown, ChevronUp, CheckCircle, XCircle, ShieldCheck, Package,
   Mail, Calendar, User as UserIcon, TrendingUp, TrendingDown, AlertTriangle,
   Star, BarChart3, RefreshCw, Download, Search, Filter, Truck, ArrowUpRight,
-  Globe, DollarSign, ShoppingBag, Users, Award, Zap,
+  Globe, DollarSign, ShoppingBag, Users, Award, Zap, Trash2, Plus,
 } from 'lucide-react';
-import type { Vendor, ProductWithDetails, AdminStats, User } from '@/types';
+import type { Vendor, ProductWithDetails, AdminStats, User, ShippingQuoteRequest, Category } from '@/types';
+import { trackEvent } from '@/lib/analytics';
+import { AdminUserDetails } from '@/components/admin-user-details';
+import { cacBusinessNamesMatch } from '@shared/cac-review';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
 const MAX_FEATURED = 8;
+const PENDING_PRODUCTS_PAGE_SIZE = 50;
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   processing: 'bg-blue-100 text-blue-800',
@@ -40,41 +49,191 @@ const STATUS_COLORS: Record<string, string> = {
 };
 const PIE_COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'];
 
+type TestDeletionPreview = {
+  email: string;
+  products: number;
+  orders: number;
+  ledgerEntries: number;
+  quotes: number;
+  notifications: number;
+  fingerprint: string;
+};
+
+type PendingReview = {
+  id: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  product: { id: number; name: string };
+  vendor: { id: number; name: string };
+  reviewer: 'Verified buyer';
+};
+
+type PendingAdminProduct = {
+  id: number;
+  name: string;
+  description: string;
+  shortDescription?: string | null;
+  price: string;
+  stock: number;
+  images?: string[] | null;
+  imageUrl?: string | null;
+  categoryId: number | null;
+  status: string;
+  vendorId: number;
+  createdAt: string;
+  vendor: {
+    id: number;
+    businessName: string;
+    status: string;
+    verificationStatus: string;
+  };
+};
+
+type PendingAdminProductsResponse = {
+  products: PendingAdminProduct[];
+  total: number;
+  hasMore: boolean;
+};
+
 export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const fullManagement = hasFullManagementAccess(user);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [reviewVendor, setReviewVendor] = useState<any | null>(null);
+  const [verificationChecks, setVerificationChecks] = useState({ cacVerified: false, identityVerified: false, businessVerified: false });
+  const [verificationNotes, setVerificationNotes] = useState('');
+  const [cacRegisteredName, setCacRegisteredName] = useState('');
+  const [cacRegistryStatus, setCacRegistryStatus] = useState('');
+  const [relationshipConfirmed, setRelationshipConfirmed] = useState(false);
+  const [relationshipEvidence, setRelationshipEvidence] = useState('');
   const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [selectedPendingProductIds, setSelectedPendingProductIds] = useState<number[]>([]);
+  const [bulkApproveConfirmationOpen, setBulkApproveConfirmationOpen] = useState(false);
+  const [bulkApproveSkipped, setBulkApproveSkipped] = useState<Array<{ id: number; reason: string }>>([]);
+  const [pendingProductsOffset, setPendingProductsOffset] = useState(0);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
+  const [showHistoricalOrders, setShowHistoricalOrders] = useState(false);
   const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
+  const [testDeletion, setTestDeletion] = useState<{ userId: string; preview: TestDeletionPreview } | null>(null);
+  const [testDeletionEmail, setTestDeletionEmail] = useState('');
+  const [testPreviewPending, setTestPreviewPending] = useState<string | null>(null);
+  const [showClosedAccounts, setShowClosedAccounts] = useState(false);
+  const [repProductOpen, setRepProductOpen] = useState(false);
+  const [repProduct, setRepProduct] = useState({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
+  const [repProductImages, setRepProductImages] = useState<File[]>([]);
   const [activityLog, setActivityLog] = useState<Array<{ id: number; orderId: number; status: string; amount: string; time: Date }>>([]);
+  const [quoteDrafts, setQuoteDrafts] = useState<Record<number, {
+    quotedAmount: string;
+    estimatedDelivery: string;
+    validDays: string;
+    adminNotes: string;
+  }>>({});
   const prevOrderStatusRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !isAdmin(user))) {
+    if (!isLoading && (!isAuthenticated || !hasSupportManagementAccess(user))) {
       toast({ title: 'Admin Access Required', description: 'You need admin privileges.', variant: 'destructive' });
       setTimeout(() => { window.location.href = '/login'; }, 500);
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ['/api/vendors'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
-    queryKey: ['/api/admin/orders'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
+  const { data: stats } = useQuery<AdminStats>({ queryKey: ['/api/admin/stats'], enabled: isAuthenticated && fullManagement, retry: false });
+  const { data: vendors = [] } = useQuery<Vendor[]>({
+    queryKey: ['/api/admin/vendors', user?.id, fullManagement],
+    queryFn: async () => (await apiRequest('GET', '/api/admin/vendors')).json(),
+    enabled: isAuthenticated && isAdmin(user), retry: false,
   });
-  const { data: allUsers = [] } = useQuery<User[]>({ queryKey: ['/api/admin/users'], enabled: isAuthenticated && isAdmin(user), retry: false });
-  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications'], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
+  const { data: allProducts = [] } = useQuery<ProductWithDetails[]>({ queryKey: ['/api/products/with-details'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const {
+    data: pendingProductsResponse,
+    isLoading: pendingProductsLoading,
+    isFetching: pendingProductsFetching,
+    error: pendingProductsError,
+    refetch: refetchPendingProducts,
+  } = useQuery<PendingAdminProductsResponse>({
+    queryKey: ['/api/admin/products/pending', user?.id, fullManagement, pendingProductsOffset],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/admin/products/pending?limit=${PENDING_PRODUCTS_PAGE_SIZE}&offset=${pendingProductsOffset}`,
+      );
+      return response.json();
+    },
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+  const pendingProducts = pendingProductsResponse?.products ?? [];
+  const pendingProductsTotal = pendingProductsResponse?.total ?? 0;
+  const pendingProductsHasMore = pendingProductsResponse?.hasMore ?? false;
+  const currentPendingPage = Math.floor(pendingProductsOffset / PENDING_PRODUCTS_PAGE_SIZE) + 1;
+  const totalPendingPages = Math.ceil(pendingProductsTotal / PENDING_PRODUCTS_PAGE_SIZE);
+  const changePendingProductsPage = (offset: number) => {
+    setSelectedPendingProductIds([]);
+    setBulkApproveSkipped([]);
+    setPendingProductsOffset(Math.max(0, offset));
+  };
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'], enabled: isAuthenticated && isAdmin(user), retry: false });
+  const { data: adminOrders = [], isFetching: ordersFetching, dataUpdatedAt: ordersUpdatedAt } = useQuery({
+    queryKey: ['/api/admin/orders', user?.id, fullManagement], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 30000, staleTime: 0,
+  });
+  const {
+    data: allUsers = [],
+    isLoading: usersLoading,
+    error: usersError,
+    refetch: refetchUsers,
+  } = useQuery<User[]>({
+    queryKey: ['/api/admin/users', user?.id, fullManagement],
+    queryFn: async () => {
+      const accounts: User[] = await (await apiRequest('GET', '/api/admin/users')).json();
+      return fullManagement ? accounts : accounts.filter(isCustomerOrVendorAccount);
+    },
+    enabled: isAuthenticated && isAdmin(user), retry: false, staleTime: 0,
+  });
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const { data: adminNotifications = [] } = useQuery({ queryKey: ['/api/notifications', user?.id], enabled: isAuthenticated && isAdmin(user), retry: false, refetchInterval: 15000 });
+  const { data: shippingQuoteRequests = [] } = useQuery<ShippingQuoteRequest[]>({
+    queryKey: ['/api/admin/shipping-quote-requests', user?.id, fullManagement],
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+    refetchInterval: 15000,
+  });
   const { data: analytics, isLoading: analyticsLoading } = useQuery<any>({
     queryKey: ['/api/admin/analytics', analyticsRefresh],
-    enabled: isAuthenticated && isAdmin(user),
+    enabled: isAuthenticated && fullManagement,
     retry: false,
     refetchInterval: 60000,
   });
+  const { data: discoverInquiries = [], refetch: refetchInquiries } = useQuery<any[]>({
+    queryKey: ['/api/discover/inquiries'],
+    enabled: isAuthenticated && fullManagement,
+    retry: false,
+  });
+  const { data: discoverPremium = [] } = useQuery<any[]>({
+    queryKey: ['/api/discover/premium'],
+    enabled: isAuthenticated && fullManagement,
+    retry: false,
+  });
+  const {
+    data: pendingReviews = { reviews: [] },
+    isLoading: reviewsLoading,
+    isFetching: reviewsFetching,
+    error: reviewsError,
+    refetch: refetchReviews,
+  } = useQuery<{ reviews: PendingReview[] }>({
+    queryKey: ['/api/admin/reviews?status=pending&limit=50'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/admin/reviews?status=pending&limit=50');
+      return response.json();
+    },
+    enabled: isAuthenticated && isAdmin(user),
+    retry: false,
+  });
+  const reviews = pendingReviews.reviews || [];
 
   // ── Real-time order change detection ────────────────────────────────────
   useEffect(() => {
@@ -89,7 +248,7 @@ export default function AdminDashboard() {
           newActivity.push({ id: Date.now() + o.id, orderId: o.id, status: o.orderStatus, amount: o.totalAmount, time: new Date() });
           toast({
             title: o.orderStatus === 'delivered' ? `✅ Order #${o.id} Delivered` : `❌ Order #${o.id} Cancelled`,
-            description: `$${parseFloat(o.totalAmount || 0).toFixed(2)} order has been ${o.orderStatus}.`,
+            description: `₦${parseFloat(o.totalAmount || 0).toLocaleString()} order has been ${o.orderStatus}.`,
           });
         }
       }
@@ -108,19 +267,78 @@ export default function AdminDashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/notifications'] }),
   });
 
-  const updateVendorStatusMutation = useMutation({
-    mutationFn: async ({ vendorId, status }: { vendorId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/vendors/${vendorId}/status`, { status });
+  const moderateReviewMutation = useMutation({
+    mutationFn: async ({ reviewId, decision }: { reviewId: number; decision: 'approved' | 'rejected' }) => {
+      await apiRequest('PATCH', `/api/admin/reviews/${reviewId}/moderation`, { decision });
     },
-    onSuccess: () => {
+    onSuccess: (_result, { decision }) => {
+      toast({
+        title: decision === 'approved' ? 'Review approved' : 'Review rejected',
+        description: 'The moderation decision has been recorded.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/reviews?status=pending&limit=50'] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
+      toast({
+        title: 'Review moderation failed',
+        description: error.message || 'The review decision could not be saved. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateVendorStatusMutation = useMutation({
+    mutationFn: async ({ vendorId, status, reason }: { vendorId: number; status: string; reason?: string }) => {
+      if (!window.confirm(`Confirm changing this vendor's status to ${status}?`)) throw new Error('No change was made.');
+      const decisionReason = reason?.trim() || (['rejected', 'suspended'].includes(status)
+        ? window.prompt('Enter the reason. This will be emailed to the vendor.')?.trim() : '');
+      if (['rejected', 'suspended'].includes(status) && !decisionReason) throw new Error('Enter a reason before rejecting or suspending a vendor.');
+      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/status`, { status, reason: decisionReason });
+      return response.json();
+    },
+    onSuccess: (result) => {
       toast({ title: 'Done', description: 'Vendor status updated.' });
+      if (result?.vendor) {
+        queryClient.setQueryData<Vendor[]>(['/api/vendors'], (current = []) =>
+          current.map((vendor) => vendor.id === result.vendor.id ? { ...vendor, ...result.vendor } : vendor)
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) { window.location.href = '/login'; return; }
-      toast({ title: 'Error', description: 'Failed to update vendor.', variant: 'destructive' });
+      toast({ title: 'Could not update vendor', description: getApiErrorMessage(error, 'Failed to update vendor.'), variant: 'destructive' });
     },
+  });
+
+  const verifyVendorMutation = useMutation({
+    mutationFn: async ({ vendorId, decision }: { vendorId: number; decision: 'verified' | 'rejected' }) => {
+      const response = await apiRequest('PATCH', `/api/admin/vendors/${vendorId}/verification`, {
+        ...(decision === 'verified' ? {
+          ...verificationChecks,
+          cacRegisteredName,
+          cacRegistryStatus,
+          relationshipConfirmed,
+          relationshipEvidence,
+        } : {}),
+        notes: verificationNotes,
+        decision,
+      });
+      return response.json();
+    },
+    onSuccess: (updated) => {
+      setReviewVendor((current: any) => current?.id === updated.id ? { ...current, ...updated } : current);
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/vendors'] });
+      toast({ title: updated.verificationStatus === 'verified' ? 'Verification recorded' : 'Verification rejected',
+        description: updated.verificationStatus === 'verified' ? 'You can now approve this vendor.' : 'The vendor cannot be approved until a new review passes.' });
+    },
+    onError: (error: Error) => toast({ title: 'Verification not recorded', description: getApiErrorMessage(error, 'The verification could not be recorded.'), variant: 'destructive' }),
   });
 
   const toggleFeaturedMutation = useMutation({
@@ -136,18 +354,68 @@ export default function AdminDashboard() {
 
   const updateProductStatusMutation = useMutation({
     mutationFn: async ({ productId, status }: { productId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/products/${productId}/status`, { status });
+      await apiRequest('PATCH', `/api/admin/products/${productId}/status`, { status });
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
+      setSelectedPendingProductIds((selected) => selected.filter((id) => id !== variables.productId));
       toast({ title: 'Product status updated.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/products/pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] }),
+      ]);
+      if (variables.status === 'approved') {
+        const refreshed = await refetchPendingProducts();
+        if (pendingProductsOffset > 0 && refreshed.data?.products.length === 0) {
+          changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE);
+        }
+      }
+    },
+    onError: (error: Error, variables) => {
+      const isApprovalConflict = variables.status === 'approved' && error.message.startsWith('409');
+      toast({
+        title: isApprovalConflict ? 'Product approval blocked' : 'Product status update failed',
+        description: getApiErrorMessage(error, 'The product status could not be updated. Please try again.'),
+        variant: 'destructive',
+      });
     },
   });
 
+  const bulkApproveProductsMutation = useMutation({
+    mutationFn: async (productIds: number[]) => {
+      const response = await apiRequest('POST', '/api/admin/products/bulk-approve', { productIds });
+      return response.json() as Promise<{ approved: number[]; skipped: Array<{ id: number; reason: string }> }>;
+    },
+    onSuccess: async (result) => {
+      setSelectedPendingProductIds((selected) => selected.filter((id) => !result.approved.includes(id)));
+      setBulkApproveSkipped(result.skipped);
+      setBulkApproveConfirmationOpen(false);
+      toast({
+        title: 'Bulk approval complete',
+        description: `${result.approved.length} approved${result.skipped.length ? `, ${result.skipped.length} skipped` : ''}.`,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/products/pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] }),
+      ]);
+      const refreshed = await refetchPendingProducts();
+      if (pendingProductsOffset > 0 && refreshed.data?.products.length === 0) {
+        changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE);
+      }
+    },
+    onError: (error: Error) => toast({
+      title: 'Bulk approval failed',
+      description: error.message,
+      variant: 'destructive',
+    }),
+  });
+
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      await apiRequest('PATCH', `/api/admin/orders/${orderId}/status`, { status });
+    mutationFn: async ({ orderId, status, trackingNumber }: { orderId: number; status: string; trackingNumber?: string }) => {
+      await apiRequest('PATCH', `/api/admin/orders/${orderId}/status`, { status, trackingNumber });
     },
     onSuccess: () => {
       toast({ title: 'Order updated', description: 'Fulfillment status saved.' });
@@ -156,9 +424,84 @@ export default function AdminDashboard() {
     },
   });
 
+  const reviewShippingQuoteMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: 'quoted' | 'rejected' }) => {
+      const draft = quoteDrafts[id] || { quotedAmount: '', estimatedDelivery: '', validDays: '7', adminNotes: '' };
+      const payload = status === 'quoted'
+        ? {
+            status,
+            quotedAmount: Number(draft.quotedAmount),
+            estimatedDelivery: draft.estimatedDelivery,
+            validDays: Number(draft.validDays || 7),
+            adminNotes: draft.adminNotes,
+          }
+        : { status, adminNotes: draft.adminNotes };
+      const response = await apiRequest('PATCH', `/api/admin/shipping-quote-requests/${id}`, payload);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Shipping quote updated', description: 'The buyer has been notified.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/shipping-quote-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not update quote',
+        description: error?.message || 'Check the quote details and try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const initCategoriesMutation = useMutation({
     mutationFn: async () => { const res = await apiRequest('POST', '/api/categories/init'); return res.json(); },
     onSuccess: (data: any) => { queryClient.invalidateQueries({ queryKey: ['/api/categories'] }); toast({ title: data?.message ?? 'Categories initialised.' }); },
+  });
+
+  const createRepProductMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      Object.entries(repProduct).forEach(([key, value]) => formData.append(key, value));
+      repProductImages.forEach(file => formData.append('images', file));
+      const response = await apiRequest('POST', `/api/admin/vendors/${repProduct.vendorId}/products`, formData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Vendor product draft created', description: 'The vendor has been notified and can now review and edit it.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/with-details'] });
+      setRepProductOpen(false);
+      setRepProduct({ vendorId: '', categoryId: '', name: '', description: '', price: '', stock: '1' });
+      setRepProductImages([]);
+    },
+    onError: (error: any) => toast({
+      title: 'Could not create product draft',
+      description: error?.message || 'Review the product details and try again.',
+      variant: 'destructive',
+    }),
+  });
+
+  const generateRepListingMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await apiRequest('POST', '/api/products/ai-suggest-listing', formData);
+      return response.json();
+    },
+    onSuccess: (suggestion) => {
+      setRepProduct(current => ({
+        ...current,
+        name: suggestion.title,
+        description: suggestion.description,
+        categoryId: String(suggestion.categoryId),
+      }));
+      trackEvent('ai_listing_generated', { source: 'rep', category_id: suggestion.categoryId });
+      toast({ title: 'Listing copy generated', description: 'Review the suggested wording and enter the vendor’s confirmed price.' });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not generate listing',
+      description: error?.message || 'Try a clearer product photo.',
+      variant: 'destructive',
+    }),
   });
 
   const toggleUserRoleMutation = useMutation({
@@ -167,16 +510,140 @@ export default function AdminDashboard() {
       else await apiRequest('POST', `/api/admin/users/${userId}/roles/${role}`);
     },
     onSuccess: () => { toast({ title: 'Role updated.' }); queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] }); },
+    onError: (error: any) => toast({
+      title: 'Could not change role',
+      description: error?.message || 'The role was not changed.',
+      variant: 'destructive',
+    }),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message = body?.message || `Account deletion failed (${response.status}).`;
+        throw new Error(body?.blocker ? `${message} Database reference: ${body.blocker}` : message);
+      }
+    },
+    onSuccess: () => {
+      toast({ title: 'Account deleted', description: 'The unused account was permanently removed.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not delete user',
+        description: error?.message || 'The user could not be deleted.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const closeUserMutation = useMutation({
+    mutationFn: async ({ userId, confirmation }: { userId: string; confirmation: string }) => {
+      const response = await apiRequest('POST', `/api/admin/users/${encodeURIComponent(userId)}/close`, { confirmation });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Account closed', description: 'Access is blocked. Orders, payouts, and other business records remain.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+    },
+    onError: (error: any) => toast({
+      title: 'Could not close account',
+      description: error?.message || 'No changes were saved.',
+      variant: 'destructive',
+    }),
+  });
+
+  const previewTestDeletion = async (userId: string) => {
+    setTestPreviewPending(userId);
+    try {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/test-data-deletion-preview`, {
+        credentials: 'include',
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message || 'Could not verify the test data.');
+      setTestDeletion({ userId, preview: body as TestDeletionPreview });
+      setTestDeletionEmail('');
+    } catch (error: any) {
+      toast({ title: 'Test data cannot be deleted', description: error?.message, variant: 'destructive' });
+    } finally {
+      setTestPreviewPending(null);
+    }
+  };
+
+  const deleteTestDataMutation = useMutation({
+    mutationFn: async ({ userId, preview, confirmationEmail }: {
+      userId: string; preview: TestDeletionPreview; confirmationEmail: string;
+    }) => {
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/test-data`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationEmail, fingerprint: preview.fingerprint }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message || 'Test-data deletion failed.');
+      return body;
+    },
+    onSuccess: () => {
+      setTestDeletion(null);
+      setTestDeletionEmail('');
+      toast({ title: 'Test account deleted', description: 'The account and its verified test data were permanently removed.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Nothing was deleted', description: error?.message || 'Review the account again.', variant: 'destructive' });
+    },
+  });
+
+  const updateInquiryStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await apiRequest('PATCH', `/api/discover/inquiries/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      toast({ title: 'Inquiry updated.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/discover/inquiries'] });
+    },
+    onError: () => toast({ title: 'Failed to update inquiry.', variant: 'destructive' }),
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────
-  const pendingProducts = allProducts.filter(p => p.status === 'pending');
   const approvedProducts = allProducts.filter(p => p.status === 'approved');
   const featuredProducts = approvedProducts.filter(p => p.featured);
-  const pendingVendors = (vendors as any[]).filter(v => v.status === 'pending');
+  const liveVendors = (vendors as any[]).filter(v => !['Adunni Fashion', 'Test Vendor Co'].includes(v.businessName));
+  const pendingVendors = liveVendors.filter(v => v.status === 'pending');
+  const actualOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => !order.isHistoricalLegacy);
+  const historicalOrders = (Array.isArray(adminOrders) ? adminOrders as any[] : []).filter(order => order.isHistoricalLegacy);
+  const selectedPendingSet = new Set(selectedPendingProductIds);
+  const selectVisiblePendingProducts = () => {
+    setSelectedPendingProductIds(pendingProducts.filter((product) => product.status === 'pending').slice(0, PENDING_PRODUCTS_PAGE_SIZE).map((product) => product.id));
+    setBulkApproveSkipped([]);
+  };
+  const togglePendingProductSelection = (productId: number, checked: boolean) => {
+    setSelectedPendingProductIds((selected) => {
+      if (checked) return selected.length >= PENDING_PRODUCTS_PAGE_SIZE || selected.includes(productId) ? selected : [...selected, productId];
+      return selected.filter((id) => id !== productId);
+    });
+    setBulkApproveSkipped([]);
+  };
 
   const filteredOrders = useMemo(() => {
-    let list = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    let list = (Array.isArray(adminOrders) ? adminOrders as any[] : [])
+      .filter((order: any) => showHistoricalOrders || !order.isHistoricalLegacy);
     if (orderStatusFilter !== 'all') list = list.filter((o: any) => o.orderStatus === orderStatusFilter);
     if (orderSearch.trim()) {
       const q = orderSearch.toLowerCase();
@@ -187,14 +654,16 @@ export default function AdminDashboard() {
       );
     }
     return list;
-  }, [adminOrders, orderStatusFilter, orderSearch]);
+  }, [adminOrders, orderStatusFilter, orderSearch, showHistoricalOrders]);
 
   const orderRevenueSummary = useMemo(() => {
-    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const orders = actualOrders;
     const total = orders.reduce((s: number, o: any) => s + parseFloat(o.totalAmount || '0'), 0);
-    const paid = orders.filter((o: any) => o.paymentStatus === 'paid' || o.paymentStatus === 'completed');
+    const paid = orders.filter((o: any) =>
+      (o.paymentStatus === 'paid' || o.paymentStatus === 'completed') && o.paymentReference
+    );
     return { total, paid: paid.length, pending: orders.filter((o: any) => o.orderStatus === 'pending').length };
-  }, [adminOrders]);
+  }, [actualOrders]);
 
   // Recommended products to feature (not featured, approved, best stock/rating)
   const recommendedToFeature = useMemo(() => {
@@ -211,8 +680,8 @@ export default function AdminDashboard() {
   const lowStockProducts = useMemo(() =>
     approvedProducts.filter(p => p.stock <= 5).slice(0, 10), [approvedProducts]);
 
-  const formatPrice = (p: string | number) => `$${parseFloat(String(p)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  const fmtCurrency = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+  const formatPrice = (p: string | number) => `₦${parseFloat(String(p)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmtCurrency = (n: number) => `₦${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -222,12 +691,14 @@ export default function AdminDashboard() {
   };
 
   const exportOrdersCSV = () => {
-    const orders = Array.isArray(adminOrders) ? adminOrders as any[] : [];
+    const orders = showHistoricalOrders
+      ? (Array.isArray(adminOrders) ? adminOrders as any[] : [])
+      : actualOrders;
     const rows = [
       ['Order ID', 'Customer', 'Email', 'Total', 'Payment', 'Status', 'Date'],
       ...orders.map((o: any) => [
         o.id, `${o.customer?.firstName || ''} ${o.customer?.lastName || ''}`.trim(),
-        o.customer?.email || '', `$${parseFloat(o.totalAmount || 0).toFixed(2)}`,
+        o.customer?.email || '', `NGN ${parseFloat(o.totalAmount || 0).toFixed(2)}`,
         o.paymentStatus, o.orderStatus, new Date(o.createdAt).toLocaleDateString('en-GB'),
       ]),
     ];
@@ -239,7 +710,7 @@ export default function AdminDashboard() {
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner-nigerian"></div></div>;
-  if (!isAuthenticated || !isAdmin(user)) return null;
+  if (!isAuthenticated || !hasSupportManagementAccess(user)) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -250,19 +721,19 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-red-600 font-nigerian">🛡️ Admin Dashboard</h1>
-            <p className="text-gray-600 text-sm">AfrolandX Platform Control Centre</p>
+            <h1 className="text-3xl font-bold text-red-600 font-nigerian">{fullManagement ? 'Superadmin Dashboard' : 'Admin Dashboard'}</h1>
+            <p className="text-gray-600 text-sm">{fullManagement ? 'AfrolandX Platform Control Centre' : 'Customer accounts, vendor approvals, orders, shipping operations, and support.'}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="destructive">Admin Access</Badge>
             {lowStockProducts.length > 0 && (
               <Badge variant="outline" className="border-orange-400 text-orange-600 gap-1">
                 <AlertTriangle className="w-3 h-3" />{lowStockProducts.length} Low Stock
               </Badge>
             )}
-            <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
-              {initCategoriesMutation.isPending ? 'Initialising…' : 'Init Categories'}
-            </Button>
+            {fullManagement && <Button variant="outline" size="sm" onClick={() => initCategoriesMutation.mutate()} disabled={initCategoriesMutation.isPending}>
+              {initCategoriesMutation.isPending ? 'Initialising…' : 'Initialise categories'}
+            </Button>}
           </div>
         </div>
 
@@ -300,11 +771,16 @@ export default function AdminDashboard() {
         )}
 
         {/* KPI Cards */}
+        {fullManagement && <><div className="mb-5 flex justify-end">
+          <Button variant="outline" onClick={() => { window.location.href = '/shipping'; }}>
+            <Truck className="w-4 h-4 mr-2" /> Manual shipping operations
+          </Button>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} paid orders` : '' },
-            { label: 'Total Orders', value: Array.isArray(adminOrders) ? String((adminOrders as any[]).length) : '0', icon: ShoppingBag, color: 'bg-blue-500', sub: `${orderRevenueSummary.pending} pending` },
-            { label: 'Active Vendors', value: String((vendors as any[]).filter((v: any) => v.status === 'approved').length), icon: Users, color: 'bg-purple-500', sub: `${pendingVendors.length} pending approval` },
+             { label: 'Actual Sales Revenue', value: analytics ? fmtCurrency(analytics.totalRevenue) : '—', icon: DollarSign, color: 'bg-green-500', sub: analytics ? `${analytics.paidOrders} verified paid orders` : '' },
+             { label: 'Actual Orders', value: String(actualOrders.length), icon: ShoppingBag, color: 'bg-blue-500', sub: `${historicalOrders.length} preserved historical records` },
+             { label: 'Active Vendors', value: String(liveVendors.filter((v: any) => v.status === 'approved' && v.verificationStatus === 'verified').length), icon: Users, color: 'bg-purple-500', sub: `${pendingVendors.length} pending approval` },
             { label: 'Fulfilment Rate', value: analytics ? `${analytics.fulfillmentRate}%` : '—', icon: TrendingUp, color: 'bg-orange-500', sub: `${analytics?.totalApprovedProducts || approvedProducts.length} live products` },
           ].map(({ label, value, icon: Icon, color, sub }) => (
             <Card key={label}>
@@ -323,22 +799,116 @@ export default function AdminDashboard() {
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>
+        </>}
+        <Tabs key={fullManagement ? 'full' : 'support'} defaultValue={
+          new URLSearchParams(window.location.search).get('tab') === 'products'
+            ? 'products'
+            : fullManagement ? 'analytics' : 'vendors'
+        } className="space-y-6">
+          <TabsList className="flex w-full flex-wrap h-auto justify-start gap-1">
+            {fullManagement && <TabsTrigger value="analytics" className="gap-1"><BarChart3 className="w-3 h-3" />Analytics</TabsTrigger>}
+            <TabsTrigger value="reviews">Reviews {reviews.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{reviews.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="products">Product Approvals {pendingProducts.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingProducts.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="shipping-quotes">Shipping Quotes {shippingQuoteRequests.filter(q => q.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{shippingQuoteRequests.filter(q => q.status === 'pending').length}</Badge>}</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="featured">Featured Products</TabsTrigger>
+            {fullManagement && <TabsTrigger value="featured">Featured Products</TabsTrigger>}
             <TabsTrigger value="vendors">Vendors {pendingVendors.length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{pendingVendors.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="overview">System Overview</TabsTrigger>
+            <TabsTrigger value="users">{fullManagement ? 'Users' : 'Customers and vendors'}</TabsTrigger>
+            {fullManagement && <TabsTrigger value="event-planners">Event Planners</TabsTrigger>}
+            {fullManagement && <TabsTrigger value="discover">Discover {discoverInquiries.filter((i: any) => i.status === 'pending').length > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{discoverInquiries.filter((i: any) => i.status === 'pending').length}</Badge>}</TabsTrigger>}
+            {fullManagement && <TabsTrigger value="overview">System Overview</TabsTrigger>}
           </TabsList>
+
+          {/* ═══ REVIEW MODERATION TAB ═══════════════════════════════════════ */}
+          <TabsContent value="reviews">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="flex items-center gap-2"><Star className="w-5 h-5" />Pending Reviews</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{reviews.length} pending</Badge>
+                    <Button variant="outline" size="sm" onClick={() => refetchReviews()} disabled={reviewsFetching}>
+                      <RefreshCw className={`w-3 h-3 mr-1 ${reviewsFetching ? 'animate-spin' : ''}`} />Refresh
+                    </Button>
+                  </div>
+                </CardTitle>
+                <CardDescription>Review customer feedback before it is published.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-12"><div className="spinner-nigerian"></div></div>
+                ) : reviewsError ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+                    <p className="font-medium">Pending reviews could not be loaded.</p>
+                    <p className="mt-1">{reviewsError instanceof Error ? reviewsError.message : 'Please try again.'}</p>
+                    <Button className="mt-3" size="sm" variant="outline" onClick={() => refetchReviews()}>Try again</Button>
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Star className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                    <p className="font-medium text-gray-700">No pending reviews.</p>
+                    <p className="text-sm text-gray-500">Reviews awaiting moderation will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map(review => (
+                      <article key={review.id} className="rounded-lg border p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold">{review.product.name}</h3>
+                              <Badge variant="outline">{review.reviewer}</Badge>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-600">Sold by {review.vendor.name}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                              <span className="inline-flex items-center gap-1 font-medium text-amber-700" aria-label={`${review.rating} out of 5 stars`}>
+                                <Star className="h-4 w-4 fill-current" />{review.rating} / 5
+                              </span>
+                              <span className="text-gray-400" aria-hidden="true">·</span>
+                              <time className="text-gray-500" dateTime={review.createdAt}>
+                                {new Date(review.createdAt).toLocaleString()}
+                              </time>
+                            </div>
+                            <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-700">
+                              {review.comment || 'No written comment provided.'}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 text-white hover:bg-green-700"
+                              disabled={moderateReviewMutation.isPending}
+                              onClick={() => moderateReviewMutation.mutate({ reviewId: review.id, decision: 'approved' })}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={moderateReviewMutation.isPending}
+                              onClick={() => {
+                                if (window.confirm('Reject this review? This moderation decision will be recorded.')) {
+                                  moderateReviewMutation.mutate({ reviewId: review.id, decision: 'rejected' });
+                                }
+                              }}
+                            >
+                              <XCircle className="mr-1 h-3 w-3" />Reject
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* ═══ ANALYTICS TAB ═══════════════════════════════════════════════ */}
           <TabsContent value="analytics">
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Real-Time Platform Analytics</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold">Live Platform Analytics</h2>
                 <Button variant="outline" size="sm" onClick={() => setAnalyticsRefresh(r => r + 1)} disabled={analyticsLoading}>
                   <RefreshCw className={`w-3 h-3 mr-1 ${analyticsLoading ? 'animate-spin' : ''}`} />Refresh
                 </Button>
@@ -350,7 +920,7 @@ export default function AdminDashboard() {
                 <>
                   {/* Revenue Trend */}
                   <Card>
-                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Revenue Trend — Last 30 Days</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-600" />Actual Sales Revenue — Last 30 Days</CardTitle></CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={220}>
                         <AreaChart data={analytics.revenueTrend}>
@@ -362,8 +932,8 @@ export default function AdminDashboard() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={d => d.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `$${v}`} />
-                          <Tooltip formatter={(v: any) => [`$${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
+                          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₦${Number(v).toLocaleString()}`} />
+                          <Tooltip formatter={(v: any) => [`₦${Number(v).toLocaleString()}`, 'Revenue']} labelFormatter={l => `Date: ${l}`} />
                           <Area type="monotone" dataKey="revenue" stroke="#22c55e" fill="url(#revGrad)" strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -409,7 +979,7 @@ export default function AdminDashboard() {
                             </BarChart>
                           </ResponsiveContainer>
                         ) : (
-                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. Orders will populate this chart.</p>
+                          <p className="text-gray-400 text-sm text-center py-8">No geographic data yet. The chart will update as orders come in.</p>
                         )}
                       </CardContent>
                     </Card>
@@ -446,7 +1016,7 @@ export default function AdminDashboard() {
                     <Card>
                       <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-500" />Customer Insights</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                           {[
                             { label: 'Total Customers', value: analytics.totalCustomers, icon: '👤' },
                             { label: 'New This Month', value: analytics.newCustomersThisMonth, icon: '✨' },
@@ -489,50 +1059,166 @@ export default function AdminDashboard() {
 
           {/* ═══ PRODUCT APPROVALS TAB ══════════════════════════════════════ */}
           <TabsContent value="products">
+            <div className="mb-4 flex justify-end">
+              <Button onClick={() => setRepProductOpen(true)} className="bg-green-700 hover:bg-green-800">
+                <Plus className="mr-2 h-4 w-4" /> Create Product for Vendor
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Product Approval Queue</span>
-                  <Badge variant="secondary">{pendingProducts.length} pending</Badge>
+                  <Badge variant="secondary">
+                    {pendingProductsResponse
+                      ? `${pendingProductsTotal} pending`
+                      : pendingProductsLoading ? 'Loading…' : pendingProductsError ? 'Unavailable' : '0 pending'}
+                  </Badge>
                 </CardTitle>
-                <CardDescription>Review each product against quality standards before approving for the storefront.</CardDescription>
+                <CardDescription>Review each product against quality standards before approving it for the storefront.</CardDescription>
               </CardHeader>
               <CardContent>
-                {pendingProducts.length === 0 ? (
+                <div className="mb-3 flex flex-col gap-3 rounded-lg border bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-gray-600" aria-live="polite">
+                    {selectedPendingProductIds.length} selected
+                    {selectedPendingProductIds.length >= PENDING_PRODUCTS_PAGE_SIZE && <span className="ml-1"> (maximum {PENDING_PRODUCTS_PAGE_SIZE} per approval)</span>}
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={selectVisiblePendingProducts}
+                      disabled={pendingProductsFetching || pendingProducts.length === 0}
+                    >
+                      Select this page’s products (up to 50)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setSelectedPendingProductIds([]); setBulkApproveSkipped([]); }}
+                      disabled={selectedPendingProductIds.length === 0}
+                    >
+                      Clear selection
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-green-700 hover:bg-green-800"
+                      onClick={() => setBulkApproveConfirmationOpen(true)}
+                      disabled={selectedPendingProductIds.length === 0 || bulkApproveProductsMutation.isPending}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />Approve selected ({selectedPendingProductIds.length})
+                    </Button>
+                  </div>
+                </div>
+                <div className="mb-4 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-gray-600" aria-live="polite">
+                    {pendingProductsFetching && !pendingProductsResponse
+                      ? 'Loading pending products…'
+                      : pendingProductsTotal === 0
+                        ? `Showing 0 of ${pendingProductsTotal} pending products`
+                        : pendingProducts.length === 0
+                          ? `Showing 0 on this page of ${pendingProductsTotal} pending products`
+                          : `Showing ${pendingProductsOffset + 1}–${Math.min(pendingProductsOffset + pendingProducts.length, pendingProductsTotal)} of ${pendingProductsTotal} pending products`}
+                    {pendingProductsResponse && (
+                      <span className="ml-2 text-gray-500">Page {totalPendingPages === 0 ? 0 : currentPendingPage} of {totalPendingPages}</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => changePendingProductsPage(pendingProductsOffset - PENDING_PRODUCTS_PAGE_SIZE)}
+                      disabled={pendingProductsOffset === 0 || pendingProductsFetching}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => changePendingProductsPage(pendingProductsOffset + PENDING_PRODUCTS_PAGE_SIZE)}
+                      disabled={!pendingProductsHasMore || pendingProductsFetching}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+                {bulkApproveSkipped.length > 0 && (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3" role="status">
+                    <h3 className="mb-2 text-sm font-semibold text-amber-900">Products skipped during bulk approval</h3>
+                    <ul className="space-y-1 text-sm text-amber-900">
+                      {bulkApproveSkipped.map(({ id, reason }) => <li key={id}>Product #{id}: {reason}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {pendingProductsLoading ? (
+                  <div className="py-12 text-center text-sm text-gray-500">Loading pending products…</div>
+                ) : pendingProductsError ? (
+                  <div className="py-10 text-center">
+                    <p className="mb-3 text-sm text-red-600">Pending products could not be loaded. {pendingProductsError instanceof Error ? pendingProductsError.message : ''}</p>
+                    <Button variant="outline" onClick={() => refetchPendingProducts()}>Retry</Button>
+                  </div>
+                ) : pendingProducts.length === 0 ? (
                   <div className="text-center py-12">
-                    <CheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
-                    <h3 className="font-semibold text-gray-700">All caught up!</h3>
-                    <p className="text-gray-500 text-sm">No products awaiting approval.</p>
+                    {pendingProductsTotal === 0 ? (
+                      <>
+                        <CheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
+                        <h3 className="font-semibold text-gray-700">All caught up!</h3>
+                        <p className="text-gray-500 text-sm">No products awaiting approval.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-semibold text-gray-700">No products on this page</h3>
+                        <p className="text-gray-500 text-sm">There are {pendingProductsTotal} pending products in the queue. Use Previous to view the preceding page.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingProducts.map((product) => (
+                    {pendingProducts.map((product) => {
+                      const productImages = product.images?.length ? product.images : product.imageUrl ? [product.imageUrl] : [];
+                      const categoryName = categories.find((category) => category.id === product.categoryId)?.name;
+                      const isSelected = selectedPendingSet.has(product.id);
+                      return (
                       <div key={product.id} className="border border-gray-200 rounded-lg overflow-hidden">
                         <div className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                              <div className="w-20 h-20 flex-shrink-0">
-                                {product.images?.[0] ? (
-                                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover rounded" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                              <Checkbox
+                                checked={isSelected}
+                                disabled={product.status !== 'pending' || (!isSelected && selectedPendingProductIds.length >= PENDING_PRODUCTS_PAGE_SIZE)}
+                                aria-label={`Select ${product.name} for bulk approval`}
+                                onCheckedChange={(checked) => togglePendingProductSelection(product.id, checked === true)}
+                                className="mt-1"
+                              />
+                              <div className="h-20 w-20 flex-shrink-0">
+                                {productImages[0] ? (
+                                  <img src={productImages[0]} alt={product.name} className="h-full w-full rounded object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   <div className="w-full h-full bg-gradient-to-br from-nigerian-green to-nigerian-gold rounded flex items-center justify-center">
                                     <Package className="w-6 h-6 text-white" />
                                   </div>
                                 )}
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <h3 className="font-semibold mb-1">{product.name}</h3>
-                                <p className="text-gray-500 text-sm line-clamp-2 mb-2">{product.description}</p>
+                                <p className="text-gray-500 text-sm line-clamp-2 mb-2">{product.shortDescription || product.description}</p>
                                 <div className="flex flex-wrap gap-2 text-xs">
                                   <span className="text-green-700 font-semibold">{formatPrice(product.price)}</span>
                                   <span className="text-gray-500">Stock: {product.stock}</span>
                                   <span className="text-gray-500">by <strong>{product.vendor.businessName}</strong></span>
-                                  <Badge variant="outline" className="text-xs">{product.category.name}</Badge>
+                                  {categoryName && <Badge variant="outline" className="text-xs">{categoryName}</Badge>}
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <Button size="sm" variant="outline" onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
+                            <div className="flex flex-wrap gap-2 sm:shrink-0">
+                              <Link href={`/admin/products/${product.id}`} className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <Eye className="mr-1 h-3 w-3" />View product
+                              </Link>
+                              <Button size="sm" variant="outline" aria-label={expandedProductId === product.id ? 'Hide product details' : 'Review product details'} onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}>
                                 <Eye className="w-3 h-3 mr-1" />{expandedProductId === product.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                               </Button>
                               <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateProductStatusMutation.isPending} onClick={() => updateProductStatusMutation.mutate({ productId: product.id, status: 'approved' })}>
@@ -547,11 +1233,11 @@ export default function AdminDashboard() {
 
                         {expandedProductId === product.id && (
                           <div className="border-t bg-gray-50 p-4 space-y-4">
-                            {product.images && product.images.length > 0 && (
+                            {productImages.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold text-gray-600 mb-2">All Images ({product.images.length})</p>
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Product Images ({productImages.length})</p>
                                 <div className="flex gap-2 overflow-x-auto pb-1">
-                                  {product.images.map((img, i) => (
+                                  {productImages.map((img, i) => (
                                     <img key={i} src={img} alt={`img ${i+1}`} className="w-28 h-28 object-cover rounded-lg flex-shrink-0 border" onError={(e) => { e.currentTarget.style.display='none'; }} />
                                   ))}
                                 </div>
@@ -565,12 +1251,13 @@ export default function AdminDashboard() {
                               <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1"><ShieldCheck className="w-3 h-3" />Quality Standards</p>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {[
-                                  { label: 'Has product images', pass: product.images && product.images.length > 0 },
-                                  { label: 'Description (20+ chars)', pass: product.description?.length > 20 },
-                                  { label: 'Price set (> $0)', pass: parseFloat(product.price) > 0 },
-                                  { label: 'In stock (> 0)', pass: product.stock > 0 },
-                                  { label: 'Category assigned', pass: !!product.category?.name },
+                                  { label: 'Has product images', pass: productImages.length > 0 },
+                                  { label: 'Description entered', pass: !!product.description?.trim() },
+                                  { label: 'Price set (> ₦0)', pass: parseFloat(product.price) > 0 },
+                                  { label: 'Stock valid (0 or more)', pass: Number.isInteger(product.stock) && product.stock >= 0 },
+                                  { label: 'Category assigned', pass: !!product.categoryId && !!categoryName },
                                   { label: 'Vendor approved', pass: product.vendor?.status === 'approved' },
+                                  { label: 'Vendor verified', pass: product.vendor?.verificationStatus === 'verified' },
                                 ].map(({ label, pass }) => (
                                   <div key={label} className={`flex items-center gap-1.5 p-2 rounded text-xs ${pass ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                     {pass ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}{label}
@@ -591,7 +1278,209 @@ export default function AdminDashboard() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Dialog open={bulkApproveConfirmationOpen} onOpenChange={setBulkApproveConfirmationOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirm bulk product approval</DialogTitle>
+                  <DialogDescription>
+                    Approve {selectedPendingProductIds.length} selected product{selectedPendingProductIds.length === 1 ? '' : 's'}? Review each selected listing before continuing. Products that are no longer eligible will be skipped and reported by ID.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setBulkApproveConfirmationOpen(false)} disabled={bulkApproveProductsMutation.isPending}>Cancel</Button>
+                  <Button
+                    type="button"
+                    className="bg-green-700 hover:bg-green-800"
+                    disabled={bulkApproveProductsMutation.isPending || selectedPendingProductIds.length === 0 || selectedPendingProductIds.length > PENDING_PRODUCTS_PAGE_SIZE}
+                    onClick={() => bulkApproveProductsMutation.mutate(selectedPendingProductIds)}
+                  >
+                    {bulkApproveProductsMutation.isPending ? 'Approving…' : `Confirm approval (${selectedPendingProductIds.length})`}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={repProductOpen} onOpenChange={setRepProductOpen}>
+              <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>Create a product draft for a vendor</DialogTitle>
+                  <DialogDescription>
+                    Photos are automatically corrected and optimised. The vendor will be notified to review and edit the draft before submitting it.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-2">
+                  <Select value={repProduct.vendorId} onValueChange={vendorId => setRepProduct(current => ({ ...current, vendorId }))}>
+                    <SelectTrigger><SelectValue placeholder="Select an approved vendor" /></SelectTrigger>
+                    <SelectContent>
+                      {vendors.filter(vendor => vendor.status === 'approved').map(vendor => (
+                        <SelectItem key={vendor.id} value={String(vendor.id)}>{vendor.businessName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input placeholder="Product title" value={repProduct.name} onChange={event => setRepProduct(current => ({ ...current, name: event.target.value }))} />
+                  <textarea className="min-h-28 rounded-md border px-3 py-2 text-sm" placeholder="Product description" value={repProduct.description} onChange={event => setRepProduct(current => ({ ...current, description: event.target.value }))} />
+                  <Select value={repProduct.categoryId} onValueChange={categoryId => setRepProduct(current => ({ ...current, categoryId }))}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>{categories.map(category => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input type="number" min="0.01" step="0.01" placeholder="Price (NGN)" value={repProduct.price} onChange={event => setRepProduct(current => ({ ...current, price: event.target.value }))} />
+                    <Input type="number" min="0" step="1" placeholder="Stock" value={repProduct.stock} onChange={event => setRepProduct(current => ({ ...current, stock: event.target.value }))} />
+                  </div>
+                  <Input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event => setRepProductImages(Array.from(event.target.files || []).slice(0, 5))} />
+                  {repProductImages.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={generateRepListingMutation.isPending}
+                      onClick={() => generateRepListingMutation.mutate(repProductImages[0])}
+                    >
+                      <Zap className="mr-2 h-4 w-4" />
+                      {generateRepListingMutation.isPending ? 'Analysing photo…' : 'Generate title & description with AI'}
+                    </Button>
+                  )}
+                  <p className="text-xs text-gray-500">{repProductImages.length} of 5 photos selected. Originals are preserved during automatic processing.</p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRepProductOpen(false)}>Cancel</Button>
+                  <Button
+                    disabled={createRepProductMutation.isPending || !repProduct.vendorId || !repProduct.categoryId || !repProduct.name.trim() || repProduct.description.trim().length < 10 || !repProduct.price}
+                    onClick={() => createRepProductMutation.mutate()}
+                  >
+                    {createRepProductMutation.isPending ? 'Creating…' : 'Create Draft & Notify Vendor'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </TabsContent>
+
+          {/* ═══ SHIPPING QUOTES TAB ═════════════════════════════════════════ */}
+          <TabsContent value="shipping-quotes">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="flex items-center gap-2"><Truck className="w-5 h-5" />International Shipping Quotes</span>
+                  <Badge variant="secondary">{shippingQuoteRequests.filter(q => q.status === 'pending').length} pending</Badge>
+                </CardTitle>
+                <CardDescription>Confirm partner rates in Nigerian Naira. Buyers can pay only an unexpired quote linked to an unchanged cart and shipping address.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {shippingQuoteRequests.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Truck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                    <p className="font-medium text-gray-700">No shipping quote requests yet.</p>
+                    <p className="text-sm text-gray-500">Shipping quote requests from checkout will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {shippingQuoteRequests.map(request => {
+                      const address = request.shippingAddress;
+                      const draft = quoteDrafts[request.id] || {
+                        quotedAmount: '',
+                        estimatedDelivery: '',
+                        validDays: '7',
+                        adminNotes: '',
+                      };
+                      const setDraft = (updates: Partial<typeof draft>) =>
+                        setQuoteDrafts(current => ({
+                          ...current,
+                          [request.id]: { ...draft, ...updates },
+                        }));
+                      return (
+                        <div key={request.id} className="rounded-lg border p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold">{request.carrier}</h3>
+                                <Badge className={
+                                  request.status === 'quoted' ? 'bg-green-100 text-green-800'
+                                    : request.status === 'pending' ? 'bg-amber-100 text-amber-800'
+                                    : request.status === 'rejected' ? 'bg-red-100 text-red-800'
+                                    : 'bg-gray-100 text-gray-700'
+                                }>{request.status}</Badge>
+                                <span className="text-xs text-gray-400">Request #{request.id}</span>
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {request.customer?.firstName} {request.customer?.lastName}
+                                {request.customer?.email && <span className="text-gray-400"> · {request.customer.email}</span>}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {address.city}, {address.state}, {address.country} {address.postalCode}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0)}{' '}
+                                {request.cartSnapshot.reduce((sum, item) => sum + item.quantity, 0) === 1 ? 'item' : 'items'}
+                                {' · '}{Number(request.totalWeight || 0).toFixed(2)} kg recorded
+                                {' · '}Requested {new Date(request.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            {request.status === 'quoted' && (
+                              <div className="text-right">
+                                <p className="text-xl font-bold text-green-700">₦{Number(request.quotedAmount || 0).toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">{request.estimatedDelivery}</p>
+                                {request.expiresAt && <p className="text-xs text-gray-400">Expires {new Date(request.expiresAt).toLocaleString()}</p>}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-3 rounded-md bg-gray-50 p-3">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Cart snapshot</p>
+                            <div className="space-y-1">
+                              {request.cartSnapshot.map((item, index) => (
+                                <div key={`${item.productId}-${index}`} className="flex justify-between text-xs text-gray-600 gap-3">
+                                  <span>{item.name}{item.selectedSize ? ` (${item.selectedSize})` : ''} × {item.quantity}</span>
+                                  <span>₦{(Number(item.unitPrice) * item.quantity).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {request.status === 'pending' ? (
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Confirmed rate (₦)</label>
+                                <Input type="number" min="1" step="0.01" value={draft.quotedAmount} onChange={e => setDraft({ quotedAmount: e.target.value })} placeholder="25000" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Delivery estimate</label>
+                                <Input value={draft.estimatedDelivery} onChange={e => setDraft({ estimatedDelivery: e.target.value })} placeholder="5–7 business days" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Validity period (days)</label>
+                                <Input type="number" min="1" max="30" value={draft.validDays} onChange={e => setDraft({ validDays: e.target.value })} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600">Notes or rejection reason</label>
+                                <Input value={draft.adminNotes} onChange={e => setDraft({ adminNotes: e.target.value })} placeholder="Optional for quotes; required for rejections" />
+                              </div>
+                              <div className="md:col-span-4 flex flex-wrap justify-end gap-2">
+                                <Button
+                                  variant="destructive"
+                                  disabled={!draft.adminNotes.trim() || reviewShippingQuoteMutation.isPending}
+                                  onClick={() => reviewShippingQuoteMutation.mutate({ id: request.id, status: 'rejected' })}
+                                >
+                                  Reject request
+                                </Button>
+                                <Button
+                                  className="bg-green-600 hover:bg-green-700"
+                                  disabled={!draft.quotedAmount || !draft.estimatedDelivery.trim() || reviewShippingQuoteMutation.isPending}
+                                  onClick={() => reviewShippingQuoteMutation.mutate({ id: request.id, status: 'quoted' })}
+                                >
+                                  Confirm quote
+                                </Button>
+                              </div>
+                            </div>
+                          ) : request.adminNotes ? (
+                            <p className="mt-3 text-sm text-gray-600"><strong>Admin notes:</strong> {request.adminNotes}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -607,8 +1496,8 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-1.5">
                     <div className={`w-2 h-2 rounded-full ${ordersFetching ? 'bg-green-400 animate-pulse' : 'bg-green-500'}`} />
                     <span className="text-xs text-gray-500">
-                      Live tracking · auto-refreshes every 30s
-                      {ordersUpdatedAt ? ` · last: ${new Date(ordersUpdatedAt).toLocaleTimeString()}` : ''}
+                      Live order tracking · refreshes every 30 seconds
+                      {ordersUpdatedAt ? ` · Last updated: ${new Date(ordersUpdatedAt).toLocaleTimeString()}` : ''}
                     </span>
                   </div>
                 </div>
@@ -637,7 +1526,7 @@ export default function AdminDashboard() {
                             <span className="font-semibold capitalize">Order #{ev.orderId} {ev.status}</span>
                           </div>
                           <div className="flex items-center gap-3 text-gray-400">
-                            <span className="font-semibold text-gray-700">${parseFloat(ev.amount || '0').toFixed(2)}</span>
+                            <span className="font-semibold text-gray-700">₦{parseFloat(ev.amount || '0').toLocaleString()}</span>
                             <span>{ev.time.toLocaleTimeString()}</span>
                           </div>
                         </div>
@@ -648,12 +1537,12 @@ export default function AdminDashboard() {
               )}
 
               {/* Summary row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 {[
-                  { label: 'Total Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
-                  { label: 'Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
+                   { label: 'Actual Revenue', value: fmtCurrency(orderRevenueSummary.total), color: 'text-green-700', icon: DollarSign },
+                   { label: 'Actual Paid Orders', value: String(orderRevenueSummary.paid), color: 'text-blue-700', icon: CheckCircle },
                   { label: 'Pending', value: String(orderRevenueSummary.pending), color: 'text-orange-700', icon: AlertTriangle },
-                  { label: 'Total Orders', value: String(Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0), color: 'text-gray-700', icon: ShoppingBag },
+                   { label: 'Historical Records', value: String(historicalOrders.length), color: 'text-gray-700', icon: ShoppingBag },
                 ].map(({ label, value, color, icon: Icon }) => (
                   <Card key={label}><CardContent className="p-4 flex items-center gap-3">
                     <Icon className={`w-5 h-5 ${color}`} />
@@ -668,10 +1557,18 @@ export default function AdminDashboard() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between flex-wrap gap-3">
-                    <CardTitle>All Orders</CardTitle>
-                    <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
-                      <Download className="w-3 h-3" />Export CSV
-                    </Button>
+                    <div>
+                      <CardTitle>{showHistoricalOrders ? 'All Order Records' : 'Actual Orders'}</CardTitle>
+                      <p className="mt-1 text-xs text-gray-500">Legacy records are preserved for audit purposes but excluded from sales reporting.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant={showHistoricalOrders ? 'secondary' : 'outline'} size="sm" onClick={() => setShowHistoricalOrders(value => !value)}>
+                        {showHistoricalOrders ? 'Hide history' : `Show history (${historicalOrders.length})`}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={exportOrdersCSV} className="gap-1">
+                        <Download className="w-3 h-3" />Export CSV
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -684,8 +1581,8 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap gap-1">
                       {['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(s => {
                         const count = s === 'all'
-                          ? (Array.isArray(adminOrders) ? (adminOrders as any[]).length : 0)
-                          : (Array.isArray(adminOrders) ? (adminOrders as any[]).filter((o: any) => o.orderStatus === s).length : 0);
+                           ? (showHistoricalOrders ? actualOrders.length + historicalOrders.length : actualOrders.length)
+                           : (showHistoricalOrders ? [...actualOrders, ...historicalOrders] : actualOrders).filter((o: any) => o.orderStatus === s).length;
                         return (
                           <Button key={s} size="sm" variant={orderStatusFilter === s ? 'default' : 'outline'} className="capitalize h-8 px-2 text-xs gap-1" onClick={() => setOrderStatusFilter(s)}>
                             {s}
@@ -708,6 +1605,7 @@ export default function AdminDashboard() {
                                 <span className="font-semibold">Order #{order.id}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-700'}`}>{order.orderStatus}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${order.paymentStatus === 'paid' || order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.paymentStatus}</span>
+                                 {order.isHistoricalLegacy && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">historical · excluded from sales</span>}
                               </div>
                               <p className="text-sm text-gray-600">
                                 {order.customer?.firstName} {order.customer?.lastName} · <span className="text-gray-400">{order.customer?.email}</span>
@@ -718,11 +1616,19 @@ export default function AdminDashboard() {
                               </p>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-green-700 text-lg">${parseFloat(order.totalAmount || 0).toFixed(2)}</span>
+                              <span className="font-bold text-green-700 text-lg">₦{orderPaidTotal(order).toLocaleString()}</span>
                               <Select
                                 value={order.orderStatus}
-                                onValueChange={(status) => updateOrderStatusMutation.mutate({ orderId: order.id, status })}
-                                disabled={order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
+                                onValueChange={(status) => {
+                                  if (status === 'shipped') {
+                                    const trackingNumber = window.prompt('Enter the carrier tracking number');
+                                    if (!trackingNumber?.trim()) return;
+                                    updateOrderStatusMutation.mutate({ orderId: order.id, status, trackingNumber: trackingNumber.trim() });
+                                    return;
+                                  }
+                                  updateOrderStatusMutation.mutate({ orderId: order.id, status });
+                                }}
+                                disabled={order.isHistoricalLegacy || order.orderStatus === 'delivered' || order.orderStatus === 'cancelled'}
                               >
                                 <SelectTrigger className="w-38 h-8 text-xs">
                                   <Truck className="w-3 h-3 mr-1" /><SelectValue />
@@ -823,7 +1729,7 @@ export default function AdminDashboard() {
                     <CardTitle className="text-base flex items-center gap-2">
                       <Zap className="w-4 h-4 text-blue-500" />Recommended to Feature
                     </CardTitle>
-                    <CardDescription>Top non-featured products ranked by inventory value and availability.</CardDescription>
+                    <CardDescription>Top products that are not featured, ranked by inventory value and availability.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
@@ -903,7 +1809,8 @@ export default function AdminDashboard() {
                             </Avatar>
                             <div>
                               <h3 className="font-semibold mb-0.5">{vendor.businessName}</h3>
-                              {vendor.user && (
+                              {vendor.staffOwned && <p className="mb-1 text-xs text-gray-500">Admin-owned business · account details restricted</p>}
+                              {vendor.user && !vendor.staffOwned && (
                                 <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
                                   <UserIcon className="w-3 h-3" />
                                   {vendor.user.firstName} {vendor.user.lastName} — {vendor.user.email}
@@ -921,15 +1828,27 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                            <Button size="sm" variant="outline" onClick={() => setReviewVendor(vendor)}>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setReviewVendor(vendor);
+                              setVerificationChecks({ cacVerified: false, identityVerified: false, businessVerified: false });
+                              setVerificationNotes('');
+                              setCacRegisteredName('');
+                              setCacRegistryStatus('');
+                              setRelationshipConfirmed(false);
+                              setRelationshipEvidence('');
+                            }}>
                               <Eye className="w-3 h-3 mr-1" />Review
                             </Button>
                             {vendor.status === 'pending' && (
                               <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                                  disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified' ||
+                                     !isAdmin(user) || !user?.emailVerified}
+                                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
+                                  onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                   <CheckCircle className="w-3 h-3 mr-1" />Approve
                                 </Button>
-                                <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>
+                                <Button size="sm" variant="destructive" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'rejected' })}>
                                   <XCircle className="w-3 h-3 mr-1" />Reject
                                 </Button>
                               </>
@@ -938,7 +1857,7 @@ export default function AdminDashboard() {
                               <Button size="sm" variant="outline" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'suspended' })}>Suspend</Button>
                             )}
                             {vendor.status === 'suspended' && (
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending || vendor.verificationStatus !== 'verified'} onClick={() => updateVendorStatusMutation.mutate({ vendorId: vendor.id, status: 'approved' })}>
                                 <CheckCircle className="w-3 h-3 mr-1" />Reactivate
                               </Button>
                             )}
@@ -954,18 +1873,69 @@ export default function AdminDashboard() {
 
           {/* ═══ USER MANAGEMENT TAB ════════════════════════════════════════ */}
           <TabsContent value="users">
+            <AdminUserDetails userId={detailUserId} onClose={() => setDetailUserId(null)} onReviewVendor={vendorId => {
+              const vendor = vendors.find(item => item.id === vendorId);
+              if (!vendor) {
+                toast({ title: 'Vendor data is unavailable. Open the Vendors tab and refresh.', variant: 'destructive' });
+                return;
+              }
+              setDetailUserId(null);
+              setReviewVendor(vendor);
+              setVerificationChecks({ cacVerified: false, identityVerified: false, businessVerified: false });
+              setVerificationNotes('');
+              setCacRegisteredName('');
+              setCacRegistryStatus('');
+              setRelationshipConfirmed(false);
+              setRelationshipEvidence('');
+            }} />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   User Management
-                  <Badge variant="outline">{allUsers.length} users</Badge>
+                  <Badge variant="outline">{allUsers.filter(u => !u.closedAt).length} active users</Badge>
                 </CardTitle>
-                <CardDescription>Assign and revoke platform roles.</CardDescription>
+                <CardDescription>
+                  {hasRole(user, 'superadmin') && user?.emailVerified
+                    ? 'Review every account and manage its platform roles.'
+                    : 'Customer and vendor support accounts only. Administrator accounts and platform management are restricted to Superadmins.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
+                <Button type="button" variant="outline" size="sm" className="mb-4"
+                  onClick={() => setShowClosedAccounts(value => !value)}>
+                  {showClosedAccounts ? 'Hide closed accounts' : `Show closed accounts (${allUsers.filter(u => u.closedAt).length})`}
+                </Button>
+                {hasRole(user, 'superadmin') && user?.emailVerified && (
+                  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <h3 className="flex items-center gap-2 font-semibold text-amber-950">
+                      <ShieldCheck className="h-4 w-4" /> Superadmin role management
+                    </h3>
+                    <p className="mt-1 text-sm text-amber-900">
+                      Check or uncheck roles for other users, including Admin. Granting Superadmin gives a verified user
+                      full admin access and the ability to manage roles. Your own roles and the designated owner’s roles are protected.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-3">
-                  {allUsers.map((u) => (
-                    <div key={u.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  {usersLoading ? (
+                    <div className="space-y-3" role="status" aria-label="Loading accounts">
+                      {[0, 1, 2].map(item => <div key={item} className="h-24 animate-pulse rounded-lg border bg-gray-50" />)}
+                    </div>
+                  ) : usersError ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-center" role="alert">
+                      <p className="mb-3 text-sm text-red-800">
+                        Could not load customer and vendor accounts. {usersError instanceof Error ? usersError.message : ''}
+                      </p>
+                      <Button type="button" variant="outline" onClick={() => refetchUsers()}>Retry</Button>
+                    </div>
+                  ) : allUsers.filter(u => showClosedAccounts || !u.closedAt).length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-8 text-center">
+                      <Users className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+                      <p className="font-medium text-gray-700">{showClosedAccounts ? 'No accounts to show' : 'No active customer or vendor accounts'}</p>
+                      <p className="mt-1 text-sm text-gray-500">{!showClosedAccounts && allUsers.some(u => u.closedAt) ? 'Closed accounts are hidden. Show closed accounts to review their retained commerce records.' : 'Accounts will appear here when customers or vendors register.'}</p>
+                    </div>
+                  ) : allUsers.filter(u => showClosedAccounts || !u.closedAt).map((u) => (
+                    <div key={u.id} className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={u.profileImageUrl} />
@@ -973,40 +1943,307 @@ export default function AdminDashboard() {
                             {u.firstName?.[0]}{u.lastName?.[0] || u.email?.[0] || 'U'}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="font-semibold text-sm">{u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}</p>
+                        <div className="min-w-0 break-words">
+                          <button type="button" className="text-left font-semibold text-sm underline underline-offset-2 hover:text-nigerian-green" onClick={() => setDetailUserId(u.id)}>
+                            {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email}
+                          </button>
                           <p className="text-xs text-gray-500">{u.email}</p>
+                          <p className="text-xs text-gray-500">{u.phone || 'Phone not recorded'}</p>
                           <div className="flex gap-1 mt-1">
                             {(u.roles as string[] || []).map(r => (
-                              <Badge key={r} variant={r === 'admin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
+                              <Badge key={r} variant={r === 'admin' || r === 'superadmin' ? 'destructive' : r === 'vendor' ? 'default' : 'secondary'} className="text-xs">{r}</Badge>
                             ))}
+                            {u.closedAt && <Badge variant="outline" className="text-xs">Closed</Badge>}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        {['customer', 'vendor', 'admin'].map(role => {
+                      <div className="flex items-center gap-4 flex-wrap justify-end">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setDetailUserId(u.id)}>
+                          <Eye className="mr-1 h-3 w-3" /> View details
+                        </Button>
+                        {hasRole(user, 'superadmin') && user?.emailVerified && ['customer', 'vendor', 'admin', 'superadmin'].map(role => {
                           const uHasRole = hasRole(u, role);
-                          const isSelf = u.id === user?.id && role === 'admin' && uHasRole;
+                          const isSelf = u.id === user?.id;
+                          const isProtected = u.roleManagementLocked;
+                          const cannotGrantSuperadmin = role === 'superadmin' && !uHasRole && !u.emailVerified;
+                          const adminRequired = role === 'admin' && uHasRole && hasRole(u, 'superadmin');
                           return (
                             <div key={role} className="flex items-center gap-1.5">
-                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole} disabled={isSelf}
+                              <Checkbox id={`${u.id}-${role}`} checked={uHasRole}
+                                  disabled={isSelf || isProtected || Boolean(u.closedAt) || cannotGrantSuperadmin || adminRequired || toggleUserRoleMutation.isPending}
                                 onCheckedChange={() => {
-                                  if (isSelf) { toast({ title: 'Cannot remove your own admin role.', variant: 'destructive' }); return; }
+                                  if (isSelf || isProtected) {
+                                    toast({ title: 'This account’s roles cannot be changed here.', variant: 'destructive' });
+                                    return;
+                                  }
+                                  if (role === 'superadmin') {
+                                    const label = u.email || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'this user';
+                                    const prompt = uHasRole
+                                      ? `Remove Superadmin from ${label}? They will keep their Admin role.`
+                                      : `Grant Superadmin to ${label}? This gives them full admin access and the ability to assign roles to others.`;
+                                    if (!window.confirm(prompt)) return;
+                                  }
                                   toggleUserRoleMutation.mutate({ userId: u.id, role, hasRole: uHasRole });
                                 }} />
-                              <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer">{role}</label>
+                              <label htmlFor={`${u.id}-${role}`} className="text-xs capitalize cursor-pointer"
+                                title={cannotGrantSuperadmin ? 'Verify this user’s email before granting Superadmin.' : undefined}>
+                                {role}
+                              </label>
                             </div>
                           );
                         })}
+                        {fullManagement && hasRole(u, 'vendor') && !u.closedAt && u.id !== user?.id && !hasRole(u, 'superadmin') && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={testPreviewPending !== null || deleteTestDataMutation.isPending}
+                            onClick={() => previewTestDeletion(u.id)}
+                          >
+                            {testPreviewPending === u.id ? 'Verifying tests…' : 'Delete test data'}
+                          </Button>
+                        )}
+                        {hasRole(user, 'superadmin') && user?.emailVerified && !u.closedAt && (
+                          <Button type="button" size="sm" variant="destructive"
+                            disabled={u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') || closeUserMutation.isPending}
+                            onClick={() => {
+                              const confirmation = window.prompt(`Close ${u.email || u.id}? This blocks sign-in immediately and suspends their vendor listings, but keeps orders, payouts, and other business records.\n\nType ${u.email || u.id} to confirm:`);
+                              if (confirmation !== null) closeUserMutation.mutate({ userId: u.id, confirmation });
+                            }}>
+                            Close account
+                          </Button>
+                        )}
+                        {fullManagement && <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="gap-1"
+                            disabled={Boolean(u.closedAt) || u.id === user?.id || u.roleManagementLocked || hasRole(u, 'superadmin') ||
+                             (hasRole(u, 'admin') && !hasRole(user, 'superadmin')) || deleteUserMutation.isPending}
+                          onClick={() => {
+                            if (u.id === user?.id) return;
+                            const label = u.firstName || u.lastName
+                              ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                              : u.email || 'this user';
+                            if (window.confirm(`Permanently delete ${label}? Accounts with a vendor profile, orders, or other protected records cannot be deleted here. Saved addresses will be removed. This action cannot be undone.`)) {
+                              deleteUserMutation.mutate(u.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />Delete unused
+                        </Button>}
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
+            <Dialog open={testDeletion !== null} onOpenChange={(open) => {
+              if (!open && !deleteTestDataMutation.isPending) {
+                setTestDeletion(null);
+                setTestDeletionEmail('');
+              }
+            }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Permanently delete verified test data?</DialogTitle>
+                  <DialogDescription>
+                    Paystack confirmed that every linked order is a test transaction. This action permanently removes
+                    this vendor account, {testDeletion?.preview.products ?? 0} products,
+                    {' '}{testDeletion?.preview.orders ?? 0} buyer test orders,
+                    {' '}{testDeletion?.preview.ledgerEntries ?? 0} sale ledger entries,
+                    {' '}{testDeletion?.preview.quotes ?? 0} shipping quote requests,
+                    and {testDeletion?.preview.notifications ?? 0} linked notifications.
+                    Buyers will lose these test orders from their history. This cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <label htmlFor="confirm-test-deletion" className="text-sm font-medium">
+                    To confirm, type {testDeletion?.preview.email}.
+                  </label>
+                  <Input
+                    id="confirm-test-deletion"
+                    autoComplete="off"
+                    value={testDeletionEmail}
+                    onChange={(event) => setTestDeletionEmail(event.target.value)}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" disabled={deleteTestDataMutation.isPending}
+                    onClick={() => { setTestDeletion(null); setTestDeletionEmail(''); }}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive"
+                    disabled={!testDeletion || deleteTestDataMutation.isPending ||
+                      testDeletionEmail.trim().toLowerCase() !== testDeletion.preview.email.toLowerCase()}
+                    onClick={() => {
+                      if (testDeletion) deleteTestDataMutation.mutate({
+                        userId: testDeletion.userId,
+                        preview: testDeletion.preview,
+                        confirmationEmail: testDeletionEmail,
+                      });
+                    }}>
+                    {deleteTestDataMutation.isPending ? 'Rechecking and deleting…' : 'Permanently delete test data'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
-          {/* ═══ SYSTEM OVERVIEW TAB ════════════════════════════════════════ */}
+          {/* ═══ DISCOVER TAB ════════════════════════════════════════════════ */}
+          <TabsContent value="event-planners">
+            <EventPlannerAdmin canManageRoles={hasRole(user, 'superadmin') && Boolean(user?.emailVerified)} />
+          </TabsContent>
+
+          <TabsContent value="discover">
+            <div className="space-y-6">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total Inquiries', value: discoverInquiries.length, color: 'text-blue-600' },
+                  { label: 'Pending Review', value: discoverInquiries.filter((i: any) => i.status === 'pending').length, color: 'text-yellow-600' },
+                  { label: 'Approved', value: discoverInquiries.filter((i: any) => i.status === 'approved').length, color: 'text-green-600' },
+                  { label: 'Premium Subscriptions', value: discoverPremium.filter((p: any) => p.paymentStatus === 'active').length, color: 'text-violet-600' },
+                ].map(({ label, value, color }) => (
+                  <Card key={label}>
+                    <CardContent className="pt-4 pb-3">
+                      <p className="text-xs text-gray-500 mb-1">{label}</p>
+                      <p className={`text-2xl font-black ${color}`}>{value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Inquiries table */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-emerald-600" />
+                      Discover Inquiries
+                    </CardTitle>
+                    <Button size="sm" variant="outline" onClick={() => refetchInquiries()}>
+                      <RefreshCw className="w-3 h-3 mr-1" />Refresh
+                    </Button>
+                  </div>
+                  <CardDescription>Guide registrations, business claims, deal listings and destination features</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {discoverInquiries.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8 text-sm">No inquiries yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(discoverInquiries as any[]).map((inq: any) => (
+                        <div key={inq.id} className="border rounded-xl p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <Badge variant="outline" className="text-xs capitalize border-emerald-300 text-emerald-700">
+                                  {inq.type?.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge className={
+                                  inq.status === 'approved' ? 'bg-green-100 text-green-800 border-0' :
+                                  inq.status === 'rejected' ? 'bg-red-100 text-red-800 border-0' :
+                                  inq.status === 'reviewed' ? 'bg-blue-100 text-blue-800 border-0' :
+                                  'bg-yellow-100 text-yellow-800 border-0'
+                                }>
+                                  {inq.status}
+                                </Badge>
+                                <span className="text-xs text-gray-400">#{inq.id} · {inq.createdAt ? new Date(inq.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                              </div>
+                              <p className="font-semibold text-sm">{inq.name}</p>
+                              <p className="text-xs text-gray-500">{inq.email}{inq.phone ? ` · ${inq.phone}` : ''}</p>
+                              {inq.details && typeof inq.details === 'object' && (
+                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                  {Object.entries(inq.details).filter(([k]) => !['name','email','phone'].includes(k)).map(([k, v]) => (
+                                    v ? <p key={k} className="text-xs text-gray-600"><span className="font-medium capitalize">{k.replace(/([A-Z])/g, ' $1')}: </span>{String(v)}</p> : null
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-1.5 shrink-0">
+                              {inq.status === 'pending' && (
+                                <>
+                                  <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'approved' })}>
+                                    <CheckCircle className="w-3 h-3 mr-1" />Approve
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs border-blue-300 text-blue-600"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'reviewed' })}>
+                                    <Eye className="w-3 h-3 mr-1" />Reviewed
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs border-red-300 text-red-600"
+                                    disabled={updateInquiryStatusMutation.isPending}
+                                    onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'rejected' })}>
+                                    <XCircle className="w-3 h-3 mr-1" />Reject
+                                  </Button>
+                                </>
+                              )}
+                              {inq.status !== 'pending' && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs"
+                                  disabled={updateInquiryStatusMutation.isPending}
+                                  onClick={() => updateInquiryStatusMutation.mutate({ id: inq.id, status: 'pending' })}>
+                                  Reset
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Premium subscriptions */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-violet-600" />
+                    Explorer Premium Subscriptions
+                  </CardTitle>
+                  <CardDescription>Users who have initiated or completed the Premium subscription</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {discoverPremium.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8 text-sm">No premium subscriptions yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Email</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Status</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Reference</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">Start</th>
+                            <th className="pb-2 text-xs text-gray-500 font-medium">End</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(discoverPremium as any[]).map((sub: any) => (
+                            <tr key={sub.id} className="border-b last:border-0 hover:bg-gray-50">
+                              <td className="py-2 text-xs">{sub.guestEmail || '—'}</td>
+                              <td className="py-2">
+                                <Badge className={sub.paymentStatus === 'active' ? 'bg-violet-100 text-violet-800 border-0' : 'bg-yellow-100 text-yellow-800 border-0'}>
+                                  {sub.paymentStatus}
+                                </Badge>
+                              </td>
+                              <td className="py-2 text-xs font-mono text-gray-500 truncate max-w-[120px]">{sub.paymentReference || '—'}</td>
+                              <td className="py-2 text-xs">{sub.subscriptionStart ? new Date(sub.subscriptionStart).toLocaleDateString('en-GB') : '—'}</td>
+                              <td className="py-2 text-xs">{sub.subscriptionEnd ? new Date(sub.subscriptionEnd).toLocaleDateString('en-GB') : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Platform Health */}
@@ -1117,64 +2354,165 @@ export default function AdminDashboard() {
 
       {/* Vendor Review Modal */}
       <Dialog open={!!reviewVendor} onOpenChange={(open) => !open && setReviewVendor(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Avatar className="w-8 h-8">
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-xl bg-[#fbf8f2] p-0 text-left sm:max-h-[90dvh]">
+          <DialogHeader className="shrink-0 border-b border-stone-200 bg-white px-5 py-4 pr-12 text-left sm:px-6 sm:py-5">
+            <div className="flex items-start gap-3">
+              <Avatar className="h-10 w-10 shrink-0">
                 <AvatarImage src={reviewVendor?.user?.profileImageUrl} />
                 <AvatarFallback className="bg-nigerian-green text-white text-sm">{reviewVendor?.businessName?.[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
-              Vendor Profile Review
-            </DialogTitle>
-            <DialogDescription>Full details for <strong>{reviewVendor?.businessName}</strong></DialogDescription>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-semibold leading-tight text-[#193d32]">Vendor profile review</DialogTitle>
+                <DialogDescription className="mt-1 break-words text-sm">
+                  {reviewVendor?.businessName}
+                </DialogDescription>
+              </div>
+            </div>
+            {reviewVendor && (
+              <div className="flex flex-wrap items-center gap-2 pt-3 text-xs text-gray-500">
+                <span className="font-medium uppercase tracking-wide">Status</span>
+                {getStatusBadge(reviewVendor.status)}
+                <span className="ml-2 font-medium uppercase tracking-wide">Verification</span>
+                <Badge variant="outline" className={reviewVendor.verificationStatus === 'verified'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'}>
+                  {reviewVendor.verificationStatus || 'pending'}
+                </Badge>
+              </div>
+            )}
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 sm:py-6"
+            tabIndex={0} aria-label="Vendor review details">
             {reviewVendor && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">{getStatusBadge(reviewVendor.status)}<span className="text-sm text-gray-500">Current status</span></div>
-                <Separator />
+              <div className="space-y-6">
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><Package className="w-4 h-4" />Business Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><span className="text-xs text-gray-400 block">Business Name</span><span className="font-medium">{reviewVendor.businessName}</span></div>
-                    <div><span className="text-xs text-gray-400 block">Applied</span><span className="font-medium">{new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><Package className="h-4 w-4" />Business details</h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                    <div><span className="mb-1 block text-xs text-gray-500">Business name</span><span className="font-medium">{reviewVendor.businessName}</span></div>
+                    <div><span className="mb-1 block text-xs text-gray-500">Applied</span><span className="font-medium">{new Date(reviewVendor.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
                   </div>
                   <div className="mt-3">
-                    <span className="text-xs text-gray-400 block mb-1">Business Description</span>
+                    <span className="mb-1 block text-xs text-gray-500">Business description</span>
                     {reviewVendor.description
-                      ? <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">{reviewVendor.description}</p>
-                      : <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg">No description provided.</p>}
+                      ? <p className="rounded-lg border border-stone-200 bg-white p-3 text-sm leading-relaxed text-gray-700">{reviewVendor.description}</p>
+                      : <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No description provided.</p>}
                   </div>
                 </div>
                 <Separator />
-                {reviewVendor.user && (
+                {reviewVendor.staffOwned && <p className="rounded-md bg-stone-100 p-3 text-sm text-stone-700">Admin-owned business. The owner's private account details are restricted. Email verification: {reviewVendor.applicantEmailVerified ? 'verified' : 'not verified'}.</p>}
+                {reviewVendor.user && !reviewVendor.staffOwned && (
                   <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2"><UserIcon className="w-4 h-4" />Account Owner</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><span className="text-xs text-gray-400 block">Full Name</span><span className="font-medium">{reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Email</span><span className="font-medium text-sm">{reviewVendor.user.email || 'N/A'}</span></div>
-                      <div><span className="text-xs text-gray-400 block">Email Verified</span>
+                    <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><UserIcon className="h-4 w-4" />Account owner</h3>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                      <div><span className="mb-1 block text-xs text-gray-500">Full name</span><span className="font-medium">{reviewVendor.user.firstName || '-'} {reviewVendor.user.lastName || ''}</span></div>
+                      <div className="min-w-0"><span className="mb-1 block text-xs text-gray-500">Email</span><span className="break-all text-sm font-medium">{reviewVendor.user.email || 'N/A'}</span></div>
+                      <div><span className="mb-1 block text-xs text-gray-500">Email verified</span>
                         <span className={`font-medium flex items-center gap-1 text-sm ${reviewVendor.user.emailVerified ? 'text-green-600' : 'text-red-500'}`}>
                           {reviewVendor.user.emailVerified ? <><ShieldCheck className="w-3 h-3" />Verified</> : <><XCircle className="w-3 h-3" />Not verified</>}
                         </span>
                       </div>
-                      <div><span className="text-xs text-gray-400 block">Account Created</span><span className="font-medium text-sm">{reviewVendor.user.createdAt ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</span></div>
+                      <div><span className="mb-1 block text-xs text-gray-500">Account created</span><span className="text-sm font-medium">{reviewVendor.user.createdAt ? new Date(reviewVendor.user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A'}</span></div>
                     </div>
                   </div>
                 )}
                 <Separator />
+                <div className="space-y-3">
+                  <h3 className="flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Business verification</h3>
+                  <p className="text-sm text-gray-600">CAC number: <span className="font-medium text-gray-800">{reviewVendor.cacNumber || 'Not provided'}</span></p>
+                  <a href="https://icrp.cac.gov.ng/public-search/" target="_blank" rel="noopener noreferrer"
+                    className="inline-flex text-sm font-medium text-[#176847] underline underline-offset-2">
+                    Open official CAC Public Search <ArrowUpRight className="ml-1 h-4 w-4" />
+                  </a>
+                  <p className="text-sm text-gray-600">Search by RC number on CAC’s site. Compare the number, registered name, and listing status with this vendor. This is a manual review, not an automatic CAC lookup.</p>
+                  {reviewVendor.verificationNotes && (
+                    <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                      <p className="text-xs font-medium text-gray-600">Previous review record</p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-700">{reviewVendor.verificationNotes}</p>
+                    </div>
+                  )}
+                  {reviewVendor.verificationStatus === 'verified' && !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This vendor was verified before documented CAC public search checks were required. Review the listing again before approval or reactivation.</p>
+                  )}
+                  {(reviewVendor.verificationStatus !== 'verified' || !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1')) && (
+                    <>
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+                        Do not mark a vendor verified if the CAC number is missing, belongs to an unrelated business, or the listing is not active.
+                      </p>
+                      <label className="block text-sm font-medium">Registered name shown on CAC
+                        <Input className="mt-1" value={cacRegisteredName} maxLength={160}
+                          onChange={event => setCacRegisteredName(event.target.value)} placeholder="Enter the exact registered name" />
+                      </label>
+                      <label className="block text-sm font-medium">Status shown on CAC
+                        <select className="mt-1 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm"
+                          value={cacRegistryStatus} onChange={event => setCacRegistryStatus(event.target.value)}>
+                          <option value="">Select the listing status</option>
+                          <option value="active">Active</option>
+                          <option value="not-active">Not active</option>
+                          <option value="not-found">Number not found</option>
+                        </select>
+                      </label>
+                      {cacRegisteredName.trim() && !cacBusinessNamesMatch(cacRegisteredName, reviewVendor.businessName) && (
+                        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm text-amber-900">The registered name differs from the vendor’s business name. Only continue if documents prove the registered business operates this shop; otherwise reject this review.</p>
+                          <label className="flex items-start gap-2 text-sm">
+                            <Checkbox checked={relationshipConfirmed} onCheckedChange={value => setRelationshipConfirmed(value === true)} />
+                            I checked documents linking the registered business to this vendor.
+                          </label>
+                          <label className="block text-sm font-medium">Evidence of the relationship
+                            <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal"
+                              maxLength={1000} value={relationshipEvidence} onChange={event => setRelationshipEvidence(event.target.value)}
+                              placeholder="Describe which document links this legal entity to the shop" />
+                          </label>
+                        </div>
+                      )}
+                      {([
+                        { key: 'cacVerified', label: 'I compared this number and registered name on the official CAC search' },
+                        { key: 'identityVerified', label: 'I checked the owner identity' },
+                        { key: 'businessVerified', label: 'I checked the business details' },
+                      ] as const).map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white p-3 text-sm">
+                          <Checkbox checked={verificationChecks[key]} onCheckedChange={checked =>
+                            setVerificationChecks(current => ({ ...current, [key]: checked === true }))
+                          } />
+                          {label}
+                        </label>
+                      ))}
+                      <Button size="sm" variant="outline" disabled={verifyVendorMutation.isPending || !reviewVendor.cacNumber ||
+                        !Object.values(verificationChecks).every(Boolean) || cacRegisteredName.trim().length < 2 ||
+                        cacRegistryStatus !== 'active' || (!cacBusinessNamesMatch(cacRegisteredName, reviewVendor.businessName) &&
+                          (!relationshipConfirmed || relationshipEvidence.trim().length < 20))}
+                        onClick={() => verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'verified' })}>
+                        {verifyVendorMutation.isPending ? 'Saving…' : 'Record verification'}
+                      </Button>
+                    </>
+                  )}
+                  <label className="block text-sm font-medium">Review notes or reason for rejection
+                    <textarea className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 bg-white p-3 font-normal" maxLength={1500}
+                      value={verificationNotes} onChange={event => setVerificationNotes(event.target.value)}
+                      placeholder="If the number is wrong or the registered business does not match, explain what needs correcting." />
+                  </label>
+                  <Button size="sm" variant="destructive" disabled={verifyVendorMutation.isPending || verificationNotes.trim().length < 10}
+                    onClick={() => {
+                      if (reviewVendor.status === 'approved' &&
+                        !window.confirm('Rejecting this verification will suspend this vendor from selling. Continue?')) return;
+                      verifyVendorMutation.mutate({ vendorId: reviewVendor.id, decision: 'rejected' });
+                    }}>
+                    {reviewVendor.verificationStatus === 'verified' ? 'Revoke verification' : 'Reject verification'}
+                  </Button>
+                </div>
+                <Separator />
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4" />Compliance Checklist</h3>
-                  <div className="space-y-2">
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-[#193d32]"><ShieldCheck className="h-4 w-4" />Compliance checklist</h3>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {[
                       { label: 'Business name provided', pass: !!reviewVendor.businessName },
                       { label: 'Business description (10+ chars)', pass: reviewVendor.description?.length > 10 },
-                      { label: 'Owner name on file', pass: !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
-                      { label: 'Valid email address', pass: !!reviewVendor.user?.email },
-                      { label: 'Email address verified', pass: !!reviewVendor.user?.emailVerified },
-                    ].map(({ label, pass }) => (
-                      <div key={label} className={`flex items-center gap-2 p-2 rounded text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                      { label: 'Owner name on file', pass: reviewVendor.staffOwned ? null : !!(reviewVendor.user?.firstName && reviewVendor.user?.lastName) },
+                      { label: 'Valid email address', pass: reviewVendor.staffOwned ? null : !!reviewVendor.user?.email },
+                      { label: 'Email address verified', pass: reviewVendor.staffOwned ? reviewVendor.applicantEmailVerified : !!reviewVendor.user?.emailVerified },
+                    ].filter(({ pass }) => pass !== null).map(({ label, pass }) => (
+                      <div key={label} className={`flex items-center gap-2 rounded-lg p-2.5 text-sm ${pass ? 'text-green-700 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                         {pass ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}{label}
                       </div>
                     ))}
@@ -1182,17 +2520,21 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="flex gap-2 pt-4 border-t">
+          <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-stone-200 bg-white px-5 py-4 sm:px-6">
             <Button variant="outline" onClick={() => setReviewVendor(null)}>Close</Button>
             {reviewVendor?.status === 'pending' && (
               <>
                 <Button variant="destructive" disabled={updateVendorStatusMutation.isPending}
-                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'suspended' }); setReviewVendor(null); }}>
+                                  onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'rejected', reason: verificationNotes }); setReviewVendor(null); }}>
                   <XCircle className="w-4 h-4 mr-2" />Reject
                 </Button>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+                <Button className="bg-green-600 hover:bg-green-700 text-white"
+                   disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                     !reviewVendor.cacReviewComplete ||
+                    !isAdmin(user) || !user?.emailVerified}
+                  title={!user?.emailVerified ? 'Verify your admin email before approving vendors.' : undefined}
                   onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                   <CheckCircle className="w-4 h-4 mr-2" />Approve Vendor
                 </Button>
@@ -1205,7 +2547,11 @@ export default function AdminDashboard() {
               </Button>
             )}
             {reviewVendor?.status === 'suspended' && (
-              <Button className="bg-green-600 hover:bg-green-700 text-white" disabled={updateVendorStatusMutation.isPending}
+              <Button className="bg-green-600 hover:bg-green-700 text-white"
+                 disabled={updateVendorStatusMutation.isPending || reviewVendor.verificationStatus !== 'verified' ||
+                   !reviewVendor.verificationNotes?.includes('CAC_PUBLIC_SEARCH_REVIEW_V1') ||
+                  !isAdmin(user) || !user?.emailVerified}
+                title={!user?.emailVerified ? 'Verify your admin email before reactivating vendors.' : undefined}
                 onClick={() => { updateVendorStatusMutation.mutate({ vendorId: reviewVendor.id, status: 'approved' }); setReviewVendor(null); }}>
                 <CheckCircle className="w-4 h-4 mr-2" />Reactivate Vendor
               </Button>

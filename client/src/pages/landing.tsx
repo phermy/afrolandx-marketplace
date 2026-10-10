@@ -1,61 +1,103 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import SiteFooter from "@/components/site-footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdmin } from "@/lib/roleUtils";
-import { ShoppingCart, Menu, X, Package, Calendar, Zap, MapPin, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, X, Package, Calendar, Zap, MapPin, Info, Pause, Play } from "lucide-react";
 import type { Product } from "@/types";
-import LocalPrice from "@/components/LocalPrice";
 import logoImage from '@assets/Group 1000002646_1749631956471.png';
 import useEmblaCarousel from 'embla-carousel-react';
-import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.png';
-import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.png';
-import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.png';
-import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.png';
-import moroccanImg from '@assets/stock_images/moroccan_berber_culture.png';
-import ndebeImg from '@assets/stock_images/ndebele_south_africa.png';
-import panAfricanImg from '@assets/stock_images/pan_african_diversity.png';
-import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.png';
-import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.jpg';
-import AfricanProductCarousel, { AFRICAN_PRODUCTS } from "@/components/AfricanProductCarousel";
+import maasaiImg from '@assets/stock_images/maasai_warriors_kenya.webp';
+import mandelaImg from '@assets/stock_images/african_leader_mandela_tribute.webp';
+import ethiopianImg from '@assets/stock_images/ethiopian_traditional_timkat.webp';
+import ashantImg from '@assets/stock_images/ghanaian_ashanti_chief.webp';
+import moroccanImg from '@assets/stock_images/moroccan_berber_culture.webp';
+import ndebeImg from '@assets/stock_images/ndebele_south_africa.webp';
+import panAfricanImg from '@assets/stock_images/pan_african_diversity.webp';
+import rwandanImg from '@assets/stock_images/rwandan_intore_dancer.webp';
+import fabricImg from '@assets/stock_images/african_kente_cloth__8cfc9c20.webp';
+import HeritageEditorial from "@/components/heritage-editorial";
+import HeritageCarousel from "@/components/heritage-carousel";
+
+type PublicMarketplaceStats = {
+  verifiedVendors: number;
+  verifiedCustomers: number;
+  dailyInteractions: number;
+  countriesServed: number;
+  interactionWindow: '24h';
+};
 
 const culturalSlides = [
-  { image: panAfricanImg,  country: "Pan-Africa",    label: "Unity in Diversity",            flag: "🌍" },
-  { image: maasaiImg,      country: "Kenya · Tanzania", label: "Maasai Warriors",             flag: "🇰🇪" },
-  { image: mandelaImg,     country: "South Africa",  label: "Spirit of African Heroes",       flag: "🇿🇦" },
-  { image: ethiopianImg,   country: "Ethiopia",      label: "Timkat Festival",                flag: "🇪🇹" },
-  { image: ashantImg,      country: "Ghana",         label: "Ashanti Royal Heritage",         flag: "🇬🇭" },
-  { image: moroccanImg,    country: "Morocco",       label: "Berber Tradition",               flag: "🇲🇦" },
-  { image: ndebeImg,       country: "South Africa",  label: "Ndebele Cultural Art",           flag: "🇿🇦" },
-  { image: rwandanImg,     country: "Rwanda",        label: "Intore Ceremony",                flag: "🇷🇼" },
-  { image: fabricImg,      country: "West Africa",   label: "Kente Cloth",                    flag: "🌍" },
+  { image: panAfricanImg, country: "Across Africa", label: "Unity in Diversity", flag: "AF" },
+  { image: maasaiImg, country: "Kenya · Tanzania", label: "Maasai Warriors", flag: "KE" },
+  { image: mandelaImg, country: "South Africa", label: "Spirit of African Heroes", flag: "ZA" },
+  { image: ethiopianImg, country: "Ethiopia", label: "Timkat Festival", flag: "ET" },
+  { image: ashantImg, country: "Ghana", label: "Ashanti Royal Heritage", flag: "GH" },
+  { image: moroccanImg, country: "Morocco", label: "Berber Tradition", flag: "MA" },
+  { image: ndebeImg, country: "South Africa", label: "Ndebele Cultural Art", flag: "ZA" },
+  { image: rwandanImg, country: "Rwanda", label: "Intore Ceremony", flag: "RW" },
+  { image: fabricImg, country: "West Africa", label: "Kente Cloth", flag: "AF" },
 ];
 
 export default function Landing() {
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedSlide, setSelectedSlide] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+  const [isCarouselFocused, setIsCarouselFocused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
 
   useEffect(() => {
     if (!emblaApi) return;
-
-    const autoplay = setInterval(() => {
-      emblaApi.scrollNext();
-    }, 5000);
-
-    return () => clearInterval(autoplay);
+    const onSelect = () => setSelectedSlide(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi]);
 
+  useEffect(() => {
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setPrefersReducedMotion(motionPreference.matches);
+    motionPreference.addEventListener("change", updateMotionPreference);
+    return () => motionPreference.removeEventListener("change", updateMotionPreference);
+  }, []);
+
+  useEffect(() => {
+    if (!emblaApi || isCarouselPaused || isCarouselHovered || isCarouselFocused || prefersReducedMotion) return;
+    const autoplay = window.setInterval(() => {
+      if (!document.hidden) emblaApi.scrollNext();
+    }, 6500);
+    return () => window.clearInterval(autoplay);
+  }, [emblaApi, isCarouselPaused, isCarouselHovered, isCarouselFocused, prefersReducedMotion]);
+
   // Fetch only approved products for display on landing page
-  const { data: products = [] } = useQuery<Product[]>({
+  const { data: products = [], isPending: productsLoading, isError: productsError } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     retry: false,
   });
+
+  const { data: marketplaceStats, isPending: statsLoading, isError: statsError } = useQuery<PublicMarketplaceStats>({
+    queryKey: ["/api/public/stats"],
+    retry: false,
+  });
+
+  const publicStats = [
+    { value: marketplaceStats?.verifiedVendors ?? 0, label: "Verified vendors" },
+    { value: marketplaceStats?.verifiedCustomers ?? 0, label: "Verified customers" },
+    { value: marketplaceStats?.dailyInteractions ?? 0, label: "Daily interactions" },
+    { value: marketplaceStats?.countriesServed ?? 0, label: "Countries served" },
+  ];
 
   useEffect(() => {
     // Check for authentication errors in URL
@@ -83,6 +125,15 @@ export default function Landing() {
     }
   }, [toast]);
 
+  useEffect(() => {
+    if (!isVendorModalOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsVendorModalOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isVendorModalOpen]);
+
   const handleLogin = () => {
     window.location.href = "/login";
   };
@@ -92,24 +143,22 @@ export default function Landing() {
     window.location.href = '/login';
   };
 
-  const handleAddToCart = (productId: number) => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to add items to your cart",
-        variant: "default",
-      });
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1000);
-      return;
+  const handleMobileMenuLink = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const destination = event.currentTarget.getAttribute("href");
+    setIsMobileMenuOpen(false);
+    if (!destination) return;
+    if (destination.startsWith("#")) {
+      window.history.pushState({}, "", destination);
+      document.querySelector(destination)?.scrollIntoView();
+    } else {
+      window.location.assign(destination);
     }
-    // This would normally trigger the add to cart functionality
-    // But since user is not authenticated, we redirect to login
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="landing-page min-h-screen bg-gray-50 text-left">
       {/* Navigation */}
       <nav className="bg-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -123,28 +172,32 @@ export default function Landing() {
             </div>
 
             {/* Desktop Nav Links */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden lg:flex items-center space-x-6">
               <a href="/products" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-products">Products</a>
               <a href="/events" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-events">Events</a>
               <a href="/collab-drops" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-collab-drops">Collabs</a>
-              <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>
+              {isAuthenticated && isAdmin(user) && <a href="/discover" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium" data-testid="nav-link-discover">Discover</a>}
+              <Link href="/policies" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">Policies</Link>
               <a href="#about" className="text-gray-700 hover:text-nigerian-green transition-colors font-medium">About</a>
             </div>
 
             {/* Right actions */}
             <div className="flex items-center space-x-2">
-              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden sm:flex border-green-700 text-green-700 hover:bg-green-50">
+              <Button onClick={handleLogin} variant="outline" className="text-sm px-3 py-2 sm:px-4 hidden lg:flex border-green-700 text-green-700 hover:bg-green-50">
                 Sign In
               </Button>
-              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4">
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian text-sm px-3 py-2 sm:px-4 hidden lg:flex">
                 Sign Up
               </Button>
               {/* Mobile Hamburger */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="md:hidden"
+                className="lg:hidden"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="landing-mobile-menu"
               >
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </Button>
@@ -154,32 +207,39 @@ export default function Landing() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
+          <div id="landing-mobile-menu" className="lg:hidden fixed inset-0 top-16 bg-white z-50 overflow-y-auto">
             <div className="px-4 py-4 space-y-1 pb-24">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 pt-2 pb-1">Explore</p>
-              <a href="/products" onClick={() => setIsMobileMenuOpen(false)}
+              <a href="/products" onClick={handleMobileMenuLink}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-products">
                 <Package className="w-5 h-5" /><span>Products</span>
               </a>
-              <a href="/events" onClick={() => setIsMobileMenuOpen(false)}
+              <a href="/events" onClick={handleMobileMenuLink}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-events">
                 <Calendar className="w-5 h-5" /><span>Events</span>
               </a>
-              <a href="/collab-drops" onClick={() => setIsMobileMenuOpen(false)}
+              <a href="/collab-drops" onClick={handleMobileMenuLink}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-collab-drops">
                 <Zap className="w-5 h-5" /><span>Collab Drops</span>
               </a>
-              <a href="/discover" onClick={() => setIsMobileMenuOpen(false)}
+              {isAuthenticated && isAdmin(user) && <a href="/discover" onClick={handleMobileMenuLink}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green" data-testid="nav-link-discover">
                 <MapPin className="w-5 h-5" /><span>Discover Africa</span>
-              </a>
-              <a href="#about" onClick={() => setIsMobileMenuOpen(false)}
+              </a>}
+              <a href="#about" onClick={handleMobileMenuLink}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
                 <Info className="w-5 h-5" /><span>About</span>
               </a>
-              <div className="pt-4 border-t border-gray-200 mt-4">
+              <a href="/policies" onClick={handleMobileMenuLink}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 hover:text-nigerian-green">
+                <Info className="w-5 h-5" /><span>Policies</span>
+              </a>
+              <div className="pt-4 border-t border-gray-200 mt-4 space-y-2">
+                <Button onClick={() => { setIsMobileMenuOpen(false); handleLogin(); }} variant="outline" className="w-full border-green-700 text-green-700 hover:bg-green-50">
+                  Sign In
+                </Button>
                 <Button onClick={() => { setIsMobileMenuOpen(false); window.location.href = "/register"; }} className="w-full btn-nigerian">
-                  Sign Up — Create Account
+                  Sign Up: Create Account
                 </Button>
               </div>
             </div>
@@ -188,12 +248,22 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section with Cultural Carousel */}
-      <section className="relative overflow-hidden h-[calc(100vh-64px)]">
+      <section
+        className="relative min-h-[calc(100svh-64px)] overflow-hidden"
+        aria-label="African fashion gallery"
+        aria-roledescription="carousel"
+        onMouseEnter={() => setIsCarouselHovered(true)}
+        onMouseLeave={() => setIsCarouselHovered(false)}
+        onFocusCapture={() => setIsCarouselFocused(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setIsCarouselFocused(false);
+        }}
+      >
         {/* Cultural Images Carousel */}
         <div className="absolute inset-0" ref={emblaRef}>
           <div className="flex h-full">
             {culturalSlides.map((slide, index) => (
-              <div key={index} className="flex-[0_0_100%] min-w-0 relative">
+              <div key={index} className="flex-[0_0_100%] min-w-0 relative" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${culturalSlides.length}: ${slide.label}`} aria-hidden={index !== selectedSlide}>
                 <img
                   src={slide.image}
                   alt={`${slide.label} — ${slide.country}`}
@@ -204,8 +274,8 @@ export default function Landing() {
                 <div className="absolute bottom-16 left-4 sm:bottom-20 sm:left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 sm:px-4 sm:py-2 border border-white/20">
                   <span className="text-base sm:text-xl">{slide.flag}</span>
                   <div>
-                    <p className="text-white/90 font-semibold text-xs sm:text-sm leading-none">{slide.label}</p>
-                    <p className="text-amber-300 text-xs mt-0.5">{slide.country}</p>
+              <p className="text-white font-semibold text-sm leading-tight">{slide.label}</p>
+              <p className="text-amber-200 text-sm mt-0.5">{slide.country}</p>
                   </div>
                 </div>
               </div>
@@ -214,13 +284,13 @@ export default function Landing() {
         </div>
 
         {/* Pattern Overlay */}
-        <div className="absolute inset-0 z-10" style={{
+         <div className="pointer-events-none absolute inset-0 z-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D4AF37' fill-opacity='0.06'%3E%3Cpath d='M30 30c0-16.569 13.431-30 30-30v30H30zM0 30c0-16.569 13.431-30 30-30v30H0z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           backgroundSize: '60px 60px'
         }}></div>
 
         {/* Hero Content */}
-        <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center">
+        <div className="relative z-20 max-w-7xl mx-auto px-4 py-20 sm:px-6 sm:py-24 lg:px-8 min-h-[calc(100svh-64px)] flex items-center">
           <div className="text-center w-full">
             <h1 className="text-2xl sm:text-5xl md:text-7xl font-bold font-nigerian mb-3 sm:mb-6 md:mb-8 text-white">
               <span className="block bg-gradient-to-r from-white via-yellow-200 to-amber-300 bg-clip-text text-transparent">
@@ -231,13 +301,12 @@ export default function Landing() {
               </span>
             </h1>
             {/* Full description — hidden on small screens to save space */}
-            <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-gray-100 leading-relaxed px-4">
-              From Nigerian Aso Oke to Ghanaian Kente, Ethiopian habesha to Maasai beadwork — 
-              celebrate the rich cultural heritage of all 54 African nations.
+            <p className="hidden sm:block text-base sm:text-xl md:text-2xl mb-6 sm:mb-8 md:mb-12 max-w-4xl mx-auto text-white leading-relaxed px-4">
+              From Nigerian Aso Oke and Ghanaian Kente to Ethiopian Habesha clothing and Maasai beadwork, celebrate the rich cultural heritage of communities across Africa.
             </p>
             {/* Compact description — only on mobile */}
-            <p className="block sm:hidden text-sm mb-6 max-w-xs mx-auto text-gray-200 leading-relaxed px-2">
-              Authentic fashion from across all 54 African nations.
+            <p className="block sm:hidden text-base mb-6 max-w-xs mx-auto text-white leading-relaxed px-2">
+              Discover African fashion and the makers behind it.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
               <Button
@@ -259,31 +328,73 @@ export default function Landing() {
         </div>
 
         {/* Carousel Indicators */}
-        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center gap-2">
-          {culturalSlides.map((_, index) => (
+        <button
+          type="button"
+          className="absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => setIsCarouselPaused(value => !value)}
+          aria-label={prefersReducedMotion ? "Automatic slide advance disabled by reduced motion preference" : isCarouselPaused ? "Play image carousel" : "Pause image carousel"}
+          aria-pressed={isCarouselPaused}
+          disabled={prefersReducedMotion}
+        >
+          {isCarouselPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+        </button>
+        <div className="absolute bottom-2 left-2 right-2 z-30 flex items-center justify-center gap-1 sm:gap-2" aria-label="Carousel controls">
+          <button type="button" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous image">
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          {culturalSlides.map((slide, index) => (
             <button
               key={index}
+              type="button"
               onClick={() => emblaApi?.scrollTo(index)}
-              className="w-2 h-2 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300"
-              aria-label={`Go to slide ${index + 1}`}
-            />
+              className="flex h-10 w-6 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:w-7"
+              aria-label={`Show ${slide.label}, image ${index + 1} of ${culturalSlides.length}`}
+              aria-current={index === selectedSlide ? "true" : undefined}
+            >
+              <span aria-hidden="true" className={`h-2.5 rounded-full transition-all ${index === selectedSlide ? "w-4 bg-white" : "w-2.5 bg-white/60 hover:bg-white"}`} />
+            </button>
           ))}
+          <button type="button" className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={() => emblaApi?.scrollNext()} aria-label="Next image">
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
         </div>
       </section>
 
+      {/* Live marketplace proof points */}
+      <section id="marketplace-stats" className="border-b-[6px] border-emerald-500 bg-white" aria-label="Afrolandx marketplace statistics">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-gray-100 px-4 py-7 sm:px-6 md:grid-cols-4 md:divide-y-0 md:py-9 lg:px-8">
+          {publicStats.map((stat) => (
+            <div key={stat.label} className="px-3 py-4 text-center md:px-6 md:py-2">
+              <p className="text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl" aria-busy={statsLoading}>
+                {statsLoading || statsError ? "—" : <>{stat.value.toLocaleString()}{stat.value > 0 ? "+" : ""}</>}
+              </p>
+              <p className="mt-1 text-sm font-medium text-gray-700">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+        {statsError && <p role="status" className="px-4 pb-4 text-center text-sm text-gray-700">Marketplace numbers are temporarily unavailable.</p>}
+      </section>
+
       {/* Featured Products Section */}
+      <HeritageEditorial />
       <section className="py-12 md:py-20 bg-white" id="products">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold font-nigerian mb-3 md:mb-6 text-gray-900">
-              Featured <span className="text-nigerian-green">Collections</span>
+              Explore the <span className="text-nigerian-green">Marketplace</span>
             </h2>
-            <p className="text-sm sm:text-base md:text-xl text-gray-600 max-w-3xl mx-auto px-2">
+            <p className="text-base md:text-xl text-gray-700 max-w-3xl mx-auto px-2">
               Discover authentic African fashion pieces crafted by local artisans.
             </p>
           </div>
 
-          {products.length > 0 ? (
+          {productsLoading ? (
+            <p role="status" className="py-12 text-center text-base text-gray-700">Loading products…</p>
+          ) : productsError ? (
+            <div role="alert" className="py-12 text-center text-base text-gray-700">
+              Products could not be loaded right now. <Link href="/products" className="font-semibold text-green-800 underline underline-offset-4">Try browsing products</Link>.
+            </div>
+          ) : products.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
               {products.slice(0, 8).map((product) => {
                 // images[] is the authoritative source; imageUrl is a legacy fallback
@@ -293,15 +404,11 @@ export default function Landing() {
                     : product.imageUrl) || '';
                 return (
                 <Card key={product.id} className="group hover:shadow-xl transition-shadow duration-300">
-                  {/* Padding-bottom trick: universally supported 1:1 aspect ratio */}
-                  <div
-                    className="relative w-full overflow-hidden rounded-t-lg bg-gray-100"
-                    style={{ height: 0, paddingBottom: '100%' }}
-                  >
+                  <div className="relative w-full aspect-square overflow-hidden rounded-t-lg bg-white">
                     <img
                       src={rawSrc || 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=400&h=400&q=75'}
                       alt={product.name}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       loading="eager"
                       decoding="async"
                       onError={(e) => {
@@ -311,47 +418,40 @@ export default function Landing() {
                       }}
                     />
                     {product.featured && (
-                      <Badge className="absolute top-2 left-2 z-10 bg-nigerian-gold text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 left-2 z-10 bg-nigerian-gold text-[#183b35] text-xs px-1.5 py-0.5">
                         Featured
                       </Badge>
                     )}
                     {product.stock <= 5 && product.stock > 0 && (
-                      <Badge className="absolute top-2 right-2 z-10 bg-orange-500 text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 right-2 z-10 bg-orange-400 text-[#183b35] text-xs px-1.5 py-0.5">
                         Low Stock
                       </Badge>
                     )}
                     {product.stock === 0 && (
-                      <Badge className="absolute top-2 right-2 z-10 bg-red-500 text-white text-xs px-1.5 py-0.5">
+                      <Badge className="absolute top-2 right-2 z-10 bg-red-700 text-white text-xs px-1.5 py-0.5">
                         Sold Out
                       </Badge>
                     )}
                   </div>
                   <CardContent className="p-3 sm:p-4 md:p-6">
-                    <h3 className="font-semibold text-xs sm:text-sm md:text-base mb-1 md:mb-2 text-gray-900 group-hover:text-nigerian-green transition-colors line-clamp-1">
+                    <h3 className="font-semibold text-sm md:text-base mb-1 md:mb-2 text-gray-900 group-hover:text-nigerian-green transition-colors line-clamp-2">
                       {product.name}
                     </h3>
-                    <p className="hidden sm:block text-gray-600 text-xs md:text-sm mb-2 md:mb-4 line-clamp-2">
+                    <p className="text-gray-700 text-sm mb-2 md:mb-4 line-clamp-2">
                       {product.description}
                     </p>
                     <div className="flex items-center justify-between mb-2 md:mb-4">
                       <div className="flex flex-col">
                         <span className="text-sm sm:text-base md:text-xl font-bold text-nigerian-green">
-                          ${product.price.toLocaleString()}
+                          ₦{parseFloat(product.price).toLocaleString()}
                         </span>
-                        <LocalPrice usdAmount={product.price} />
                       </div>
-                      <span className="hidden sm:block text-xs text-gray-500">
+                      <span className="hidden sm:block text-sm text-gray-700">
                         {product.stock} left
                       </span>
                     </div>
-                    <Button
-                      onClick={() => handleAddToCart(product.id)}
-                      className="w-full btn-nigerian text-xs sm:text-sm py-1.5 sm:py-2 h-auto"
-                      disabled={product.stock === 0}
-                    >
-                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">{product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</span>
-                      <span className="sm:hidden">{product.stock === 0 ? 'Sold Out' : 'Add'}</span>
+                    <Button asChild className="w-full btn-nigerian text-sm py-2 h-auto">
+                      <Link href={`/products/${product.id}`}>View product</Link>
                     </Button>
                   </CardContent>
                 </Card>
@@ -368,7 +468,7 @@ export default function Landing() {
 
           {products.length > 8 && (
             <div className="text-center mt-12">
-              <Button onClick={handleLogin} size="lg" className="btn-nigerian">
+              <Button onClick={() => window.location.href = "/products"} size="lg" className="btn-nigerian">
                 View All Products
               </Button>
             </div>
@@ -383,7 +483,7 @@ export default function Landing() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Why Choose Afrolandx?
             </h2>
-            <p className="text-sm sm:text-base md:text-lg text-gray-600">
+            <p className="text-base md:text-lg text-gray-700">
               Your trusted marketplace for authentic African fashion
             </p>
           </div>
@@ -397,8 +497,8 @@ export default function Landing() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Authentic Products</h3>
-                <p className="text-gray-600">
-                  Every product is verified by our cultural experts to ensure authenticity and quality.
+                <p className="text-gray-700">
+                  Product listings are reviewed before they appear in the marketplace.
                 </p>
               </CardContent>
             </Card>
@@ -412,8 +512,8 @@ export default function Landing() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Global Shipping</h3>
-                <p className="text-gray-600">
-                  Fast and secure delivery worldwide via UPS, FedEx, and DHL partnerships.
+                <p className="text-gray-700">
+                  International delivery options and costs are confirmed with a shipping quote.
                 </p>
               </CardContent>
             </Card>
@@ -426,7 +526,7 @@ export default function Landing() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">Support Artisans</h3>
-                <p className="text-gray-600">
+                <p className="text-gray-700">
                   Direct connection with African artisans and designers, supporting local communities.
                 </p>
               </CardContent>
@@ -442,45 +542,27 @@ export default function Landing() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Explore Our Categories
             </h2>
-            <p className="text-sm sm:text-base md:text-lg text-gray-600">
+            <p className="text-base md:text-lg text-gray-700">
               Discover the beauty of African traditional fashion
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {[
-              { name: "Traditional Wear", description: "Authentic African clothing", emoji: "👘" },
-              { name: "Aso Oke", description: "Handwoven fabrics", emoji: "🧵" },
-              { name: "Beads & Jewelry", description: "Traditional accessories", emoji: "📿" },
-              { name: "Modern Fusion", description: "Contemporary designs", emoji: "✨" },
+              { name: "Traditional Wear", description: "Authentic African clothing", mark: "01" },
+              { name: "Aso Oke", description: "Handwoven fabrics", mark: "02" },
+              { name: "Beads & Jewelry", description: "Traditional accessories", mark: "03" },
+              { name: "Modern Fusion", description: "Contemporary designs", mark: "04" },
             ].map((category, index) => (
               <Card key={index} className="text-center card-hover">
                 <CardContent className="p-4 md:p-6">
-                  <div className="text-3xl md:text-4xl mb-2 md:mb-4">{category.emoji}</div>
-                  <h3 className="text-sm md:text-lg font-semibold text-gray-900 mb-1 md:mb-2">{category.name}</h3>
-                  <p className="hidden sm:block text-gray-600 text-xs md:text-sm">{category.description}</p>
+                  <div className="text-xl md:text-2xl font-semibold text-nigerian-green mb-2 md:mb-4">{category.mark}</div>
+                  <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-1 md:mb-2">{category.name}</h3>
+                  <p className="text-gray-700 text-sm">{category.description}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* African Products Showcase — auto-scrolling carousel */}
-      <section className="py-10 md:py-14 bg-nigerian-green overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 md:mb-8 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white font-nigerian mb-2 md:mb-3">
-            100+ African Products
-          </h2>
-          <p className="text-sm sm:text-base text-white/80">
-            Textiles · Jewelry · Fashion · Crafts · Beauty — from all 54 nations
-          </p>
-        </div>
-        <AfricanProductCarousel />
-        <div className="text-center mt-6 md:mt-8">
-          <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold text-gray-900 hover:bg-yellow-400 font-bold px-8">
-            Shop All Products
-          </Button>
         </div>
       </section>
 
@@ -491,7 +573,7 @@ export default function Landing() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-3 md:mb-4">
               Secure Payment & Fast Delivery
             </h2>
-            <p className="text-sm sm:text-base md:text-lg text-gray-600">
+            <p className="text-base md:text-lg text-gray-700">
               We accept multiple payment methods and deliver worldwide
             </p>
           </div>
@@ -503,24 +585,21 @@ export default function Landing() {
                 <Badge variant="secondary" className="text-lg font-bold text-nigerian-green bg-green-100 px-4 py-2">
                   PAYSTACK
                 </Badge>
-                <div className="text-3xl text-gray-400">💳</div>
-                <div className="text-3xl text-gray-400">🏦</div>
-                <div className="text-3xl text-gray-400">📱</div>
               </div>
-              <p className="text-sm text-gray-600">
-                Bank Transfer • Mobile Money • Card Payments • Bitcoin
+              <p className="text-base text-gray-700">
+                Secure checkout with Paystack
               </p>
             </div>
             
             <div className="text-center">
-              <h3 className="text-xl font-semibold mb-6">Delivery Partners</h3>
+              <h3 className="text-xl font-semibold mb-6">International Carriers</h3>
               <div className="flex justify-center items-center space-x-8 mb-4">
                 <Badge variant="outline" className="text-lg font-bold text-blue-600 px-3 py-2">UPS</Badge>
                 <Badge variant="outline" className="text-lg font-bold text-purple-600 px-3 py-2">FedEx</Badge>
                 <Badge variant="outline" className="text-lg font-bold text-yellow-600 px-3 py-2">DHL</Badge>
               </div>
-              <p className="text-sm text-gray-600">
-                Fast & Reliable Worldwide Delivery
+              <p className="text-base text-gray-700">
+                Availability and shipping cost are confirmed for your destination.
               </p>
             </div>
           </div>
@@ -528,72 +607,30 @@ export default function Landing() {
       </section>
 
       {/* About Section */}
-      <section id="about" className="py-10 md:py-16 bg-gray-50">
+      <section id="about" className="scroll-mt-20 py-10 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
             <div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 font-nigerian mb-4 md:mb-6" style={{ lineHeight: '1.3' }}>
                 Celebrating African Heritage
               </h2>
-              <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
-                Afrolandx is more than just an e-commerce platform. We're a cultural bridge 
+              <p className="reading-copy text-gray-700 text-base md:text-lg mb-4 md:mb-6">
+                Afrolandx is more than just an online marketplace. We're a cultural bridge
                 connecting African artisans with fashion enthusiasts worldwide. Our mission is 
                 to preserve and promote the rich heritage of African traditional fashion while 
                 supporting local communities.
               </p>
-              <p className="hidden sm:block text-gray-600 text-sm sm:text-base md:text-lg mb-4 md:mb-6">
+              <p className="reading-copy text-gray-700 text-base md:text-lg mb-4 md:mb-6">
                 Every purchase you make helps support African artisans, preserves traditional 
                 crafting techniques, and celebrates the vibrant culture of Africa.
               </p>
-              <Button onClick={handleLogin} className="btn-nigerian w-full sm:w-auto">
+              <Button onClick={() => window.location.href = "/register"} className="btn-nigerian w-full sm:w-auto">
                 Join Our Community
               </Button>
             </div>
-            <div className="relative overflow-hidden rounded-xl shadow-2xl bg-gray-900">
-              <div className="overflow-hidden space-y-3 p-4">
-                {([
-                  { slice: AFRICAN_PRODUCTS.slice(0, 16), dir: "left", speed: 28 },
-                  { slice: AFRICAN_PRODUCTS.slice(16, 32), dir: "right", speed: 22 },
-                ] as const).map(({ slice, dir, speed }, rowIdx) => {
-                  const doubled = [...slice, ...slice];
-                  return (
-                    <div key={rowIdx} className="overflow-hidden">
-                      <div
-                        className="flex gap-2"
-                        style={{
-                          animation: `${dir === "left" ? "marqueeLeft" : "marqueeRight"} ${speed}s linear infinite`,
-                          width: "max-content",
-                        }}
-                      >
-                        {doubled.map((item, i) => (
-                          <div key={i} className="flex-shrink-0 w-24 rounded-lg overflow-hidden bg-black/30">
-                            <div className="w-24 h-24 overflow-hidden">
-                              <img
-                                src={item.url}
-                                alt={item.label}
-                                className="w-full h-full object-cover object-top"
-                                loading="lazy"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/320px-No_image_available.svg.png";
-                                }}
-                              />
-                            </div>
-                            <p className="text-white text-[9px] text-center px-1 py-0.5 truncate font-semibold">{item.label}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <h3 className="text-white font-bold text-lg md:text-xl drop-shadow-lg">African Heritage</h3>
-                <p className="text-white/90 text-sm drop-shadow-md">Celebrating the visionaries who shaped our continent</p>
-              </div>
-            </div>
+            <HeritageCarousel />
           </div>
+          {/* Team profiles are intentionally withheld from the public landing page for now. */}
         </div>
       </section>
 
@@ -603,11 +640,11 @@ export default function Landing() {
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 md:mb-6">
             Ready to Explore African Fashion?
           </h2>
-          <p className="text-sm sm:text-base md:text-xl mb-6 md:mb-8 opacity-90 max-w-2xl mx-auto px-2">
-            Join thousands of fashion enthusiasts who trust Afrolandx for authentic African clothing and accessories.
+          <p className="text-base md:text-xl mb-6 md:mb-8 max-w-2xl mx-auto px-2">
+            Explore African clothing and accessories and connect with the makers behind them.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-            <Button onClick={handleLogin} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-white font-semibold w-full sm:w-auto max-w-xs sm:max-w-none">
+            <Button onClick={() => window.location.href = "/products"} size="lg" className="bg-nigerian-gold hover:bg-yellow-600 text-[#183b35] font-semibold w-full sm:w-auto max-w-xs sm:max-w-none">
               Start Shopping Now
             </Button>
             <Button
@@ -622,88 +659,28 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 md:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            <div>
-              <div className="flex items-center text-2xl font-bold font-nigerian mb-4">
-                <img 
-                  src={logoImage} 
-                  alt="Afrolandx Logo" 
-                  className="w-8 h-8 mr-2"
-                />
-                Afrolandx
-              </div>
-              <p className="text-gray-400 mb-4">
-                Connecting the world to authentic African fashion and culture.
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Our Story</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Support</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Shipping Info</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Returns</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Business</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" onClick={() => setIsVendorModalOpen(true)} className="hover:text-white transition-colors">Sell with Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Vendor Guidelines</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Partnership</a></li>
-                {(!isAuthenticated || (isAuthenticated && isAdmin(user))) && (
-                  <li>
-                    <button 
-                      onClick={handleAdminPortalClick} 
-                      className="hover:text-white transition-colors text-left"
-                    >
-                      Admin Portal
-                    </button>
-                  </li>
-                )}
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Afrolandx. Proudly celebrating African heritage worldwide. 🌍</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
 
       {/* Vendor Modal */}
       {isVendorModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full">
+          <Card role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title" className="max-w-md w-full">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-xl font-bold">Become a Vendor</CardTitle>
+                <CardTitle id="vendor-modal-title" className="text-xl font-bold">Become a Vendor</CardTitle>
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => setIsVendorModalOpen(false)}
+                  aria-label="Close vendor information"
+                  autoFocus
                 >
                   ✕
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-700 mb-6">
                 Join our community of African artisans and designers. Share your authentic 
                 fashion creations with customers worldwide.
               </p>
@@ -726,7 +703,7 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mt-6 space-y-3">
-                <Button onClick={handleLogin} className="w-full btn-nigerian">
+                <Button onClick={() => window.location.href = "/register?as=vendor"} className="w-full btn-nigerian">
                   Get Started as Vendor
                 </Button>
                 <Button 
@@ -734,7 +711,7 @@ export default function Landing() {
                   className="w-full" 
                   onClick={() => setIsVendorModalOpen(false)}
                 >
-                  Learn More
+                  Close
                 </Button>
               </div>
             </CardContent>

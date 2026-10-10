@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "LF6rfTWeZaM6pfCJuujGq"
@@ -48,3 +47,101 @@ id = "atzL4nQa4p6YKWmhBa6JS"
 uri = "file://attached_assets/stock_images/rwandan_intore_dancer.png"
 type = "image"
 title = "rwandan intore dancer"
+
+[[outputs]]
+id = "UrYGv_4SzQ4v7czJKpM6f"
+uri = "file://docs/payment-and-vendor-settlement.md"
+type = "text"
+title = "Detailed AfrolandX Payment and Vendor Settlement Workflow"
+description = "Verified and expanded workflow covering responsibilities, NGN payment verification, 8% commission, ledger states, bank setup, settlements, refunds, chargebacks, shipping adjustments, controls, and examples."
+logical_id = "9b6b0412-7a0e-45f0-90ef-bf8617591273"
+content_hash = "sha256:87006aa85fea788362f56a516f20fb87259c29a65f6c71d5f563689799af7405"
+size = 11638
+mtime_ms = 1789239354255
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/9b6b0412-7a0e-45f0-90ef-bf8617591273/816da1e2-151e-4a92-93b2-140404454424"
+storage_version_token = "1789239376183404"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "M1-V322_UWyOR8BR_EV1w"
+uri = "file://attached_assets/AfrolandX_Paystack_Clarification_Final.docx"
+type = "word_document"
+title = "AfrolandX Paystack Clarification — Final"
+description = "Reviewed and corrected merchant-review letter aligned with the implemented NGN payment, refund, vendor settlement, webhook, reconciliation, and OTP controls."
+logical_id = "10838771-897c-44f8-b442-a3ed2c1da777"
+content_hash = "sha256:10800e2993bc1ef1d02e7cfb3349418bd6967dc1394a441d3eebdbf76ffd750c"
+size = 41395
+mtime_ms = 1789385584599
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/10838771-897c-44f8-b442-a3ed2c1da777/ba7dc390-9436-461b-889d-1f573c2269e7"
+storage_version_token = "1789385622607910"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "rd6mHBs9T8YEi-TZojj-O"
+uri = "file://exports/afrolandx-completed-website-checklist.pdf"
+type = "pdf"
+title = "Download Afrolandx Website Checklist"
+description = "Click this file card, then select Download to save the PDF to your device."
+logical_id = "df884a28-c824-4bbf-a755-b1ba38de3b7b"
+content_hash = "sha256:3aefb47877b47ee66a51bde6b5edacfb0f8860d36879118c4c9d928f4fa6edce"
+size = 80329
+mtime_ms = 1790081955340
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/df884a28-c824-4bbf-a755-b1ba38de3b7b/90fac848-5fd5-4516-bbd5-6b81a812f782"
+storage_version_token = "1790082063257797"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "6mjhzES0D_VJ9vW92RHSP"
+uri = "file://attached_assets/femi-elegbeleye-office-portrait.png"
+type = "image"
+title = "Femi Elegbeleye — edited office portrait"
+description = "Professional office portrait created from the supplied photo, with a laptop at the desk."
+logical_id = "827841a3-b585-4b3b-a692-899f9a95bbec"
+content_hash = "sha256:d58af92cbe0c77fe0a5ab59171f5e32dbea20f4d1c9930b679c9e6b9b487183f"
+size = 1348734
+mtime_ms = 1790171954513
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/827841a3-b585-4b3b-a692-899f9a95bbec/6e4d28a5-2bf0-4141-a868-1a4153f3cc74"
+storage_version_token = "1790172119292679"
+content_type = "image/png"
+
+[[outputs]]
+id = "kpC0SYr97YglC0G7-Ria0"
+uri = "file://attached_assets/femi-elegbeleye-original-blue-suit.png"
+type = "image"
+title = "Femi — original photo with blue suit"
+description = "Your original face and standing pose, with the suit changed to blue and the background replaced by an office."
+logical_id = "c3cfd6df-c862-425d-a565-ed245a2d60df"
+content_hash = "sha256:363d464bb3cf7d53817799986be3860f55626e7808ccf317d435ec488b62864a"
+size = 1406149
+mtime_ms = 1790174956175
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/c3cfd6df-c862-425d-a565-ed245a2d60df/4da21882-3cf3-4959-bf81-96d5e2f8d0c3"
+storage_version_token = "1790175111314822"
+content_type = "image/png"
+
+[[outputs]]
+id = "PolBzSY0oLmaOCVL20ASX"
+uri = "file://attached_assets/femi-elegbeleye-original-blue-suit-card-v2.webp"
+type = "image"
+title = "Dr. Femi A. Elegbeleye — profile photo"
+description = "The photo currently used on the Afrolandx About page. Download the WebP image from this card."
+logical_id = "ea1c8d64-4f0b-4edf-ac01-1453ac20a890"
+content_hash = "sha256:874560e7a7231c9fcc2d5729b6b69b56531b6331e7125b1807d92b85d68af583"
+size = 15732
+mtime_ms = 1790175046939
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/ea1c8d64-4f0b-4edf-ac01-1453ac20a890/050e9b0d-0acf-4ea5-95ba-67ad3143d00a"
+storage_version_token = "1790217165086805"
+content_type = "image/webp"
+
+[[outputs]]
+id = "WWRLKxczbbZNOp_98Ljqp"
+uri = "file://attached_assets/femi-elegbeleye-about-photo.jpg"
+type = "image"
+title = "Download Dr. Femi’s About photo (JPG)"
+description = "JPG copy of the profile photo shown on the About page. Open this file card and choose Download."
+logical_id = "80ab902e-a29b-467c-a0d3-c7996c32557d"
+content_hash = "sha256:3dc21e9b1b205a28ad451aac02153d4852456580a8021bf729d5eae3d7dfbdfa"
+size = 72619
+mtime_ms = 1790217223246
+storage_uri = "gcs://replit-rams-assets-picard/rams/assets/repl:d9726de8-0dd4-459a-8e6c-2d4c105d51a7/80ab902e-a29b-467c-a0d3-c7996c32557d/38c64b1b-75cf-4d44-bd09-1144981db529"
+storage_version_token = "1790217228370364"
+content_type = "image/jpeg"

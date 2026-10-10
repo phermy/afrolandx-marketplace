@@ -28,25 +28,26 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import Navbar from "@/components/navbar";
 
 const productionStages = [
+  "received",
   "fabric_cutting",
   "sewing",
-  "embroidery",
   "finishing",
   "quality_check",
-  "packaging",
-  "ready_for_shipping",
+  "ready_to_ship",
+  "shipped",
 ];
 
 const stageLabels: Record<string, string> = {
+  received: "Order Received",
   fabric_cutting: "Fabric Cutting",
   sewing: "Sewing",
-  embroidery: "Embroidery/Beading",
   finishing: "Finishing Touches",
   quality_check: "Quality Check",
-  packaging: "Packaging",
-  ready_for_shipping: "Ready for Shipping",
+  ready_to_ship: "Ready to Ship",
+  shipped: "Shipped",
 };
 
 export default function VendorWorkshopPage() {
@@ -159,9 +160,12 @@ export default function VendorWorkshopPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">Vendor Access Required</h1>
-        <p className="text-muted-foreground">Sign in as a vendor to access the workshop dashboard.</p>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="container mx-auto py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Vendor Access Required</h1>
+          <p className="text-muted-foreground">Sign in as a vendor to access the workshop dashboard.</p>
+        </div>
       </div>
     );
   }
@@ -177,6 +181,8 @@ export default function VendorWorkshopPage() {
   };
 
   return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-6">
@@ -395,7 +401,7 @@ export default function VendorWorkshopPage() {
                         <SelectContent>
                           <SelectItem value="fabric">Fabric</SelectItem>
                           <SelectItem value="thread">Thread</SelectItem>
-                          <SelectItem value="beads">Beads/Accessories</SelectItem>
+                          <SelectItem value="beads">Beads and accessories</SelectItem>
                           <SelectItem value="buttons">Buttons</SelectItem>
                           <SelectItem value="zippers">Zippers</SelectItem>
                           <SelectItem value="other">Other</SelectItem>
@@ -526,7 +532,7 @@ export default function VendorWorkshopPage() {
                   Measurement Change Alerts
                 </CardTitle>
                 <CardDescription>
-                  Get notified when customer measurements change significantly between orders
+                  Get notified when a customer's measurements change significantly between orders.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -604,6 +610,7 @@ export default function VendorWorkshopPage() {
           </TabsContent>
         </Tabs>
       </div>
+    </div>
     </div>
   );
 }

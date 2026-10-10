@@ -1,15 +1,13 @@
-import sgMail from "@sendgrid/mail";
+import crypto from "crypto";
+import { PAYMENT_EMAIL } from "../shared/payment-contact";
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@afrolandx.com";
+const FROM_EMAIL = process.env.FROM_EMAIL || "management@afrolandx.com";
+// Replies must reach an existing Titan mailbox, even when the sender is no-reply.
+const SUPPORT_EMAIL = "support@afrolandx.com";
 const APP_NAME = "Afrolandx";
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
-
 export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1_000_000).toString();
 }
 
 export function otpExpiryTime(): Date {
@@ -18,104 +16,167 @@ export function otpExpiryTime(): Date {
   return expiry;
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  if (!SENDGRID_API_KEY) {
-    console.log("\n========================================");
-    console.log(`[${APP_NAME} Email] TO: ${to}`);
-    console.log(`[${APP_NAME} Email] SUBJECT: ${subject}`);
-    const otpMatch = html.match(/\d{6}/);
-    if (otpMatch) {
-      console.log(`[${APP_NAME} Email] OTP CODE: ${otpMatch[0]}`);
-    }
-    console.log("========================================\n");
-    return;
-  }
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-  await sgMail.send({
-    to,
-    from: { email: FROM_EMAIL, name: APP_NAME },
+export function emailPayload(to: string, subject: string, html: string, payment = false) {
+  return {
+    from: `${APP_NAME} <${payment ? PAYMENT_EMAIL : FROM_EMAIL}>`,
+    to: [to],
+    reply_to: payment ? PAYMENT_EMAIL : SUPPORT_EMAIL,
+    ...(payment && to.toLowerCase() !== PAYMENT_EMAIL ? { bcc: [PAYMENT_EMAIL] } : {}),
     subject,
     html,
+  };
+}
+
+async function sendEmail(to: string, subject: string, html: string, payment = false, eventKey?: string): Promise<void> {
+  const { ReplitConnectors } = await import("@replit/connectors-sdk");
+  const connectors = new ReplitConnectors();
+  const response = await connectors.proxy("resend", "/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(eventKey ? { "Idempotency-Key": `payment/${crypto.createHash("sha256").update(eventKey).digest("hex")}` } : {}),
+    },
+    body: JSON.stringify(emailPayload(to, subject, html, payment)),
   });
+
+  if (response.ok) return;
+  const providerMessage = await response.text().catch(() => "");
+  throw new Error(`Email delivery failed (${response.status})${providerMessage ? `: ${providerMessage.slice(0, 200)}` : ""}`);
+}
+
+export async function sendPaymentEmail(email: string | null | undefined, subject: string, message: string, eventKey: string): Promise<void> {
+  await sendEmail(email || PAYMENT_EMAIL, subject,
+    `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px"><h2>${escapeHtml(subject)}</h2><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p>For payment questions, contact <a href="mailto:${PAYMENT_EMAIL}">${PAYMENT_EMAIL}</a>. Check your Afrolandx account for the latest transaction status.</p></div>`,
+    true, eventKey);
+}
+
+function otpEmailHtml(title: string, greeting: string, description: string, codeLabel: string, otp: string, accent: string): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 40px 20px;">
+      <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #1a5c2a; font-size: 28px; margin: 0;">${APP_NAME}</h1>
+          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Authentic African Fashion</p>
+        </div>
+        <h2 style="color: #1a5c2a; font-size: 22px; margin-bottom: 8px;">${title}</h2>
+        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">${greeting}</p>
+        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">${description}</p>
+        <div style="background: #f8fbf8; border: 2px dashed ${accent}; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #888; font-size: 14px; margin: 0 0 8px;">${codeLabel}</p>
+          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a5c2a;">${otp}</div>
+          <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 15 minutes</p>
+        </div>
+        <p style="color: #888; font-size: 13px; line-height: 1.5;">
+          If you didn't request this email, you can safely ignore it.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+export async function sendLogisticsEmail(email: string, subject: string, message: string, eventKey?: string): Promise<void> {
+  await sendEmail(email, subject, `<div style="font-family:Arial,sans-serif;max-width:600px;padding:24px"><h2>${escapeHtml(subject)}</h2><p style="white-space:pre-wrap">${escapeHtml(message)}</p><p>Sign in to your Afrolandx account for details. For help, contact support@afrolandx.com.</p></div>`, false, eventKey);
 }
 
 export async function sendVerificationEmail(email: string, firstName: string, otp: string): Promise<void> {
-  const subject = `Verify your ${APP_NAME} account`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 40px 20px;">
-      <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        <div style="text-align: center; margin-bottom: 32px;">
-          <h1 style="color: #1a5c2a; font-size: 28px; margin: 0;">Afrolandx</h1>
-          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Authentic African Fashion</p>
-        </div>
-        <h2 style="color: #1a5c2a; font-size: 22px; margin-bottom: 8px;">Welcome, ${firstName}! 🎉</h2>
-        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
-          Thanks for joining Afrolandx. Please verify your email address to activate your account.
-        </p>
-        <div style="background: #f0f9f0; border: 2px dashed #4caf50; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
-          <p style="color: #888; font-size: 14px; margin: 0 0 8px;">Your verification code</p>
-          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a5c2a;">${otp}</div>
-          <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 15 minutes</p>
-        </div>
-        <p style="color: #888; font-size: 13px; line-height: 1.5;">
-          If you didn't create an account with Afrolandx, you can safely ignore this email.
-        </p>
-      </div>
-    </div>
-  `;
-  await sendEmail(email, subject, html);
+  const safeName = escapeHtml(firstName || "there");
+  await sendEmail(
+    email,
+    `Verify your ${APP_NAME} account`,
+    otpEmailHtml(
+      "Welcome to Afrolandx!",
+      `Thanks for joining us, ${safeName}.`,
+      "Please verify your email address to activate your account.",
+      "Your verification code",
+      otp,
+      "#4caf50",
+    ),
+  );
 }
 
 export async function sendLoginOtpEmail(email: string, firstName: string, otp: string): Promise<void> {
-  const subject = `Your ${APP_NAME} sign-in code`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 40px 20px;">
-      <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        <div style="text-align: center; margin-bottom: 32px;">
-          <h1 style="color: #1a5c2a; font-size: 28px; margin: 0;">Afrolandx</h1>
-          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Authentic African Fashion</p>
-        </div>
-        <h2 style="color: #1a5c2a; font-size: 22px; margin-bottom: 8px;">Your Sign-In Code 🔑</h2>
-        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
-          Hi ${firstName}, use the code below to sign in to your Afrolandx account.
-        </p>
-        <div style="background: #f0f9f0; border: 2px dashed #4caf50; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
-          <p style="color: #888; font-size: 14px; margin: 0 0 8px;">Your sign-in code</p>
-          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #1a5c2a;">${otp}</div>
-          <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 15 minutes</p>
-        </div>
-        <p style="color: #888; font-size: 13px; line-height: 1.5;">
-          If you didn't request this code, you can safely ignore this email. Someone may have entered your email address by mistake.
-        </p>
-      </div>
-    </div>
-  `;
-  await sendEmail(email, subject, html);
+  const safeName = escapeHtml(firstName || "there");
+  await sendEmail(
+    email,
+    `Your ${APP_NAME} sign-in code`,
+    otpEmailHtml(
+      "Your sign-in code",
+      `Hi ${safeName},`,
+      "Use the code below to sign in to your Afrolandx account.",
+      "Your sign-in code",
+      otp,
+      "#4caf50",
+    ),
+  );
 }
 
 export async function sendPasswordResetEmail(email: string, firstName: string, otp: string): Promise<void> {
-  const subject = `Reset your ${APP_NAME} password`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 40px 20px;">
-      <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        <div style="text-align: center; margin-bottom: 32px;">
-          <h1 style="color: #1a5c2a; font-size: 28px; margin: 0;">Afrolandx</h1>
-          <p style="color: #888; font-size: 14px; margin: 4px 0 0;">Authentic African Fashion</p>
+  const safeName = escapeHtml(firstName || "there");
+  await sendEmail(
+    email,
+    `Reset your ${APP_NAME} password`,
+    otpEmailHtml(
+      "Password reset request",
+      `Hi ${safeName},`,
+      "Use the code below to create a new password.",
+      "Your reset code",
+      otp,
+      "#ff9800",
+    ),
+  );
+}
+
+type ExperienceFeedbackNotification = {
+  mood: "sad" | "indifferent" | "happy";
+  comment?: string | null;
+  pagePath?: string | null;
+  createdAt: Date;
+};
+
+export async function sendExperienceFeedbackNotification(
+  feedback: ExperienceFeedbackNotification,
+): Promise<void> {
+  const moodLabels = {
+    sad: "Sad 😢",
+    indifferent: "Indifferent 😐",
+    happy: "Happy 😊",
+  } as const;
+  const priority = feedback.mood === "sad" ? "[Action requested] " : "";
+  const safeMood = moodLabels[feedback.mood];
+  const safeComment = feedback.comment
+    ? escapeHtml(feedback.comment)
+    : "No written note was provided.";
+  const safePagePath = escapeHtml(feedback.pagePath || "/");
+  const safeSubmittedAt = escapeHtml(feedback.createdAt.toISOString());
+
+  await sendEmail(
+    SUPPORT_EMAIL,
+    `${priority}New Afrolandx feedback: ${safeMood}`,
+    `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f4f1e8; padding: 32px 20px;">
+        <div style="background: #ffffff; border-radius: 12px; padding: 32px; border-top: 5px solid ${feedback.mood === "sad" ? "#b42318" : "#1a5c2a"};">
+          <h1 style="color: #17352e; font-size: 24px; margin: 0 0 20px;">New Afrolandx experience feedback</h1>
+          <p style="color: #444; margin: 0 0 12px;"><strong>Mood:</strong> ${safeMood}</p>
+          <p style="color: #444; margin: 0 0 12px;"><strong>Page:</strong> ${safePagePath}</p>
+          <p style="color: #444; margin: 0 0 20px;"><strong>Submitted:</strong> ${safeSubmittedAt}</p>
+          <div style="background: #f8fbf8; border-radius: 8px; padding: 18px;">
+            <p style="color: #17352e; font-weight: bold; margin: 0 0 8px;">Visitor note</p>
+            <p style="color: #444; line-height: 1.6; white-space: pre-wrap; margin: 0;">${safeComment}</p>
+          </div>
+          <p style="color: #777; font-size: 12px; line-height: 1.5; margin: 24px 0 0;">
+            The complete response remains stored in the Afrolandx database. This notification intentionally excludes customer identity details.
+          </p>
         </div>
-        <h2 style="color: #1a5c2a; font-size: 22px; margin-bottom: 8px;">Password Reset Request 🔒</h2>
-        <p style="color: #444; line-height: 1.6; margin-bottom: 24px;">
-          Hi ${firstName}, we received a request to reset your password. Use the code below to create a new password.
-        </p>
-        <div style="background: #fff3e0; border: 2px dashed #ff9800; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
-          <p style="color: #888; font-size: 14px; margin: 0 0 8px;">Your reset code</p>
-          <div style="font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #e65100;">${otp}</div>
-          <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Expires in 15 minutes</p>
-        </div>
-        <p style="color: #888; font-size: 13px; line-height: 1.5;">
-          If you didn't request a password reset, please ignore this email. Your password will remain unchanged.
-        </p>
       </div>
-    </div>
-  `;
-  await sendEmail(email, subject, html);
+    `,
+  );
 }

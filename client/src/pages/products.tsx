@@ -1,431 +1,304 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import Navbar from '@/components/navbar';
 import ProductCard from '@/components/product-card';
+import CatalogCategoryStrip from '@/components/catalog-category-strip';
 import ShoppingCart from '@/components/shopping-cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import type { Product, Category, ProductFilters } from '@/types';
+import { AFRICAN_COUNTRIES } from '@shared/africanFashion';
+import { findSubcategory, subcategoriesFor } from '@shared/product-subcategories';
+import type { Product, Category } from '@/types';
+import { trackEvent } from '@/lib/analytics';
+import { ArrowDownUp, ArrowRight, ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
+import '@/components/catalog-styles.css';
+
+type GenderTab = 'all' | 'women' | 'men' | 'kids';
 
 export default function Products() {
   const [location] = useLocation();
+  const queryString = useSearch();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [priceRange, setPriceRange] = useState<{ min: string; max: string }>({ min: '', max: '' });
   const [sortBy, setSortBy] = useState('newest');
+  const [genderTab, setGenderTab] = useState<GenderTab>('all');
+  const [selectedCountry, setSelectedCountry] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Parse URL search params
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ['/api/categories'] });
+
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(queryString);
     const search = urlParams.get('search');
     const category = urlParams.get('category');
-    
-    if (search) setSearchQuery(search);
-    if (category) setSelectedCategory(parseInt(category));
-  }, [location]);
-
-  // Fetch categories
-  const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['/api/categories'],
-  });
-
-  // Build filters for API call
-  const buildFilters = (): ProductFilters => {
-    const filters: ProductFilters = {
-      status: 'approved',
-    };
-
-    if (searchQuery.trim()) {
-      filters.search = searchQuery.trim();
+    const gender = urlParams.get('gender');
+    const originCountry = urlParams.get('originCountry');
+    setSearchQuery(search || '');
+    setGenderTab(gender === 'women' || gender === 'men' || gender === 'kids' ? gender : 'all');
+    setSelectedCountry(AFRICAN_COUNTRIES.some(country => country.name === originCountry) ? originCountry! : '');
+    const subcategory = urlParams.get('subcategory') || '';
+    const match = findSubcategory(subcategory);
+    setSelectedSubcategory(match?.slug || '');
+    if (match) setSelectedCategory(categories.find(item => item.slug === match.parentSlug)?.id ?? null);
+    else {
+      const categoryId = Number(category);
+      setSelectedCategory(category && Number.isSafeInteger(categoryId) && categories.some(item => item.id === categoryId) ? categoryId : null);
     }
+  }, [location, queryString, categories]);
 
-    if (selectedCategory) {
-      filters.categoryId = selectedCategory;
-    }
-
-    if (priceRange.min) {
-      filters.minPrice = parseFloat(priceRange.min);
-    }
-
-    if (priceRange.max) {
-      filters.maxPrice = parseFloat(priceRange.max);
-    }
-
-    return filters;
-  };
-
-  // Fetch products with proper dependency tracking
-  const filters = buildFilters();
-  const { data: allProducts = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products', searchQuery, selectedCategory, priceRange.min, priceRange.max],
+  const { data: allProducts = [], isLoading, isError, refetch } = useQuery<Product[]>({
+    queryKey: ['/api/products', searchQuery, selectedCategory, selectedSubcategory, priceRange.min, priceRange.max, genderTab, selectedCountry],
     queryFn: async () => {
       const params = new URLSearchParams();
-      
-      // Add status filter
       params.append('status', 'approved');
-      
-      // Add search filter
-      if (searchQuery.trim()) {
-        params.append('search', searchQuery.trim());
-      }
-      
-      // Add category filter
-      if (selectedCategory) {
-        params.append('categoryId', selectedCategory.toString());
-      }
-      
-      // Add price filters
-      if (priceRange.min) {
-        params.append('minPrice', priceRange.min);
-      }
-      
-      if (priceRange.max) {
-        params.append('maxPrice', priceRange.max);
-      }
-      
+      if (searchQuery.trim()) params.append('search', searchQuery.trim());
+      if (selectedCategory) params.append('categoryId', selectedCategory.toString());
+      if (selectedSubcategory) params.append('subcategory', selectedSubcategory);
+      if (priceRange.min) params.append('minPrice', priceRange.min);
+      if (priceRange.max) params.append('maxPrice', priceRange.max);
+      if (genderTab !== 'all') params.append('gender', genderTab);
+      if (selectedCountry) params.append('originCountry', selectedCountry);
       const response = await fetch(`/api/products?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch products');
-      }
+      if (!response.ok) throw new Error('Failed to fetch products');
       return response.json();
     },
   });
 
-  // Sort products
   const sortedProducts = [...allProducts].sort((a, b) => {
     switch (sortBy) {
-      case 'price-low':
-        return parseFloat(a.price) - parseFloat(b.price);
-      case 'price-high':
-        return parseFloat(b.price) - parseFloat(a.price);
-      case 'name':
-        return a.name.localeCompare(b.name);
-      case 'newest':
-      default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case 'price-low': return parseFloat(a.price) - parseFloat(b.price);
+      case 'price-high': return parseFloat(b.price) - parseFloat(a.price);
+      default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
   });
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Update URL without page reload
-    const url = new URL(window.location.href);
-    if (searchQuery.trim()) {
-      url.searchParams.set('search', searchQuery.trim());
-    } else {
-      url.searchParams.delete('search');
-    }
-    window.history.pushState({}, '', url.toString());
-  };
+  useEffect(() => {
+    if (isLoading || isError) return;
+    trackEvent('product_list_viewed', {
+      category_id: selectedCategory ?? 0,
+      search_present: Boolean(searchQuery.trim()),
+      sort: sortBy,
+      result_count: sortedProducts.length,
+      gender: genderTab,
+      country_filter: Boolean(selectedCountry),
+    });
+  }, [genderTab, isError, isLoading, searchQuery, selectedCategory, selectedCountry, sortBy, sortedProducts.length]);
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory(null);
+    setSelectedSubcategory('');
     setPriceRange({ min: '', max: '' });
     setSortBy('newest');
-    // Clear URL params
-    window.history.pushState({}, '', window.location.pathname);
+    setGenderTab('all');
+    setSelectedCountry('');
   };
-
-  const hasActiveFilters = searchQuery || selectedCategory || priceRange.min || priceRange.max;
+  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedSubcategory || priceRange.min || priceRange.max || genderTab !== 'all' || selectedCountry);
+  const genderTabs: { value: GenderTab; label: string }[] = [
+    { value: 'all', label: 'Everything' }, { value: 'women', label: 'Women' }, { value: 'men', label: 'Men' }, { value: 'kids', label: 'Kids' },
+  ];
+  const currentCategorySlug = categories.find(item => item.id === selectedCategory)?.slug || '';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="catalog-page min-h-screen">
       <Navbar />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 font-nigerian mb-4">
-            African Fashion Collection
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Discover authentic traditional wear, Aso Oke, and handcrafted jewelry
-          </p>
-        </div>
+      <main className="catalog-shell">
+        <CatalogCategoryStrip
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelect={(id) => {
+            setSelectedCategory(id);
+            setSelectedSubcategory('');
+            setSearchQuery('');
+            setPriceRange({ min: '', max: '' });
+            setGenderTab('all');
+            setSelectedCountry('');
+            document.getElementById('catalog-results-list')?.scrollIntoView({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+              block: 'start',
+            });
+          }}
+        />
 
-        {/* Mobile Filter Toggle */}
-        <div className="md:hidden mb-6">
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="w-full"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filters & Search
-          </Button>
-        </div>
+        <section className="catalog-hero">
+          <div className="catalog-hero-copy">
+            <p className="catalog-eyebrow"><span className="catalog-eyebrow-rule" />Afrolandx marketplace</p>
+            <h1>Made by hand.<br /><em>Rooted in place.</em></h1>
+            <p className="catalog-hero-lede">Wear the story. Find expressive fashion, considered objects and living craft from African makers.</p>
+            <button className="catalog-hero-jump" onClick={() => document.getElementById('catalog-results')?.scrollIntoView({ behavior: 'smooth' })}>
+              Explore the collection <ArrowRight size={16} />
+            </button>
+          </div>
+          <div className="catalog-hero-art" aria-label="Decorative woven pattern" role="img">
+            <div className="catalog-hero-art-inner">
+              <span className="catalog-hero-orbit catalog-hero-orbit--one" />
+              <span className="catalog-hero-orbit catalog-hero-orbit--two" />
+              <span className="catalog-hero-disc" />
+              <span className="catalog-hero-art-label">A continent<br />of many hands</span>
+              <span className="catalog-hero-art-number">AF / 01</span>
+            </div>
+            <span className="catalog-hero-caption">Textile studies — Afrolandx</span>
+          </div>
+          <span className="catalog-hero-index">AF / 01</span>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Filters Sidebar */}
-          <div className={`lg:col-span-1 ${showFilters ? 'block' : 'hidden lg:block'}`}>
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Filters</span>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      Clear All
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Search */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Search Products
-                  </label>
-                  <form onSubmit={handleSearchSubmit}>
-                    <Input
-                      type="text"
-                      placeholder="Search..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="input-nigerian"
-                    />
-                  </form>
-                </div>
-
-                <Separator />
-
-                {/* Categories */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
-                  </label>
-                  <Select
-                    value={selectedCategory?.toString() || 'all'}
-                    onValueChange={(value) => {
-                      if (value === 'all') { setSelectedCategory(null); return; }
-                      if (value === 'others') {
-                        // Resolve to the actual "Others" category ID if it's in the DB
-                        const otherscat = categories.find((c: any) => c.name.toLowerCase() === 'others');
-                        setSelectedCategory(otherscat ? otherscat.id : null);
-                      } else {
-                        setSelectedCategory(parseInt(value));
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="input-nigerian">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id.toString()}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                      {!categories.some((c: any) => c.name.toLowerCase() === 'others') && (
-                        <SelectItem value="others">Others</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Separator />
-
-                {/* Price Range */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price Range ($)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Min"
-                      value={priceRange.min}
-                      onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
-                      className="input-nigerian"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Max"
-                      value={priceRange.max}
-                      onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
-                      className="input-nigerian"
-                    />
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Quick Filter Badges */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quick Filters
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant={selectedCategory === 1 ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 1 ? null : 1)}
-                    >
-                      Traditional Wear
-                    </Badge>
-                    <Badge
-                      variant={selectedCategory === 2 ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 2 ? null : 2)}
-                    >
-                      Aso Oke
-                    </Badge>
-                    <Badge
-                      variant={selectedCategory === 3 ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedCategory(selectedCategory === 3 ? null : 3)}
-                    >
-                      Beads & Jewelry
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <section className="catalog-shopping" id="catalog-results">
+          <div className="catalog-shopping-heading">
+            <div>
+              <p className="catalog-eyebrow">The collection</p>
+              <h2>Find something <em>made to matter.</em></h2>
+            </div>
+            <p className="catalog-shopping-aside">Distinct materials, regional techniques, and makers’ own points of view.</p>
           </div>
 
-          {/* Products Grid */}
-          <div className="lg:col-span-3">
-            {/* Results Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {searchQuery ? `Results for "${searchQuery}"` : 'All Products'}
-                </h2>
-                <p className="text-gray-600">
-                  {sortedProducts.length} product{sortedProducts.length !== 1 ? 's' : ''} found
-                </p>
-              </div>
+          <div className="catalog-gender-tabs" role="tablist" aria-label="Shop by collection">
+            {genderTabs.map(tab => (
+              <button key={tab.value} type="button" role="tab" aria-selected={genderTab === tab.value} onClick={() => setGenderTab(tab.value)} className={genderTab === tab.value ? 'is-active' : ''}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-              {/* Sort Dropdown */}
-              <div className="mt-4 sm:mt-0">
+          <div className="catalog-toolbar">
+            <div className="catalog-search-wrap">
+              <Search size={17} aria-hidden="true" />
+              <Input aria-label="Search products" placeholder="Search pieces, materials, makers…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              {searchQuery && <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')}><X size={15} /></button>}
+            </div>
+            <div className="catalog-toolbar-actions">
+              <Button variant="outline" className="catalog-filter-toggle" onClick={() => setShowFilters(!showFilters)}>
+                <SlidersHorizontal size={15} /> Filters {hasActiveFilters && <span className="catalog-filter-dot" />}
+              </Button>
+              <div className="catalog-sort-control">
+                <ArrowDownUp size={15} aria-hidden="true" />
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full sm:w-48 input-nigerian">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger aria-label="Sort products"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="newest">Newest First</SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
-                    <SelectItem value="name">Name: A to Z</SelectItem>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="price-low">Lowest price</SelectItem>
+                    <SelectItem value="price-high">Highest price</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+          </div>
 
-            {/* Active Filters */}
-            {hasActiveFilters && (
-              <div className="mb-6">
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-sm text-gray-600">Active filters:</span>
-                  {searchQuery && (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      Search: {searchQuery}
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {selectedCategory && (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      {categories.find(c => c.id === selectedCategory)?.name}
-                      <button
-                        onClick={() => setSelectedCategory(null)}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
-                  {(priceRange.min || priceRange.max) && (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      ${priceRange.min || '0'} - ${priceRange.max || '∞'}
-                      <button
-                        onClick={() => setPriceRange({ min: '', max: '' })}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  )}
+          <div className="catalog-content-layout">
+            <aside className={`catalog-filters ${showFilters ? 'is-open' : ''}`} aria-label="Product filters">
+              <div className="catalog-filters-top">
+                <div><span className="catalog-eyebrow">Refine</span><h3>Your search</h3></div>
+                {hasActiveFilters && <button type="button" onClick={clearFilters} className="catalog-clear">Clear all</button>}
+                <button type="button" className="catalog-filter-close" aria-label="Close filters" onClick={() => setShowFilters(false)}><X size={17} /></button>
+              </div>
+              <div className="catalog-filter-group">
+                <label htmlFor="catalog-category">Category</label>
+                <Select value={selectedCategory?.toString() || 'all'} onValueChange={value => { setSelectedSubcategory(''); setSelectedCategory(value === 'all' ? null : parseInt(value)); }}>
+                  <SelectTrigger id="catalog-category"><SelectValue placeholder="All categories" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categories.map(category => <SelectItem key={category.id} value={category.id.toString()}>{category.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedCategory !== null && subcategoriesFor(currentCategorySlug).length > 0 && (
+                <div className="catalog-filter-group">
+                  <label htmlFor="subcategory-filter">Within category</label>
+                  <select id="subcategory-filter" value={selectedSubcategory} onChange={event => setSelectedSubcategory(event.target.value)}>
+                    <option value="">All in this category</option>
+                    {subcategoriesFor(currentCategorySlug).map(item => <option key={item.slug} value={item.slug}>{item.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="catalog-filter-group">
+                <label>Price range <span>(₦)</span></label>
+                <div className="catalog-price-range">
+                  <Input type="number" min="0" placeholder="From" value={priceRange.min} onChange={e => setPriceRange(prev => ({ ...prev, min: e.target.value }))} aria-label="Minimum price" />
+                  <span aria-hidden="true">—</span>
+                  <Input type="number" min="0" placeholder="To" value={priceRange.max} onChange={e => setPriceRange(prev => ({ ...prev, max: e.target.value }))} aria-label="Maximum price" />
                 </div>
               </div>
-            )}
-
-            {/* Loading State */}
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <div className="h-64 bg-gray-200"></div>
-                    <CardContent className="p-6">
-                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded mb-3"></div>
-                      <div className="h-6 bg-gray-200 rounded mb-4"></div>
-                      <div className="h-10 bg-gray-200 rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <>
-                {/* Products Grid */}
-                {sortedProducts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4m16 0l-2-2H6l-2 2" />
-                    </svg>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
-                    <p className="text-gray-600 mb-4">
-                      {hasActiveFilters 
-                        ? 'Try adjusting your filters or search terms'
-                        : 'No products are currently available'
-                      }
-                    </p>
-                    {hasActiveFilters && (
-                      <Button onClick={clearFilters} className="btn-nigerian">
-                        Clear Filters
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="product-grid">
-                    {sortedProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} />
+              <div className="catalog-filter-group">
+                <label htmlFor="origin-country">Made in</label>
+                <div className="catalog-select-wrap">
+                  <select id="origin-country" value={selectedCountry} onChange={e => setSelectedCountry(e.target.value)}>
+                    <option value="">Any African country</option>
+                    {['West', 'East', 'North', 'Central', 'Southern'].map(region => (
+                      <optgroup key={region} label={`${region} Africa`}>
+                        {AFRICAN_COUNTRIES.filter(country => country.region === region).map(country => <option key={country.name} value={country.name}>{country.name}</option>)}
+                      </optgroup>
                     ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Load More / Pagination could go here */}
-            {sortedProducts.length > 0 && (
-              <div className="mt-12 text-center">
-                <p className="text-gray-600">
-                  Showing {sortedProducts.length} of {sortedProducts.length} products
-                </p>
+                  </select><ChevronDown size={15} aria-hidden="true" />
+                </div>
+                {selectedCountry && <button type="button" className="catalog-inline-clear" onClick={() => setSelectedCountry('')}>Clear country</button>}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+              <div className="catalog-filter-group">
+                <label>Quick browse</label>
+                <div className="catalog-quick-filters">
+                  {['Traditional Wear', 'Aso Oke', 'Beads & Jewelry'].map((label, index) => (
+                    <button type="button" key={label} className={selectedCategory === index + 1 ? 'is-active' : ''} onClick={() => { setSelectedSubcategory(''); setSelectedCategory(selectedCategory === index + 1 ? null : index + 1); }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </aside>
 
+            <div className="catalog-results" id="catalog-results-list">
+              <div className="catalog-results-head">
+                <div>
+                  <p className="catalog-eyebrow">{searchQuery ? 'Search results' : 'Curated from across the continent'}</p>
+                  <h3>{searchQuery ? `“${searchQuery}”` : genderTab !== 'all' ? `${genderTabs.find(tab => tab.value === genderTab)?.label}'s collection` : selectedCategory ? categories.find(item => item.id === selectedCategory)?.name : 'All pieces'}</h3>
+                </div>
+                <span className="catalog-result-count">{isLoading ? 'Gathering pieces…' : `${sortedProducts.length} ${sortedProducts.length === 1 ? 'piece' : 'pieces'}`}</span>
+              </div>
+
+              {hasActiveFilters && (
+                <div className="catalog-active-filters">
+                  {genderTab !== 'all' && <button type="button" onClick={() => setGenderTab('all')}>{genderTabs.find(tab => tab.value === genderTab)?.label}<X size={12} /></button>}
+                  {searchQuery && <button type="button" onClick={() => setSearchQuery('')}>Search: {searchQuery}<X size={12} /></button>}
+                  {selectedCountry && <button type="button" onClick={() => setSelectedCountry('')}>{selectedCountry}<X size={12} /></button>}
+                  {selectedCategory && <button type="button" onClick={() => { setSelectedCategory(null); setSelectedSubcategory(''); }}>{categories.find(item => item.id === selectedCategory)?.name}<X size={12} /></button>}
+                  {selectedSubcategory && <button type="button" onClick={() => setSelectedSubcategory('')}>{findSubcategory(selectedSubcategory)?.name}<X size={12} /></button>}
+                  {(priceRange.min || priceRange.max) && <button type="button" onClick={() => setPriceRange({ min: '', max: '' })}>₦{priceRange.min || '0'} – ₦{priceRange.max || '∞'}<X size={12} /></button>}
+                </div>
+              )}
+
+              {isLoading ? (
+                <div className="catalog-product-grid" aria-label="Loading products">
+                  {Array.from({ length: 6 }, (_, index) => <div className="catalog-skeleton" key={index}><div /><span /><span /></div>)}
+                </div>
+              ) : isError ? (
+                <div className="catalog-empty-state catalog-error-state">
+                  <span className="catalog-empty-mark">!</span>
+                  <p className="catalog-eyebrow">A brief pause</p>
+                  <h3>The collection didn’t load.</h3>
+                  <p>Check your connection, then try again.</p>
+                  <Button onClick={() => refetch()}>Try again</Button>
+                </div>
+              ) : sortedProducts.length === 0 ? (
+                <div className="catalog-empty-state">
+                  <div className="catalog-empty-weave" aria-hidden="true"><span /><span /><span /><span /><span /></div>
+                  <p className="catalog-eyebrow">{hasActiveFilters ? 'No pieces found' : 'The shelf is being set'}</p>
+                  <h3>{selectedCategory && !searchQuery && !selectedSubcategory && !priceRange.min && !priceRange.max && genderTab === 'all' && !selectedCountry
+                    ? `No ${categories.find(item => item.id === selectedCategory)?.name ?? 'category'} pieces yet.`
+                    : hasActiveFilters ? 'Nothing in this edit just yet.' : 'The collection is taking shape.'}</h3>
+                  <p>{hasActiveFilters ? 'There are no approved pieces matching this selection right now. Try another category or clear your filters.' : 'There are no approved pieces to browse right now. Check back as makers add their work.'}</p>
+                  {hasActiveFilters && <Button onClick={clearFilters}>Show all pieces</Button>}
+                </div>
+              ) : (
+                <div className="catalog-product-grid">
+                  {sortedProducts.map(product => <ProductCard key={product.id} product={product} />)}
+                </div>
+              )}
+              {!isLoading && !isError && sortedProducts.length > 0 && <p className="catalog-endnote">Showing all {sortedProducts.length} available {sortedProducts.length === 1 ? 'piece' : 'pieces'} in this view</p>}
+            </div>
+          </div>
+        </section>
+      </main>
       <ShoppingCart />
     </div>
   );

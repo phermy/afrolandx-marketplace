@@ -69,7 +69,7 @@ export function FitScoreBadge({ productId }: { productId: number }) {
           <div className="text-sm">
             <p className="font-medium">{data.recommendation}</p>
             <p className="text-muted-foreground">
-              Based on {data.totalReviews} customer reviews
+              Based on {data.totalReviews} customer {data.totalReviews === 1 ? "review" : "reviews"}
             </p>
           </div>
         </TooltipContent>

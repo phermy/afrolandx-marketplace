@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { isUnauthorizedError } from '@/lib/authUtils';
+import { trackEvent } from '@/lib/analytics';
 import type { CartItem, Product } from '@/types';
 
 interface CartContextType {
@@ -14,7 +15,7 @@ interface CartContextType {
   isUpdatingQuantity: boolean;
   isRemovingFromCart: boolean;
   isClearingCart: boolean;
-  addToCart: (productId: number, quantity?: number) => void;
+  addToCart: (productId: number, quantity?: number, selectedSize?: string) => void;
   removeFromCart: (cartItemId: number) => void;
   updateQuantity: (cartItemId: number, quantity: number) => void;
   clearCart: () => void;
@@ -37,8 +38,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Add to cart mutation with optimistic updates
   const addToCartMutation = useMutation({
-    mutationFn: async ({ productId, quantity = 1 }: { productId: number; quantity?: number }) => {
-      const response = await apiRequest('POST', '/api/cart', { productId, quantity });
+    mutationFn: async ({ productId, quantity = 1, selectedSize }: { productId: number; quantity?: number; selectedSize?: string }) => {
+      const response = await apiRequest('POST', '/api/cart', { productId, quantity, selectedSize });
       return response;
     },
     onMutate: async ({ productId, quantity = 1 }) => {
@@ -50,9 +51,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       return { previousCart };
     },
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      trackEvent('cart_item_added', {
+        product_id: variables.productId,
+        quantity: variables.quantity ?? 1,
+        has_size: Boolean(variables.selectedSize),
+      });
       
       toast({
         title: 'Added to cart',
@@ -187,8 +193,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const cartCount = cartItems.reduce((count: number, item: any) => count + item.quantity, 0);
 
   // Cart actions
-  const addToCart = (productId: number, quantity = 1) => {
-    addToCartMutation.mutate({ productId, quantity });
+  const addToCart = (productId: number, quantity = 1, selectedSize?: string) => {
+    addToCartMutation.mutate({ productId, quantity, selectedSize });
   };
 
   const updateQuantity = (cartItemId: number, quantity: number) => {

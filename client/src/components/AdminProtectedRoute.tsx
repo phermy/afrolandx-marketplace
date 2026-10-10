@@ -21,7 +21,7 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
     }
     if (!isAdmin(user)) {
       toast({
-        title: 'Access Denied',
+        title: 'Access denied',
         description: 'You do not have admin privileges to access this area.',
         variant: 'destructive',
       });
@@ -43,7 +43,7 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
         <div className="text-center">
           <div className="spinner-nigerian mb-4"></div>
           <p className="text-gray-600">
-            {!isAuthenticated ? 'Redirecting to sign in...' : 'Access denied. Redirecting...'}
+            {!isAuthenticated ? 'Redirecting to sign in…' : 'Access denied. Redirecting…'}
           </p>
         </div>
       </div>

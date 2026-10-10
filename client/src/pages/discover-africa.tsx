@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { Fragment, useEffect, useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -36,67 +36,69 @@ interface Place {
   photoUri?: string;
 }
 
-// ─── Country images via loremflickr keyword search (HTTP 302→200, browser follows) ──
-function lf(keywords: string, seed: number) {
-  return `https://loremflickr.com/1200/600/${encodeURIComponent(keywords)}/all?lock=${seed}`;
-}
-
+// ─── Curated country hero images — direct CDN URLs, verified to load ──────────
 const COUNTRY_IMAGES: Record<string, string> = {
-  NG: lf("Lagos,Nigeria,skyline", 1),
-  EG: lf("Egypt,pyramids,cairo", 2),
-  ZA: lf("Cape Town,South Africa,mountain", 3),
-  KE: lf("Kenya,Nairobi,savanna,Africa", 4),
-  MA: lf("Morocco,Marrakech,medina", 5),
-  GH: lf("Ghana,Accra,Africa,coast", 6),
-  ET: lf("Ethiopia,Addis Ababa,Africa", 7),
-  TZ: lf("Tanzania,Zanzibar,Kilimanjaro", 8),
-  SN: lf("Senegal,Dakar,West Africa", 9),
-  UG: lf("Uganda,Kampala,Africa", 10),
-  RW: lf("Rwanda,Kigali,Africa", 11),
-  ZW: lf("Zimbabwe,Victoria Falls,Africa", 12),
-  NA: lf("Namibia,desert,dunes,Africa", 13),
-  ZM: lf("Zambia,Victoria Falls,Africa", 14),
-  BW: lf("Botswana,Okavango,Africa,elephant", 15),
-  TN: lf("Tunisia,Carthage,Mediterranean", 16),
-  DZ: lf("Algeria,Sahara,desert,Algeria", 17),
-  CI: lf("Ivory Coast,Abidjan,Africa", 18),
-  CM: lf("Cameroon,Africa,tropical", 19),
-  ML: lf("Mali,Timbuktu,Sahel,Africa", 20),
-  MZ: lf("Mozambique,Africa,coast,ocean", 21),
-  AO: lf("Angola,Luanda,Africa", 22),
-  MG: lf("Madagascar,Africa,tropical,island", 23),
-  CD: lf("Congo,Africa,rainforest,river", 24),
-  SD: lf("Sudan,Nile,Africa,ancient", 25),
-  LY: lf("Libya,Sahara,North Africa,ruins", 26),
-  NE: lf("Niger,Sahel,Africa,landscape", 27),
-  BF: lf("Burkina Faso,West Africa,savanna", 28),
-  BJ: lf("Benin,West Africa,Africa,market", 29),
-  TG: lf("Togo,Lome,West Africa,coast", 30),
-  SL: lf("Sierra Leone,Africa,coast,jungle", 31),
-  LR: lf("Liberia,West Africa,jungle,ocean", 32),
-  GN: lf("Guinea,West Africa,Africa,tropical", 33),
-  GW: lf("Guinea Bissau,Africa,tropical,ocean", 34),
-  GM: lf("Gambia,West Africa,river,beach", 35),
-  SS: lf("South Sudan,Africa,Nile,landscape", 36),
-  ER: lf("Eritrea,Africa,Red Sea,coast", 37),
-  SO: lf("Somalia,Africa,Mogadishu,coast", 38),
-  DJ: lf("Djibouti,Africa,Red Sea", 39),
-  CF: lf("Central Africa,tropical,rainforest", 40),
-  CG: lf("Congo Brazzaville,Africa,rainforest", 41),
-  GA: lf("Gabon,Africa,rainforest,ocean", 42),
-  GQ: lf("Equatorial Guinea,Africa,forest", 43),
-  TD: lf("Chad,Africa,Sahara,lake", 44),
-  MR: lf("Mauritania,Sahara,desert,Africa", 45),
-  LS: lf("Lesotho,South Africa,mountains", 46),
-  SZ: lf("Eswatini,Swaziland,Africa,landscape", 47),
-  MU: lf("Mauritius,island,tropical,lagoon", 48),
-  SC: lf("Seychelles,island,tropical,beach", 49),
-  KM: lf("Comoros,Africa,island,ocean", 50),
-  ST: lf("Sao Tome,Africa,tropical,island", 51),
-  CV: lf("Cape Verde,Africa,island,coast", 52),
+  // West Africa
+  NG: "https://images.pexels.com/photos/32656347/pexels-photo-32656347/free-photo-of-aerial-view-of-lagos-cityscape-with-ocean-horizon.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GH: "https://afar.brightspotcdn.com/dims4/default/bfebf58/2147483647/strip/true/crop/942x628+1+0/resize/900x600!/quality/90/?url=https://k3-prod-afar-media.s3.us-west-2.amazonaws.com/brightspot/4d/6f/d3d36fb519b32a9ce941bbb6dac1/original-ghana.png",
+  SN: "https://images.squarespace-cdn.com/content/v1/58b6c5e186e6c03c6630b232/1537527043488-PDCJGSYUYO7QYKCSXKHH/YOFF_New_04.jpg",
+  CI: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BJ: "https://images.pexels.com/photos/1252983/pexels-photo-1252983.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TG: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GN: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GM: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LR: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SL: "https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BF: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ML: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  NE: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MR: "https://images.pexels.com/photos/1303081/pexels-photo-1303081.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // North Africa
+  EG: "https://images.pexels.com/photos/3689859/pexels-photo-3689859.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MA: "https://images.pexels.com/photos/3889843/pexels-photo-3889843.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TN: "https://images.pexels.com/photos/3889826/pexels-photo-3889826.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  DZ: "https://images.pexels.com/photos/3184311/pexels-photo-3184311.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LY: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SD: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // East Africa
+  KE: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ET: "https://images.pexels.com/photos/3889843/pexels-photo-3889843.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TZ: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  UG: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  RW: "https://images.pexels.com/photos/36470681/pexels-photo-36470681/free-photo-of-aerial-view-of-kigali-city-in-the-lush-green-hills-of-rwanda.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SS: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ER: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SO: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  DJ: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Southern Africa
+  ZA: "https://images.locationscout.net/2017/11/tafelberg-table-mountain-cape-town-south-africa-kiki.webp?h=1400&q=80",
+  ZW: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ZM: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  BW: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  NA: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MZ: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  AO: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  LS: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SZ: "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Central Africa
+  CD: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CF: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CG: "https://images.pexels.com/photos/931018/pexels-photo-931018.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GA: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GQ: "https://images.pexels.com/photos/2064827/pexels-photo-2064827.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CM: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  TD: "https://images.pexels.com/photos/2693208/pexels-photo-2693208.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  // Islands
+  MG: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  MU: "https://images.pexels.com/photos/1591382/pexels-photo-1591382.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  SC: "https://images.pexels.com/photos/1252983/pexels-photo-1252983.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  CV: "https://images.pexels.com/photos/1033729/pexels-photo-1033729.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  KM: "https://images.pexels.com/photos/1007657/pexels-photo-1007657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  ST: "https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=1200",
+  GW: "https://images.pexels.com/photos/1533720/pexels-photo-1533720.jpeg?auto=compress&cs=tinysrgb&w=1200",
 };
 
-const COUNTRY_FALLBACK = lf("Africa,savanna,landscape,wildlife", 99);
+const COUNTRY_FALLBACK = "https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
 function getCountryImage(code: string): string {
   return COUNTRY_IMAGES[code] || COUNTRY_FALLBACK;
@@ -187,7 +189,7 @@ function PlaceDetailsDialog({ place, open, onClose }: { place: Place | null; ope
         <ScrollArea className="max-h-[calc(90vh-192px)]">
           <div className="p-5 space-y-3">
             {place.editorialSummary?.text && (
-              <p className="text-muted-foreground text-sm leading-relaxed">{place.editorialSummary.text}</p>
+              <p className="reading-copy text-muted-foreground text-sm leading-relaxed">{place.editorialSummary.text}</p>
             )}
             <div className="space-y-2">
               <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-xl">
@@ -412,16 +414,15 @@ function BookingDialog({ deal, open, onClose }: { deal: DealInfo | null; open: b
   const bookMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/discover/bookings/initialize", {
-        dealTitle: deal!.title, dealType: deal!.type,
+        dealTitle: deal!.title,
         guestName: name, guestEmail: email, guestCount: guests,
-        bookingDate: date, totalAmountNgn: total,
+        bookingDate: date,
       });
       return res.json();
     },
     onSuccess: (data) => {
       if (data.authorizationUrl) {
-        window.open(data.authorizationUrl, "_blank");
-        setDone(true);
+        window.location.assign(data.authorizationUrl);
       }
     },
     onError: () => toast({ title: "Booking failed", description: "Please try again.", variant: "destructive" }),
@@ -686,8 +687,7 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
     },
     onSuccess: (data) => {
       if (data.authorizationUrl) {
-        window.open(data.authorizationUrl, "_blank");
-        setDone(true);
+        window.location.assign(data.authorizationUrl);
       }
     },
     onError: () => toast({ title: "Payment failed", description: "Please try again.", variant: "destructive" }),
@@ -702,7 +702,7 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
             <Badge className="bg-yellow-400 text-yellow-900 border-0 font-bold">Premium</Badge>
           </div>
           <h2 className="text-2xl font-black text-white mb-1">AfrolandX Explorer Premium</h2>
-          <p className="text-white/75 text-sm">₦2,500/month · Cancel anytime · 7-day free trial</p>
+          <p className="text-white/75 text-sm">₦2,500 for one month · Renew when you choose</p>
         </div>
         <div className="p-5">
           {done ? (
@@ -743,9 +743,9 @@ function PremiumDialog({ open, onClose }: { open: boolean; onClose: () => void }
                   disabled={!email || subscribeMutation.isPending}
                   onClick={() => subscribeMutation.mutate()}
                 >
-                  {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Start Free Trial — ₦2,500/mo</>}
+                  {subscribeMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Crown className="h-4 w-4 mr-2" />Buy one month — ₦2,500</>}
                 </Button>
-                <p className="text-xs text-center text-gray-400">Secure payment via Paystack · No charge during 7-day trial</p>
+                <p className="text-xs text-center text-gray-400">One payment, securely processed by Paystack</p>
               </div>
             </>
           )}
@@ -768,7 +768,7 @@ function GuideLearnMoreDialog({ open, onClose, onRegister }: { open: boolean; on
           <div className="space-y-4 pr-2">
             {[
               { step: "1", title: "Register & Get Verified", body: "Submit your application with your city, specialties, and languages. Our team verifies guides within 3 business days." },
-              { step: "2", title: "Create Your Tours", body: "Build custom tour packages — street food walks, cultural visits, market tours, nightlife guides, or anything unique to your city." },
+              { step: "2", title: "Create Your Tours", body: "Build custom tour packages, including street food walks, cultural visits, market tours, nightlife guides, or anything unique to your city." },
               { step: "3", title: "Accept Bookings", body: "Travellers book directly through AfrolandX. You receive confirmed bookings with guest details and payment guaranteed upfront." },
               { step: "4", title: "Earn & Grow", body: "Keep 85% of every booking fee. AfrolandX takes 15% to cover platform, insurance, and marketing. Build reviews to command higher prices." },
             ].map(s => (
@@ -798,6 +798,7 @@ function GuideLearnMoreDialog({ open, onClose, onRegister }: { open: boolean; on
 }
 
 export default function DiscoverAfrica() {
+  const { toast } = useToast();
   // ── Discovery state ───────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -814,11 +815,41 @@ export default function DiscoverAfrica() {
   const [showPremium, setShowPremium] = useState(false);
   const [showGuideLearnMore, setShowGuideLearnMore] = useState(false);
 
-  const selectedCountry = africaLocations[selectedCountryCode];
+  const selectedCountry = africaLocations[selectedCountryCode] || africaLocations.NG || Object.values(africaLocations)[0];
   const selectedCity = useMemo(() => {
     if (!selectedCityName) return selectedCountry.cities[0];
     return selectedCountry.cities.find(c => c.name === selectedCityName) || selectedCountry.cities[0];
   }, [selectedCountry, selectedCityName]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("booking_ref") || params.get("premium_ref");
+    if (!reference) return;
+
+    let cancelled = false;
+    apiRequest("POST", "/api/discover/payment/verify", { reference })
+      .then(response => response.json())
+      .then(result => {
+        if (cancelled) return;
+        toast({
+          title: result.type === "booking" ? "Booking confirmed" : "Premium activated",
+          description: result.type === "booking"
+            ? "Your payment was verified and your booking is confirmed."
+            : "Your one-month Premium access is now active.",
+        });
+        window.history.replaceState({}, "", "/discover");
+      })
+      .catch(error => {
+        if (cancelled) return;
+        toast({
+          title: "Payment verification pending",
+          description: error instanceof Error ? error.message : "We could not verify this payment yet. Please try again.",
+          variant: "destructive",
+        });
+      });
+
+    return () => { cancelled = true; };
+  }, [toast]);
 
   // Filtered country list by region tab
   const filteredCountries = useMemo(() => {
@@ -1078,8 +1109,8 @@ export default function DiscoverAfrica() {
                 /* Masonry-style grid */
                 <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                   {places.map((place, idx) => (
-                    <>
-                      <div key={place.id} className="break-inside-avoid mb-4">
+                    <Fragment key={place.id}>
+                      <div className="break-inside-avoid mb-4">
                         <PlaceCard
                           place={place}
                           tall={idx % 5 === 0}
@@ -1088,7 +1119,7 @@ export default function DiscoverAfrica() {
                       </div>
                       {/* ══ REVENUE STREAM 3: "Claim Your Business" inline ad (every 8th card) ══ */}
                       {idx > 0 && (idx + 1) % 8 === 0 && (
-                        <div key={`claim-${idx}`} className="break-inside-avoid mb-4">
+                        <div className="break-inside-avoid mb-4">
                           <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 flex flex-col items-center text-center cursor-pointer hover:border-emerald-500 hover:shadow-lg transition-all group">
                             <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
                               <Building2 className="h-6 w-6 text-emerald-600" />
@@ -1115,7 +1146,7 @@ export default function DiscoverAfrica() {
                           </div>
                         </div>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </div>
               ) : null}
@@ -1140,7 +1171,7 @@ export default function DiscoverAfrica() {
           <div className="relative rounded-2xl overflow-hidden mb-6 cursor-pointer group shadow-xl hover:shadow-2xl transition-all">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600" />
             <img
-              src={lf("Nigeria,Lagos,Africa,culture", 42)}
+              src="https://images.pexels.com/photos/32656347/pexels-photo-32656347/free-photo-of-aerial-view-of-lagos-cityscape-with-ocean-horizon.jpeg?auto=compress&cs=tinysrgb&w=1200"
               alt="Featured Destination"
               className="absolute inset-0 w-full h-full object-cover opacity-40"
               style={{ opacity: 0 }}
@@ -1158,7 +1189,7 @@ export default function DiscoverAfrica() {
                 </div>
                 <h3 className="text-2xl font-black text-white mb-1">🇳🇬 Discover Nigeria</h3>
                 <p className="text-white/80 text-sm mb-3">
-                  From Lagos's vibrant nightlife to Abuja's modern skyline and Calabar's cultural festivals — Nigeria is calling.
+                  From Lagos's vibrant nightlife to Abuja's modern skyline and Calabar's cultural festivals. Nigeria is calling.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["🏙️ Lagos", "🏛️ Abuja", "🎭 Calabar", "🌊 Port Harcourt"].map(tag => (
@@ -1183,7 +1214,7 @@ export default function DiscoverAfrica() {
             <span
               className="font-semibold text-emerald-600 cursor-pointer hover:underline"
               onClick={() => setInquiryType("destination_feature")}
-            >Feature your country or city here</span> — reach 50,000+ monthly travellers.
+            >Feature your country or city here</span> to reach 50,000+ monthly travellers.
           </p>
 
           {/* Region tabs */}
@@ -1265,7 +1296,7 @@ export default function DiscoverAfrica() {
         <div className="mt-14 rounded-3xl overflow-hidden shadow-2xl relative">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-600" />
           <img
-            src={lf("Africa,guide,tour,culture,people", 77)}
+            src="https://images.pexels.com/photos/1387577/pexels-photo-1387577.jpeg?auto=compress&cs=tinysrgb&w=1200"
             alt="Local Guides"
             className="absolute inset-0 w-full h-full object-cover"
             style={{ opacity: 0 }}
@@ -1280,7 +1311,7 @@ export default function DiscoverAfrica() {
               <p className="text-white/80 text-base mb-6 leading-relaxed">
                 Are you a local in Lagos, Nairobi, Cairo, Cape Town or any African city? 
                 Register as an AfrolandX Expert Guide and earn by showing visitors the real, 
-                authentic side of your city — street food, hidden markets, cultural tours and more.
+                authentic side of your city, including street food, hidden markets, cultural tours and more.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
                 {[
@@ -1329,13 +1360,13 @@ export default function DiscoverAfrica() {
                 AfrolandX Explorer Premium
               </h2>
               <p className="text-white/70 text-sm mb-6 max-w-xl">
-                Unlock the full power of AfrolandX Discover — curated city guides, exclusive deals, 
+                Unlock the full power of AfrolandX Discover with curated city guides, exclusive deals,
                 offline access and priority support for travellers who want more.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
                 {[
                   { icon: <Sparkles className="h-5 w-5 text-yellow-400" />, title: "Curated City Guides", desc: "Expert-written guides for 20+ African cities" },
-                  { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Members-Only Deals", desc: "Exclusive discounts you won't find anywhere else" },
+                  { icon: <BadgePercent className="h-5 w-5 text-rose-400" />, title: "Exclusive Member Deals", desc: "Exclusive discounts you won't find anywhere else" },
                   { icon: <TrendingUp className="h-5 w-5 text-emerald-400" />, title: "Trending Alerts", desc: "Get notified when hot new places open nearby" },
                   { icon: <Star className="h-5 w-5 text-sky-400" />, title: "Priority Listings", desc: "Your business listed at the top of every search" },
                 ].map(f => (
@@ -1351,7 +1382,7 @@ export default function DiscoverAfrica() {
                   className="bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl px-8 py-5 text-base shadow-xl"
                   onClick={() => setShowPremium(true)}
                 >
-                  <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium — ₦2,500/mo
+                  <Crown className="h-4 w-4 mr-2" /> Upgrade to Premium for ₦2,500/mo
                 </Button>
                 <div className="text-white/60 text-xs">
                   Cancel anytime · 7-day free trial
